@@ -1,0 +1,20 @@
+{
+  "menu_file": "File",
+  "menu_settings": "Settings",
+  "menu_language": "Language",
+  "menu_open_workspace": "Open Workspace…",
+  "menu_save": "Save",
+  "no_workspace_open": "No workspace open.",
+  "no_document_selected": "No document open.",
+  "preview_title": "Preview",
+  "refresh_diagrams": "Refresh diagrams",
+  "rendering": "Rendering...",
+  "no_preview": "(No preview)",
+  "downloading_plantuml": "⬇ Downloading PlantUML JAR...",
+  "plantuml_installed": "✅ PlantUML installed. Refreshing preview...",
+  "download_error": "❌ Download error: ",
+  "workspace_title": "Workspace",
+  "view_mode_preview": "Preview",
+  "view_mode_code": "Code",
+  "view_mode_split": "Split"
+}
