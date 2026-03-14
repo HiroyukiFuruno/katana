@@ -66,10 +66,6 @@ docs/blog
 .serena
 openspec
 
-# Obsidian personal settings
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/hotkeys.json
-.obsidian/appearance.json
-.obsidian/community-plugins.json
-.obsidian/plugins/
+# Obsidian
+.obsidian/
+docs/obsidian.md
