@@ -94,9 +94,17 @@ pub enum DiagramValidationError {
 pub enum DiagramResult {
     /// Successfully rendered HTML/SVG fragment.
     Ok(String),
+    /// Successfully rendered as PNG bytes (e.g. mmdc output).
+    OkPng(Vec<u8>),
     /// Rendering failed; preserve the original source for fallback display.
     Err { source: String, error: String },
-    /// Required runtime tool is not installed.
+    /// Required command line tool is not found.
+    CommandNotFound {
+        tool_name: String,
+        install_hint: String,
+        source: String,
+    },
+    /// Required runtime tool is not installed (supports auto-download).
     NotInstalled {
         /// 表示名（"PlantUML" 等）。
         kind: String,

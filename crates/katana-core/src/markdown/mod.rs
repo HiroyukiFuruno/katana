@@ -119,7 +119,14 @@ fn render_diagram_block<R: DiagramRenderer>(block: &FenceBlock, renderer: &R) ->
     };
     Some(match renderer.render(&diagram) {
         DiagramResult::Ok(html) => html,
+        // OkPng は UI 層で直接 RGBA に変換される。core 層ではプレースホルダーのみ。
+        DiagramResult::OkPng(_) => String::new(),
         DiagramResult::Err { source, error } => fallback_html(&source, &error),
+        DiagramResult::CommandNotFound {
+            tool_name,
+            install_hint,
+            ..
+        } => fallback_html("", &format!("{tool_name} not found. {install_hint}")),
         // core 層では「未インストール」をフォールバック HTML として表示する。
         // UI 層の RenderedSection::NotInstalled で適切なダウンロード UI が描画される。
         DiagramResult::NotInstalled { kind, .. } => {

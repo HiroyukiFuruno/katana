@@ -18,10 +18,31 @@ use tempfile::NamedTempFile;
 use super::diagram::{DiagramBlock, DiagramResult};
 
 /// 使用する `mmdc` バイナリパスを解決する。
+///
+/// 1. `MERMAID_MMDC` 環境変数が設定されていればそれを使う。
+/// 2. ログインシェル経由で `which mmdc` を実行し、nvm 等のパスも含めて探す。
+///    GUI アプリはシェルの PATH を引き継がないため、`sh -l -c` でログインシェルを使う。
+/// 3. どちらも見つからなければフォールバックとして `mmdc` を返す。
 fn resolve_mmdc_binary() -> PathBuf {
     if let Ok(env_path) = std::env::var("MERMAID_MMDC") {
         return PathBuf::from(env_path);
     }
+
+    // ログインシェル経由で実パスを解決する（nvm, volta 等に対応）。
+    if let Ok(output) = Command::new("sh")
+        .args(["-l", "-c", "which mmdc"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return PathBuf::from(path);
+            }
+        }
+    }
+
     PathBuf::from("mmdc")
 }
 
@@ -36,16 +57,20 @@ pub fn is_mmdc_available() -> bool {
         .unwrap_or(false)
 }
 
-/// Mermaid ソースを SVG に変換する。
+/// Mermaid ソースを PNG に変換する。
+///
+/// mmdc (Puppeteer/Chrome ベース) で PNG をレンダリングすることで
+/// resvg の `<foreignObject>` 非対応を回避する。
 pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     if !is_mmdc_available() {
-        return DiagramResult::Err {
+        return DiagramResult::CommandNotFound {
+            tool_name: "mmdc (Mermaid CLI)".to_string(),
+            install_hint: "`npm install -g @mermaid-js/mermaid-cli`".to_string(),
             source: block.source.clone(),
-            error: "mmdc (Mermaid CLI) が見つかりません。`npm install -g @mermaid-js/mermaid-cli` でインストールしてください。".to_string(),
         };
     }
     match run_mmdc_process(&block.source) {
-        Ok(svg) => DiagramResult::Ok(svg_to_html_fragment(&svg)),
+        Ok(png_bytes) => DiagramResult::OkPng(png_bytes),
         Err(e) => DiagramResult::Err {
             source: block.source.clone(),
             error: e,
@@ -53,13 +78,14 @@ pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// 一時ファイルを介して mmdc を実行し SVG を返す。
+/// 一時ファイルを介して mmdc を実行し PNG バイト列を返す。
 ///
-/// mmdc は stdin パイプを直接サポートしないため、
-/// 入力を一時ファイルに書き出し、出力先も一時ファイルとして指定する。
-fn run_mmdc_process(source: &str) -> Result<String, String> {
+/// PNG 出力により mmdc (Puppeteer) がすべての SVG 要素を正しくレンダリングする。
+/// resvg が非対応の `<foreignObject>` によるテキスト消失を回避できる。
+fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     let input_file = create_input_file(source)?;
-    let output_path = input_file.path().with_extension("svg");
+    // mmdc は出力ファイルの拡張子で形式を判断する。
+    let output_path = input_file.path().with_extension("png");
 
     let status = Command::new(resolve_mmdc_binary())
         .args([
@@ -81,7 +107,7 @@ fn run_mmdc_process(source: &str) -> Result<String, String> {
     if !status.success() {
         return Err("mmdc がゼロ以外の終了コードを返しました".to_string());
     }
-    std::fs::read_to_string(&output_path).map_err(|e| format!("SVG 読み込み失敗: {e}"))
+    std::fs::read(&output_path).map_err(|e| format!("PNG 読み込み失敗: {e}"))
 }
 
 /// Mermaid ソースを一時ファイルに書き出す。
@@ -91,11 +117,6 @@ fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
     file.write_all(source.as_bytes())
         .map_err(|e| format!("一時ファイル書き込み失敗: {e}"))?;
     Ok(file)
-}
-
-/// SVG テキストをプレビュー埋め込み用の HTML フラグメントに変換する。
-fn svg_to_html_fragment(svg: &str) -> String {
-    format!(r#"<div class="katana-diagram mermaid">{svg}</div>"#)
 }
 
 #[cfg(test)]
@@ -112,7 +133,7 @@ mod tests {
             source: "graph TD; A-->B".to_string(),
         };
         let result = render_mermaid(&block);
-        assert!(matches!(result, DiagramResult::Err { .. }));
+        assert!(matches!(result, DiagramResult::CommandNotFound { .. }));
         // テスト後に環境変数を戻す。
         std::env::remove_var("MERMAID_MMDC");
     }
@@ -132,6 +153,6 @@ mod tests {
             source: "graph TD; A-->B".to_string(),
         };
         let result = render_mermaid(&block);
-        assert!(matches!(result, DiagramResult::Ok(_)));
+        assert!(matches!(result, DiagramResult::OkPng(_)));
     }
 }

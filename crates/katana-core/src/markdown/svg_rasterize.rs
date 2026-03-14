@@ -32,6 +32,8 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
     let width = ((size.width() * scale) as u32).max(1);
     let height = ((size.height() * scale) as u32).max(1);
     let mut pixmap = Pixmap::new(width, height).ok_or(SvgRasterizeError::PixmapAllocationFailed)?;
+    // SVG コンテンツがダーク背景で消えないよう、レンダリング前に白で塗りつぶす。
+    pixmap.fill(tiny_skia::Color::WHITE);
     let transform = tiny_skia::Transform::from_scale(scale, scale);
     render(&tree, transform, &mut pixmap.as_mut());
     Ok(RasterizedSvg {

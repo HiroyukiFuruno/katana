@@ -77,10 +77,33 @@ fn estimate_canvas_size(cells: &[&Element]) -> (f64, f64) {
 
 /// SVG 文書全体を組み立てる。
 fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
+    // セル ID → (x, y, w, h) のマップを構築する。
+    let mut geo_map: std::collections::HashMap<String, (f64, f64, f64, f64)> =
+        std::collections::HashMap::new();
+    for cell in cells {
+        if let (Some(id), Some(geo)) = (cell.attributes.get("id"), cell.get_child("mxGeometry")) {
+            let is_vertex = cell
+                .attributes
+                .get("vertex")
+                .map(|v| v == "1")
+                .unwrap_or(false);
+            if is_vertex {
+                let x = attr_f64(geo, "x");
+                let y = attr_f64(geo, "y");
+                let w = attr_f64(geo, "width").max(1.0);
+                let h = attr_f64(geo, "height").max(1.0);
+                geo_map.insert(id.clone(), (x, y, w, h));
+            }
+        }
+    }
     let mut shapes = String::new();
     let mut labels = String::new();
+    // SVG 矢印マーカーを定義する。
+    shapes.push_str(
+        "<defs><marker id=\"katana-arrow\" markerWidth=\"8\" markerHeight=\"6\" refX=\"8\" refY=\"3\" orient=\"auto\"><polygon points=\"0 0, 8 3, 0 6\" fill=\"#555555\"/></marker></defs>"
+    );
     for cell in cells {
-        render_cell(cell, &mut shapes, &mut labels);
+        render_cell(cell, &mut shapes, &mut labels, &geo_map);
     }
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">{shapes}{labels}</svg>"#
@@ -88,7 +111,12 @@ fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
 }
 
 /// 単一の `<mxCell>` を shapes/labels バッファに書き出す。
-fn render_cell(cell: &Element, shapes: &mut String, labels: &mut String) {
+fn render_cell(
+    cell: &Element,
+    shapes: &mut String,
+    labels: &mut String,
+    geo_map: &std::collections::HashMap<String, (f64, f64, f64, f64)>,
+) {
     let is_vertex = cell
         .attributes
         .get("vertex")
@@ -102,7 +130,7 @@ fn render_cell(cell: &Element, shapes: &mut String, labels: &mut String) {
     if is_vertex {
         render_vertex(cell, shapes, labels);
     } else if is_edge {
-        render_edge(cell, shapes);
+        render_edge(cell, shapes, geo_map);
     }
 }
 
@@ -150,11 +178,129 @@ fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
     append_label(cell, cx, cy, labels);
 }
 
-/// エッジセルを SVG 直線として描画する（簡易: mxGeometry の Array を無視）。
-fn render_edge(cell: &Element, shapes: &mut String) {
-    // MVP: Array（ポイント列）は非対応。直線として描画。
-    // ソースとターゲットは親セルの mxGeometry から取得できないため省略。
-    let _ = (cell, shapes);
+/// エッジセルを矢印付き折れ線（ポリライン）として描画する。
+///
+/// ソース・ターゲットの矩形ボーダー上の最近点を接続点とし、
+/// `mxGeometry` 内の `Array` 要素に含まれる `mxPoint` 中間点も経由する。
+fn render_edge(
+    cell: &Element,
+    shapes: &mut String,
+    geo_map: &std::collections::HashMap<String, (f64, f64, f64, f64)>,
+) {
+    let src_id = match cell.attributes.get("source") {
+        Some(id) => id.as_str(),
+        None => return,
+    };
+    let tgt_id = match cell.attributes.get("target") {
+        Some(id) => id.as_str(),
+        None => return,
+    };
+    let Some(&(sx, sy, sw, sh)) = geo_map.get(src_id) else {
+        return;
+    };
+    let Some(&(tx, ty, tw, th)) = geo_map.get(tgt_id) else {
+        return;
+    };
+
+    // 各ボックスの中心を求める。
+    let scx = sx + sw / 2.0;
+    let scy = sy + sh / 2.0;
+    let tcx = tx + tw / 2.0;
+    let tcy = ty + th / 2.0;
+
+    // mxGeometry 内の Array/mxPoint から中間ウェイポイントを収集する。
+    let waypoints = collect_waypoints(cell);
+
+    // 最初のウェイポイント（または最終ターゲット中心）への方向でソース接続点を算出する。
+    let first_target = waypoints.first().copied().unwrap_or((tcx, tcy));
+    let (x1, y1) = border_point(sx, sy, sw, sh, scx, scy, first_target.0, first_target.1);
+
+    // 最後のウェイポイント（またはソース中心）からの方向でターゲット接続点を算出する。
+    let last_source = waypoints.last().copied().unwrap_or((scx, scy));
+    let (x2, y2) = border_point(tx, ty, tw, th, tcx, tcy, last_source.0, last_source.1);
+
+    // ポリライン座標列を組み立てる。
+    let mut points_str = format!("{x1:.1},{y1:.1}");
+    for (wx, wy) in &waypoints {
+        points_str.push_str(&format!(" {wx:.1},{wy:.1}"));
+    }
+    points_str.push_str(&format!(" {x2:.1},{y2:.1}"));
+
+    shapes.push_str(&format!(
+        "<polyline points=\"{points_str}\" fill=\"none\" stroke=\"#555555\" stroke-width=\"1.5\" marker-end=\"url(#katana-arrow)\"/>"
+    ));
+
+    // エッジラベルがあれば中間地点に描画する。
+    if let Some(label) = cell.attributes.get("value") {
+        if !label.is_empty() {
+            let mid_x = (x1 + x2) / 2.0;
+            let mid_y = (y1 + y2) / 2.0 - 6.0;
+            const TEXT_COLOR: &str = "#333333";
+            shapes.push_str(&format!(
+                r#"<text x="{mid_x:.1}" y="{mid_y:.1}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="{TEXT_COLOR}">{}</text>"#,
+                xml_escape(label)
+            ));
+        }
+    }
+}
+
+/// mxGeometry 内の Array > mxPoint 要素からウェイポイント座標を収集する。
+fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
+    let Some(geo) = cell.get_child("mxGeometry") else {
+        return Vec::new();
+    };
+    let mut points = Vec::new();
+    for child in &geo.children {
+        let Some(el) = child.as_element() else {
+            continue;
+        };
+        if el.name == "Array" {
+            for pt_node in &el.children {
+                let Some(pt) = pt_node.as_element() else {
+                    continue;
+                };
+                if pt.name == "mxPoint" {
+                    let x = attr_f64(pt, "x");
+                    let y = attr_f64(pt, "y");
+                    points.push((x, y));
+                }
+            }
+        }
+    }
+    points
+}
+
+/// 矩形のボーダー上で、(fx, fy) から (tx, ty) への方向ベクトルに沿った接続点を返す。
+fn border_point(
+    rx: f64,
+    ry: f64,
+    rw: f64,
+    rh: f64,
+    cx: f64,
+    cy: f64,
+    tx: f64,
+    ty: f64,
+) -> (f64, f64) {
+    let dx = tx - cx;
+    let dy = ty - cy;
+    if dx.abs() < 0.001 && dy.abs() < 0.001 {
+        return (cx, cy);
+    }
+    if dx.abs() * rh >= dy.abs() * rw {
+        // 左右のボーダーに当たる
+        if dx >= 0.0 {
+            (rx + rw, cy + dy * (rw / 2.0) / dx.abs())
+        } else {
+            (rx, cy - dy * (rw / 2.0) / dx.abs())
+        }
+    } else {
+        // 上下のボーダーに当たる
+        if dy >= 0.0 {
+            (cx + dx * (rh / 2.0) / dy.abs(), ry + rh)
+        } else {
+            (cx - dx * (rh / 2.0) / dy.abs(), ry)
+        }
+    }
 }
 
 /// セルのラベルテキストを SVG <text> として追加する。
@@ -163,8 +309,11 @@ fn append_label(cell: &Element, cx: f64, cy: f64, labels: &mut String) {
         Some(v) if !v.is_empty() => v.as_str(),
         _ => return,
     };
+    // dy="0.35em" で垂直中央揃え（dominant-baseline は resvg が未サポートのため）。
+    // fill を明示指定しないと resvg がテキストをスキップする場合がある。
+    const TEXT_COLOR: &str = "#333333";
     labels.push_str(&format!(
-        r#"<text x="{cx}" y="{cy}" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12">{}</text>"#,
+        r#"<text x="{cx}" y="{cy}" dy="0.35em" text-anchor="middle" font-family="sans-serif" font-size="12" fill="{TEXT_COLOR}">{}</text>"#,
         xml_escape(label)
     ));
 }
