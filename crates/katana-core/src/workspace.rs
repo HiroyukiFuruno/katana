@@ -4,8 +4,13 @@ use thiserror::Error;
 /// An entry in the workspace project tree.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TreeEntry {
-    File { path: PathBuf },
-    Directory { path: PathBuf, children: Vec<TreeEntry> },
+    File {
+        path: PathBuf,
+    },
+    Directory {
+        path: PathBuf,
+        children: Vec<TreeEntry>,
+    },
 }
 
 impl TreeEntry {
@@ -94,15 +99,22 @@ mod tests {
 
     #[test]
     fn tree_entry_identifies_markdown_files() {
-        let md = TreeEntry::File { path: PathBuf::from("docs/spec.md") };
-        let rs = TreeEntry::File { path: PathBuf::from("src/main.rs") };
+        let md = TreeEntry::File {
+            path: PathBuf::from("docs/spec.md"),
+        };
+        let rs = TreeEntry::File {
+            path: PathBuf::from("src/main.rs"),
+        };
         assert!(md.is_markdown());
         assert!(!rs.is_markdown());
     }
 
     #[test]
     fn directory_entry_is_not_markdown() {
-        let dir = TreeEntry::Directory { path: PathBuf::from("docs"), children: vec![] };
+        let dir = TreeEntry::Directory {
+            path: PathBuf::from("docs"),
+            children: vec![],
+        };
         assert!(!dir.is_markdown());
         assert!(!dir.is_file());
     }

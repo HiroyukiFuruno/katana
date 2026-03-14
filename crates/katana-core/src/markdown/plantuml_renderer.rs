@@ -61,7 +61,12 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
 /// `java -jar plantuml.jar` を起動してソースを渡し SVG を返す。
 fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let mut child = Command::new("java")
-        .args(["-jar", jar.to_str().unwrap_or("plantuml.jar"), "-pipe", "-tsvg"])
+        .args([
+            "-jar",
+            jar.to_str().unwrap_or("plantuml.jar"),
+            "-pipe",
+            "-tsvg",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -71,10 +76,14 @@ fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     // stdin への書き込みは別スコープで drop して EOF を送る。
     {
         let stdin = child.stdin.as_mut().ok_or("stdin 取得失敗")?;
-        stdin.write_all(source.as_bytes()).map_err(|e| format!("stdin 書き込み失敗: {e}"))?;
+        stdin
+            .write_all(source.as_bytes())
+            .map_err(|e| format!("stdin 書き込み失敗: {e}"))?;
     }
 
-    let output = child.wait_with_output().map_err(|e| format!("プロセス待機失敗: {e}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("プロセス待機失敗: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         return Err(format!("PlantUML レンダリングエラー: {stderr}"));

@@ -3,11 +3,11 @@
 mod app_state;
 mod shell;
 
+use app_state::AppState;
 use katana_core::{
     ai::AiProviderRegistry,
-    plugin::{PluginMeta, PluginRegistry, PLUGIN_API_VERSION, ExtensionPoint},
+    plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API_VERSION},
 };
-use app_state::AppState;
 use shell::KatanaApp;
 
 fn main() -> eframe::Result<()> {

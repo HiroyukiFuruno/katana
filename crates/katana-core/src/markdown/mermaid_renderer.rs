@@ -77,15 +77,15 @@ fn run_mmdc_process(source: &str) -> Result<String, String> {
     if !status.success() {
         return Err("mmdc がゼロ以外の終了コードを返しました".to_string());
     }
-    std::fs::read_to_string(&output_path)
-        .map_err(|e| format!("SVG 読み込み失敗: {e}"))
+    std::fs::read_to_string(&output_path).map_err(|e| format!("SVG 読み込み失敗: {e}"))
 }
 
 /// Mermaid ソースを一時ファイルに書き出す。
 fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
     let mut file =
         NamedTempFile::with_suffix(".mmd").map_err(|e| format!("一時ファイル作成失敗: {e}"))?;
-    file.write_all(source.as_bytes()).map_err(|e| format!("一時ファイル書き込み失敗: {e}"))?;
+    file.write_all(source.as_bytes())
+        .map_err(|e| format!("一時ファイル書き込み失敗: {e}"))?;
     Ok(file)
 }
 

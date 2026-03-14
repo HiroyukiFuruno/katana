@@ -5,10 +5,7 @@
 //! through the update loop.
 
 use katana_core::{
-    ai::AiProviderRegistry,
-    document::Document,
-    plugin::PluginRegistry,
-    workspace::Workspace,
+    ai::AiProviderRegistry, document::Document, plugin::PluginRegistry, workspace::Workspace,
 };
 
 /// User-visible actions dispatched from UI components to the core update loop.
@@ -38,8 +35,8 @@ pub struct AppState {
     pub preview_error: Option<String>,
     /// AI provider registry.
     pub ai_registry: AiProviderRegistry,
-    /// Plugin registry.
-    pub plugin_registry: PluginRegistry,
+    /// Plugin registry（将来の Task 5.x でプラグインウィジェット統合時に参照する）。
+    pub _plugin_registry: PluginRegistry,
     /// Non-fatal status message for the status bar.
     pub status_message: Option<String>,
 }
@@ -52,14 +49,17 @@ impl AppState {
             preview_html: String::new(),
             preview_error: None,
             ai_registry,
-            plugin_registry,
+            _plugin_registry: plugin_registry,
             status_message: None,
         }
     }
 
     /// Whether the active document has unsaved changes.
     pub fn is_dirty(&self) -> bool {
-        self.active_document.as_ref().map(|d| d.is_dirty).unwrap_or(false)
+        self.active_document
+            .as_ref()
+            .map(|d| d.is_dirty)
+            .unwrap_or(false)
     }
 
     /// Whether the AI panel should be shown as available.

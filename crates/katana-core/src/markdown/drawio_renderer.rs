@@ -31,7 +31,7 @@ fn convert_xml_to_svg(xml: &str) -> Result<String, String> {
 }
 
 /// `<mxfile>` か `<mxGraphModel>` のどちらかから `<mxGraphModel>` 要素を返す。
-fn extract_graph_model<'a>(root: &'a Element) -> Result<&'a Element, String> {
+fn extract_graph_model(root: &Element) -> Result<&Element, String> {
     if root.name == "mxGraphModel" {
         return Ok(root);
     }
@@ -89,8 +89,16 @@ fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
 
 /// 単一の `<mxCell>` を shapes/labels バッファに書き出す。
 fn render_cell(cell: &Element, shapes: &mut String, labels: &mut String) {
-    let is_vertex = cell.attributes.get("vertex").map(|v| v == "1").unwrap_or(false);
-    let is_edge = cell.attributes.get("edge").map(|v| v == "1").unwrap_or(false);
+    let is_vertex = cell
+        .attributes
+        .get("vertex")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    let is_edge = cell
+        .attributes
+        .get("edge")
+        .map(|v| v == "1")
+        .unwrap_or(false);
     if is_vertex {
         render_vertex(cell, shapes, labels);
     } else if is_edge {
@@ -98,32 +106,48 @@ fn render_cell(cell: &Element, shapes: &mut String, labels: &mut String) {
     }
 }
 
-/// 頂点セルを SVG 図形として描画する。
-fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
-    let geo = match cell.get_child("mxGeometry") {
-        Some(g) => g,
-        None => return,
-    };
+/// 頂点の図形部分（rect/ellipse）を描画する。
+fn render_shape(geo: &Element, style: &str, shapes: &mut String) {
     let x = attr_f64(geo, "x");
     let y = attr_f64(geo, "y");
     let w = attr_f64(geo, "width").max(1.0);
     let h = attr_f64(geo, "height").max(1.0);
-    let style = cell.attributes.get("style").map(String::as_str).unwrap_or("");
     let fill = extract_style_value(style, "fillColor").unwrap_or("#fff2cc");
     let stroke = extract_style_value(style, "strokeColor").unwrap_or("#d6b656");
-
     if style.contains("ellipse") {
         shapes.push_str(&format!(
             r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>"#,
-            x + w / 2.0, y + h / 2.0, w / 2.0, h / 2.0
+            x + w / 2.0,
+            y + h / 2.0,
+            w / 2.0,
+            h / 2.0
         ));
     } else {
-        let rx = if style.contains("rounded=1") { "6" } else { "0" };
+        let rx = if style.contains("rounded=1") {
+            "6"
+        } else {
+            "0"
+        };
         shapes.push_str(&format!(
             r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>"#
         ));
     }
-    append_label(cell, x + w / 2.0, y + h / 2.0, labels);
+}
+
+/// 頂点セルを SVG 図形 + ラベルとして描画する。
+fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
+    let Some(geo) = cell.get_child("mxGeometry") else {
+        return;
+    };
+    let style = cell
+        .attributes
+        .get("style")
+        .map(String::as_str)
+        .unwrap_or("");
+    let cx = attr_f64(geo, "x") + attr_f64(geo, "width").max(1.0) / 2.0;
+    let cy = attr_f64(geo, "y") + attr_f64(geo, "height").max(1.0) / 2.0;
+    render_shape(geo, style, shapes);
+    append_label(cell, cx, cy, labels);
 }
 
 /// エッジセルを SVG 直線として描画する（簡易: mxGeometry の Array を無視）。
@@ -147,7 +171,10 @@ fn append_label(cell: &Element, cx: f64, cy: f64, labels: &mut String) {
 
 /// XML 属性を `f64` として取得する。存在しない場合は 0.0。
 fn attr_f64(el: &Element, name: &str) -> f64 {
-    el.attributes.get(name).and_then(|v| v.parse().ok()).unwrap_or(0.0)
+    el.attributes
+        .get(name)
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.0)
 }
 
 /// mxGraph スタイル文字列から `key=value` を取り出す。
@@ -160,7 +187,9 @@ fn extract_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
 
 /// SVG テキストノード用の最小限 XML エスケープ。
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]
@@ -212,7 +241,10 @@ mod tests {
     <mxGeometry x="50" y="50" width="100" height="100" as="geometry"/>
 </mxCell>
 </root></mxGraphModel>"#;
-        let block = DiagramBlock { kind: DiagramKind::DrawIo, source: xml.to_string() };
+        let block = DiagramBlock {
+            kind: DiagramKind::DrawIo,
+            source: xml.to_string(),
+        };
         let result = render_drawio(&block);
         if let DiagramResult::Ok(html) = result {
             assert!(html.contains("<ellipse"));
@@ -221,7 +253,10 @@ mod tests {
 
     #[test]
     fn spaceの抽出() {
-        assert_eq!(extract_style_value("rounded=1;fillColor=#fff;", "fillColor"), Some("#fff"));
+        assert_eq!(
+            extract_style_value("rounded=1;fillColor=#fff;", "fillColor"),
+            Some("#fff")
+        );
         assert_eq!(extract_style_value("rounded=1;", "fillColor"), None);
     }
 }

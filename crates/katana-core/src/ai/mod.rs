@@ -135,9 +135,15 @@ mod tests {
     struct DisabledProvider;
 
     impl AiProvider for DisabledProvider {
-        fn id(&self) -> &str { "disabled" }
-        fn display_name(&self) -> &str { "Disabled" }
-        fn is_available(&self) -> bool { false }
+        fn id(&self) -> &str {
+            "disabled"
+        }
+        fn display_name(&self) -> &str {
+            "Disabled"
+        }
+        fn is_available(&self) -> bool {
+            false
+        }
         fn execute(&self, _: &AiRequest) -> Result<AiResponse, AiError> {
             Err(AiError::NotConfigured)
         }
@@ -146,9 +152,15 @@ mod tests {
     struct EchoProvider;
 
     impl AiProvider for EchoProvider {
-        fn id(&self) -> &str { "echo" }
-        fn display_name(&self) -> &str { "Echo" }
-        fn is_available(&self) -> bool { true }
+        fn id(&self) -> &str {
+            "echo"
+        }
+        fn display_name(&self) -> &str {
+            "Echo"
+        }
+        fn is_available(&self) -> bool {
+            true
+        }
         fn execute(&self, req: &AiRequest) -> Result<AiResponse, AiError> {
             Ok(AiResponse {
                 content: req.prompt.clone(),
@@ -161,7 +173,10 @@ mod tests {
     fn registry_returns_not_configured_when_empty() {
         let registry = AiProviderRegistry::new();
         let req = AiRequest::new("hello");
-        assert!(matches!(registry.execute(&req), Err(AiError::NotConfigured)));
+        assert!(matches!(
+            registry.execute(&req),
+            Err(AiError::NotConfigured)
+        ));
     }
 
     #[test]
@@ -170,7 +185,10 @@ mod tests {
         registry.register(Box::new(DisabledProvider));
         registry.set_active("disabled");
         let req = AiRequest::new("hello");
-        assert!(matches!(registry.execute(&req), Err(AiError::NotConfigured)));
+        assert!(matches!(
+            registry.execute(&req),
+            Err(AiError::NotConfigured)
+        ));
     }
 
     #[test]

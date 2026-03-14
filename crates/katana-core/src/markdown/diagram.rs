@@ -48,7 +48,9 @@ impl DiagramBlock {
             DiagramKind::Mermaid => {
                 // Any non-empty source is accepted.
                 if self.source.trim().is_empty() {
-                    return Err(DiagramValidationError::EmptySource { kind: self.kind.display_name() });
+                    return Err(DiagramValidationError::EmptySource {
+                        kind: self.kind.display_name(),
+                    });
                 }
             }
             DiagramKind::PlantUml => {
@@ -134,13 +136,22 @@ mod tests {
 
     #[test]
     fn mermaid_kind_parsed() {
-        assert_eq!(DiagramKind::from_info("mermaid"), Some(DiagramKind::Mermaid));
-        assert_eq!(DiagramKind::from_info("Mermaid"), Some(DiagramKind::Mermaid));
+        assert_eq!(
+            DiagramKind::from_info("mermaid"),
+            Some(DiagramKind::Mermaid)
+        );
+        assert_eq!(
+            DiagramKind::from_info("Mermaid"),
+            Some(DiagramKind::Mermaid)
+        );
     }
 
     #[test]
     fn plantuml_kind_parsed() {
-        assert_eq!(DiagramKind::from_info("plantuml"), Some(DiagramKind::PlantUml));
+        assert_eq!(
+            DiagramKind::from_info("plantuml"),
+            Some(DiagramKind::PlantUml)
+        );
     }
 
     #[test]

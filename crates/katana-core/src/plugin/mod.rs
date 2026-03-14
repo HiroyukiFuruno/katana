@@ -97,7 +97,8 @@ impl PluginRegistry {
                 }
             }
         };
-        self.entries.insert(meta.id.clone(), PluginEntry { meta, status });
+        self.entries
+            .insert(meta.id.clone(), PluginEntry { meta, status });
     }
 
     /// Return metadata for all plugins that are active and contribute to `point`.
@@ -141,7 +142,11 @@ mod tests {
     fn compatible_plugin_becomes_active() {
         let mut registry = PluginRegistry::new();
         registry.register(
-            make_meta("my-renderer", PLUGIN_API_VERSION, vec![ExtensionPoint::RendererEnhancement]),
+            make_meta(
+                "my-renderer",
+                PLUGIN_API_VERSION,
+                vec![ExtensionPoint::RendererEnhancement],
+            ),
             || Ok(()),
         );
         assert_eq!(registry.status("my-renderer"), Some(&PluginStatus::Active));
@@ -154,14 +159,21 @@ mod tests {
             make_meta("old-plugin", 999, vec![ExtensionPoint::AiTool]),
             || Ok(()),
         );
-        assert_eq!(registry.status("old-plugin"), Some(&PluginStatus::IncompatibleVersion));
+        assert_eq!(
+            registry.status("old-plugin"),
+            Some(&PluginStatus::IncompatibleVersion)
+        );
     }
 
     #[test]
     fn failing_init_disables_plugin_without_panic() {
         let mut registry = PluginRegistry::new();
         registry.register(
-            make_meta("bad-plugin", PLUGIN_API_VERSION, vec![ExtensionPoint::UiPanel]),
+            make_meta(
+                "bad-plugin",
+                PLUGIN_API_VERSION,
+                vec![ExtensionPoint::UiPanel],
+            ),
             || Err("simulated startup failure".to_string()),
         );
         assert_eq!(registry.status("bad-plugin"), Some(&PluginStatus::Disabled));
@@ -171,7 +183,11 @@ mod tests {
     fn active_plugins_for_returns_only_matching_active() {
         let mut registry = PluginRegistry::new();
         registry.register(
-            make_meta("r1", PLUGIN_API_VERSION, vec![ExtensionPoint::RendererEnhancement]),
+            make_meta(
+                "r1",
+                PLUGIN_API_VERSION,
+                vec![ExtensionPoint::RendererEnhancement],
+            ),
             || Ok(()),
         );
         registry.register(
@@ -179,7 +195,11 @@ mod tests {
             || Ok(()),
         );
         registry.register(
-            make_meta("bad", PLUGIN_API_VERSION, vec![ExtensionPoint::RendererEnhancement]),
+            make_meta(
+                "bad",
+                PLUGIN_API_VERSION,
+                vec![ExtensionPoint::RendererEnhancement],
+            ),
             || Err("fail".to_string()),
         );
 

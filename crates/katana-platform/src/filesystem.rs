@@ -1,10 +1,10 @@
 //! Filesystem service: reading workspace directories and loading/saving documents.
 
-use std::path::{Path, PathBuf};
 use katana_core::{
     document::{Document, DocumentError},
     workspace::{TreeEntry, Workspace, WorkspaceError},
 };
+use std::path::{Path, PathBuf};
 
 /// Platform-layer filesystem service.
 ///
@@ -23,18 +23,17 @@ impl FilesystemService {
     /// On failure (unreadable path), returns a recoverable [`WorkspaceError`].
     pub fn open_workspace(&self, path: impl Into<PathBuf>) -> Result<Workspace, WorkspaceError> {
         let root: PathBuf = path.into();
-        let tree = self.scan_directory(&root).map_err(|e| {
-            WorkspaceError::unreadable_root(root.clone(), e)
-        })?;
+        let tree = self
+            .scan_directory(&root)
+            .map_err(|e| WorkspaceError::unreadable_root(root.clone(), e))?;
         Ok(Workspace::new(root, tree))
     }
 
     /// Load a document from `path`, returning its in-memory representation.
     pub fn load_document(&self, path: impl Into<PathBuf>) -> Result<Document, DocumentError> {
         let path = path.into();
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            DocumentError::read_failed(path.clone(), e)
-        })?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| DocumentError::read_failed(path.clone(), e))?;
         Ok(Document::new(path, content))
     }
 
@@ -43,9 +42,8 @@ impl FilesystemService {
     /// This is the *only* path that writes to the source file. There is no
     /// implicit or background save.
     pub fn save_document(&self, doc: &mut Document) -> Result<(), DocumentError> {
-        std::fs::write(&doc.path, &doc.buffer).map_err(|e| {
-            DocumentError::save_failed(doc.path.clone(), e)
-        })?;
+        std::fs::write(&doc.path, &doc.buffer)
+            .map_err(|e| DocumentError::save_failed(doc.path.clone(), e))?;
         doc.mark_clean();
         Ok(())
     }
@@ -90,8 +88,8 @@ impl Default for FilesystemService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     fn setup_workspace() -> TempDir {
         let dir = TempDir::new().unwrap();

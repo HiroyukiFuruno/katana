@@ -10,8 +10,8 @@ pub mod mermaid_renderer;
 pub mod plantuml_renderer;
 pub mod svg_rasterize;
 
-use diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
 pub use diagram::NoOpRenderer;
+use diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
 
 /// 本番用レンダラー: 各図ブロック種別を実際のサブプロセス / XML パーサーに委譲する。
 #[derive(Debug, Default)]
@@ -90,7 +90,9 @@ fn extract_fence_block(s: &str) -> Option<(FenceBlock, &str)> {
     let close = after_info.find("\n```")?;
     let content = after_info[..close].to_string();
     let raw = format!("```{info}\n{content}\n```");
-    let rest = after_info[close + 4..].strip_prefix('\n').unwrap_or(&after_info[close + 4..]);
+    let rest = after_info[close + 4..]
+        .strip_prefix('\n')
+        .unwrap_or(&after_info[close + 4..]);
     Some((FenceBlock { info, content, raw }, rest))
 }
 

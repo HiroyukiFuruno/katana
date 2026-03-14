@@ -27,8 +27,7 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
     let size = tree.size();
     let width = ((size.width() * scale) as u32).max(1);
     let height = ((size.height() * scale) as u32).max(1);
-    let mut pixmap =
-        Pixmap::new(width, height).ok_or(SvgRasterizeError::PixmapAllocationFailed)?;
+    let mut pixmap = Pixmap::new(width, height).ok_or(SvgRasterizeError::PixmapAllocationFailed)?;
     let transform = tiny_skia::Transform::from_scale(scale, scale);
     render(&tree, transform, &mut pixmap.as_mut());
     Ok(RasterizedSvg {
@@ -53,8 +52,7 @@ mod tests {
     use super::*;
 
     // 最小限の有効な SVG。
-    const MINIMAL_SVG: &str =
-        r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>"#;
+    const MINIMAL_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>"#;
 
     #[test]
     fn 有効なsvgがラスタライズされる() {
