@@ -1,10 +1,20 @@
 {
   "files.exclude": {
-    ".*": true,
-    "**/.*": false
+    "target": true,
   },
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.patterns": {
     "Cargo.toml": "Cargo.lock, rustfmt.toml, .clippy.toml"
-  }
+  },
+  "cSpell.words": [
+    "apdisk",
+    "donotpresent",
+    "fseventsd",
+    "Katana",
+    "MSVC",
+    "openspec",
+    "opsx",
+    "rustc",
+    "timemachine"
+  ]
 }
