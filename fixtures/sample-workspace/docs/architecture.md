@@ -17,6 +17,8 @@ graph TD
     Core --> Platform
 ```
 
+日本語テスト
+
 ## Layer Responsibilities
 
 | Layer    | Responsibility                                      |

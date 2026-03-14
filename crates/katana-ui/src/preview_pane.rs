@@ -40,6 +40,8 @@ pub enum RenderedSection {
         download_url: String,
         install_path: std::path::PathBuf,
     },
+    /// バックグラウンドレンダリング中のプレースホルダー。
+    Pending { kind: String },
 }
 
 /// プレビューペインから返されるダウンロードリクエスト。
@@ -53,6 +55,8 @@ pub struct DownloadRequest {
 pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
     pub sections: Vec<RenderedSection>,
+    /// バックグラウンドレンダリング完了通知チャネル。
+    render_rx: Option<std::sync::mpsc::Receiver<(usize, RenderedSection)>>,
 }
 
 impl PreviewPane {
@@ -88,14 +92,53 @@ impl PreviewPane {
     }
 
     /// 全セクション（ダイアグラム含む）を完全に再レンダリングする。
+    ///
+    /// Markdown セクションは即座に返す。ダイアグラムは `Pending` にせて
+    /// バックグラウンドスレッドでレンダリングする。
     pub fn full_render(&mut self, source: &str) {
         let raw = split_into_sections(source);
-        self.sections = raw.iter().map(render_section).collect();
+        // 前回レンダリングをキャンセル。
+        self.render_rx = None;
+
+        let mut sections = Vec::with_capacity(raw.len());
+        let mut jobs: Vec<(usize, DiagramKind, String)> = Vec::new();
+
+        for (i, section) in raw.iter().enumerate() {
+            match section {
+                PreviewSection::Markdown(md) => {
+                    sections.push(RenderedSection::Markdown(md.clone()));
+                }
+                PreviewSection::Diagram { kind, source: src } => {
+                    sections.push(RenderedSection::Pending {
+                        kind: format!("{kind:?}"),
+                    });
+                    jobs.push((i, kind.clone(), src.clone()));
+                }
+            }
+        }
+        self.sections = sections;
+
+        if jobs.is_empty() {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.render_rx = Some(rx);
+        std::thread::spawn(move || {
+            for (index, kind, src) in jobs {
+                let section = render_diagram(&kind, &src);
+                if tx.send((index, section)).is_err() {
+                    break; // レシーバがドロップされた。
+                }
+            }
+        });
     }
 
     /// プレビューペインの内容を描画する。
     /// ダウンロードボタンが押された場合は `Some(DownloadRequest)` を返す。
     pub fn show(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+        // バックグラウンドレンダリング完了をポーリング。
+        self.poll_renders(ui.ctx());
+
         let mut request: Option<DownloadRequest> = None;
         ScrollArea::vertical()
             .auto_shrink([false, false])
@@ -111,6 +154,58 @@ impl PreviewPane {
                 }
             });
         request
+    }
+
+    /// バックグラウンドレンダリング完了をポーリングし、届いた結果でセクションを更新する。
+    fn poll_renders(&mut self, ctx: &egui::Context) {
+        let still_pending = if let Some(rx) = &self.render_rx {
+            let mut updated = false;
+            while let Ok((idx, section)) = rx.try_recv() {
+                if idx < self.sections.len() {
+                    self.sections[idx] = section;
+                    updated = true;
+                }
+            }
+            if updated {
+                ctx.request_repaint();
+            }
+            self.sections
+                .iter()
+                .any(|s| matches!(s, RenderedSection::Pending { .. }))
+        } else {
+            false
+        };
+        if still_pending {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        } else {
+            self.render_rx = None;
+        }
+    }
+
+    /// テスト用: Pending がなくなるまでバックグラウンドスレッドをブロック待機する。
+    #[cfg(test)]
+    pub fn wait_for_renders(&mut self) {
+        loop {
+            if let Some(rx) = &self.render_rx {
+                while let Ok((idx, section)) = rx.try_recv() {
+                    if idx < self.sections.len() {
+                        self.sections[idx] = section;
+                    }
+                }
+                if self
+                    .sections
+                    .iter()
+                    .any(|s| matches!(s, RenderedSection::Pending { .. }))
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                } else {
+                    self.render_rx = None;
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
     }
 }
 
@@ -148,6 +243,13 @@ fn show_section(
             download_url,
             install_path,
         } => show_not_installed(ui, kind, download_url, install_path),
+        RenderedSection::Pending { kind } => {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label(egui::RichText::new(format!("{kind} をレンダリング中…")).weak());
+            });
+            None
+        }
     }
 }
 
@@ -196,14 +298,7 @@ fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str, id: usize
     ui.add(egui::Image::new((texture.id(), size)));
 }
 
-/// `PreviewSection` をレンダリングして `RenderedSection` に変換する。
-fn render_section(section: &PreviewSection) -> RenderedSection {
-    match section {
-        PreviewSection::Markdown(md) => RenderedSection::Markdown(md.clone()),
-        PreviewSection::Diagram { kind, source } => render_diagram(kind, source),
-    }
-}
-
+/// `PreviewSection` をレンダリングして `RenderedSection` に変換する（非使用になったことでの削除答候用コメント）。
 /// ダイアグラムブロックをレンダラー経由で変換し、SVG ラスタライズを試みる。
 fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     let block = DiagramBlock {
@@ -371,6 +466,8 @@ mod tests {
         let src = format!("before\n```drawio\n{xml}\n```\nafter");
         let mut pane = PreviewPane::default();
         pane.full_render(&src);
+        // レイジーロードのためバックグラウンド完了を待つ。
+        pane.wait_for_renders();
         assert_eq!(pane.sections.len(), 3);
         // Draw.io はネイティブ Rust なので Image か Error のどちらか。
         assert!(matches!(
