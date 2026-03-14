@@ -34,7 +34,7 @@
 ## 6. Validation assets and quality gates
 
 - [x] 6.1 Create a sample spec-driven workspace fixture that includes Markdown documents and representative Mermaid, PlantUML, and Draw.io blocks using only supported input formats.
-- [ ] 6.2 Add automated tests for workspace loading, document save flow, preview synchronization, diagram rendering, plugin failure isolation, and renderer failure fallback behavior.
+- [x] 6.2 Add automated tests for workspace loading, document save flow, preview synchronization, diagram rendering, plugin failure isolation, and renderer failure fallback behavior.
 - [x] 6.3 Document the MVP architecture, explicit-save constraints, diagram rendering constraints, bundled runtime assets, and follow-on implementation expectations for later AI and plugin phases.
 
 ## 7. OSS repository security baseline
