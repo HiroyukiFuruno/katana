@@ -8,6 +8,14 @@ use katana_core::{
     ai::AiProviderRegistry, document::Document, plugin::PluginRegistry, workspace::Workspace,
 };
 
+/// UIレイアウトの表示モード
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ViewMode {
+    PreviewOnly,
+    CodeOnly,
+    Split,
+}
+
 /// User-visible actions dispatched from UI components to the core update loop.
 #[derive(Debug)]
 pub enum AppAction {
@@ -15,12 +23,18 @@ pub enum AppAction {
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
     SelectDocument(std::path::PathBuf),
-    /// Update the active document buffer.
+    /// タブを閉じる
+    CloseDocument(usize),
+    /// アクティブなドキュメントのバッファを更新
     UpdateBuffer(String),
     /// Explicitly save the active document.
     SaveDocument,
     /// ダイアグラムを含めてプレビューを完全再レンダリングする。
     RefreshDiagrams,
+    /// 表示モードの変更
+    SetViewMode(ViewMode),
+    /// 言語変更
+    ChangeLanguage(String),
     /// No-op (used internally).
     None,
 }
@@ -29,8 +43,12 @@ pub enum AppAction {
 pub struct AppState {
     /// The currently open workspace, if any.
     pub workspace: Option<Workspace>,
-    /// The currently active document, if any.
-    pub active_document: Option<Document>,
+    /// Currently open documents (tabs).
+    pub open_documents: Vec<Document>,
+    /// Index of the currently active document, if any.
+    pub active_doc_idx: Option<usize>,
+    /// Current view mode.
+    pub view_mode: ViewMode,
     /// AI provider registry.
     pub ai_registry: AiProviderRegistry,
     /// Plugin registry（将来の Task 5.x でプラグインウィジェット統合時に参照する）。
@@ -43,7 +61,9 @@ impl AppState {
     pub fn new(ai_registry: AiProviderRegistry, plugin_registry: PluginRegistry) -> Self {
         Self {
             workspace: None,
-            active_document: None,
+            open_documents: Vec::new(),
+            active_doc_idx: None,
+            view_mode: ViewMode::PreviewOnly,
             ai_registry,
             _plugin_registry: plugin_registry,
             status_message: None,
@@ -52,10 +72,19 @@ impl AppState {
 
     /// Whether the active document has unsaved changes.
     pub fn is_dirty(&self) -> bool {
-        self.active_document
-            .as_ref()
+        self.active_document()
             .map(|d| d.is_dirty)
             .unwrap_or(false)
+    }
+
+    /// 現在アクティブなドキュメントを参照する
+    pub fn active_document(&self) -> Option<&Document> {
+        self.active_doc_idx.and_then(|idx| self.open_documents.get(idx))
+    }
+
+    /// 現在アクティブなドキュメントをミュータブルに参照する
+    pub fn active_document_mut(&mut self) -> Option<&mut Document> {
+        self.active_doc_idx.and_then(|idx| self.open_documents.get_mut(idx))
     }
 
     /// Whether the AI panel should be shown as available.

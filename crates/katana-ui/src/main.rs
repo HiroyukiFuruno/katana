@@ -1,6 +1,7 @@
 //! Katana UI application entry point.
 
 mod app_state;
+mod i18n;
 mod preview_pane;
 mod shell;
 

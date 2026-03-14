@@ -6,7 +6,8 @@ use eframe::egui;
 use katana_platform::FilesystemService;
 
 use crate::{
-    app_state::{AppAction, AppState},
+    app_state::{AppAction, AppState, ViewMode},
+    i18n,
     preview_pane::{DownloadRequest, PreviewPane},
 };
 
@@ -50,7 +51,8 @@ impl KatanaApp {
                 let name = ws.name().unwrap_or("unknown").to_string();
                 self.state.status_message = Some(format!("Opened workspace: {name}"));
                 self.state.workspace = Some(ws);
-                self.state.active_document = None;
+                self.state.open_documents.clear();
+                self.state.active_doc_idx = None;
             }
             Err(e) => {
                 self.state.status_message = Some(format!("Cannot open workspace: {e}"));
@@ -63,7 +65,8 @@ impl KatanaApp {
             Ok(doc) => {
                 // ドキュメント選択時はダイアグラム含め完全レンダリング。
                 self.full_refresh_preview(&doc.buffer.clone());
-                self.state.active_document = Some(doc);
+                self.state.open_documents.push(doc);
+                self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
             }
             Err(e) => {
                 self.state.status_message = Some(format!("Cannot open file: {e}"));
@@ -72,14 +75,14 @@ impl KatanaApp {
     }
 
     fn handle_update_buffer(&mut self, content: String) {
-        if let Some(doc) = &mut self.state.active_document {
+        if let Some(doc) = self.state.active_document_mut() {
             doc.update_buffer(content.clone());
         }
         self.refresh_preview(&content);
     }
 
     fn handle_save_document(&mut self) {
-        let Some(doc) = &mut self.state.active_document else {
+        let Some(doc) = self.state.active_document_mut() else {
             return;
         };
         match self.fs.save_document(doc) {
@@ -92,13 +95,29 @@ impl KatanaApp {
         match action {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
             AppAction::SelectDocument(p) => self.handle_select_document(p),
+            AppAction::CloseDocument(idx) => {
+                if idx < self.state.open_documents.len() {
+                    self.state.open_documents.remove(idx);
+                    self.state.active_doc_idx = if self.state.open_documents.is_empty() {
+                        None
+                    } else {
+                        Some(self.state.open_documents.len() - 1)
+                    };
+                }
+            }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
-                if let Some(doc) = &self.state.active_document {
+                if let Some(doc) = self.state.active_document() {
                     let src = doc.buffer.clone();
                     self.full_refresh_preview(&src);
                 }
+            }
+            AppAction::SetViewMode(mode) => {
+                self.state.view_mode = mode;
+            }
+            AppAction::ChangeLanguage(lang) => {
+                crate::i18n::set_language(&lang);
             }
             AppAction::None => {}
         }
@@ -108,7 +127,7 @@ impl KatanaApp {
     fn start_download(&mut self, req: DownloadRequest) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.download_rx = Some(rx);
-        self.state.status_message = Some("⬇ PlantUML JAR をダウンロード中…".to_string());
+        self.state.status_message = Some(crate::i18n::t("downloading_plantuml"));
         let url = req.url;
         let dest = req.dest;
         std::thread::spawn(move || {
@@ -123,14 +142,14 @@ impl KatanaApp {
             match rx.try_recv() {
                 Ok(Ok(())) => {
                     self.state.status_message = Some(
-                        "✅ PlantUML のインストールが完了しました。プレビューを更新中…".to_string(),
+                        crate::i18n::t("plantuml_installed")
                     );
                     // ダウンロード完了 → プレビュー全体を再レンダリング。
                     self.pending_action = AppAction::RefreshDiagrams;
                     true
                 }
                 Ok(Err(e)) => {
-                    self.state.status_message = Some(format!("❌ ダウンロードエラー: {e}"));
+                    self.state.status_message = Some(format!("{}{}", crate::i18n::t("download_error"), e));
                     true
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
@@ -176,16 +195,31 @@ impl eframe::App for KatanaApp {
         render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
         render_status_bar(ctx, &self.state);
         render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
-        let download_req = render_preview_panel(
-            ctx,
-            &mut self.preview_pane,
-            &self.state,
-            &mut self.pending_action,
-        );
+
+        let mut download_req = None;
+        if self.state.view_mode == ViewMode::PreviewOnly || self.state.view_mode == ViewMode::Split {
+            download_req = render_preview_panel(
+                ctx,
+                &mut self.preview_pane,
+                &self.state,
+                &mut self.pending_action,
+            );
+        }
         if let Some(req) = download_req {
             self.start_download(req);
         }
-        render_editor_panel(ctx, &mut self.state, &mut self.pending_action);
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            render_tabs_and_toolbar(ui, &mut self.state, &mut self.pending_action);
+            ui.separator();
+
+            if self.state.view_mode == ViewMode::CodeOnly || self.state.view_mode == ViewMode::Split {
+                render_editor_content(ui, &mut self.state, &mut self.pending_action);
+            } else {
+                // Keep the center panel from looking entirely empty if not showing code
+                ui.label(i18n::t("view_mode_preview"));
+            }
+        });
     }
 }
 
@@ -196,8 +230,11 @@ fn open_folder_dialog() -> Option<std::path::PathBuf> {
 fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
     egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
-            ui.menu_button("File", |ui| {
+            ui.menu_button(crate::i18n::t("menu_file"), |ui| {
                 render_file_menu(ui, state, action);
+            });
+            ui.menu_button(crate::i18n::t("menu_settings"), |ui| {
+                render_settings_menu(ui, state, action);
             });
             render_header_right(ui, state);
         });
@@ -205,7 +242,7 @@ fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAc
 }
 
 fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
-    if ui.button("Open Workspace…").clicked() {
+    if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
         if let Some(path) = open_folder_dialog() {
             *action = AppAction::OpenWorkspace(path);
         }
@@ -213,12 +250,34 @@ fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction)
     }
     ui.separator();
     if ui
-        .add_enabled(state.is_dirty(), egui::Button::new("Save"))
+        .add_enabled(state.is_dirty(), egui::Button::new(crate::i18n::t("menu_save")))
         .clicked()
     {
         *action = AppAction::SaveDocument;
         ui.close_menu();
     }
+}
+
+fn render_settings_menu(ui: &mut egui::Ui, _state: &AppState, action: &mut AppAction) {
+    ui.menu_button(crate::i18n::t("menu_language"), |ui| {
+        let mut reset_layout = false;
+        
+        // en
+        if ui.button("English").clicked() {
+            *action = AppAction::ChangeLanguage("en".to_string());
+            reset_layout = true;
+        }
+
+        // ja
+        if ui.button("日本語").clicked() {
+            *action = AppAction::ChangeLanguage("ja".to_string());
+            reset_layout = true;
+        }
+
+        if reset_layout {
+            ui.close_menu();
+        }
+    });
 }
 
 fn render_header_right(ui: &mut egui::Ui, state: &AppState) {
@@ -245,7 +304,7 @@ fn render_workspace_panel(ctx: &egui::Context, state: &mut AppState, action: &mu
         .min_width(160.0)
         .default_width(220.0)
         .show(ctx, |ui| {
-            ui.heading("Workspace");
+            ui.heading(crate::i18n::t("workspace_title"));
             ui.separator();
             render_workspace_content(ui, state, action);
         });
@@ -262,9 +321,9 @@ fn render_workspace_content(ui: &mut egui::Ui, state: &AppState, action: &mut Ap
             *action = AppAction::SelectDocument(path);
         }
     } else {
-        ui.label("No workspace open.");
+        ui.label(crate::i18n::t("no_workspace_open"));
         ui.add_space(8.0);
-        if ui.button("Open Workspace…").clicked() {
+        if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
             if let Some(path) = open_folder_dialog() {
                 *action = AppAction::OpenWorkspace(path);
             }
@@ -286,8 +345,8 @@ fn render_preview_panel(
         .show(ctx, |ui| {
             render_preview_header(ui, state, action);
             ui.separator();
-            if state.active_document.is_none() {
-                ui.label("No document selected.");
+            if state.active_document().is_none() {
+                ui.label(i18n::t("no_document_selected"));
             } else {
                 download_req = preview.show(ui);
             }
@@ -299,7 +358,7 @@ fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAc
     ui.horizontal(|ui| {
         ui.heading("Preview");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let has_doc = state.active_document.is_some();
+            let has_doc = state.active_document().is_some();
             if ui
                 .add_enabled(has_doc, egui::Button::new("🔄"))
                 .on_hover_text("Refresh diagrams")
@@ -311,32 +370,60 @@ fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAc
     });
 }
 
-fn render_editor_panel(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        let title = editor_title(state);
-        ui.heading(title);
+fn render_tabs_and_toolbar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
+    ui.horizontal(|ui| {
+        // Toolbar for ViewMode
+        ui.horizontal(|ui| {
+            ui.selectable_value(
+                &mut state.view_mode,
+                ViewMode::PreviewOnly,
+                i18n::t("view_mode_preview"),
+            );
+            ui.selectable_value(
+                &mut state.view_mode,
+                ViewMode::CodeOnly,
+                i18n::t("view_mode_code"),
+            );
+            ui.selectable_value(
+                &mut state.view_mode,
+                ViewMode::Split,
+                i18n::t("view_mode_split"),
+            );
+        });
+
         ui.separator();
-        render_editor_content(ui, state, action);
+
+        // Tabs
+        let mut close_idx = None;
+        egui::ScrollArea::horizontal().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                for (idx, doc) in state.open_documents.iter().enumerate() {
+                    let is_active = state.active_doc_idx == Some(idx);
+                    let mut title = doc.file_name().unwrap_or("untitled").to_string();
+                    if doc.is_dirty {
+                        title.push_str(" ●");
+                    }
+
+                    // A basic tab: Button + Close button
+                    let resp = ui.selectable_label(is_active, title);
+                    if resp.clicked() {
+                        state.active_doc_idx = Some(idx);
+                    }
+                    if ui.button("❌").clicked() {
+                        close_idx = Some(idx);
+                    }
+                }
+            });
+        });
+
+        if let Some(idx) = close_idx {
+            *action = AppAction::CloseDocument(idx);
+        }
     });
 }
 
-fn editor_title(state: &AppState) -> String {
-    state
-        .active_document
-        .as_ref()
-        .and_then(|d| d.file_name())
-        .map(|n| {
-            if state.is_dirty() {
-                format!("{n} ●")
-            } else {
-                n.to_string()
-            }
-        })
-        .unwrap_or_else(|| "Editor".to_string())
-}
-
 fn render_editor_content(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
-    if let Some(doc) = &state.active_document {
+    if let Some(doc) = state.active_document() {
         let mut buffer = doc.buffer.clone();
         egui::ScrollArea::vertical().show(ui, |ui| {
             let response = ui.add(
@@ -349,15 +436,7 @@ fn render_editor_content(ui: &mut egui::Ui, state: &mut AppState, action: &mut A
                 *action = AppAction::UpdateBuffer(buffer);
             }
         });
-    } else {
-        render_empty_editor(ui);
     }
-}
-
-fn render_empty_editor(ui: &mut egui::Ui) {
-    ui.centered_and_justified(|ui| {
-        ui.label("Open a workspace and select a Markdown file to begin editing.");
-    });
 }
 
 fn render_tree_entry(

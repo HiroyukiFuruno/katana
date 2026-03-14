@@ -1,0 +1,20 @@
+{
+  "menu_file": "ファイル",
+  "menu_settings": "設定",
+  "menu_language": "言語 (Language)",
+  "menu_open_workspace": "ワークスペースを開く…",
+  "menu_save": "保存",
+  "no_workspace_open": "ワークスペースが開かれていません。",
+  "no_document_selected": "ドキュメントが開かれていません。",
+  "preview_title": "プレビュー",
+  "refresh_diagrams": "ダイアグラムを更新",
+  "rendering": "レンダリング中…",
+  "no_preview": "（プレビューなし）",
+  "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",
+  "plantuml_installed": "✅ PlantUML のインストールが完了しました。プレビューを更新中…",
+  "download_error": "❌ ダウンロードエラー: ",
+  "workspace_title": "ワークスペース",
+  "view_mode_preview": "プレビュー",
+  "view_mode_code": "コード",
+  "view_mode_split": "分割"
+}
