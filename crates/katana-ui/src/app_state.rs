@@ -19,6 +19,8 @@ pub enum AppAction {
     UpdateBuffer(String),
     /// Explicitly save the active document.
     SaveDocument,
+    /// ダイアグラムを含めてプレビューを完全再レンダリングする。
+    RefreshDiagrams,
     /// No-op (used internally).
     None,
 }
@@ -29,10 +31,6 @@ pub struct AppState {
     pub workspace: Option<Workspace>,
     /// The currently active document, if any.
     pub active_document: Option<Document>,
-    /// Cached HTML render of the active document's preview.
-    pub preview_html: String,
-    /// Preview error, if the last render failed.
-    pub preview_error: Option<String>,
     /// AI provider registry.
     pub ai_registry: AiProviderRegistry,
     /// Plugin registry（将来の Task 5.x でプラグインウィジェット統合時に参照する）。
@@ -46,8 +44,6 @@ impl AppState {
         Self {
             workspace: None,
             active_document: None,
-            preview_html: String::new(),
-            preview_error: None,
             ai_registry,
             _plugin_registry: plugin_registry,
             status_message: None,

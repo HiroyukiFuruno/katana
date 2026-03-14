@@ -1,6 +1,7 @@
 //! Katana UI application entry point.
 
 mod app_state;
+mod preview_pane;
 mod shell;
 
 use app_state::AppState;

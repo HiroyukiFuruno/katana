@@ -1,0 +1,10 @@
+{
+  "files.exclude": {
+    ".*": true,
+    "**/.*": false
+  },
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "Cargo.toml": "Cargo.lock, rustfmt.toml, .clippy.toml"
+  }
+}

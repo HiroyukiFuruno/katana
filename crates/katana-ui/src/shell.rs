@@ -3,15 +3,18 @@
 #![deny(clippy::too_many_lines, clippy::cognitive_complexity)]
 
 use eframe::egui;
-use katana_core::markdown;
 use katana_platform::FilesystemService;
 
-use crate::app_state::{AppAction, AppState};
+use crate::{
+    app_state::{AppAction, AppState},
+    preview_pane::PreviewPane,
+};
 
 pub struct KatanaApp {
     state: AppState,
     fs: FilesystemService,
     pending_action: AppAction,
+    preview_pane: PreviewPane,
 }
 
 impl KatanaApp {
@@ -20,6 +23,7 @@ impl KatanaApp {
             state,
             fs: FilesystemService::new(),
             pending_action: AppAction::None,
+            preview_pane: PreviewPane::default(),
         }
     }
 
@@ -28,15 +32,13 @@ impl KatanaApp {
     }
 
     fn refresh_preview(&mut self, source: &str) {
-        match markdown::render_basic(source) {
-            Ok(out) => {
-                self.state.preview_html = out.html;
-                self.state.preview_error = None;
-            }
-            Err(e) => {
-                self.state.preview_error = Some(e.to_string());
-            }
-        }
+        // テキスト変更は即時反映（ダイアグラムは既存の画像を保持）。
+        self.preview_pane.update_markdown_sections(source);
+    }
+
+    fn full_refresh_preview(&mut self, source: &str) {
+        // ドキュメント選択や Refresh ボタン押下で全セクションを再レンダリング。
+        self.preview_pane.full_render(source);
     }
 
     fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
@@ -46,7 +48,6 @@ impl KatanaApp {
                 self.state.status_message = Some(format!("Opened workspace: {name}"));
                 self.state.workspace = Some(ws);
                 self.state.active_document = None;
-                self.state.preview_html = String::new();
             }
             Err(e) => {
                 self.state.status_message = Some(format!("Cannot open workspace: {e}"));
@@ -57,7 +58,8 @@ impl KatanaApp {
     fn handle_select_document(&mut self, path: std::path::PathBuf) {
         match self.fs.load_document(&path) {
             Ok(doc) => {
-                self.refresh_preview(&doc.buffer.clone());
+                // ドキュメント選択時はダイアグラム含め完全レンダリング。
+                self.full_refresh_preview(&doc.buffer.clone());
                 self.state.active_document = Some(doc);
             }
             Err(e) => {
@@ -89,6 +91,12 @@ impl KatanaApp {
             AppAction::SelectDocument(p) => self.handle_select_document(p),
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
+            AppAction::RefreshDiagrams => {
+                if let Some(doc) = &self.state.active_document {
+                    let src = doc.buffer.clone();
+                    self.full_refresh_preview(&src);
+                }
+            }
             AppAction::None => {}
         }
     }
@@ -102,7 +110,12 @@ impl eframe::App for KatanaApp {
         render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
         render_status_bar(ctx, &self.state);
         render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
-        render_preview_panel(ctx, &self.state);
+        render_preview_panel(
+            ctx,
+            &mut self.preview_pane,
+            &self.state,
+            &mut self.pending_action,
+        );
         render_editor_panel(ctx, &mut self.state, &mut self.pending_action);
     }
 }
@@ -190,28 +203,41 @@ fn render_workspace_content(ui: &mut egui::Ui, state: &AppState, action: &mut Ap
     }
 }
 
-fn render_preview_panel(ctx: &egui::Context, state: &AppState) {
+fn render_preview_panel(
+    ctx: &egui::Context,
+    preview: &mut PreviewPane,
+    state: &AppState,
+    action: &mut AppAction,
+) {
     egui::SidePanel::right("preview_pane")
         .resizable(true)
         .min_width(200.0)
         .default_width(400.0)
         .show(ctx, |ui| {
-            ui.heading("Preview");
+            render_preview_header(ui, state, action);
             ui.separator();
-            render_preview_content(ui, state);
+            if state.active_document.is_none() {
+                ui.label("No document selected.");
+            } else {
+                preview.show(ui);
+            }
         });
 }
 
-fn render_preview_content(ui: &mut egui::Ui, state: &AppState) {
-    if let Some(err) = &state.preview_error {
-        ui.colored_label(egui::Color32::YELLOW, format!("⚠ {err}"));
-    } else if state.preview_html.is_empty() {
-        ui.label("No document selected.");
-    } else {
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            ui.label(&state.preview_html);
+fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
+    ui.horizontal(|ui| {
+        ui.heading("Preview");
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let has_doc = state.active_document.is_some();
+            if ui
+                .add_enabled(has_doc, egui::Button::new("🔄"))
+                .on_hover_text("Refresh diagrams")
+                .clicked()
+            {
+                *action = AppAction::RefreshDiagrams;
+            }
         });
-    }
+    });
 }
 
 fn render_editor_panel(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
