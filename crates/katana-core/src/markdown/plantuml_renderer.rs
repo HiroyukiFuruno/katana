@@ -75,6 +75,7 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
 fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let mut child = Command::new("java")
         .args([
+            "-Djava.awt.headless=true",
             "-jar",
             jar.to_str().unwrap_or("plantuml.jar"),
             "-pipe",
