@@ -21,7 +21,11 @@ pub struct RasterizedSvg {
 ///
 /// `scale` で出力解像度を調整する（1.0 = 元のサイズ）。
 pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRasterizeError> {
-    let opts = usvg::Options::default();
+    let opts = usvg::Options {
+        // システムフォントを渡さないと SVG 内テキストが不可視になる。
+        fontdb: font_db(),
+        ..usvg::Options::default()
+    };
     let tree = usvg::Tree::from_str(svg_text, &opts)
         .map_err(|e| SvgRasterizeError::ParseFailed(e.to_string()))?;
     let size = tree.size();
@@ -35,6 +39,17 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
         height,
         rgba: pixmap.take(),
     })
+}
+
+/// システムフォント DB を初期化済み Arc として返す（プロセス全体で一度だけ初期化）。
+fn font_db() -> std::sync::Arc<usvg::fontdb::Database> {
+    static FONT_DB: std::sync::OnceLock<std::sync::Arc<usvg::fontdb::Database>> =
+        std::sync::OnceLock::new();
+    std::sync::Arc::clone(FONT_DB.get_or_init(|| {
+        let mut db = usvg::fontdb::Database::new();
+        db.load_system_fonts();
+        std::sync::Arc::new(db)
+    }))
 }
 
 /// SVG ラスタライズ時に発生するエラー。
