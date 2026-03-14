@@ -203,3 +203,133 @@ fn extract_svg(html: &str) -> Option<&str> {
     let end = html.rfind("</svg>")? + "</svg>".len();
     Some(&html[start..end])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── extract_svg ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn svgタグが正しく抽出される() {
+        let html =
+            r#"<div class="diagram"><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg></div>"#;
+        let result = extract_svg(html).unwrap();
+        assert!(result.starts_with("<svg"));
+        assert!(result.ends_with("</svg>"));
+    }
+
+    #[test]
+    fn svgがなければnoneを返す() {
+        assert!(extract_svg("<div>no svg here</div>").is_none());
+    }
+
+    #[test]
+    fn 複数svgは先頭開始から末尾終了を返す() {
+        // rfind で末尾の</svg>を使うため、最初の<svg>から最後の</svg>まで。
+        let html = r#"<svg id="a"><text>A</text></svg><svg id="b"></svg>"#;
+        let result = extract_svg(html).unwrap();
+        assert!(result.starts_with("<svg"));
+        assert!(result.ends_with("</svg>"));
+    }
+
+    // ─── update_markdown_sections (preview synchronization) ───────────────────
+
+    #[test]
+    fn markdownのみの場合テキストセクションが更新される() {
+        let mut pane = PreviewPane::default();
+        pane.update_markdown_sections("# Hello\n\nWorld");
+        assert_eq!(pane.sections.len(), 1);
+        assert!(matches!(&pane.sections[0], RenderedSection::Markdown(s) if s.contains("Hello")));
+    }
+
+    #[test]
+    fn ダイアグラムセクションは既存レンダリング結果を再利用する() {
+        let mut pane = PreviewPane::default();
+        // 事前に「レンダリング済み」ダイアグラムを格納しておく。
+        pane.sections = vec![
+            RenderedSection::Markdown("old".to_string()),
+            RenderedSection::Error {
+                kind: "Mermaid".to_string(),
+                _source: "graph TD; A-->B".to_string(),
+                message: "dummy".to_string(),
+            },
+        ];
+        let new_source = "new text\n```mermaid\ngraph TD; A-->B\n```\nfooter";
+        pane.update_markdown_sections(new_source);
+        // markdown + diagram(再利用) + markdown の 3 セクション。
+        assert_eq!(pane.sections.len(), 3);
+        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+        // 既存の Error がそのまま再利用される（再レンダリングされない）。
+        assert!(matches!(pane.sections[1], RenderedSection::Error { .. }));
+        assert!(matches!(pane.sections[2], RenderedSection::Markdown(_)));
+    }
+
+    #[test]
+    fn 既存ダイアグラムがない場合プレースホルダーエラーになる() {
+        let mut pane = PreviewPane::default();
+        pane.update_markdown_sections("intro\n```mermaid\ngraph TD; A-->B\n```\nfin");
+        assert_eq!(pane.sections.len(), 3);
+        // 未レンダリングのプレースホルダー Error になる。
+        assert!(matches!(pane.sections[1], RenderedSection::Error { .. }));
+    }
+
+    #[test]
+    fn テキスト変更がダイアグラムセクション数を変えない場合再利用される() {
+        let mut pane = PreviewPane::default();
+        // 初期ロード（テキストのみ）。
+        pane.update_markdown_sections("intro\n```drawio\n<mxGraphModel/>\n```");
+        assert_eq!(pane.sections.len(), 2);
+        let first_kind = match &pane.sections[1] {
+            RenderedSection::Error { kind, .. } => kind.clone(),
+            _ => "Image".to_string(),
+        };
+        // テキスト変更後もダイアグラム部分は再利用される。
+        pane.update_markdown_sections("changed intro\n```drawio\n<mxGraphModel/>\n```");
+        assert_eq!(pane.sections.len(), 2);
+        assert!(matches!(&pane.sections[1],
+            RenderedSection::Error { kind, .. } if *kind == first_kind));
+    }
+
+    // ─── full_render ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn markdownのみの文書はmarkdownセクション一つになる() {
+        let mut pane = PreviewPane::default();
+        pane.full_render("# Hello\n\nNo diagrams here.");
+        assert_eq!(pane.sections.len(), 1);
+        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+    }
+
+    #[test]
+    fn drawio_xmlは描画を試みてエラーまたは画像になる() {
+        let xml = r#"<mxGraphModel><root><mxCell id="0"/></root></mxGraphModel>"#;
+        let src = format!("before\n```drawio\n{xml}\n```\nafter");
+        let mut pane = PreviewPane::default();
+        pane.full_render(&src);
+        assert_eq!(pane.sections.len(), 3);
+        // Draw.io はネイティブ Rust なので Image か Error のどちらか。
+        assert!(matches!(
+            pane.sections[1],
+            RenderedSection::Image { .. } | RenderedSection::Error { .. }
+        ));
+    }
+
+    #[test]
+    fn 不明フェンスはmarkdownセクションに残る() {
+        let src = "intro\n```rust\nfn main() {}\n```\nfin";
+        let mut pane = PreviewPane::default();
+        pane.full_render(src);
+        assert!(pane
+            .sections
+            .iter()
+            .all(|s| matches!(s, RenderedSection::Markdown(_))));
+    }
+
+    #[test]
+    fn 空文字列はセクションなしになる() {
+        let mut pane = PreviewPane::default();
+        pane.full_render("");
+        assert!(pane.sections.is_empty());
+    }
+}
