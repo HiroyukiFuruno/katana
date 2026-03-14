@@ -48,34 +48,47 @@ impl FilesystemService {
         Ok(())
     }
 
-    /// ディレクトリを再帰的にスキャンし、`.md` ファイルのみを含むツリーを返す。
+    /// ディレクトリを再帰的に並列スキャンし、`.md` ファイルのみを含むツリーを返す。
     fn scan_directory(&self, dir: &Path) -> std::io::Result<Vec<TreeEntry>> {
-        let mut entries = Vec::new();
-        for entry in std::fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            let file_name = match path.file_name().and_then(|n| n.to_str()) {
-                Some(n) => n,
-                None => continue,
-            };
-            // 隠しファイル・ビルド成果物・ Node.js モジュールはスキップ。
-            if file_name.starts_with('.') || file_name == "target" || file_name == "node_modules" {
-                continue;
-            }
-            if path.is_dir() {
-                let children = self.scan_directory(&path).unwrap_or_default();
-                // 配下に `.md` ファイルが一つもないディレクトリは表示しない。
-                if has_any_markdown(&children) {
-                    entries.push(TreeEntry::Directory { path, children });
+        use rayon::prelude::*;
+
+        let iter = std::fs::read_dir(dir)?;
+        let child_entries: Vec<_> = iter.filter_map(Result::ok).collect();
+
+        let mut entries: Vec<TreeEntry> = child_entries
+            .into_par_iter()
+            .filter_map(|entry| {
+                let path = entry.path();
+                let file_name = path.file_name().and_then(|n| n.to_str())?;
+
+                // 隠しファイル・ビルド成果物・ Node.js モジュールはスキップ。
+                if file_name.starts_with('.')
+                    || file_name == "target"
+                    || file_name == "node_modules"
+                {
+                    return None;
                 }
-            } else if path
-                .extension()
-                .map(|e| e.eq_ignore_ascii_case("md"))
-                .unwrap_or(false)
-            {
-                entries.push(TreeEntry::File { path });
-            }
-        }
+
+                if path.is_dir() {
+                    let children = self.scan_directory(&path).unwrap_or_default();
+                    // 配下に `.md` ファイルが一つもないディレクトリは表示しない。
+                    if has_any_markdown(&children) {
+                        Some(TreeEntry::Directory { path, children })
+                    } else {
+                        None
+                    }
+                } else if path
+                    .extension()
+                    .map(|e| e.eq_ignore_ascii_case("md"))
+                    .unwrap_or(false)
+                {
+                    Some(TreeEntry::File { path })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         // Sort: directories first, then files, both alphabetically.
         entries.sort_by(|a, b| match (a, b) {
             (TreeEntry::Directory { .. }, TreeEntry::File { .. }) => std::cmp::Ordering::Less,
