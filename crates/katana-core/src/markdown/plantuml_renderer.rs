@@ -17,10 +17,11 @@ use super::diagram::{DiagramBlock, DiagramResult};
 
 /// PlantUML JAR を探索する候補パスを返す。
 fn jar_candidate_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
+    // 環境変数が設定されている場合はそのパスのみを使用する（他の候補は無視）。
     if let Ok(env_path) = std::env::var("PLANTUML_JAR") {
-        paths.push(PathBuf::from(env_path));
+        return vec![PathBuf::from(env_path)];
     }
+    let mut paths = Vec::new();
     // Homebrew (Apple Silicon / Intel)
     for prefix in &["/opt/homebrew", "/usr/local"] {
         paths.push(PathBuf::from(prefix).join("opt/plantuml/libexec/plantuml.jar"));
