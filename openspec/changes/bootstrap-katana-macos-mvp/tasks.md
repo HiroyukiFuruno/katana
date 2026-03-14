@@ -46,9 +46,9 @@
 
 ## 8. User Feedback & Structural Refinements (Current Priorities)
 
-- [ ] 8.1 Fix Test Compilation: Fix the missing imports and visibility issues caused by separating internal tests to the `tests/` directory at the project root for crates.
-- [ ] 8.2 i18n & Settings Menu: Complete the setup of `en.json` and `ja.json` through the system, fix the View Mode texts to use `.t()`, and wire up the Settings -> Language menu properly. Change the binary name to `katana`.
+- [x] 8.1 Fix Test Compilation: Fix the missing imports and visibility issues caused by separating internal tests to the `tests/` directory at the project root for crates.
+- [x] 8.2 i18n & Settings Menu: Complete the setup of `en.json` and `ja.json` through the system, fix the View Mode texts to use `.t()`, and wire up the Settings -> Language menu properly. Change the binary name to `katana`.
 - [ ] 8.3 Lazy Load & Diagram UI: Ensure preview diagrams (PlantUML, Mermaid) do not block rendering and properly show a lazy-load placeholder ("Rendering...") while background processes are running. 
-- [ ] 8.4 PlantUML Desktop Focus Bug: Investigate and fix the PlantUML headless mode on macOS so it does not pull focus or move the user to the desktop.
-- [ ] 8.5 Mermaid Text Visibility: Fix Mermaid text not rendering properly by adjusting `mmdc` configurations or ensuring a fully configured headless rendering environment.
-- [ ] 8.6 Tabbed Interface & View Modes: Implement multiple documents opened via tabs. Add UI buttons to switch between Preview Only (default), Code Only, and Split mode.
+- [x] 8.4 PlantUML Desktop Focus Bug: Investigate and fix the PlantUML headless mode on macOS so it does not pull focus or move the user to the desktop.
+- [x] 8.5 Mermaid Text Visibility: Fix Mermaid text not rendering properly by adjusting `mmdc` configurations or ensuring a fully configured headless rendering environment.
+- [x] 8.6 Tabbed Interface & View Modes: Implement multiple documents opened via tabs. Add UI buttons to switch between Preview Only (default), Code Only, and Split mode.
