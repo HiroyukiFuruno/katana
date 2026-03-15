@@ -36,6 +36,15 @@ impl std::fmt::Display for Violation {
 }
 
 // ─────────────────────────────────────────────
+// 共通ユーティリティ
+// ─────────────────────────────────────────────
+
+/// `proc_macro2::Span` から (行番号, カラム番号) を取得する。
+fn span_location(span: proc_macro2::Span) -> (usize, usize) {
+    (span.start().line, span.start().column + 1)
+}
+
+// ─────────────────────────────────────────────
 // Allowlist — 記号・絵文字・数値のみの文字列をバイパス
 // ─────────────────────────────────────────────
 
@@ -136,11 +145,6 @@ impl I18nHardcodeVisitor {
         }
     }
 
-    /// `proc_macro2::Span` から行番号・カラム番号を取得する。
-    fn span_location(&self, span: proc_macro2::Span) -> (usize, usize) {
-        (span.start().line, span.start().column + 1)
-    }
-
     /// 引数リストから文字列リテラルのハードコードを検出する。
     fn check_string_literal_args(
         &mut self,
@@ -160,7 +164,7 @@ impl I18nHardcodeVisitor {
                 if let syn::Lit::Str(lit_str) = &expr_lit.lit {
                     let value = lit_str.value();
                     if !is_allowed_string(&value) {
-                        let (line, column) = self.span_location(lit_str.span());
+                        let (line, column) = span_location(lit_str.span());
                         self.violations.push(Violation {
                             file: self.file.clone(),
                             line,
@@ -176,7 +180,7 @@ impl I18nHardcodeVisitor {
             // format!(...) マクロ: format!("Saved: {}", val)
             syn::Expr::Macro(expr_macro) => {
                 if is_format_macro(&expr_macro.mac) {
-                    let (line, column) = self.span_location(
+                    let (line, column) = span_location(
                         expr_macro
                             .mac
                             .path
@@ -317,10 +321,6 @@ impl MagicNumberVisitor {
         }
     }
 
-    fn span_location(&self, span: proc_macro2::Span) -> (usize, usize) {
-        (span.start().line, span.start().column + 1)
-    }
-
     fn check_lit(&mut self, lit: &syn::Lit) {
         if self.in_const_context > 0 {
             return;
@@ -329,7 +329,7 @@ impl MagicNumberVisitor {
             syn::Lit::Int(lit_int) => {
                 if let Ok(value) = lit_int.base10_parse::<i64>() {
                     if !is_allowed_number(value as f64) {
-                        let (line, column) = self.span_location(lit_int.span());
+                        let (line, column) = span_location(lit_int.span());
                         self.violations.push(Violation {
                             file: self.file.clone(),
                             line,
@@ -344,7 +344,7 @@ impl MagicNumberVisitor {
             syn::Lit::Float(lit_float) => {
                 if let Ok(value) = lit_float.base10_parse::<f64>() {
                     if !is_allowed_number(value) {
-                        let (line, column) = self.span_location(lit_float.span());
+                        let (line, column) = span_location(lit_float.span());
                         self.violations.push(Violation {
                             file: self.file.clone(),
                             line,
