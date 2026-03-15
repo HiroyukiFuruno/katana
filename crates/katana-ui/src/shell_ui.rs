@@ -542,6 +542,7 @@ mod native_menu {
     extern "C" {
         pub fn katana_setup_native_menu();
         pub fn katana_poll_menu_action() -> i32;
+        pub fn katana_set_app_icon_png(png_data: *const u8, png_len: std::ffi::c_ulong);
     }
 }
 
@@ -553,6 +554,15 @@ mod native_menu {
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     native_menu::katana_setup_native_menu();
+}
+
+/// Sets the macOS application icon dynamically from PNG data.
+///
+/// # Safety
+/// Contains Objective-C runtime calls. Must be called from the main thread.
+#[cfg(all(target_os = "macos", not(test)))]
+pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
+    native_menu::katana_set_app_icon_png(png_data, png_len as std::ffi::c_ulong);
 }
 
 // ─────────────────────────────────────────────
