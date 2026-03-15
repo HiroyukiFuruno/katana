@@ -317,7 +317,11 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_app() -> KatanaApp {
-        let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+        let state = AppState::new(
+            AiProviderRegistry::new(),
+            PluginRegistry::new(),
+            katana_platform::SettingsService::default(),
+        );
         KatanaApp::new(state)
     }
 
@@ -567,7 +571,11 @@ mod tests_extra {
     use katana_core::{ai::AiProviderRegistry, plugin::PluginRegistry};
 
     fn make_app() -> KatanaApp {
-        let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+        let state = AppState::new(
+            AiProviderRegistry::new(),
+            PluginRegistry::new(),
+            katana_platform::SettingsService::default(),
+        );
         KatanaApp::new(state)
     }
 
