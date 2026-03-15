@@ -409,3 +409,38 @@ fn mxgeometryなしエッジのwaypointは空() {
     let result = render_drawio(&block);
     assert!(matches!(result, DiagramResult::Ok(_)));
 }
+
+// L296, L301, L309: collect_waypoints 内のテキストノードと非 Array 子要素
+#[test]
+fn collect_waypointsでテキストノードと非array子要素をスキップ() {
+    // mxGeometry 内にテキストノード（改行等）と Array 以外の子要素を含むケース
+    // as_element() が None → continue (L296)
+    // el.name != "Array" → continue (L309)
+    // Array 内にテキストノード → continue (L301)
+    let xml = r#"<mxGraphModel><root>
+<mxCell id="0"/><mxCell id="1" parent="0"/>
+<mxCell id="2" value="A" vertex="1" parent="1">
+    <mxGeometry x="10" y="10" width="100" height="50" as="geometry"/>
+</mxCell>
+<mxCell id="3" value="B" vertex="1" parent="1">
+    <mxGeometry x="200" y="10" width="100" height="50" as="geometry"/>
+</mxCell>
+<mxCell id="4" value="" edge="1" source="2" target="3" parent="1">
+    <mxGeometry relative="1" as="geometry">
+        <!-- テキストノード for L296 -->
+        text node here
+        <SomeOtherElement foo="bar"/>
+        <Array as="points">
+            text inside array for L301
+            <mxPoint x="100" y="200"/>
+        </Array>
+    </mxGeometry>
+</mxCell>
+</root></mxGraphModel>"#;
+    let block = DiagramBlock {
+        kind: DiagramKind::DrawIo,
+        source: xml.to_string(),
+    };
+    let result = render_drawio(&block);
+    assert!(matches!(result, DiagramResult::Ok(_)));
+}

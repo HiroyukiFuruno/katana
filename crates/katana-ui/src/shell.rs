@@ -533,13 +533,13 @@ mod tests {
     #[test]
     fn handle_open_workspace_error_sets_status_message() {
         let mut app = make_app();
-        // 存在しないパスでエラーを発生させる
         app.handle_open_workspace(PathBuf::from("/nonexistent/path/that/cannot/exist"));
-        // 成功の場合もあるが、エラーパスはステータスメッセージに記録されるはず
-        // ワークスペースが開けなかった場合の確認
-        if app.state.workspace.is_none() {
-            assert!(app.state.status_message.is_some());
-        }
+        // 存在しないパスなので workspace は None（空ディレクトリとして開かれる可能性も）
+        // エラーが記録される or workspace が空で開かれる
+        assert!(
+            app.state.workspace.is_some() || app.state.status_message.is_some(),
+            "エラーまたはワークスペースが設定されるべき"
+        );
     }
 
     // handle_select_document: 存在しないファイルのロードエラー (L198-204)
@@ -818,11 +818,9 @@ mod tests_extra {
 
         let url = format!("file://{}", src.display());
         let result = download_with_curl(&url, &dest);
-        // curl がインストールされていれば成功
-        match result {
-            Ok(()) => assert!(dest.exists()),
-            Err(_) => {} // curl がない環境では失敗してもOK
-        }
+        // macOS では curl が利用可能
+        assert!(result.is_ok());
+        assert!(dest.exists());
     }
 
     // process_action: OpenWorkspace (L234)
@@ -858,10 +856,96 @@ mod tests_extra {
     #[test]
     fn refresh_preview_updates_existing_pane() {
         let mut app = make_app();
-        let dir = make_temp_workspace();
-        let path = dir.path().join("test.md");
+        let _dir = make_temp_workspace();
+        let path = _dir.path().join("test.md");
         app.refresh_preview(&path, "# Initial");
         app.refresh_preview(&path, "# Updated");
-        // クラッシュしなければOK
+    }
+
+    // poll_download: download_rx が None の場合は何もしない
+    #[test]
+    fn poll_download_does_nothing_when_no_rx() {
+        let mut app = make_app();
+        let ctx = egui::Context::default();
+        app.poll_download(&ctx);
+        assert!(app.download_rx.is_none());
+    }
+
+    // poll_download: Ok(Ok(())) で完了 → status_message設定, download_rx=None
+    #[test]
+    fn poll_download_sets_status_on_success() {
+        let mut app = make_app();
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.download_rx = Some(rx);
+        tx.send(Ok(())).unwrap();
+        drop(tx);
+        let ctx = egui::Context::default();
+        app.poll_download(&ctx);
+        assert!(app.state.status_message.is_some());
+        assert!(app.download_rx.is_none());
+        assert!(matches!(app.pending_action, AppAction::RefreshDiagrams));
+    }
+
+    // poll_download: Ok(Err(e)) でエラー → error status_message
+    #[test]
+    fn poll_download_sets_error_on_failure() {
+        let mut app = make_app();
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.download_rx = Some(rx);
+        tx.send(Err("network error".to_string())).unwrap();
+        drop(tx);
+        let ctx = egui::Context::default();
+        app.poll_download(&ctx);
+        assert!(app.state.status_message.is_some());
+        assert!(app.download_rx.is_none());
+    }
+
+    // poll_download: Err(Empty) → まだ受信中
+    #[test]
+    fn poll_download_keeps_rx_when_empty() {
+        let mut app = make_app();
+        let (_tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+        app.download_rx = Some(rx);
+        let ctx = egui::Context::default();
+        app.poll_download(&ctx);
+        // Empty なので rx は維持される
+        assert!(app.download_rx.is_some());
+    }
+
+    // poll_download: Err(Disconnected) → 完了として処理
+    #[test]
+    fn poll_download_clears_rx_on_disconnect() {
+        let mut app = make_app();
+        let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+        drop(tx); // sender ドロップで Disconnected
+        app.download_rx = Some(rx);
+        let ctx = egui::Context::default();
+        app.poll_download(&ctx);
+        assert!(app.download_rx.is_none());
+    }
+
+    // download_with_curl: 失敗パス（不正URL → exit code 非0）
+    #[test]
+    fn download_with_curl_failure_returns_error() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let dest = dir.path().join("nonexistent.jar");
+        // 存在しないファイルURL → curl が失敗する
+        let result = download_with_curl("file:///nonexistent/path/to/file", &dest);
+        assert!(result.is_err());
+    }
+
+    // download_with_curl: create_dir_all パスをカバー（親ディレクトリが存在しない場合）
+    #[test]
+    fn download_with_curl_creates_parent_dirs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let src = dir.path().join("source.txt");
+        std::fs::write(&src, "hello").unwrap();
+        let dest = dir.path().join("subdir").join("deep").join("dest.txt");
+        let url = format!("file://{}", src.display());
+        let result = download_with_curl(&url, &dest);
+        // ディレクトリは作成される
+        assert!(dest.parent().unwrap().exists());
+        assert!(result.is_ok());
+        assert!(dest.exists());
     }
 }
