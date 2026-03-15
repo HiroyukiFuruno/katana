@@ -132,6 +132,13 @@ impl KatanaApp {
                 self.state.workspace = Some(ws);
                 self.state.open_documents.clear();
                 self.state.active_doc_idx = None;
+
+                // Persist the last opened workspace path.
+                self.state.settings.settings_mut().last_workspace =
+                    Some(path.display().to_string());
+                if let Err(e) = self.state.settings.save() {
+                    tracing::warn!("Failed to save settings: {e}");
+                }
             }
             Err(e) => {
                 let error = e.to_string();
@@ -229,6 +236,10 @@ impl KatanaApp {
             }
             AppAction::ChangeLanguage(lang) => {
                 crate::i18n::set_language(&lang);
+                self.state.settings.settings_mut().language = lang;
+                if let Err(e) = self.state.settings.save() {
+                    tracing::warn!("Failed to save settings: {e}");
+                }
             }
             AppAction::None => {}
         }
@@ -790,5 +801,41 @@ mod tests_extra {
         let dest = std::path::Path::new("/dev/null/impossible_dir/file.jar");
         let result = download_with_curl("file:///nonexistent/file", dest);
         assert!(result.is_err());
+    }
+
+    /// A mock repository that always fails on save, for testing error paths.
+    struct FailingRepository;
+
+    impl katana_platform::SettingsRepository for FailingRepository {
+        fn load(&self) -> katana_platform::settings::AppSettings {
+            katana_platform::settings::AppSettings::default()
+        }
+        fn save(&self, _settings: &katana_platform::settings::AppSettings) -> anyhow::Result<()> {
+            anyhow::bail!("simulated save failure")
+        }
+    }
+
+    fn make_app_with_failing_repo() -> KatanaApp {
+        let settings = katana_platform::SettingsService::new(Box::new(FailingRepository));
+        let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new(), settings);
+        KatanaApp::new(state)
+    }
+
+    // handle_open_workspace: settings.save() error is logged, not panicked
+    #[test]
+    fn handle_open_workspace_save_error_does_not_panic() {
+        let mut app = make_app_with_failing_repo();
+        let dir = make_temp_workspace();
+        app.handle_open_workspace(dir.path().to_path_buf());
+        // Workspace is still opened despite save failure
+        assert!(app.state.workspace.is_some());
+    }
+
+    // ChangeLanguage: settings.save() error is logged, not panicked
+    #[test]
+    fn change_language_save_error_does_not_panic() {
+        let mut app = make_app_with_failing_repo();
+        app.process_action(AppAction::ChangeLanguage("ja".to_string()));
+        // Language change still proceeds despite save failure
     }
 }
