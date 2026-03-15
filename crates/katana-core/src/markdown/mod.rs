@@ -167,3 +167,37 @@ fn transform_diagram_blocks<R: DiagramRenderer>(source: &str, renderer: &R) -> S
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // extract_fence_block: strip_prefix("```") が None（フェンスで始まらない入力）
+    #[test]
+    fn extract_fence_block_no_fence_prefix() {
+        assert!(extract_fence_block("not a fence").is_none());
+    }
+
+    // extract_fence_block: ``` はあるが改行がない（info_end の find('\n') が None）
+    #[test]
+    fn extract_fence_block_no_newline_after_info() {
+        assert!(extract_fence_block("```mermaid").is_none());
+    }
+
+    // extract_fence_block: 開きフェンスはあるが閉じフェンスがない
+    #[test]
+    fn extract_fence_block_no_closing_fence() {
+        assert!(extract_fence_block("```mermaid\ngraph TD; A-->B").is_none());
+    }
+
+    // extract_fence_block: 正常なフェンスブロック
+    #[test]
+    fn extract_fence_block_valid() {
+        let result = extract_fence_block("```mermaid\ngraph TD; A-->B\n```\nrest");
+        assert!(result.is_some());
+        let (block, rest) = result.unwrap();
+        assert_eq!(block.info, "mermaid");
+        assert_eq!(block.content, "graph TD; A-->B");
+        assert_eq!(rest, "rest");
+    }
+}
