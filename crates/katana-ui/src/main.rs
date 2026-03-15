@@ -1,13 +1,15 @@
 #![deny(warnings)]
 //! Katana UI application entry point.
 
-use katana_core::{
-    ai::AiProviderRegistry,
-    plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API_VERSION},
-};
+#[cfg(not(test))]
+use katana_core::ai::AiProviderRegistry;
+use katana_core::plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API_VERSION};
+#[cfg(not(test))]
 use katana_ui::app_state::AppState;
+#[cfg(not(test))]
 use katana_ui::shell::{self, KatanaApp};
 
+#[cfg(not(test))]
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
@@ -56,7 +58,7 @@ fn main() -> eframe::Result<()> {
 /// 日本語を含む CJK フォントを読み込んで egui に登録する。
 ///
 /// macOS バンドルの AquaKana.ttc などを倪側フォントとして追加する。
-fn setup_fonts(ctx: &egui::Context) {
+pub fn setup_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     // 試行順序: AquaKana (macOS) → Hiragino Sans GB → フォールバックなし。
     let candidates = [
@@ -65,9 +67,10 @@ fn setup_fonts(ctx: &egui::Context) {
     ];
     let loaded = load_first_font(&candidates);
     if let Some((name, data)) = loaded {
-        fonts
-            .font_data
-            .insert(name.clone(), egui::FontData::from_owned(data));
+        fonts.font_data.insert(
+            name.clone(),
+            std::sync::Arc::new(egui::FontData::from_owned(data)),
+        );
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
             if let Some(list) = fonts.families.get_mut(&family) {
                 // 追加フォントはフォールバックとして末尾に追加（日本語文字のみがこのフォントで描画される）。
@@ -91,7 +94,7 @@ fn setup_fonts(ctx: &egui::Context) {
 }
 
 /// 候補パスの先頭から読めたフォントを返す。
-fn load_first_font(candidates: &[&str]) -> Option<(String, Vec<u8>)> {
+pub fn load_first_font(candidates: &[&str]) -> Option<(String, Vec<u8>)> {
     for &path in candidates {
         if let Ok(data) = std::fs::read(path) {
             let name = std::path::Path::new(path)
@@ -109,7 +112,7 @@ fn load_first_font(candidates: &[&str]) -> Option<(String, Vec<u8>)> {
 ///
 /// In the MVP, all plugin registrations are static compile-time definitions.
 /// No runtime manifest file is required.
-fn register_builtin_plugins(registry: &mut PluginRegistry) {
+pub fn register_builtin_plugins(registry: &mut PluginRegistry) {
     // Built-in Mermaid renderer plugin (placeholder; actual renderer bound in Task 4.2).
     registry.register(
         PluginMeta {
@@ -142,4 +145,30 @@ fn register_builtin_plugins(registry: &mut PluginRegistry) {
         },
         || Ok(()),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_first_font_not_found() {
+        let candidates = ["/invalid/path/to/never/found/font.ttc"];
+        let result = load_first_font(&candidates);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_setup_fonts() {
+        let ctx = egui::Context::default();
+        setup_fonts(&ctx);
+        // Ensure no panics
+    }
+
+    #[test]
+    fn test_register_builtin_plugins() {
+        let mut registry = PluginRegistry::new();
+        register_builtin_plugins(&mut registry);
+        // Ensure it doesn't panic. No public field to check length easily.
+    }
 }

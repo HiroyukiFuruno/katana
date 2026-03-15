@@ -1,0 +1,20 @@
+# lefthook.yml
+pre-commit:
+  parallel: true
+  commands:
+    formatting:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+    clippy:
+      glob: "*.rs"
+      run: cargo clippy --workspace -- -D warnings
+
+pre-push:
+  parallel: true
+  commands:
+    test:
+      run: cargo test --workspace
+    test-integration:
+      run: make test-integration
+    coverage:
+      run: cargo llvm-cov --workspace --fail-under-lines 100

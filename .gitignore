@@ -68,3 +68,7 @@ openspec
 
 # Coverage
 target/llvm-cov/
+
+# egui_kittest snapshots
+**/tests/snapshots/**/*.diff.png
+*.new.png

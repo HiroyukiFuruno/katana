@@ -20,6 +20,7 @@ mod native_menu {
     pub const TAG_LANG_EN: i32 = 3;
     pub const TAG_LANG_JA: i32 = 4;
 
+    #[allow(dead_code)]
     extern "C" {
         pub fn katana_setup_native_menu();
         pub fn katana_poll_menu_action() -> i32;
@@ -31,7 +32,7 @@ mod native_menu {
 ///
 /// # Safety
 /// Objective-C ランタイム呼び出しを含む。メインスレッドから1回だけ呼ぶこと。
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     native_menu::katana_setup_native_menu();
 }
@@ -239,6 +240,17 @@ impl KatanaApp {
         if done {
             self.download_rx = None;
         }
+    }
+
+    /// テスト時などにプログラムからアクションを注入するためのメソッド
+    pub fn trigger_action(&mut self, action: AppAction) {
+        self.pending_action = action;
+    }
+
+    /// テスト時などに AppState のメソッドを呼び出すためのヘルパー
+    #[doc(hidden)]
+    pub fn app_state_mut(&mut self) -> &mut AppState {
+        &mut self.state
     }
 }
 
