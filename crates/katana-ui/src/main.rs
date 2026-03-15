@@ -18,6 +18,21 @@ const INITIAL_WINDOW_SIZE: [f32; 2] = [1280.0, 800.0];
 const MIN_WINDOW_SIZE: [f32; 2] = [800.0, 500.0];
 
 #[cfg(not(test))]
+fn load_icon() -> std::sync::Arc<egui::IconData> {
+    let icon_bytes = include_bytes!("../../../assets/icon.iconset/icon_512x512.png");
+    let image = image::load_from_memory(icon_bytes)
+        .expect("Failed to load icon byte map")
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+    let rgba = image.into_raw();
+    std::sync::Arc::new(egui::IconData {
+        rgba,
+        width,
+        height,
+    })
+}
+
+#[cfg(not(test))]
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
@@ -41,6 +56,7 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Katana")
+            .with_icon(load_icon())
             .with_inner_size(INITIAL_WINDOW_SIZE)
             .with_min_inner_size(MIN_WINDOW_SIZE),
         ..Default::default()
