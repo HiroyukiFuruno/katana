@@ -723,3 +723,181 @@ fn test_integration_refresh_button_click() {
     }
     harness.step();
 }
+
+// ── Persistence roundtrip tests (real file I/O) ──
+
+/// Helper: create a Harness backed by a JsonFileRepository at the given path.
+fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'static, KatanaApp> {
+    let path = settings_path.to_path_buf();
+    Harness::builder().build_eframe(move |_cc| {
+        let repo = katana_platform::JsonFileRepository::new(path.clone());
+        let settings = katana_platform::SettingsService::new(Box::new(repo));
+        let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new(), settings);
+        katana_ui::i18n::set_language("en");
+        KatanaApp::new(state)
+    })
+}
+
+#[test]
+fn test_persistence_workspace_roundtrip() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+
+    // Create a workspace directory.
+    let ws_dir = tempfile::tempdir().unwrap();
+    std::fs::write(ws_dir.path().join("doc.md"), "# Hello").unwrap();
+
+    // --- Session 1: Open workspace → settings saved to disk ---
+    {
+        let mut harness = setup_harness_with_json_repo(&settings_path);
+        harness.step();
+
+        harness
+            .state_mut()
+            .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+        harness.step();
+
+        // Verify workspace was opened.
+        assert!(harness.state_mut().app_state_mut().workspace.is_some());
+
+        // Verify settings file was written with the workspace path.
+        let json = std::fs::read_to_string(&settings_path).unwrap();
+        assert!(
+            json.contains(&ws_dir.path().display().to_string()),
+            "settings.json should contain the workspace path, got: {json}"
+        );
+    }
+
+    // --- Session 2: New app from the same file → workspace path is restored ---
+    {
+        let repo = katana_platform::JsonFileRepository::new(settings_path.to_path_buf());
+        let settings = katana_platform::SettingsService::new(Box::new(repo));
+        let restored_ws = settings.settings().last_workspace.clone();
+
+        assert!(
+            restored_ws.is_some(),
+            "last_workspace should be persisted in settings.json"
+        );
+        assert!(
+            restored_ws
+                .unwrap()
+                .contains(&ws_dir.path().display().to_string()),
+            "Restored workspace should match the previously opened directory"
+        );
+    }
+}
+
+#[test]
+fn test_persistence_language_roundtrip() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+
+    // --- Session 1: Change language to "ja" → saved to disk ---
+    {
+        let mut harness = setup_harness_with_json_repo(&settings_path);
+        harness.step();
+
+        harness
+            .state_mut()
+            .trigger_action(AppAction::ChangeLanguage("ja".to_string()));
+        harness.step();
+
+        let json = std::fs::read_to_string(&settings_path).unwrap();
+        assert!(
+            json.contains("\"language\": \"ja\""),
+            "settings.json should contain language=ja, got: {json}"
+        );
+    }
+
+    // --- Session 2: Reload from disk → language is "ja" ---
+    {
+        let repo = katana_platform::JsonFileRepository::new(settings_path.to_path_buf());
+        let settings = katana_platform::SettingsService::new(Box::new(repo));
+        assert_eq!(
+            settings.settings().language,
+            "ja",
+            "Language should be restored as 'ja' from disk"
+        );
+    }
+}
+
+#[test]
+fn test_persistence_multiple_changes_accumulate() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+
+    let ws_dir = tempfile::tempdir().unwrap();
+    std::fs::write(ws_dir.path().join("readme.md"), "# Readme").unwrap();
+
+    // --- Session 1: Open workspace + change language ---
+    {
+        let mut harness = setup_harness_with_json_repo(&settings_path);
+        harness.step();
+
+        harness
+            .state_mut()
+            .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+        harness.step();
+
+        harness
+            .state_mut()
+            .trigger_action(AppAction::ChangeLanguage("ja".to_string()));
+        harness.step();
+    }
+
+    // --- Session 2: Both workspace AND language should be restored ---
+    {
+        let repo = katana_platform::JsonFileRepository::new(settings_path.to_path_buf());
+        let settings = katana_platform::SettingsService::new(Box::new(repo));
+        let s = settings.settings();
+
+        assert!(
+            s.last_workspace.is_some(),
+            "last_workspace should be persisted"
+        );
+        assert_eq!(s.language, "ja", "language should be persisted");
+    }
+}
+
+#[test]
+fn test_persistence_corrupt_file_falls_back_to_defaults() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+
+    // Write corrupt JSON.
+    std::fs::write(&settings_path, "NOT VALID JSON {{{").unwrap();
+
+    // App should start with defaults without panicking.
+    let mut harness = setup_harness_with_json_repo(&settings_path);
+    harness.step();
+
+    let s = harness.state_mut().app_state_mut();
+    assert_eq!(
+        s.settings.settings().theme,
+        "dark",
+        "Should fall back to default theme"
+    );
+    assert_eq!(
+        s.settings.settings().language,
+        "en",
+        "Should fall back to default language"
+    );
+    assert!(
+        s.settings.settings().last_workspace.is_none(),
+        "Should fall back to no workspace"
+    );
+}
+
+#[test]
+fn test_persistence_missing_file_uses_defaults() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("nonexistent.json");
+
+    // File does not exist — should gracefully use defaults.
+    let mut harness = setup_harness_with_json_repo(&settings_path);
+    harness.step();
+
+    let s = harness.state_mut().app_state_mut();
+    assert_eq!(s.settings.settings().theme, "dark");
+    assert_eq!(s.settings.settings().language, "en");
+}
