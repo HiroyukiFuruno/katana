@@ -100,3 +100,55 @@ int katana_poll_menu_action(void) {
     g_last_action = 0;
     return action;
 }
+
+#import <objc/runtime.h>
+
+static NSImage *g_app_icon = nil;
+
+@implementation NSApplication (KatanaSwizzle)
+- (void)katana_orderFrontStandardAboutPanel:(id)sender {
+    if (g_app_icon) {
+        [self katana_orderFrontStandardAboutPanelWithOptions:@{ @"ApplicationIcon": g_app_icon }];
+    } else {
+        [self katana_orderFrontStandardAboutPanel:sender]; // Calls original
+    }
+}
+
+- (void)katana_orderFrontStandardAboutPanelWithOptions:(NSDictionary *)options {
+    if (g_app_icon) {
+        NSMutableDictionary *newOptions = [NSMutableDictionary dictionaryWithDictionary:options];
+        newOptions[@"ApplicationIcon"] = g_app_icon;
+        [self katana_orderFrontStandardAboutPanelWithOptions:newOptions]; // Calls original
+    } else {
+        [self katana_orderFrontStandardAboutPanelWithOptions:options];
+    }
+}
+@end
+
+static void swizzle_about_panel() {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = [NSApplication class];
+        
+        Method orig1 = class_getInstanceMethod(cls, @selector(orderFrontStandardAboutPanel:));
+        Method swiz1 = class_getInstanceMethod(cls, @selector(katana_orderFrontStandardAboutPanel:));
+        method_exchangeImplementations(orig1, swiz1);
+        
+        Method orig2 = class_getInstanceMethod(cls, @selector(orderFrontStandardAboutPanelWithOptions:));
+        Method swiz2 = class_getInstanceMethod(cls, @selector(katana_orderFrontStandardAboutPanelWithOptions:));
+        method_exchangeImplementations(orig2, swiz2);
+    });
+}
+
+/// Called from Rust: Sets the application and dock icon from PNG bytes.
+void katana_set_app_icon_png(const unsigned char *png_data, unsigned long png_len) {
+    @autoreleasepool {
+        NSData *data = [NSData dataWithBytes:png_data length:png_len];
+        NSImage *image = [[NSImage alloc] initWithData:data];
+        if (image) {
+            g_app_icon = image;
+            [NSApp setApplicationIconImage:image];
+            swizzle_about_panel();
+        }
+    }
+}

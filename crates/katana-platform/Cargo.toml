@@ -13,6 +13,7 @@ thiserror.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 rayon = "1.11.0"
+dirs = "6"
 
 [dev-dependencies]
 tempfile.workspace = true

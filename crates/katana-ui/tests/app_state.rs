@@ -1,11 +1,16 @@
 use katana_core::ai::AiProviderRegistry;
 use katana_core::plugin::PluginRegistry;
 use katana_core::Document;
+use katana_platform::SettingsService;
 use katana_ui::app_state::*;
 
 #[test]
 fn new_app_state_is_empty_and_default_view() {
-    let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let state = AppState::new(
+        AiProviderRegistry::new(),
+        PluginRegistry::new(),
+        SettingsService::in_memory(),
+    );
     assert!(state.workspace.is_none());
     assert!(state.open_documents.is_empty());
     assert_eq!(state.active_doc_idx, None);
@@ -14,7 +19,11 @@ fn new_app_state_is_empty_and_default_view() {
 
 #[test]
 fn active_document_returns_correct_doc_when_set() {
-    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let mut state = AppState::new(
+        AiProviderRegistry::new(),
+        PluginRegistry::new(),
+        SettingsService::in_memory(),
+    );
     let doc1 = Document::new("doc1.md", "Doc1");
     let doc2 = Document::new("doc2.md", "Doc2");
 
@@ -33,7 +42,11 @@ fn active_document_returns_correct_doc_when_set() {
 
 #[test]
 fn is_dirty_reflects_active_document_state() {
-    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let mut state = AppState::new(
+        AiProviderRegistry::new(),
+        PluginRegistry::new(),
+        SettingsService::in_memory(),
+    );
     assert!(!state.is_dirty()); // no document
 
     let mut doc = Document::new("test.md", "test");
@@ -46,7 +59,11 @@ fn is_dirty_reflects_active_document_state() {
 
 #[test]
 fn active_document_mut_returns_correct_mut_doc() {
-    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let mut state = AppState::new(
+        AiProviderRegistry::new(),
+        PluginRegistry::new(),
+        SettingsService::in_memory(),
+    );
     let doc1 = Document::new("doc1.md", "Doc1");
     state.open_documents.push(doc1);
     state.active_doc_idx = Some(0);
@@ -60,7 +77,11 @@ fn active_document_mut_returns_correct_mut_doc() {
 
 #[test]
 fn active_path_returns_path_of_active_document() {
-    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let mut state = AppState::new(
+        AiProviderRegistry::new(),
+        PluginRegistry::new(),
+        SettingsService::in_memory(),
+    );
     let doc1 = Document::new("doc1.md", "Doc1");
     state.open_documents.push(doc1);
     state.active_doc_idx = Some(0);

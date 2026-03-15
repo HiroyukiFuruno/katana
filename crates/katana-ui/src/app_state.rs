@@ -1,7 +1,7 @@
 //! Shared application state.
 //!
-//! `scroll_fraction` — State for bidirectionally synchronizing scroll position
-//! between editor and preview in Split mode, using a ratio (0.0–1.0).
+//! `scroll_fraction` — Splitモードでエディタ/プレビュー間の
+//! スクロール位置を比率 (0.0–1.0) で双方向同期するためのステート。
 //!
 //! A single `AppState` container is owned by the egui application. UI
 //! components render from this state and dispatch `AppAction` values back
@@ -10,9 +10,10 @@
 use katana_core::{
     ai::AiProviderRegistry, document::Document, plugin::PluginRegistry, workspace::Workspace,
 };
+use katana_platform::SettingsService;
 use std::collections::HashMap;
 
-/// Display mode for the UI layout
+/// UIレイアウトの表示モード
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ViewMode {
     PreviewOnly,
@@ -27,15 +28,15 @@ pub enum AppAction {
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
     SelectDocument(std::path::PathBuf),
-    /// Close a tab.
+    /// タブを閉じる
     CloseDocument(usize),
-    /// Update the buffer of the active document.
+    /// アクティブなドキュメントのバッファを更新
     UpdateBuffer(String),
     /// Explicitly save the active document.
     SaveDocument,
-    /// Fully re-render the preview, including diagrams.
+    /// ダイアグラムを含めてプレビューを完全再レンダリングする。
     RefreshDiagrams,
-    /// Change language.
+    /// 言語変更
     ChangeLanguage(String),
     /// No-op (used internally).
     None,
@@ -43,50 +44,57 @@ pub enum AppAction {
 
 /// Top-level application state shared across all UI components.
 pub struct AppState {
+    /// Application settings with persistence.
+    pub settings: SettingsService,
     /// The currently open workspace, if any.
     pub workspace: Option<Workspace>,
     /// Currently open documents (tabs).
     pub open_documents: Vec<Document>,
     /// Index of the currently active document, if any.
     pub active_doc_idx: Option<usize>,
-    /// View mode per tab. The key is the file path (to prevent index shifts after closing a tab).
+    /// タブごとの表示モード。キーはファイルパス（タブ閉じ後のインデックスずれを防ぐ）。
     pub tab_view_modes: HashMap<std::path::PathBuf, ViewMode>,
 
-    /// Plugin registry (will be referenced during plugin widget integration in future Task 5.x).
+    /// Plugin registry（将来の Task 5.x でプラグインウィジェット統合時に参照する）。
     pub _plugin_registry: PluginRegistry,
     /// Non-fatal status message for the status bar.
     pub status_message: Option<String>,
-    /// Show/hide the workspace panel.
+    /// ワークスペースパネルの表示・非表示。
     pub show_workspace: bool,
-    /// Trigger to expand/collapse the entire workspace tree. Some(true)=expand all, Some(false)=collapse all.
+    /// ワークスペースツリーの全展開/全折畳トリガー。Some(true)=全展開, Some(false)=全折畳。
     pub force_tree_open: Option<bool>,
-    /// Split mode scroll sync: Normalized scroll position (0.0–1.0).
+    /// Splitモード スクロール同期: 正規化されたスクロール位置 (0.0–1.0)。
     pub scroll_fraction: f32,
-    /// Source of the scroll operation. Prevents chain reactions (infinite loops).
+    /// スクロール操作の発生元。連鎖反応（無限ループ）を防ぐ。
     pub scroll_source: ScrollSource,
-    /// Previous frame's editor-side max_scroll (content_height - viewport_height).
+    /// 前フレームのエディタ側 max_scroll (content_height - viewport_height)。
     pub editor_max_scroll: f32,
-    /// Previous frame's preview-side max_scroll (content_height - viewport_height).
+    /// 前フレームのプレビュー側 max_scroll (content_height - viewport_height)。
     pub preview_max_scroll: f32,
 }
 
-/// Indicates the source of a scroll operation. Used to prevent chain reactions.
+/// スクロール操作の発生元を示す。連鎖反応を防ぐために使用。
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum ScrollSource {
-    /// No change from either (initial state).
+    /// どちらからも変更なし（初期状態）。
     #[default]
     Neither,
-    /// Scroll from the editor pane.
+    /// エディタペインからのスクロール。
     Editor,
-    /// Scroll from the preview pane.
+    /// プレビューペインからのスクロール。
     Preview,
 }
 
 impl AppState {
-    pub fn new(ai_registry: AiProviderRegistry, plugin_registry: PluginRegistry) -> Self {
-        // ai_registry is planned for future AI integration. Currently unused.
+    pub fn new(
+        ai_registry: AiProviderRegistry,
+        plugin_registry: PluginRegistry,
+        settings: SettingsService,
+    ) -> Self {
+        // ai_registry は将来 AI 統合時に使用予定。現時点では未使用。
         let _ = ai_registry;
         Self {
+            settings,
             workspace: None,
             open_documents: Vec::new(),
             active_doc_idx: None,
@@ -107,24 +115,24 @@ impl AppState {
         self.active_document().map(|d| d.is_dirty).unwrap_or(false)
     }
 
-    /// Get a reference to the currently active document.
+    /// 現在アクティブなドキュメントを参照する
     pub fn active_document(&self) -> Option<&Document> {
         self.active_doc_idx
             .and_then(|idx| self.open_documents.get(idx))
     }
 
-    /// Get a mutable reference to the currently active document.
+    /// 現在アクティブなドキュメントをミュータブルに参照する
     pub fn active_document_mut(&mut self) -> Option<&mut Document> {
         self.active_doc_idx
             .and_then(|idx| self.open_documents.get_mut(idx))
     }
 
-    /// Returns the path of the currently active document (used for highlighting in the workspace tree).
+    /// 現在アクティブなドキュメントのパスを返す（ワークスペースツリーのハイライトに使用）。
     pub fn active_path(&self) -> Option<&std::path::Path> {
         self.active_document().map(|d| d.path.as_path())
     }
 
-    /// Returns the view mode of the active tab. Default value if no tab is selected.
+    /// アクティブなタブの表示モードを返す。タブ未選択時はデフォルト値。
     pub fn active_view_mode(&self) -> ViewMode {
         self.active_document()
             .and_then(|doc| self.tab_view_modes.get(&doc.path))
@@ -132,7 +140,7 @@ impl AppState {
             .unwrap_or(ViewMode::PreviewOnly)
     }
 
-    /// Sets the view mode of the active tab.
+    /// アクティブなタブの表示モードを設定する。
     pub fn set_active_view_mode(&mut self, mode: ViewMode) {
         if let Some(doc) = self.active_document() {
             let path = doc.path.clone();
