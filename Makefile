@@ -41,6 +41,10 @@ fmt-check: ## Check format differences (for CI)
 lint: ## Run Clippy (forces zero warnings)
 	cargo clippy --workspace -- -D warnings
 
+.PHONY: lint-fix
+lint-fix: ## Run Clippy and apply automatic fixes
+	cargo clippy --workspace --fix --allow-dirty --allow-staged -- -D warnings
+
 .PHONY: check
 check: ## cargo check (type check only, fast)
 	cargo check --workspace

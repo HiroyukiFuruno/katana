@@ -4,17 +4,12 @@ pre-commit:
   commands:
     formatting:
       glob: "*.rs"
-      run: cargo fmt --all -- --check
+      run: make fmt
     clippy:
       glob: "*.rs"
-      run: cargo clippy --workspace -- -D warnings
+      run: make lint-fix
 
 pre-push:
-  parallel: true
   commands:
-    test:
-      run: cargo test --workspace
-    test-integration:
-      run: make test-integration
-    coverage:
-      run: cargo llvm-cov --workspace --fail-under-lines 100
+    ci:
+      run: make ci
