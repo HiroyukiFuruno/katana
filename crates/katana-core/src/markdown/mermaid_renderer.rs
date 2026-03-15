@@ -1,12 +1,12 @@
-//! Mermaid CLI (`mmdc`) サブプロセスレンダラー。
+//! Mermaid CLI (`mmdc`) subprocess renderer.
 //!
-//! システムにインストールされた `mmdc` を呼び出し、
-//! Mermaid ソースを SVG に変換して返す。
+//! Calls the system-installed `mmdc`,
+//! converts Mermaid source to SVG and returns it.
 //!
-//! MVP 制約:
-//! - `mmdc` がシステム PATH 上にある場合のみ動作する。
-//! - `MERMAID_MMDC` 環境変数で代替バイナリパスを指定可能。
-//! - 入力は生の Mermaid ソース（コードフェンスのマーカーを除く）。
+//! MVP constraints:
+//! - Only works if `mmdc` is on the system PATH.
+//! - Alternative binary path can be specified via the `MERMAID_MMDC` environment variable.
+//! - Input is raw Mermaid source (excluding code fence markers).
 
 use std::{
     io::Write,
@@ -17,18 +17,18 @@ use tempfile::NamedTempFile;
 
 use super::diagram::{DiagramBlock, DiagramResult};
 
-/// 使用する `mmdc` バイナリパスを解決する。
+/// Resolves the `mmdc` binary path to use.
 ///
-/// 1. `MERMAID_MMDC` 環境変数が設定されていればそれを使う。
-/// 2. ログインシェル経由で `which mmdc` を実行し、nvm 等のパスも含めて探す。
-///    GUI アプリはシェルの PATH を引き継がないため、`sh -l -c` でログインシェルを使う。
-/// 3. どちらも見つからなければフォールバックとして `mmdc` を返す。
+/// 1. If the `MERMAID_MMDC` environment variable is set, use it.
+/// 2. Run `which mmdc` via login shell to search including paths like nvm.
+///    Since GUI apps don't inherit the shell's PATH, use `sh -l -c` for a login shell.
+/// 3. If neither is found, return `mmdc` as a fallback.
 pub fn resolve_mmdc_binary() -> PathBuf {
     if let Ok(env_path) = std::env::var("MERMAID_MMDC") {
         return PathBuf::from(env_path);
     }
 
-    // ログインシェル経由で実パスを解決する（nvm, volta 等に対応）。
+    // Resolve actual path via login shell (for nvm, volta, etc.).
     if let Ok(output) = Command::new("sh")
         .args(["-l", "-c", "which mmdc"])
         .stdout(Stdio::piped())
@@ -46,7 +46,7 @@ pub fn resolve_mmdc_binary() -> PathBuf {
     PathBuf::from("mmdc")
 }
 
-/// `mmdc` が利用可能かどうかを確認する。
+/// Checks if `mmdc` is available.
 pub fn is_mmdc_available() -> bool {
     Command::new(resolve_mmdc_binary())
         .arg("--version")
@@ -57,10 +57,10 @@ pub fn is_mmdc_available() -> bool {
         .unwrap_or(false)
 }
 
-/// Mermaid ソースを PNG に変換する。
+/// Converts Mermaid source to PNG.
 ///
-/// mmdc (Puppeteer/Chrome ベース) で PNG をレンダリングすることで
-/// resvg の `<foreignObject>` 非対応を回避する。
+/// Rendering as PNG with mmdc (Puppeteer/Chrome based)
+/// bypasses resvg's lack of support for `<foreignObject>`.
 pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     if !is_mmdc_available() {
         return DiagramResult::CommandNotFound {
@@ -78,13 +78,13 @@ pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// 一時ファイルを介して mmdc を実行し PNG バイト列を返す。
+/// Executes mmdc via a temporary file and returns PNG bytes.
 ///
-/// PNG 出力により mmdc (Puppeteer) がすべての SVG 要素を正しくレンダリングする。
-/// resvg が非対応の `<foreignObject>` によるテキスト消失を回避できる。
+/// PNG output ensures mmdc (Puppeteer) correctly renders all SVG elements.
+/// Bypasses text loss caused by `<foreignObject>` which resvg doesn't support.
 pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     let input_file = create_input_file(source)?;
-    // mmdc は出力ファイルの拡張子で形式を判断する。
+    // mmdc determines the format by the output file's extension.
     let output_path = input_file.path().with_extension("png");
 
     let status = Command::new(resolve_mmdc_binary())
@@ -102,19 +102,19 @@ pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .status()
-        .map_err(|e| format!("mmdc 起動失敗: {e}"))?;
+        .map_err(|e| format!("mmdc startup failed: {e}"))?;
 
     if !status.success() {
-        return Err("mmdc がゼロ以外の終了コードを返しました".to_string());
+        return Err("mmdc returned a non-zero exit code".to_string());
     }
-    std::fs::read(&output_path).map_err(|e| format!("PNG 読み込み失敗: {e}"))
+    std::fs::read(&output_path).map_err(|e| format!("PNG read failed: {e}"))
 }
 
-/// Mermaid ソースを一時ファイルに書き出す。
+/// Writes Mermaid source to a temporary file.
 pub fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
-    let mut file =
-        NamedTempFile::with_suffix(".mmd").map_err(|e| format!("一時ファイル作成失敗: {e}"))?;
+    let mut file = NamedTempFile::with_suffix(".mmd")
+        .map_err(|e| format!("Temp file creation failed: {e}"))?;
     file.write_all(source.as_bytes())
-        .map_err(|e| format!("一時ファイル書き込み失敗: {e}"))?;
+        .map_err(|e| format!("Temp file write failed: {e}"))?;
     Ok(file)
 }

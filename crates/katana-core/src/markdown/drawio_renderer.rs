@@ -1,31 +1,31 @@
-//! Draw.io (mxGraph) XML → SVG 変換レンダラー。
+//! Draw.io (mxGraph) XML to SVG conversion renderer.
 //!
-//! MVP 対応範囲:
-//! - 非圧縮の `<mxfile>` / `<mxGraphModel>` XML のみ受け付ける。
-//! - `<mxCell>` の `vertex`（矩形・角丸矩形）と `edge`（直線矢印）を SVG に変換する。
-//! - スタイルパースは最小限（`rounded`, `ellipse`, `label`, `fillColor`, `strokeColor`）。
-//! - 非対応要素はスキップし、対応要素のみ描画する。
+//! MVP supported scope:
+//! - Only accepts uncompressed `<mxfile>` / `<mxGraphModel>` XML.
+//! - Converts `vertex` (rectangle/rounded rectangle) and `edge` (straight arrow) of `<mxCell>` to SVG.
+//! - Minimal style parsing (`rounded`, `ellipse`, `label`, `fillColor`, `strokeColor`).
+//! - Unsupported elements are skipped, rendering only supported ones.
 
 use xmltree::Element;
 
 use super::diagram::{DiagramBlock, DiagramResult};
 
-/// Draw.io キャンバスの最小幅（要素がない場合のフォールバック）。
+/// Minimum width of the Draw.io canvas (fallback when there are no elements).
 const CANVAS_MIN_WIDTH: f64 = 400.0;
 
-/// Draw.io キャンバスの最小高さ（要素がない場合のフォールバック）。
+/// Minimum height of the Draw.io canvas (fallback when there are no elements).
 const CANVAS_MIN_HEIGHT: f64 = 300.0;
 
-/// キャンバスサイズ推定時に各要素の端から追加するマージン (px)。
+/// Margin added from the edges of each element when estimating canvas size (px).
 const CANVAS_EDGE_MARGIN: f64 = 20.0;
 
-/// エッジラベルのベースラインからの上方オフセット (px)。
+/// Upward offset of edge labels from the baseline (px).
 const EDGE_LABEL_VERTICAL_OFFSET: f64 = 6.0;
 
-/// border_point() でゼロ除算を防ぐためのベクトル長最小閾値。
+/// Minimum vector length threshold to prevent division by zero in `border_point()`.
 const BORDER_POINT_EPSILON: f64 = 0.001;
 
-/// Draw.io XML を SVG HTML フラグメントに変換する。
+/// Converts Draw.io XML to an SVG HTML fragment.
 pub fn render_drawio(block: &DiagramBlock) -> DiagramResult {
     match convert_xml_to_svg(&block.source) {
         Ok(svg) => DiagramResult::Ok(format!(r#"<div class="katana-diagram drawio">{svg}</div>"#)),
@@ -36,16 +36,16 @@ pub fn render_drawio(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// XML を解析して SVG 文字列を返す。
+/// Parses XML and returns an SVG string.
 fn convert_xml_to_svg(xml: &str) -> Result<String, String> {
-    let root = Element::parse(xml.as_bytes()).map_err(|e| format!("XML パースエラー: {e}"))?;
+    let root = Element::parse(xml.as_bytes()).map_err(|e| format!("XML parse error: {e}"))?;
     let model = extract_graph_model(&root)?;
     let cells = collect_cells(model);
     let (w, h) = estimate_canvas_size(&cells);
     Ok(build_svg(&cells, w, h))
 }
 
-/// `<mxfile>` か `<mxGraphModel>` のどちらかから `<mxGraphModel>` 要素を返す。
+/// Returns the `<mxGraphModel>` element from either `<mxfile>` or `<mxGraphModel>`.
 fn extract_graph_model(root: &Element) -> Result<&Element, String> {
     if root.name == "mxGraphModel" {
         return Ok(root);
@@ -53,15 +53,15 @@ fn extract_graph_model(root: &Element) -> Result<&Element, String> {
     if root.name == "mxfile" {
         let diagram = root
             .get_child("diagram")
-            .ok_or("<diagram> 要素が見つかりません")?;
+            .ok_or("<diagram> element not found")?;
         return diagram
             .get_child("mxGraphModel")
-            .ok_or("<mxGraphModel> 要素が見つかりません".to_string());
+            .ok_or("<mxGraphModel> element not found".to_string());
     }
-    Err(format!("サポート外のルート要素: {}", root.name))
+    Err(format!("Unsupported root element: {}", root.name))
 }
 
-/// `<root>` 以下の全 `<mxCell>` を収集する。
+/// Collects all `<mxCell>` elements under `<root>`.
 fn collect_cells(model: &Element) -> Vec<&Element> {
     let root = match model.get_child("root") {
         Some(r) => r,
@@ -74,7 +74,7 @@ fn collect_cells(model: &Element) -> Vec<&Element> {
         .collect()
 }
 
-/// キャンバスサイズを推定する（全頂点の最大座標 + マージン）。
+/// Estimates canvas size (maximum coordinates of all vertices + margin).
 fn estimate_canvas_size(cells: &[&Element]) -> (f64, f64) {
     let (mut max_x, mut max_y) = (CANVAS_MIN_WIDTH, CANVAS_MIN_HEIGHT);
     for cell in cells {
@@ -90,9 +90,9 @@ fn estimate_canvas_size(cells: &[&Element]) -> (f64, f64) {
     (max_x, max_y)
 }
 
-/// SVG 文書全体を組み立てる。
+/// Assembles the entire SVG document.
 fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
-    // セル ID → (x, y, w, h) のマップを構築する。
+    // Builds a map of cell ID -> (x, y, w, h).
     let mut geo_map: std::collections::HashMap<String, (f64, f64, f64, f64)> =
         std::collections::HashMap::new();
     for cell in cells {
@@ -113,7 +113,7 @@ fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
     }
     let mut shapes = String::new();
     let mut labels = String::new();
-    // SVG 矢印マーカーを定義する。
+    // Defines the SVG arrow marker.
     shapes.push_str(
         "<defs><marker id=\"katana-arrow\" markerWidth=\"8\" markerHeight=\"6\" refX=\"8\" refY=\"3\" orient=\"auto\"><polygon points=\"0 0, 8 3, 0 6\" fill=\"#555555\"/></marker></defs>"
     );
@@ -125,7 +125,7 @@ fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
     )
 }
 
-/// 単一の `<mxCell>` を shapes/labels バッファに書き出す。
+/// Writes a single `<mxCell>` to the shapes/labels buffers.
 fn render_cell(
     cell: &Element,
     shapes: &mut String,
@@ -149,7 +149,7 @@ fn render_cell(
     }
 }
 
-/// 頂点の図形部分（rect/ellipse）を描画する。
+/// Renders the shape part (rect/ellipse) of a vertex.
 fn render_shape(geo: &Element, style: &str, shapes: &mut String) {
     let x = attr_f64(geo, "x");
     let y = attr_f64(geo, "y");
@@ -177,7 +177,7 @@ fn render_shape(geo: &Element, style: &str, shapes: &mut String) {
     }
 }
 
-/// 頂点セルを SVG 図形 + ラベルとして描画する。
+/// Renders a vertex cell as an SVG shape + label.
 fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
     let Some(geo) = cell.get_child("mxGeometry") else {
         return;
@@ -193,7 +193,7 @@ fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
     append_label(cell, cx, cy, labels);
 }
 
-/// 矩形の位置・サイズを保持する構造体。
+/// Struct holding the position and size of a rectangle.
 struct Rect {
     x: f64,
     y: f64,
@@ -207,10 +207,10 @@ impl Rect {
     }
 }
 
-/// エッジセルを矢印付き折れ線（ポリライン）として描画する。
+/// Renders an edge cell as a polyline with an arrow.
 ///
-/// ソース・ターゲットの矩形ボーダー上の最近点を接続点とし、
-/// `mxGeometry` 内の `Array` 要素に含まれる `mxPoint` 中間点も経由する。
+/// Uses the nearest point on the source and target rectangle borders as connection points,
+/// and also routes through `mxPoint` waypoints included in the `Array` element within `mxGeometry`.
 fn render_edge(
     cell: &Element,
     shapes: &mut String,
@@ -260,7 +260,7 @@ fn render_edge(
     append_edge_label(cell, shapes, x1, y1, x2, y2);
 }
 
-/// ポリライン座標列を組み立てる。
+/// Assembles the polyline coordinate sequence.
 fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2: f64) -> String {
     let mut s = format!("{x1:.1},{y1:.1}");
     for (wx, wy) in waypoints {
@@ -270,7 +270,7 @@ fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2
     s
 }
 
-/// エッジラベルがあれば中間地点に描画する。
+/// Renders the edge label at the midpoint, if it exists.
 fn append_edge_label(cell: &Element, shapes: &mut String, x1: f64, y1: f64, x2: f64, y2: f64) {
     if let Some(label) = cell.attributes.get("value") {
         if !label.is_empty() {
@@ -285,7 +285,7 @@ fn append_edge_label(cell: &Element, shapes: &mut String, x1: f64, y1: f64, x2: 
     }
 }
 
-/// mxGeometry 内の Array > mxPoint 要素からウェイポイント座標を収集する。
+/// Collects waypoint coordinates from `Array` > `mxPoint` elements within `mxGeometry`.
 fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
     let Some(geo) = cell.get_child("mxGeometry") else {
         return Vec::new();
@@ -311,7 +311,7 @@ fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
     points
 }
 
-/// 矩形のボーダー上で、(cx, cy) から (tx, ty) への方向ベクトルに沿った接続点を返す。
+/// Returns the connection point on the rectangle's border along the direction vector from `(cx, cy)` to `(tx, ty)`.
 fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
     let dx = tx - cx;
     let dy = ty - cy;
@@ -319,14 +319,14 @@ fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
         return (cx, cy);
     }
     if dx.abs() * rect.h >= dy.abs() * rect.w {
-        // 左右のボーダーに当たる
+        // Hits the left or right border
         if dx >= 0.0 {
             (rect.x + rect.w, cy + dy * (rect.w / 2.0) / dx.abs())
         } else {
             (rect.x, cy - dy * (rect.w / 2.0) / dx.abs())
         }
     } else {
-        // 上下のボーダーに当たる
+        // Hits the top or bottom border
         if dy >= 0.0 {
             (cx + dx * (rect.h / 2.0) / dy.abs(), rect.y + rect.h)
         } else {
@@ -335,14 +335,14 @@ fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
     }
 }
 
-/// セルのラベルテキストを SVG <text> として追加する。
+/// Adds the cell's label text as an SVG `<text>` element.
 fn append_label(cell: &Element, cx: f64, cy: f64, labels: &mut String) {
     let label = match cell.attributes.get("value") {
         Some(v) if !v.is_empty() => v.as_str(),
         _ => return,
     };
-    // dy="0.35em" で垂直中央揃え（dominant-baseline は resvg が未サポートのため）。
-    // fill を明示指定しないと resvg がテキストをスキップする場合がある。
+    // Vertical centering with `dy="0.35em"` (because `dominant-baseline` is not supported by resvg).
+    // If `fill` is not explicitly specified, resvg may skip the text.
     const TEXT_COLOR: &str = "#333333";
     labels.push_str(&format!(
         r#"<text x="{cx}" y="{cy}" dy="0.35em" text-anchor="middle" font-family="sans-serif" font-size="12" fill="{TEXT_COLOR}">{}</text>"#,
@@ -350,7 +350,7 @@ fn append_label(cell: &Element, cx: f64, cy: f64, labels: &mut String) {
     ));
 }
 
-/// XML 属性を `f64` として取得する。存在しない場合は 0.0。
+/// Gets an XML attribute as `f64`. Returns 0.0 if it doesn't exist.
 fn attr_f64(el: &Element, name: &str) -> f64 {
     el.attributes
         .get(name)
@@ -358,7 +358,7 @@ fn attr_f64(el: &Element, name: &str) -> f64 {
         .unwrap_or(0.0)
 }
 
-/// mxGraph スタイル文字列から `key=value` を取り出す。
+/// Extracts `key=value` from an mxGraph style string.
 fn extract_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
     style.split(';').find_map(|pair| {
         let (k, v) = pair.split_once('=')?;
@@ -366,7 +366,7 @@ fn extract_style_value<'a>(style: &'a str, key: &str) -> Option<&'a str> {
     })
 }
 
-/// SVG テキストノード用の最小限 XML エスケープ。
+/// Minimal XML escape for SVG text nodes.
 fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")

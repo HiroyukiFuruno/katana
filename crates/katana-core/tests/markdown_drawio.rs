@@ -13,7 +13,7 @@ const SIMPLE_DRAWIO_XML: &str = r#"<mxfile><diagram name="test"><mxGraphModel><r
 </root></mxGraphModel></diagram></mxfile>"#;
 
 #[test]
-fn 有効なdrawio_xmlがsvgに変換される() {
+fn valid_drawio_xml_is_converted_to_svg() {
     let block = DiagramBlock {
         kind: DiagramKind::DrawIo,
         source: SIMPLE_DRAWIO_XML.to_string(),
@@ -28,7 +28,7 @@ fn 有効なdrawio_xmlがsvgに変換される() {
 }
 
 #[test]
-fn 無効なxmlはエラー結果を返す() {
+fn invalid_xml_returns_error_result() {
     let block = DiagramBlock {
         kind: DiagramKind::DrawIo,
         source: "not xml".to_string(),
@@ -38,7 +38,7 @@ fn 無効なxmlはエラー結果を返す() {
 }
 
 #[test]
-fn 楕円スタイルが処理される() {
+fn ellipse_style_is_processed() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="Circle" style="ellipse;" vertex="1" parent="1">
@@ -56,8 +56,8 @@ fn 楕円スタイルが処理される() {
 }
 
 #[test]
-fn fillcolorスタイルがsvg出力に反映される() {
-    // extract_style_value の振る舞いは render_drawio 経由で検証する
+fn fillcolor_style_is_reflected_in_svg_output() {
+    // extract_style_value behavior is verified through render_drawio
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="Colored" style="fillColor=#ff0000;strokeColor=#00ff00;" vertex="1" parent="1">
@@ -83,7 +83,7 @@ fn fillcolorスタイルがsvg出力に反映される() {
 
 // Edge rendering (L147-261): src/target vertices + edge cell
 #[test]
-fn エッジセルが矢印として描画される() {
+fn edge_cell_is_drawn_as_arrow() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -111,7 +111,7 @@ fn エッジセルが矢印として描画される() {
 
 // Edge with label (append_edge_label L273-286)
 #[test]
-fn エッジラベルが描画される() {
+fn edge_label_is_drawn() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -137,7 +137,7 @@ fn エッジラベルが描画される() {
 
 // Edge with waypoints in mxGeometry/Array/mxPoint (collect_waypoints L289-312)
 #[test]
-fn ウェイポイント付きエッジが描画される() {
+fn edge_with_waypoints_is_drawn() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -170,7 +170,7 @@ fn ウェイポイント付きエッジが描画される() {
 
 // Edge without source/target (should be skipped, L221-226)
 #[test]
-fn ソースなしエッジはスキップされる() {
+fn edge_without_source_is_skipped() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -193,7 +193,7 @@ fn ソースなしエッジはスキップされる() {
 // border_point: same-point case (dx, dy both near zero, L318-319)
 // This is tested via edge where src and target centers are very close
 #[test]
-fn 同位置セルのエッジはパニックしない() {
+fn edge_with_cells_at_same_position_does_not_panic() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -218,7 +218,7 @@ fn 同位置セルのエッジはパニックしない() {
 
 // border_point: vertical edge case (dx small, dy large → top/bottom border, L329-334)
 #[test]
-fn 垂直エッジが上下ボーダー点を使う() {
+fn vertical_edge_uses_top_bottom_border_points() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -242,7 +242,7 @@ fn 垂直エッジが上下ボーダー点を使う() {
 
 // xml_escape in SVG text: label with & < >
 #[test]
-fn ラベルの特殊文字がエスケープされる() {
+fn special_characters_in_label_are_escaped() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/>
 <mxCell id="1" parent="0"/>
@@ -263,7 +263,7 @@ fn ラベルの特殊文字がエスケープされる() {
 
 // mxGraphModel without root element returns empty SVG (L67-68: None branch)
 #[test]
-fn rootなしmxgraphmodelは空svgを返す() {
+fn mxgraphmodel_without_root_returns_empty_svg() {
     let xml = r#"<mxGraphModel></mxGraphModel>"#;
     let block = DiagramBlock {
         kind: DiagramKind::DrawIo,
@@ -275,7 +275,7 @@ fn rootなしmxgraphmodelは空svgを返す() {
 
 // Unsupported root element error (L61)
 #[test]
-fn 未対応のルート要素はエラーを返す() {
+fn unsupported_root_element_returns_error() {
     let xml = r#"<svg><g></g></svg>"#;
     let block = DiagramBlock {
         kind: DiagramKind::DrawIo,
@@ -285,9 +285,9 @@ fn 未対応のルート要素はエラーを返す() {
     assert!(matches!(result, DiagramResult::Err { .. }));
 }
 
-// L183: mxGeometry なしの vertex セルは render_vertex で早期リターン
+// L183: vertex cell without mxGeometry returns early in render_vertex
 #[test]
-fn mxgeometryなし頂点はスキップされる() {
+fn vertex_without_mxgeometry_is_skipped() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="NoGeo" vertex="1" parent="1"/>
@@ -299,14 +299,14 @@ fn mxgeometryなし頂点はスキップされる() {
     let result = render_drawio(&block);
     assert!(matches!(result, DiagramResult::Ok(_)));
     if let DiagramResult::Ok(html) = result {
-        // mxGeometry がないのでこの頂点の図形は描画されないがパニックしない
+        // The shape for this vertex is not drawn due to missing mxGeometry, but does not panic
         assert!(html.contains("<svg"));
     }
 }
 
-// L221-225: source なしエッジ, L223-225: target なしエッジ
+// L221-225: edge without source, L223-225: edge without target
 #[test]
-fn source_targetなしエッジはスキップされる() {
+fn edge_without_source_target_is_skipped() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="A" vertex="1" parent="1">
@@ -323,9 +323,9 @@ fn source_targetなしエッジはスキップされる() {
     assert!(matches!(result, DiagramResult::Ok(_)));
 }
 
-// L227-231: source/target IDがgeo_mapに存在しないエッジ
+// L227-231: edge with source/target ID not in geo_map
 #[test]
-fn 存在しないsource_target_idのエッジはスキップされる() {
+fn edge_with_non_existent_source_target_id_is_skipped() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="A" vertex="1" parent="1">
@@ -342,9 +342,9 @@ fn 存在しないsource_target_idのエッジはスキップされる() {
     assert!(matches!(result, DiagramResult::Ok(_)));
 }
 
-// L342: value属性なしの頂点（ラベルなし）
+// L342: vertex without value attribute (no label)
 #[test]
-fn ラベルなし頂点はテキスト要素を出力しない() {
+fn vertex_without_label_outputs_no_text_element() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" vertex="1" parent="1">
@@ -362,9 +362,9 @@ fn ラベルなし頂点はテキスト要素を出力しない() {
     }
 }
 
-// L275-285: エッジの空ラベル / ラベルなし
+// L275-285: empty edge label / no label
 #[test]
-fn エッジの空ラベルはテキストを出力しない() {
+fn empty_edge_label_outputs_no_text() {
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="A" vertex="1" parent="1">
@@ -388,10 +388,10 @@ fn エッジの空ラベルはテキストを出力しない() {
     assert!(matches!(result, DiagramResult::Ok(_)));
 }
 
-// L290-311: collect_waypoints の mxGeometry なしエッジ + Array/mxPoint 処理
+// L290-311: edge without mxGeometry in collect_waypoints + Array/mxPoint processing
 #[test]
-fn mxgeometryなしエッジのwaypointは空() {
-    // source/target が存在する正常なエッジだが mxGeometry がないケース
+fn edge_waypoint_without_mxgeometry_is_empty() {
+    // Valid edge with source/target but lacking mxGeometry
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="A" vertex="1" parent="1">
@@ -410,13 +410,13 @@ fn mxgeometryなしエッジのwaypointは空() {
     assert!(matches!(result, DiagramResult::Ok(_)));
 }
 
-// L296, L301, L309: collect_waypoints 内のテキストノードと非 Array 子要素
+// L296, L301, L309: text node and non-Array child elements within collect_waypoints
 #[test]
-fn collect_waypointsでテキストノードと非array子要素をスキップ() {
-    // mxGeometry 内にテキストノード（改行等）と Array 以外の子要素を含むケース
-    // as_element() が None → continue (L296)
-    // el.name != "Array" → continue (L309)
-    // Array 内にテキストノード → continue (L301)
+fn collect_waypoints_skips_text_node_and_non_array_child_elements() {
+    // Case where mxGeometry contains text nodes (newlines, etc.) and non-Array child elements
+    // as_element() returns None -> continue (L296)
+    // el.name != "Array" -> continue (L309)
+    // Text node within Array -> continue (L301)
     let xml = r#"<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="2" value="A" vertex="1" parent="1">
@@ -427,7 +427,7 @@ fn collect_waypointsでテキストノードと非array子要素をスキップ(
 </mxCell>
 <mxCell id="4" value="" edge="1" source="2" target="3" parent="1">
     <mxGeometry relative="1" as="geometry">
-        <!-- テキストノード for L296 -->
+        <!-- text node for L296 -->
         text node here
         <SomeOtherElement foo="bar"/>
         <Array as="points">

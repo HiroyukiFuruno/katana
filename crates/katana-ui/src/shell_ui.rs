@@ -1,12 +1,12 @@
-//! Katana shell の純粋な egui UI 描画関数群。
+//! Pure egui UI rendering functions for the Katana shell.
 //!
-//! このモジュールはすべて egui のフレームコンテキスト・UIイベント（クリック等）に
-//! 依存するコードを含む。
-//! - `eframe::App::update` 内でしか呼べない描画関数
-//! - ユーザーのクリックイベントなしには実行されないブランチ
-//! - `rfd` のファイルダイアログ等のOS UI依存コード
+//! This module contains code that depends entirely on the egui frame context
+//! and UI events (e.g., clicks).
+//! - Rendering functions that can only be called within `eframe::App::update`
+//! - Branches that are not executed without user click events
+//! - OS UI dependent code like `rfd` file dialogs
 //!
-//! そのためコードカバレッジ計測では `--ignore-filename-regex` で除外する。
+//! Therefore, it is excluded from code coverage measurement using `--ignore-filename-regex`.
 
 use eframe::egui;
 
@@ -252,7 +252,7 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     });
 }
 
-/// タブ行: 開いているドキュメントのタブを横並びに表示する。
+/// Tab bar: Displays tabs of open documents side-by-side.
 pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
     const MAX_TAB_WIDTH: f32 = 200.0;
 
@@ -527,12 +527,12 @@ pub(crate) fn render_file_entry(
 }
 
 // ─────────────────────────────────────────────
-// macOS ネイティブメニュー FFI
+// macOS Native Menu FFI
 // ─────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
 mod native_menu {
-    // macos_menu.m (Objective-C) で定義されたタグ定数と一致させる。
+    // Must match the tag constants defined in macos_menu.m (Objective-C).
     pub const TAG_OPEN_WORKSPACE: i32 = 1;
     pub const TAG_SAVE: i32 = 2;
     pub const TAG_LANG_EN: i32 = 3;
@@ -545,18 +545,18 @@ mod native_menu {
     }
 }
 
-/// macOS ネイティブメニューバーを初期化する。
-/// eframe がウィンドウを生成した後に main.rs から呼ばれる。
+/// Initializes the macOS native menu bar.
+/// Called from main.rs after eframe creates the window.
 ///
 /// # Safety
-/// Objective-C ランタイム呼び出しを含む。メインスレッドから1回だけ呼ぶこと。
+/// Contains Objective-C runtime calls. Must be called only once from the main thread.
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     native_menu::katana_setup_native_menu();
 }
 
 // ─────────────────────────────────────────────
-// eframe::App 実装（egui 描画メインループ）
+// eframe::App Implementation (egui Main Rendering Loop)
 // ─────────────────────────────────────────────
 
 use crate::shell::{
@@ -568,7 +568,7 @@ impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_download(ctx);
 
-        // macOS: ネイティブメニューからのアクションをポーリングする。
+        // macOS: Poll actions from the native menu.
         #[cfg(target_os = "macos")]
         {
             let action = unsafe { native_menu::katana_poll_menu_action() };
@@ -594,12 +594,12 @@ impl eframe::App for KatanaApp {
         let action = self.take_action();
         self.process_action(action);
 
-        // macOS ではネイティブメニューバーを使うため egui 内メニューは非表示。
+        // On macOS, the egui menu is hidden because the native menu bar is used.
         #[cfg(not(target_os = "macos"))]
         render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
         render_status_bar(ctx, &self.state);
 
-        // ウィンドウタイトルにファイル名を反映
+        // Reflect the file name in the window title
         let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
         let title_text = match self.state.active_document() {
             Some(doc) => {
@@ -610,7 +610,7 @@ impl eframe::App for KatanaApp {
         };
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
 
-        // アプリ内タイトルバー
+        // In-app title bar
         egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.centered_and_justified(|ui| {
@@ -623,7 +623,7 @@ impl eframe::App for KatanaApp {
             });
         });
 
-        // ワークスペースが非表示のときも折りたたみトグルボタンを表示する。
+        // Show the collapse toggle button even when the workspace is hidden.
         if !self.state.show_workspace {
             egui::SidePanel::left("workspace_collapsed")
                 .resizable(false)
@@ -643,7 +643,7 @@ impl eframe::App for KatanaApp {
             render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
         }
 
-        // タブ行 + パンくずリスト + ビューモード行
+        // Tab row + breadcrumbs + view mode row
         egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
             render_tab_bar(ui, &mut self.state, &mut self.pending_action);
             if let Some(doc) = self.state.active_document() {
@@ -666,7 +666,7 @@ impl eframe::App for KatanaApp {
         let current_mode = self.state.active_view_mode();
         let is_split = current_mode == ViewMode::Split;
 
-        // Split モード
+        // Split mode
         if is_split {
             let active_path = self.state.active_document().map(|d| d.path.clone());
             let mut scroll_state = (

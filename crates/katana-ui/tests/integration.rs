@@ -283,24 +283,24 @@ fn test_integration_workspace_with_subdirectory() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
-// ワークスペースパネル折りたたみUIをカバー (shell.rs: L394-407)
+// Covers workspace panel collapse UI (shell.rs: L394-407)
 #[test]
 fn test_integration_workspace_panel_collapsed() {
     let mut harness = setup_harness();
     harness.step();
 
-    // show_workspace を false に設定してから描画
+    // Set show_workspace to false and then draw
     harness.state_mut().app_state_mut().show_workspace = false;
     harness.step();
     harness.snapshot("workspace_collapsed");
 
-    // 「›」展開ボタンをkittestでクリックを試みる (shell.rs L403-404をカバー)
-    // ボタンが見つからない場合はスキップする（kittestではボタンの文字列が
-    // Unicode形式で比較されるため見つからないこともある）
+    // Try to click the "›" expand button using kittest (covers shell.rs L403-404)
+    // If the button is not found, skip it (in kittest, button strings are
+    // compared in Unicode format, so they might not be found)
     {
         use egui_kittest::kittest::Queryable;
         for label in ["›", ">", "❯"] {
-            // query_all_by_value はパニックしないため、見つからない場合は空イテレータを返す
+            // query_all_by_value does not panic, so it returns an empty iterator if not found
             let nodes: Vec<_> = harness.query_all_by_value(label).collect();
             if let Some(node) = nodes.into_iter().next() {
                 node.click();
@@ -314,7 +314,7 @@ fn test_integration_workspace_panel_collapsed() {
     harness.step();
 }
 
-// Split モードでエディタとプレビューを同時表示 (shell.rs: L604-)
+// Display both editor and preview in Split mode (shell.rs: L604-)
 #[test]
 fn test_integration_split_mode_with_document() {
     let mut harness = setup_harness();
@@ -337,7 +337,7 @@ fn test_integration_split_mode_with_document() {
         .trigger_action(AppAction::SelectDocument(abs_path));
     harness.step();
 
-    // Split モードに切り替え
+    // Switch to Split mode
     harness
         .state_mut()
         .app_state_mut()
@@ -345,7 +345,7 @@ fn test_integration_split_mode_with_document() {
     harness.step();
     harness.snapshot("split_mode");
 
-    // Code Only モードに切り替え
+    // Switch to Code Only mode
     harness
         .state_mut()
         .app_state_mut()
@@ -356,7 +356,7 @@ fn test_integration_split_mode_with_document() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
-// タブを複数開いて閉じる（CloseDocumentの多タブ処理）
+// Open and close multiple tabs (CloseDocument multiple tab handling)
 #[test]
 fn test_integration_multiple_tabs_close() {
     let mut harness = setup_harness();
@@ -373,7 +373,7 @@ fn test_integration_multiple_tabs_close() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
     harness.step();
 
-    // File 1 を開く
+    // Open File 1
     let p1 = temp_dir
         .join("file1.md")
         .canonicalize()
@@ -383,7 +383,7 @@ fn test_integration_multiple_tabs_close() {
         .trigger_action(AppAction::SelectDocument(p1));
     harness.step();
 
-    // File 2 を開く
+    // Open File 2
     let p2 = temp_dir
         .join("file2.md")
         .canonicalize()
@@ -395,13 +395,13 @@ fn test_integration_multiple_tabs_close() {
 
     harness.snapshot("two_tabs_open");
 
-    // タブ 0 を閉じる（残ったタブが active_doc_idx を適切に更新する）
+    // Close tab 0 (the remaining tab appropriately updates active_doc_idx)
     harness
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
     harness.step();
 
-    // タブ 0 を閉じる（最後のタブ）
+    // Close tab 0 (the last tab)
     harness
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
@@ -411,7 +411,7 @@ fn test_integration_multiple_tabs_close() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
-// ワークスペースの force_tree_open トグル（tree 全展開/全折畳）
+// Workspace force_tree_open toggle (expand all / collapse all tree)
 #[test]
 fn test_integration_workspace_tree_expand_collapse() {
     let mut harness = setup_harness();
@@ -428,11 +428,11 @@ fn test_integration_workspace_tree_expand_collapse() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
     harness.step();
 
-    // 全展開
+    // Expand all
     harness.state_mut().app_state_mut().force_tree_open = Some(true);
     harness.step();
 
-    // 全折畳
+    // Collapse all
     harness.state_mut().app_state_mut().force_tree_open = Some(false);
     harness.step();
     harness.snapshot("tree_collapse");
@@ -440,13 +440,13 @@ fn test_integration_workspace_tree_expand_collapse() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
-// PreviewOnly モードでドキュメントが選択されていない場合の UI (shell.rs L490-492)
+// UI when no document is selected in PreviewOnly mode (shell.rs L490-492)
 #[test]
 fn test_integration_preview_only_no_document() {
     let mut harness = setup_harness();
     harness.step();
 
-    // PreviewOnly では active_document が None の場合 "no_document_selected" を表示
+    // Show "no_document_selected" when active_document is None in PreviewOnly
     harness
         .state_mut()
         .app_state_mut()
@@ -455,7 +455,7 @@ fn test_integration_preview_only_no_document() {
     harness.snapshot("preview_only_no_doc");
 }
 
-// RefreshDiagrams アクションが処理される (shell.rs L542相当)
+// RefreshDiagrams action is processed (equivalent to shell.rs L542)
 #[test]
 fn test_integration_refresh_diagrams_action() {
     let temp_dir = tempfile::TempDir::new().unwrap();
@@ -475,14 +475,14 @@ fn test_integration_refresh_diagrams_action() {
         .trigger_action(AppAction::SelectDocument(md_path));
     harness.step();
 
-    // RefreshDiagrams アクションを発行
+    // Emit RefreshDiagrams action
     harness
         .state_mut()
         .trigger_action(AppAction::RefreshDiagrams);
     harness.step();
 }
 
-// サイドバーの show_workspace フラグ切替（shell.rs L406-407）
+// Toggle show_workspace flag in sidebar (shell.rs L406-407)
 #[test]
 fn test_integration_sidebar_collapse_expand() {
     let mut harness = setup_harness();
@@ -495,18 +495,18 @@ fn test_integration_sidebar_collapse_expand() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
     harness.step();
 
-    // サイドバーを閉じる
+    // Close sidebar
     harness.state_mut().app_state_mut().show_workspace = false;
     harness.step();
-    // 再描画で collapsed panel が表示される
+    // The collapsed panel is displayed on redraw
     harness.step();
 
-    // サイドバーを再展開
+    // Re-expand sidebar
     harness.state_mut().app_state_mut().show_workspace = true;
     harness.step();
 }
 
-// + / - ボタンをクリックしてツリー全展開/全折畳
+// Click the + / - buttons to expand / collapse entire tree
 #[test]
 fn test_integration_tree_toggle_buttons() {
     let mut harness = setup_harness();
@@ -522,20 +522,20 @@ fn test_integration_tree_toggle_buttons() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
     harness.step();
 
-    // + ボタンクリック → 全展開
+    // Click + button -> Expand all
     if let Some(btn) = harness.get_all_by_label("+").next() {
         btn.click();
     }
     harness.step();
 
-    // - ボタンクリック → 全折畳
+    // Click - button -> Collapse all
     if let Some(btn) = harness.get_all_by_label("-").next() {
         btn.click();
     }
     harness.step();
 }
 
-// タブの ◀ / ▶ ナビゲーション + タブクリック + x (close) ボタン
+// Tab ◀ / ▶ navigation + tab click + x (close) button
 #[test]
 fn test_integration_tab_navigation_and_close() {
     let mut harness = setup_harness();
@@ -550,7 +550,7 @@ fn test_integration_tab_navigation_and_close() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
     harness.step();
 
-    // 2ファイルを開く
+    // Open 2 files
     let a_path = temp_dir.path().join("a.md");
     let b_path = temp_dir.path().join("b.md");
     harness
@@ -562,26 +562,26 @@ fn test_integration_tab_navigation_and_close() {
         .trigger_action(AppAction::SelectDocument(b_path.clone()));
     harness.step();
 
-    // ◀ ボタンクリック → 前のタブに移動
+    // Click ◀ button -> Move to previous tab
     if let Some(btn) = harness.get_all_by_label("◀").next() {
         btn.click();
     }
     harness.step();
 
-    // ▶ ボタンクリック → 次のタブに移動
+    // Click ▶ button -> Move to next tab
     if let Some(btn) = harness.get_all_by_label("▶").next() {
         btn.click();
     }
     harness.step();
 
-    // タブの x ボタンクリック → タブを閉じる
+    // Click tab x button -> Close the tab
     if let Some(btn) = harness.get_all_by_label("x").next() {
         btn.click();
     }
     harness.step();
 }
 
-// ビューモード選択ボタン (shell_ui.rs L366)
+// View mode selection buttons (shell_ui.rs L366)
 #[test]
 fn test_integration_view_mode_selection_via_button() {
     let mut harness = setup_harness();
@@ -599,7 +599,7 @@ fn test_integration_view_mode_selection_via_button() {
         .trigger_action(AppAction::SelectDocument(temp_dir.path().join("test.md")));
     harness.step();
 
-    // "Code" モードボタンをクリック
+    // Click "Code" mode button
     let code_label = katana_ui::i18n::t("view_mode_code");
     if let Some(btn) = harness.get_all_by_label(&code_label).next() {
         btn.click();
@@ -610,7 +610,7 @@ fn test_integration_view_mode_selection_via_button() {
         ViewMode::CodeOnly
     );
 
-    // "Preview" モードボタンをクリック
+    // Click "Preview" mode button
     let preview_label = katana_ui::i18n::t("view_mode_preview");
     if let Some(btn) = harness.get_all_by_label(&preview_label).next() {
         btn.click();
@@ -621,7 +621,7 @@ fn test_integration_view_mode_selection_via_button() {
         ViewMode::PreviewOnly
     );
 
-    // "Split" モードボタンをクリック
+    // Click "Split" mode button
     let split_label = katana_ui::i18n::t("view_mode_split");
     if let Some(btn) = harness.get_all_by_label(&split_label).next() {
         btn.click();
@@ -633,7 +633,7 @@ fn test_integration_view_mode_selection_via_button() {
     );
 }
 
-// ディレクトリエントリの展開/折畳（state で force_tree_open を制御）
+// Expand/collapse directory entries (controlled by force_tree_open in state)
 #[test]
 fn test_integration_directory_entry_click_toggle() {
     let mut harness = setup_harness();
@@ -648,16 +648,16 @@ fn test_integration_directory_entry_click_toggle() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
     harness.step();
 
-    // 全展開 → force_tree_open = Some(true)
+    // Expand all -> force_tree_open = Some(true)
     harness.state_mut().app_state_mut().force_tree_open = Some(true);
     harness.step();
 
-    // 全折畳 → force_tree_open = Some(false)
+    // Collapse all -> force_tree_open = Some(false)
     harness.state_mut().app_state_mut().force_tree_open = Some(false);
     harness.step();
 }
 
-// エディタでテキスト変更 → UpdateBuffer (shell_ui.rs L395)
+// Modify text in editor -> UpdateBuffer (shell_ui.rs L395)
 #[test]
 fn test_integration_text_edit_triggers_update_buffer() {
     let mut harness = setup_harness();
@@ -676,21 +676,21 @@ fn test_integration_text_edit_triggers_update_buffer() {
         .trigger_action(AppAction::SelectDocument(md_path));
     harness.step();
 
-    // テキストエディタの CodeOnly ビューを使って入力
+    // Input using the CodeOnly view of the text editor
     harness
         .state_mut()
         .app_state_mut()
         .set_active_view_mode(ViewMode::CodeOnly);
     harness.step();
 
-    // UpdateBuffer アクション直接注入
+    // Inject UpdateBuffer action directly
     harness
         .state_mut()
         .trigger_action(AppAction::UpdateBuffer("# Modified content".to_string()));
     harness.step();
 }
 
-// Refresh diagrams ボタン (🔄) クリック (shell_ui.rs L248-249)
+// Refresh diagrams button (🔄) click (shell_ui.rs L248-249)
 #[test]
 fn test_integration_refresh_button_click() {
     let mut harness = setup_harness();
@@ -713,7 +713,7 @@ fn test_integration_refresh_button_click() {
         .trigger_action(AppAction::SelectDocument(md_path));
     harness.step();
 
-    // 🔄 ボタンクリック
+    // Click 🔄 button
     if let Some(btn) = harness.get_all_by_label("🔄").next() {
         btn.click();
     }

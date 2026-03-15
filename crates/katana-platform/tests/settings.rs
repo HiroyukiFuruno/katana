@@ -20,7 +20,7 @@ fn load_from_returns_defaults_in_mvp() {
 fn settings_returns_immutable_reference() {
     let svc = SettingsService::new();
     let settings = svc.settings();
-    // settings は不変参照なので変更できないことをコンパイル時に保証
+    // Compile-time guarantee that settings cannot be modified because it is an immutable reference
     assert_eq!(settings.extra.len(), 0);
 }
 

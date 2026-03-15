@@ -52,7 +52,7 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| {
             setup_fonts(&cc.egui_ctx);
 
-            // macOS: eframe がウィンドウを生成した後にネイティブメニューバーを構築する。
+            // macOS: Construct the native menu bar after eframe creates the window.
             #[cfg(target_os = "macos")]
             unsafe {
                 shell_ui::native_menu_setup();
@@ -63,9 +63,9 @@ fn main() -> eframe::Result<()> {
     )
 }
 
-/// 日本語を含む CJK フォントを読み込んで egui に登録する。
+/// Loads CJK fonts including Japanese and registers them with egui.
 ///
-/// macOS バンドルの AquaKana.ttc などを倪側フォントとして追加する。
+/// Adds bundled macOS fonts like AquaKana.ttc as fallback fonts.
 pub fn setup_fonts(ctx: &egui::Context) {
     let candidates = [
         "/System/Library/Fonts/AquaKana.ttc",
@@ -74,7 +74,7 @@ pub fn setup_fonts(ctx: &egui::Context) {
     setup_fonts_with_candidates(ctx, &candidates);
 }
 
-/// フォント候補リストを受け取ってフォントを設定する。テスト可能。
+/// Receives a list of font candidates and sets the fonts. Testable.
 pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
     let mut fonts = egui::FontDefinitions::default();
     let loaded = load_first_font(candidates);
@@ -88,9 +88,9 @@ pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
                 list.push(name.clone());
             }
         }
-        tracing::info!("日本語フォントを読み込みました font={name}");
+        tracing::info!("Loaded Japanese font font={name}");
     } else {
-        tracing::warn!("日本語フォントが見つかりませんでした。文字化けが発生する場合があります。");
+        tracing::warn!("Japanese font not found. Garbled text may occur.");
     }
     ctx.set_fonts(fonts);
 
@@ -102,7 +102,7 @@ pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
     });
 }
 
-/// 候補パスの先頭から読めたフォントを返す。
+/// Returns the first readable font from the list of candidate paths.
 pub fn load_first_font(candidates: &[&str]) -> Option<(String, Vec<u8>)> {
     for &path in candidates {
         if let Ok(data) = std::fs::read(path) {
@@ -173,13 +173,13 @@ mod tests {
 
     #[test]
     fn test_load_first_font_found() {
-        // macOS に存在するフォントで成功パスをカバー
+        // Cover the success path using fonts that exist on macOS
         let candidates = [
             "/System/Library/Fonts/AquaKana.ttc",
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
         ];
         let result = load_first_font(&candidates);
-        // macOS 環境ではどちらかが見つかるはず
+        // One of them should be found in a macOS environment
         if result.is_some() {
             let (name, data) = result.unwrap();
             assert!(!name.is_empty());
@@ -198,7 +198,7 @@ mod tests {
     fn test_setup_fonts_without_cjk() {
         init_tracing();
         let ctx = egui::Context::default();
-        // 存在しないパスのみ → else (warn) パスを通す
+        // Only non-existent paths -> take the else (warn) path
         setup_fonts_with_candidates(&ctx, &["/nonexistent/font.ttc"]);
     }
 

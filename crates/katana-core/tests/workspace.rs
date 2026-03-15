@@ -77,7 +77,7 @@ fn workspace_name_none_for_filesystem_root() {
     assert_eq!(ws.name(), None);
 }
 
-// is_markdown: 拡張子なしファイルは false (unwrap_or(false) の false パス)
+// is_markdown: file without extension is false (false path of unwrap_or(false))
 #[test]
 fn is_markdown_returns_false_for_no_extension() {
     let entry = TreeEntry::File {

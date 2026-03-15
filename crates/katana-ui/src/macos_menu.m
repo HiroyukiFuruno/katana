@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 
-// メニューアクションの識別用タグ定数。
-// Rust 側の MenuAction enum と一致させる。
+// Tag constants for identifying menu actions.
+// Should match the MenuAction enum in Rust.
 enum {
     TAG_OPEN_WORKSPACE = 1,
     TAG_SAVE           = 2,
@@ -9,8 +9,8 @@ enum {
     TAG_LANG_JA        = 4,
 };
 
-// グローバル：最後に選択されたメニューアクションのタグ。
-// Rust 側から polling で読み取る。
+// Global: Tag of the last selected menu action.
+// Read by polling from Rust.
 static volatile int g_last_action = 0;
 
 @interface KatanaMenuTarget : NSObject
@@ -26,12 +26,12 @@ static volatile int g_last_action = 0;
 
 static KatanaMenuTarget *g_target = nil;
 
-/// Rust から呼ばれる: ネイティブメニューバーを構築する。
+/// Called from Rust: Builds the native menu bar.
 void katana_setup_native_menu(void) {
     g_target = [[KatanaMenuTarget alloc] init];
     SEL action = @selector(menuAction:);
 
-    // --- File メニュー ---
+    // --- File Menu ---
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
 
     NSMenuItem *openItem = [[NSMenuItem alloc]
@@ -83,7 +83,7 @@ void katana_setup_native_menu(void) {
     NSMenuItem *settingsMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [settingsMenuItem setSubmenu:settingsMenu];
 
-    // --- メインメニューに追加 ---
+    // --- Add to Main Menu ---
     NSMenu *mainMenu = [NSApp mainMenu];
     if (!mainMenu) {
         mainMenu = [[NSMenu alloc] initWithTitle:@""];
@@ -93,8 +93,8 @@ void katana_setup_native_menu(void) {
     [mainMenu addItem:settingsMenuItem];
 }
 
-/// Rust から呼ばれる: 最後のメニューアクションを取得してリセットする。
-/// 戻り値: 0 = アクションなし, それ以外 = TAG_* 定数。
+/// Called from Rust: Gets and resets the last menu action.
+/// Return value: 0 = No action, otherwise = TAG_* constant.
 int katana_poll_menu_action(void) {
     int action = g_last_action;
     g_last_action = 0;

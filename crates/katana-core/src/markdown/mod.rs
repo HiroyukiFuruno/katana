@@ -11,13 +11,13 @@ pub mod svg_rasterize;
 pub use diagram::NoOpRenderer;
 use diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
 
-/// フェンスブロック開始デリミタ「```」のバイト長。
+/// Byte length of the fence block start delimiter "```".
 const FENCE_OPEN_LEN: usize = 3;
 
-/// フェンスブロック終了デリミタ「\n```」のバイト長。
+/// Byte length of the fence block end delimiter "\n```".
 const FENCE_CLOSE_LEN: usize = 4;
 
-/// 本番用レンダラー: 各図ブロック種別を実際のサブプロセス / XML パーサーに委譲する。
+/// Production renderer: delegates each diagram block type to the actual subprocess / XML parser.
 #[derive(Debug, Default)]
 pub struct KatanaRenderer;
 
@@ -31,7 +31,7 @@ impl DiagramRenderer for KatanaRenderer {
     }
 }
 
-/// 本番用 `KatanaRenderer` を使って Markdown を HTML にレンダリングする。
+/// Renders Markdown to HTML using the production `KatanaRenderer`.
 pub fn render_with_katana_renderer(source: &str) -> Result<RenderOutput, MarkdownError> {
     render(source, &KatanaRenderer)
 }
@@ -57,7 +57,7 @@ fn gfm_options() -> ComrakOptions<'static> {
     opts.extension.autolink = true;
     opts.extension.tasklist = true;
     opts.extension.footnotes = true;
-    // カスタム HTML（図ブロック変換後のマークアップ）をそのまま出力するために必要。
+    // Required to output custom HTML (markup after diagram block conversion) as-is.
     opts.render.unsafe_ = true;
     opts
 }
@@ -123,7 +123,7 @@ fn render_diagram_block<R: DiagramRenderer>(block: &FenceBlock, renderer: &R) ->
     };
     Some(match renderer.render(&diagram) {
         DiagramResult::Ok(html) => html,
-        // OkPng は UI 層で直接 RGBA に変換される。core 層ではプレースホルダーのみ。
+        // OkPng is directly converted to RGBA in the UI layer. Only a placeholder in the core layer.
         DiagramResult::OkPng(_) => String::new(),
         DiagramResult::Err { source, error } => fallback_html(&source, &error),
         DiagramResult::CommandNotFound {
@@ -131,8 +131,8 @@ fn render_diagram_block<R: DiagramRenderer>(block: &FenceBlock, renderer: &R) ->
             install_hint,
             ..
         } => fallback_html("", &format!("{tool_name} not found. {install_hint}")),
-        // core 層では「未インストール」をフォールバック HTML として表示する。
-        // UI 層の RenderedSection::NotInstalled で適切なダウンロード UI が描画される。
+        // In the core layer, "NotInstalled" is displayed as fallback HTML.
+        // The appropriate download UI is rendered in the UI layer by `RenderedSection::NotInstalled`.
         DiagramResult::NotInstalled { kind, .. } => {
             fallback_html("", &format!("{kind} is not installed"))
         }
@@ -172,25 +172,25 @@ fn transform_diagram_blocks<R: DiagramRenderer>(source: &str, renderer: &R) -> S
 mod tests {
     use super::*;
 
-    // extract_fence_block: strip_prefix("```") が None（フェンスで始まらない入力）
+    // extract_fence_block: strip_prefix("```") is None (input doesn't start with a fence)
     #[test]
     fn extract_fence_block_no_fence_prefix() {
         assert!(extract_fence_block("not a fence").is_none());
     }
 
-    // extract_fence_block: ``` はあるが改行がない（info_end の find('\n') が None）
+    // extract_fence_block: has "```" but no newline (find('\n') in info_end is None)
     #[test]
     fn extract_fence_block_no_newline_after_info() {
         assert!(extract_fence_block("```mermaid").is_none());
     }
 
-    // extract_fence_block: 開きフェンスはあるが閉じフェンスがない
+    // extract_fence_block: has an opening fence but no closing fence
     #[test]
     fn extract_fence_block_no_closing_fence() {
         assert!(extract_fence_block("```mermaid\ngraph TD; A-->B").is_none());
     }
 
-    // extract_fence_block: 正常なフェンスブロック
+    // extract_fence_block: valid fence block
     #[test]
     fn extract_fence_block_valid() {
         let result = extract_fence_block("```mermaid\ngraph TD; A-->B\n```\nrest");

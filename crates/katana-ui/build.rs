@@ -1,5 +1,5 @@
-// macOS ネイティブメニューバーのビルドスクリプト。
-// Objective-C ファイル (macos_menu.m) をコンパイルしてリンクする。
+// Build script for macOS native menu bar.
+// Compiles and links the Objective-C file (macos_menu.m).
 
 fn main() {
     #[cfg(target_os = "macos")]

@@ -3,7 +3,7 @@ use katana_core::markdown::plantuml_renderer;
 use std::path::PathBuf;
 
 #[test]
-fn jar未検出時はnotinstalledを返す() {
+fn returns_notinstalled_when_jar_not_found() {
     unsafe { std::env::set_var("PLANTUML_JAR", "/nonexistent/plantuml.jar") };
     let block = DiagramBlock {
         kind: DiagramKind::PlantUml,
@@ -15,7 +15,7 @@ fn jar未検出時はnotinstalledを返す() {
 }
 
 #[test]
-fn jar_candidate_paths_env_var設定時は環境変数パスのみ返す() {
+fn returns_only_env_var_path_when_jar_candidate_paths_env_var_is_set() {
     unsafe { std::env::set_var("PLANTUML_JAR", "/custom/path/plantuml.jar") };
     let paths = plantuml_renderer::jar_candidate_paths();
     assert_eq!(paths, vec![PathBuf::from("/custom/path/plantuml.jar")]);
@@ -23,15 +23,15 @@ fn jar_candidate_paths_env_var設定時は環境変数パスのみ返す() {
 }
 
 #[test]
-fn jar_candidate_paths_env_var未設定時は複数候補を返す() {
+fn returns_multiple_candidates_when_jar_candidate_paths_env_var_is_not_set() {
     unsafe { std::env::remove_var("PLANTUML_JAR") };
     let paths = plantuml_renderer::jar_candidate_paths();
-    // Homebrewパス + バイナリ隣接 + XDG候補が含まれる
+    // Includes Homebrew path + binary adjacent + XDG candidates
     assert!(paths.len() >= 2);
 }
 
 #[test]
-fn find_plantuml_jar_存在しない場合はnone() {
+fn find_plantuml_jar_returns_none_if_not_exists() {
     unsafe { std::env::set_var("PLANTUML_JAR", "/nonexistent/never/plantuml.jar") };
     let result = plantuml_renderer::find_plantuml_jar();
     assert!(result.is_none());
@@ -39,7 +39,7 @@ fn find_plantuml_jar_存在しない場合はnone() {
 }
 
 #[test]
-fn default_install_path_はhomeディレクトリ配下() {
+fn default_install_path_is_under_home_directory() {
     let path = plantuml_renderer::default_install_path();
     assert!(path.is_some());
     let p = path.unwrap();
@@ -47,7 +47,7 @@ fn default_install_path_はhomeディレクトリ配下() {
 }
 
 #[test]
-fn svg_to_html_fragment_はdivで囲む() {
+fn svg_to_html_fragment_wraps_with_div() {
     let html = plantuml_renderer::svg_to_html_fragment("<svg>test</svg>");
     assert!(html.contains("<div class=\"katana-diagram plantuml\">"));
     assert!(html.contains("<svg>test</svg>"));
@@ -55,11 +55,11 @@ fn svg_to_html_fragment_はdivで囲む() {
 }
 
 #[test]
-fn run_plantuml_process_存在しないjarでエラー() {
+fn run_plantuml_process_errors_with_non_existent_jar() {
     let result = plantuml_renderer::run_plantuml_process(
         std::path::Path::new("/nonexistent/plantuml.jar"),
         "@startuml\nA -> B\n@enduml",
     );
-    // java が見つからないか、JAR が無効でエラーになる
+    // Errors if java is not found or JAR is invalid
     assert!(result.is_err());
 }

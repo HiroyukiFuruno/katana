@@ -1,8 +1,8 @@
 use katana_core::plugin::*;
 use tracing_subscriber;
 
-/// tracing subscriber を初期化（一度だけ）。
-/// tracing::warn!/info! マクロが展開するコードをカバーするために必要。
+/// Initialize the tracing subscriber (only once).
+/// Required to cover the code expanded by tracing::warn!/info! macros.
 fn init_tracing() {
     let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 }

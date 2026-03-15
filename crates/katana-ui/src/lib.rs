@@ -1,7 +1,7 @@
 #![deny(warnings)]
-//! Katana UI ライブラリ。
+//! Katana UI library.
 //!
-//! エディタの主要コンポーネントを公開し、テストや外部ツールからのアクセスを可能にする。
+//! Exposes main editor components, allowing access for testing and external tools.
 
 pub mod app_state;
 pub mod i18n;

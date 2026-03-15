@@ -2,7 +2,7 @@ use katana_core::markdown::diagram::{DiagramBlock, DiagramKind, DiagramResult};
 use katana_core::markdown::mermaid_renderer;
 
 #[test]
-fn mmdc未検出時はcommandnotfoundを返す() {
+fn returns_commandnotfound_when_mmdc_not_found() {
     unsafe { std::env::set_var("MERMAID_MMDC", "/nonexistent/mmdc") };
     let block = DiagramBlock {
         kind: DiagramKind::Mermaid,
@@ -14,7 +14,7 @@ fn mmdc未検出時はcommandnotfoundを返す() {
 }
 
 #[test]
-fn resolve_mmdc_binary_env_var設定時はそのパスを返す() {
+fn returns_its_path_when_resolve_mmdc_binary_env_var_is_set() {
     unsafe { std::env::set_var("MERMAID_MMDC", "/custom/mmdc") };
     let path = mermaid_renderer::resolve_mmdc_binary();
     assert_eq!(path, std::path::PathBuf::from("/custom/mmdc"));
@@ -22,15 +22,15 @@ fn resolve_mmdc_binary_env_var設定時はそのパスを返す() {
 }
 
 #[test]
-fn resolve_mmdc_binary_env_var未設定時はシステムパスを探す() {
+fn searches_system_path_when_resolve_mmdc_binary_env_var_is_not_set() {
     unsafe { std::env::remove_var("MERMAID_MMDC") };
     let path = mermaid_renderer::resolve_mmdc_binary();
-    // mmdc が見つからなくてもフォールバックとして "mmdc" が返る
+    // Even if mmdc is not found, "mmdc" is returned as fallback
     assert!(!path.as_os_str().is_empty());
 }
 
 #[test]
-fn create_input_file_は一時ファイルを作成する() {
+fn create_input_file_creates_a_temporary_file() {
     let file = mermaid_renderer::create_input_file("graph TD; A-->B").unwrap();
     let path = file.path().to_path_buf();
     assert!(path.exists());
@@ -38,15 +38,15 @@ fn create_input_file_は一時ファイルを作成する() {
 }
 
 #[test]
-fn is_mmdc_available_偽バイナリはfalse() {
+fn fake_binary_is_false_in_is_mmdc_available() {
     unsafe { std::env::set_var("MERMAID_MMDC", "/nonexistent/mmdc") };
     assert!(!mermaid_renderer::is_mmdc_available());
     unsafe { std::env::remove_var("MERMAID_MMDC") };
 }
 
-// mmdc がシステムで利用可能な場合のみ実行する結合テスト。
+// Integration test that runs only when mmdc is available on the system.
 #[test]
-fn mmdcが利用可能なら正しくpngを返す() {
+fn returns_png_correctly_if_mmdc_is_available() {
     if std::env::var("MERMAID_MMDC").as_deref() == Ok("/nonexistent/mmdc") {
         return;
     }
@@ -61,9 +61,9 @@ fn mmdcが利用可能なら正しくpngを返す() {
     assert!(matches!(result, DiagramResult::OkPng(_)));
 }
 
-// mmdc が見つからない場合の run_mmdc_process エラーパス
+// run_mmdc_process error path when mmdc is not found
 #[test]
-fn run_mmdc_process_mmdc不在時はエラー() {
+fn run_mmdc_process_errors_when_mmdc_is_absent() {
     unsafe { std::env::set_var("MERMAID_MMDC", "/nonexistent/mmdc") };
     let result = mermaid_renderer::run_mmdc_process("graph TD; A-->B");
     assert!(result.is_err());

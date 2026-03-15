@@ -1,28 +1,28 @@
-//! SVG ラスタライズユーティリティ。
+//! SVG rasterization utility.
 //!
-//! `resvg` + `usvg` を使い SVG テキストを RGBA ピクセルバッファに変換する。
-//! 結果は egui の `ColorImage` 互換の生バイト列として返す。
+//! Uses `resvg` + `usvg` to convert SVG text to an RGBA pixel buffer.
+//! Returns the result as raw bytes compatible with egui's `ColorImage`.
 
 use resvg::{render, usvg};
 use tiny_skia::Pixmap;
 
-/// ラスタライズ済みの SVG 画像。
+/// Rasterized SVG image.
 #[derive(Debug, Clone)]
 pub struct RasterizedSvg {
-    /// ピクセル幅。
+    /// Pixel width.
     pub width: u32,
-    /// ピクセル高さ。
+    /// Pixel height.
     pub height: u32,
-    /// RGBA バイト列（row-major）。
+    /// RGBA bytes (row-major).
     pub rgba: Vec<u8>,
 }
 
-/// SVG テキストを RGBA ピクセルバッファに変換する。
+/// Converts SVG text to an RGBA pixel buffer.
 ///
-/// `scale` で出力解像度を調整する（1.0 = 元のサイズ）。
+/// Use `scale` to adjust the output resolution (1.0 = original size).
 pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRasterizeError> {
     let opts = usvg::Options {
-        // システムフォントを渡さないと SVG 内テキストが不可視になる。
+        // Text inside SVG becomes invisible if system fonts are not provided.
         fontdb: font_db(),
         ..usvg::Options::default()
     };
@@ -31,10 +31,10 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
     let size = tree.size();
     let width = ((size.width() * scale) as u32).max(1);
     let height = ((size.height() * scale) as u32).max(1);
-    // max(1) により width/height >= 1 が保証されるため Pixmap::new は常に Some。
+    // `Pixmap::new` is always `Some` because `max(1)` guarantees width/height >= 1.
     let mut pixmap =
         Pixmap::new(width, height).expect("BUG: width/height >= 1 guaranteed by max(1)");
-    // SVG コンテンツがダーク背景で消えないよう、レンダリング前に白で塗りつぶす。
+    // Fill with white before rendering so SVG content doesn't disappear on dark backgrounds.
     pixmap.fill(tiny_skia::Color::WHITE);
     let transform = tiny_skia::Transform::from_scale(scale, scale);
     render(&tree, transform, &mut pixmap.as_mut());
@@ -55,9 +55,9 @@ fn font_db() -> std::sync::Arc<usvg::fontdb::Database> {
     }))
 }
 
-/// SVG ラスタライズ時に発生するエラー。
+/// Errors that occur during SVG rasterization.
 #[derive(Debug, thiserror::Error)]
 pub enum SvgRasterizeError {
-    #[error("SVG パースに失敗しました: {0}")]
+    #[error("Failed to parse SVG: {0}")]
     ParseFailed(String),
 }

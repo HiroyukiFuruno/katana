@@ -48,7 +48,7 @@ impl FilesystemService {
         Ok(())
     }
 
-    /// ディレクトリを再帰的に並列スキャンし、`.md` ファイルのみを含むツリーを返す。
+    /// Recursively and in parallel scans a directory, returning a tree containing only `.md` files.
     fn scan_directory(&self, dir: &Path) -> std::io::Result<Vec<TreeEntry>> {
         use rayon::prelude::*;
 
@@ -61,7 +61,7 @@ impl FilesystemService {
                 let path = entry.path();
                 let file_name = path.file_name().and_then(|n| n.to_str())?;
 
-                // 隠しファイル・ビルド成果物・ Node.js モジュールはスキップ。
+                // Skip hidden files, build artifacts, and Node.js modules.
                 if file_name.starts_with('.')
                     || file_name == "target"
                     || file_name == "node_modules"
@@ -71,7 +71,7 @@ impl FilesystemService {
 
                 if path.is_dir() {
                     let children = self.scan_directory(&path).unwrap_or_default();
-                    // 配下に `.md` ファイルが一つもないディレクトリは表示しない。
+                    // Do not show directories that contain no `.md` files underneath.
                     if has_any_markdown(&children) {
                         Some(TreeEntry::Directory { path, children })
                     } else {
@@ -99,7 +99,7 @@ impl FilesystemService {
     }
 }
 
-/// ツリー内に `.md` ファイルが少なくとも1つあるかを再帰的に確認する。
+/// Recursively checks if there is at least one `.md` file in the tree.
 fn has_any_markdown(entries: &[TreeEntry]) -> bool {
     entries.iter().any(|e| match e {
         TreeEntry::File { .. } => e.is_markdown(),

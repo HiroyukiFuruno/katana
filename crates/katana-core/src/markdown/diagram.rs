@@ -106,11 +106,11 @@ pub enum DiagramResult {
     },
     /// Required runtime tool is not installed (supports auto-download).
     NotInstalled {
-        /// 表示名（"PlantUML" 等）。
+        /// Display name (e.g., "PlantUML").
         kind: String,
-        /// ダウンロード URL。
+        /// Download URL.
         download_url: String,
-        /// インストール先パス。
+        /// Installation path.
         install_path: std::path::PathBuf,
     },
 }

@@ -1,17 +1,17 @@
-// AST Linter — カスタム静的解析エンジン
+// AST Linter — Custom Static Analysis Engine
 //
-// coding-rules.md の第11章・第12章で定義された規約を、
-// syn クレートの AST トラバースにより機械的に強制する。
+// Mechanically enforces conventions defined in Chapters 11 and 12
+// of coding-rules.md via AST traversal using the `syn` crate.
 //
-// このテストファイルは `cargo test` で実行され、lefthook の
-// pre-commit / pre-push フックを通じてハードゲートとして機能する。
+// This test file runs during `cargo test` and functions as a hard gate
+// through lefthook's pre-commit / pre-push hooks.
 
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
 // ─────────────────────────────────────────────
-// 違反レポート
+// Violation Report
 // ─────────────────────────────────────────────
 
 #[derive(Debug)]
@@ -36,50 +36,50 @@ impl std::fmt::Display for Violation {
 }
 
 // ─────────────────────────────────────────────
-// 共通ユーティリティ
+// Common Utilities
 // ─────────────────────────────────────────────
 
-/// `proc_macro2::Span` から (行番号, カラム番号) を取得する。
+/// Get (line, column) from `proc_macro2::Span`.
 fn span_location(span: proc_macro2::Span) -> (usize, usize) {
     (span.start().line, span.start().column + 1)
 }
 
 // ─────────────────────────────────────────────
-// Allowlist — 記号・絵文字・数値のみの文字列をバイパス
+// Allowlist — Bypass symbols, emojis, and numbers
 // ─────────────────────────────────────────────
 
-/// 文字列が「翻訳不要」であると判定できるかを返す。
+/// Determine if a string can be classified as "No translation needed".
 ///
-/// 以下に該当する文字列は Allowlist として許可する:
-/// - 空文字列・空白のみ
-/// - 単一の ASCII 記号（`/`, `+`, `-`, `*`, `x`, `#` など）
-/// - 絵文字のみ（UI アイコン用途: `🔄`, `▶`, `▼` など）
-/// - 数値のみ（`100`, `0.5` など）
-/// - パス区切り・レイアウト用文字のみ（`/`, `›` など）
+/// Strings matching the following criteria are bypassed by the Allowlist:
+/// - Empty string or whitespace only
+/// - Single ASCII symbol (`/`, `+`, `-`, `*`, `x`, `#`, etc.)
+/// - Emoji only (For UI icons: `🔄`, `▶`, `▼`, etc.)
+/// - Numbers only (`100`, `0.5`, etc.)
+/// - Path separators or layout characters only (`/`, `›`, etc.)
 fn is_allowed_string(s: &str) -> bool {
     let trimmed = s.trim();
 
-    // 空文字列・空白のみ
+    // Empty string or whitespace only
     if trimmed.is_empty() {
         return true;
     }
 
-    // 単一文字で、アルファベット以外（記号・数値・句読点など）
+    // Single character, non-alphabet (symbol, number, punctuation, etc.)
     let chars: Vec<char> = trimmed.chars().collect();
     if chars.len() == 1 {
         let c = chars[0];
-        // ASCII の英字(a-z, A-Z) でなければ許可
+        // Allow if it's not an ASCII alphabet (a-z, A-Z)
         if !c.is_ascii_alphabetic() {
             return true;
         }
-        // 単一英字の "x"（UIで閉じるボタン等）は許可
+        // Allow single letter "x" (often used as close button in UI, etc.)
         if c == 'x' || c == 'X' {
             return true;
         }
         return false;
     }
 
-    // 全文字が非アルファベット（記号・絵文字・数値・空白のみ）
+    // All characters are non-alphabetic (symbol, emoji, number, or whitespace only)
     if trimmed
         .chars()
         .all(|c| !c.is_alphabetic() || is_emoji_or_symbol(c))
@@ -90,27 +90,27 @@ fn is_allowed_string(s: &str) -> bool {
     false
 }
 
-/// Unicode の「絵文字的記号」かどうかを判定する。
-/// ここでは厳密な絵文字判定ではなく、ASCII英字・ひらがな・カタカナ・CJK漢字以外の
-/// 「装飾的シンボル」をカバーする。
+/// Determine if a character is an "emoji-like symbol" in Unicode.
+/// Rather than strict emoji detection, this covers "decorative symbols"
+/// excluding ASCII alphabets, Hiragana, Katakana, and CJK Kanji.
 fn is_emoji_or_symbol(c: char) -> bool {
-    // 各種記号・絵文字ブロック
+    // Various symbol and emoji blocks
     matches!(c,
-        '\u{2000}'..='\u{2BFF}'  // 一般句読点、上付き、通貨、記号
-        | '\u{2E00}'..='\u{2E7F}' // 補助句読点
-        | '\u{3000}'..='\u{303F}' // CJK記号
-        | '\u{FE00}'..='\u{FE0F}' // 異体字セレクタ
-        | '\u{FE30}'..='\u{FE4F}' // CJK互換形
-        | '\u{1F000}'..='\u{1FAFF}' // 絵文字ブロック
-        | '\u{E0000}'..='\u{E007F}' // タグ
+        '\u{2000}'..='\u{2BFF}'  // General Punctuation, Superscripts, Currency, Symbols
+        | '\u{2E00}'..='\u{2E7F}' // Supplemental Punctuation
+        | '\u{3000}'..='\u{303F}' // CJK Symbols and Punctuation
+        | '\u{FE00}'..='\u{FE0F}' // Variation Selectors
+        | '\u{FE30}'..='\u{FE4F}' // CJK Compatibility Forms
+        | '\u{1F000}'..='\u{1FAFF}' // Emoji blocks
+        | '\u{E0000}'..='\u{E007F}' // Tags
     )
 }
 
 // ─────────────────────────────────────────────
-// i18n ハードコード文字列検知 Visitor
+// i18n Hardcoded String Detection Visitor
 // ─────────────────────────────────────────────
 
-/// 検査対象とする UI メソッド名のリスト。
+/// List of UI method names to inspect.
 const UI_METHODS: &[&str] = &[
     "label",
     "heading",
@@ -126,10 +126,10 @@ const UI_METHODS: &[&str] = &[
     "collapsing",
 ];
 
-/// 検査対象とする関数呼び出し（`Type::func()` 形式）のリスト。
+/// List of function calls (`Type::func()` format) to inspect.
 const UI_FUNCTIONS: &[&str] = &["new"];
 
-/// 関数呼び出しの対象となる型名。
+/// Target type names for function calls.
 const UI_TYPES_FOR_NEW: &[&str] = &["RichText"];
 
 struct I18nHardcodeVisitor {
@@ -145,7 +145,7 @@ impl I18nHardcodeVisitor {
         }
     }
 
-    /// 引数リストから文字列リテラルのハードコードを検出する。
+    /// Detect hardcoded string literals from an argument list.
     fn check_string_literal_args(
         &mut self,
         args: &syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>,
@@ -156,10 +156,10 @@ impl I18nHardcodeVisitor {
         }
     }
 
-    /// 式がハードコード文字列かどうかを再帰的に検査する。
+    /// Recursively check if an expression is a hardcoded string.
     fn check_expr_for_hardcoded_string(&mut self, expr: &syn::Expr, method_name: &str) {
         match expr {
-            // 直接の文字列リテラル: "Hello"
+            // Direct string literal: "Hello"
             syn::Expr::Lit(expr_lit) => {
                 if let syn::Lit::Str(lit_str) = &expr_lit.lit {
                     let value = lit_str.value();
@@ -170,14 +170,14 @@ impl I18nHardcodeVisitor {
                             line,
                             column,
                             message: format!(
-                                "{method_name}() にハードコード文字列 \"{value}\" を検出。\
-                                 i18n::t() または i18n::tf() を使用してください。"
+                                "Hardcoded string \"{value}\" detected in {method_name}().\
+                                 Please use i18n::t() or i18n::tf()."
                             ),
                         });
                     }
                 }
             }
-            // format!(...) マクロ: format!("Saved: {}", val)
+            // format!(...) macro: format!("Saved: {}", val)
             syn::Expr::Macro(expr_macro) => {
                 if is_format_macro(&expr_macro.mac) {
                     let (line, column) = span_location(
@@ -194,14 +194,14 @@ impl I18nHardcodeVisitor {
                         line,
                         column,
                         message: format!(
-                            "{method_name}() で format!() によるハードコード文字列合成を検出。\
-                             i18n::tf() を使用してください。"
+                            "Hardcoded string synthesis using format!() detected in {method_name}().\
+                             Please use i18n::tf()."
                         ),
                     });
                 }
             }
-            // メソッドチェーン内の RichText::new("...") は visit_expr_call で処理
-            // 参照やグループ化は中身を再帰検査
+            // RichText::new("...") inside a method chain is handled by visit_expr_call.
+            // References or groupings recursively check their contents.
             syn::Expr::Reference(expr_ref) => {
                 self.check_expr_for_hardcoded_string(&expr_ref.expr, method_name);
             }
@@ -215,12 +215,12 @@ impl I18nHardcodeVisitor {
         }
     }
 
-    /// `Type::func(args)` 形式の関数呼び出しで UI 型のコンストラクタに文字列が渡されていないか検査する。
+    /// Inspect `Type::func(args)` style function calls to ensure strings are not passed to UI type constructors.
     fn check_call_for_ui_violation(&mut self, node: &syn::ExprCall) {
         let syn::Expr::Path(expr_path) = &*node.func else {
             return;
         };
-        // syn パーサーの不変量: Path のセグメントは必ず1つ以上存在する
+        // syn parser invariant: Path always has at least one segment
         let last_segment = expr_path
             .path
             .segments
@@ -240,7 +240,7 @@ impl I18nHardcodeVisitor {
     }
 }
 
-/// `format!` マクロかどうかを判定する。
+/// Determine if it is a `format!` macro.
 fn is_format_macro(mac: &syn::Macro) -> bool {
     mac.path
         .segments
@@ -249,7 +249,7 @@ fn is_format_macro(mac: &syn::Macro) -> bool {
         .unwrap_or(false)
 }
 
-/// メソッドパスの末尾セグメントから型名を取得する。
+/// Extract type name from the last segment of the method path.
 fn extract_type_from_call(func: &syn::Expr) -> Option<String> {
     if let syn::Expr::Path(expr_path) = func {
         let segments = &expr_path.path.segments;
@@ -261,37 +261,37 @@ fn extract_type_from_call(func: &syn::Expr) -> Option<String> {
 }
 
 impl<'ast> Visit<'ast> for I18nHardcodeVisitor {
-    /// メソッド呼び出し: `receiver.method(args)` を検査する。
+    /// Inspect method call: `receiver.method(args)`.
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
         let method_name = node.method.to_string();
         if UI_METHODS.contains(&method_name.as_str()) {
             self.check_string_literal_args(&node.args, &method_name);
         }
 
-        // 子ノードの探索を続行
+        // Continue exploring child nodes
         syn::visit::visit_expr_method_call(self, node);
     }
 
-    /// 関数呼び出し: `Type::func(args)` を検査する。
+    /// Inspect function call: `Type::func(args)`.
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
         self.check_call_for_ui_violation(node);
 
-        // 子ノードの探索を続行
+        // Continue exploring child nodes
         syn::visit::visit_expr_call(self, node);
     }
 }
 
 // ─────────────────────────────────────────────
-// 共通ヘルパー
+// Common Helpers
 // ─────────────────────────────────────────────
 
-/// 属性リストに `#[cfg(test)]` が含まれるかを判定する。
+/// Check if the attribute list contains `#[cfg(test)]`.
 fn has_cfg_test_attr(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
         if !attr.path().is_ident("cfg") {
             return false;
         }
-        // #[cfg(test)] の中身を文字列化して "test" を含むか確認
+        // Stringify #[cfg(test)] contents and check if it contains "test"
         attr.meta
             .require_list()
             .ok()
@@ -301,14 +301,14 @@ fn has_cfg_test_attr(attrs: &[syn::Attribute]) -> bool {
 }
 
 // ─────────────────────────────────────────────
-// マジックナンバー検知 Visitor
+// Magic Number Detection Visitor
 // ─────────────────────────────────────────────
 
-/// マジックナンバーとして許可する数値リテラル。
-/// これらは意図が明確であり、名前付き定数に抽出する必要がない。
+/// Numeric literals allowed as magic numbers.
+/// These have clear intent and do not need to be extracted into named constants.
 fn is_allowed_number(value: f64) -> bool {
     const ALLOWED: &[f64] = &[
-        -1.0, 0.0, 1.0, 2.0, // 100 はパーセントやスケーリングで頻出
+        -1.0, 0.0, 1.0, 2.0, // 100 often appears in percentages and scaling
         100.0,
     ];
     ALLOWED.iter().any(|it| (*it - value).abs() < f64::EPSILON)
@@ -317,8 +317,8 @@ fn is_allowed_number(value: f64) -> bool {
 struct MagicNumberVisitor {
     file: PathBuf,
     violations: Vec<Violation>,
-    /// const/static 宣言の内部にいるかどうかのネスト深度。
-    /// 0 より大きい場合、数値リテラルは名前付き定数内なので許可する。
+    /// Nesting depth of being inside a const/static declaration.
+    /// If greater than 0, numeric literals are inside a named constant and thus allowed.
     in_const_context: u32,
 }
 
@@ -337,7 +337,7 @@ impl MagicNumberVisitor {
         }
         match lit {
             syn::Lit::Int(lit_int) => {
-                // syn の LitInt は常に正常な整数リテラル
+                // syn's LitInt is always a valid integer literal
                 let value = lit_int
                     .base10_parse::<i64>()
                     .expect("syn::LitInt should always be parseable");
@@ -348,13 +348,13 @@ impl MagicNumberVisitor {
                         line,
                         column,
                         message: format!(
-                            "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
+                            "Magic number {value} detected. Please extract to a named constant."
                         ),
                     });
                 }
             }
             syn::Lit::Float(lit_float) => {
-                // syn の LitFloat は常に正常な浮動小数点リテラル
+                // syn's LitFloat is always a valid floating-point literal
                 let value = lit_float
                     .base10_parse::<f64>()
                     .expect("syn::LitFloat should always be parseable");
@@ -365,7 +365,7 @@ impl MagicNumberVisitor {
                         line,
                         column,
                         message: format!(
-                            "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
+                            "Magic number {value} detected. Please extract to a named constant."
                         ),
                     });
                 }
@@ -390,7 +390,7 @@ impl<'ast> Visit<'ast> for MagicNumberVisitor {
 
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         if has_cfg_test_attr(&node.attrs) {
-            return; // #[cfg(test)] mod はスキップ
+            return; // Skip #[cfg(test)] mod
         }
         syn::visit::visit_item_mod(self, node);
     }
@@ -404,14 +404,14 @@ impl<'ast> Visit<'ast> for MagicNumberVisitor {
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
         if has_cfg_test_attr(&node.attrs) {
-            return; // #[cfg(test)] impl メソッドはスキップ
+            return; // Skip #[cfg(test)] impl method
         }
         syn::visit::visit_impl_item_fn(self, node);
     }
 
-    // `const` フィールドやローカル const（`const X: f32 = 42.0;` inside fn）
+    // `const` fields or local const (`const X: f32 = 42.0;` inside fn)
     fn visit_local(&mut self, node: &'ast syn::Local) {
-        // `let` バインディング — 通常通り検査
+        // `let` binding — inspect as usual
         syn::visit::visit_local(self, node);
     }
 
@@ -422,10 +422,10 @@ impl<'ast> Visit<'ast> for MagicNumberVisitor {
 }
 
 // ─────────────────────────────────────────────
-// ファイル走査エンジン
+// File Traversal Engine
 // ─────────────────────────────────────────────
 
-/// 指定パス以下の `.rs` ファイルをすべて収集する（`.gitignore` 準拠）。
+/// Collect all `.rs` files under the specified path (respecting `.gitignore`).
 fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let walker = WalkBuilder::new(root).standard_filters(true).build();
@@ -433,8 +433,8 @@ fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
     for entry in walker.flatten() {
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-            // テストディレクトリ自体は解析対象外
-            // （Linterテストコード内のサンプルでfalse positiveを避けるため）
+            // Test directory itself is excluded from analysis
+            // (To avoid false positives in sample code within Linter tests)
             let relative = path.strip_prefix(root).unwrap_or(path);
             if !relative.starts_with("tests") {
                 files.push(path.to_path_buf());
@@ -444,14 +444,14 @@ fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// 単一ファイルをパースして AST を返す。エラー時は Violation を返す。
+/// Parse a single file and return the AST. Return a Violation on error.
 fn parse_file(path: &Path) -> Result<syn::File, Vec<Violation>> {
     let source = std::fs::read_to_string(path).map_err(|err| {
         vec![Violation {
             file: path.to_path_buf(),
             line: 0,
             column: 0,
-            message: format!("ファイル読み込みエラー: {err}"),
+            message: format!("File read error: {err}"),
         }]
     })?;
     syn::parse_file(&source).map_err(|err| {
@@ -459,19 +459,19 @@ fn parse_file(path: &Path) -> Result<syn::File, Vec<Violation>> {
             file: path.to_path_buf(),
             line: 0,
             column: 0,
-            message: format!("構文解析エラー: {err}"),
+            message: format!("Syntax parse error: {err}"),
         }]
     })
 }
 
-/// 単一ファイルに i18n ルールを適用して違反リストを返す。
+/// Apply i18n rule to a single file and return a list of violations.
 fn lint_i18n(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = I18nHardcodeVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);
     visitor.violations
 }
 
-/// 単一ファイルにマジックナンバールールを適用して違反リストを返す。
+/// Apply magic number rule to a single file and return a list of violations.
 fn lint_magic_numbers(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = MagicNumberVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);
@@ -479,20 +479,20 @@ fn lint_magic_numbers(path: &Path, syntax: &syn::File) -> Vec<Violation> {
 }
 
 // ─────────────────────────────────────────────
-// テストエントリポイント
+// Test Entry Point
 // ─────────────────────────────────────────────
 
-/// ワークスペースルートを返す。
+/// Return the workspace root.
 fn workspace_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(|it| it.parent())
-        .expect("ワークスペースルートが見つかりません")
+        .expect("Workspace root not found")
 }
 
-/// AST Lint の共通実行ロジック。
-/// 指定ディレクトリ群の全 .rs ファイルに対して lint 関数を適用し、
-/// 違反があればパニックする。
+/// Common execution logic for AST Lint.
+/// Applies the lint function to all .rs files in the specified directories,
+/// and panics if any violations are found.
 fn run_ast_lint(
     rule_name: &str,
     hint: &str,
@@ -505,7 +505,7 @@ fn run_ast_lint(
         let rs_files = collect_rs_files(target_dir);
         assert!(
             !rs_files.is_empty(),
-            "解析対象の .rs ファイルが見つかりません: {}",
+            "No .rs files found for analysis: {}",
             target_dir.display()
         );
 
@@ -530,23 +530,23 @@ fn run_ast_lint(
             .join("\n");
 
         panic!(
-            "\n\n🚨 AST Linter [{rule_name}]: 違反が {} 件見つかりました:\n\n{}\n\n\
+            "\n\n🚨 AST Linter [{rule_name}]: Found {} violation(s):\n\n{}\n\n\
             💡 {hint}\n\
-            📖 詳細: docs/coding-rules.md を参照\n",
+            📖 Details: See docs/coding-rules.md\n",
             all_violations.len(),
             report
         );
     }
 }
 
-/// i18n ルール: UI メソッドへのハードコード文字列を検出。
-/// 対象: 全クレート（将来どのクレートにUIコードが追加されても検知する）。
+/// i18n rule: Detect hardcoded strings in UI methods.
+/// Scope: All crates (detects UI code added to any crate in the future).
 #[test]
 fn ast_linter_i18n_no_hardcoded_strings() {
     let root = workspace_root();
     run_ast_lint(
         "i18n",
-        "修正方法: 文字列リテラルを i18n::t(\"key\") または i18n::tf(\"key\", &[...]) に置き換えてください。",
+        "Fix: Replace string literals with i18n::t(\"key\") or i18n::tf(\"key\", &[...]).",
         &[
             root.join("crates/katana-core/src"),
             root.join("crates/katana-platform/src"),
@@ -556,14 +556,14 @@ fn ast_linter_i18n_no_hardcoded_strings() {
     );
 }
 
-/// マジックナンバールール: const/static 外の数値リテラルを検出。
-/// 対象: 全クレート（コーディング規約はプロジェクト全体に適用）。
+/// Magic number rule: Detect numeric literals outside of const/static.
+/// Scope: All crates (coding conventions apply project-wide).
 #[test]
 fn ast_linter_no_magic_numbers() {
     let root = workspace_root();
     run_ast_lint(
         "magic-number",
-        "修正方法: 数値リテラルを名前付き定数（const）に抽出してください。",
+        "Fix: Extract numeric literals into named constants (const).",
         &[
             root.join("crates/katana-core/src"),
             root.join("crates/katana-platform/src"),
@@ -574,7 +574,7 @@ fn ast_linter_no_magic_numbers() {
 }
 
 // ─────────────────────────────────────────────
-// Allowlist のユニットテスト
+// Allowlist Unit Tests
 // ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -582,19 +582,19 @@ mod allowlist_tests {
     use super::is_allowed_string;
 
     #[test]
-    fn 空文字列は許可される() {
+    fn allowlist_allows_empty_strings() {
         assert!(is_allowed_string(""));
     }
 
     #[test]
-    fn 空白のみは許可される() {
+    fn allowlist_allows_whitespace_only() {
         assert!(is_allowed_string("   "));
         assert!(is_allowed_string("\n"));
         assert!(is_allowed_string("\t"));
     }
 
     #[test]
-    fn 単一記号は許可される() {
+    fn allowlist_allows_single_symbol() {
         assert!(is_allowed_string("/"));
         assert!(is_allowed_string("+"));
         assert!(is_allowed_string("-"));
@@ -607,37 +607,37 @@ mod allowlist_tests {
     }
 
     #[test]
-    fn 単一英字xは許可される() {
-        // 閉じるボタン等でよく使われる
+    fn allowlist_allows_single_letter_x() {
+        // Often used for close buttons
         assert!(is_allowed_string("x"));
         assert!(is_allowed_string("X"));
     }
 
     #[test]
-    fn 単一英字は拒否される() {
+    fn allowlist_rejects_single_letter() {
         assert!(!is_allowed_string("a"));
         assert!(!is_allowed_string("S"));
     }
 
     #[test]
-    fn 絵文字のみは許可される() {
+    fn allowlist_allows_emojis_only() {
         assert!(is_allowed_string("🔄"));
         assert!(is_allowed_string("⬇"));
     }
 
     #[test]
-    fn 数値のみは許可される() {
+    fn allowlist_allows_numbers_only() {
         assert!(is_allowed_string("100"));
         assert!(is_allowed_string("0.5"));
     }
 
     #[test]
-    fn 記号と数値の組み合わせは許可される() {
+    fn allowlist_allows_symbols_combined_with_numbers() {
         assert!(is_allowed_string("100%"));
     }
 
     #[test]
-    fn 英語テキストは拒否される() {
+    fn allowlist_rejects_english_texts() {
         assert!(!is_allowed_string("Hello"));
         assert!(!is_allowed_string("Save"));
         assert!(!is_allowed_string("Ready"));
@@ -645,20 +645,20 @@ mod allowlist_tests {
     }
 
     #[test]
-    fn 日本語テキストは拒否される() {
-        assert!(!is_allowed_string("保存"));
-        assert!(!is_allowed_string("プレビュー"));
-        assert!(!is_allowed_string("日本語"));
+    fn allowlist_rejects_japanese_texts() {
+        assert!(!is_allowed_string("Save"));
+        assert!(!is_allowed_string("Preview"));
+        assert!(!is_allowed_string("Japanese"));
     }
 
     #[test]
-    fn 記号混じりの日本語テキストは拒否される() {
-        assert!(!is_allowed_string("⚠ エラー"));
-        assert!(!is_allowed_string("⬇ ダウンロード"));
+    fn allowlist_rejects_japanese_texts_mixed_with_symbols() {
+        assert!(!is_allowed_string("⚠ Error"));
+        assert!(!is_allowed_string("⬇ Download"));
     }
 
     #[test]
-    fn 記号のみの複数文字は許可される() {
+    fn allowlist_allows_multiple_symbols() {
         assert!(is_allowed_string("..."));
         assert!(is_allowed_string("---"));
         assert!(is_allowed_string("==="));
@@ -666,7 +666,7 @@ mod allowlist_tests {
 }
 
 // ─────────────────────────────────────────────
-// 内部ロジックの追加ユニットテスト
+// Additional Unit Tests for Internal Logic
 // ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -708,9 +708,9 @@ mod internal_tests {
 
     #[test]
     fn is_emoji_or_symbol_returns_false_for_katakana() {
-        // カタカナ U+30A0..U+30FF — not in emoji block
-        assert!(!is_emoji_or_symbol('ア'));
-        assert!(!is_emoji_or_symbol('テ'));
+        // Katakana U+30A0..U+30FF — not in emoji block
+        assert!(!is_emoji_or_symbol('A'));
+        assert!(!is_emoji_or_symbol('B'));
     }
 
     // is_format_macro (L220-226)
@@ -823,7 +823,7 @@ mod internal_tests {
         assert!(result.is_err());
         let errors = result.err().expect("should have failed with errors");
         assert!(!errors.is_empty());
-        assert!(errors[0].to_string().contains("構文解析エラー"));
+        assert!(errors[0].to_string().contains("Syntax parse error"));
     }
 
     // extract_type_from_call: path with >= 2 segments (L229-237)
@@ -840,40 +840,40 @@ mod internal_tests {
         assert!(!violations.is_empty());
     }
 
-    // is_emoji_or_symbol: タグ範囲 U+E0000..U+E007F (L105)
+    // is_emoji_or_symbol: Tag range U+E0000..U+E007F (L105)
     #[test]
     fn is_emoji_or_symbol_tag_range() {
         assert!(is_emoji_or_symbol('\u{E0001}'));
         assert!(is_emoji_or_symbol('\u{E007F}'));
     }
 
-    // is_emoji_or_symbol: 補助句読点 U+2E00..U+2E7F (L100)
+    // is_emoji_or_symbol: Supplemental Punctuation U+2E00..U+2E7F (L100)
     #[test]
     fn is_emoji_or_symbol_supplemental_punctuation() {
         assert!(is_emoji_or_symbol('\u{2E00}'));
     }
 
-    // is_emoji_or_symbol: CJK記号 U+3000..U+303F (L101)
+    // is_emoji_or_symbol: CJK Symbols U+3000..U+303F (L101)
     #[test]
     fn is_emoji_or_symbol_cjk_symbols() {
         assert!(is_emoji_or_symbol('\u{3000}')); // ideographic space
         assert!(is_emoji_or_symbol('\u{3001}')); // 。
     }
 
-    // is_emoji_or_symbol: 異体字セレクタ U+FE00..U+FE0F (L102)
+    // is_emoji_or_symbol: Variation Selectors U+FE00..U+FE0F (L102)
     #[test]
     fn is_emoji_or_symbol_variation_selectors() {
         assert!(is_emoji_or_symbol('\u{FE00}'));
         assert!(is_emoji_or_symbol('\u{FE0F}'));
     }
 
-    // is_emoji_or_symbol: CJK互換形 U+FE30..U+FE4F (L103)
+    // is_emoji_or_symbol: CJK Compatibility Forms U+FE30..U+FE4F (L103)
     #[test]
     fn is_emoji_or_symbol_cjk_compat() {
         assert!(is_emoji_or_symbol('\u{FE30}'));
     }
 
-    // check_expr_for_hardcoded_string: Paren式の再帰 (L208-210)
+    // check_expr_for_hardcoded_string: Recursion for Paren macro (L208-210)
     #[test]
     fn lint_i18n_detects_paren_wrapped_string() {
         let code = r#"fn render(ui: &mut Ui) { ui.label(("Hello")); }"#;
@@ -882,7 +882,7 @@ mod internal_tests {
         assert!(!violations.is_empty());
     }
 
-    // check_expr_for_hardcoded_string: Reference式の再帰 (L205-207)
+    // check_expr_for_hardcoded_string: Recursion for Reference expression (L205-207)
     #[test]
     fn lint_i18n_detects_reference_wrapped_string() {
         let code = r#"fn render(ui: &mut Ui) { ui.label(&"Hello"); }"#;
@@ -891,7 +891,7 @@ mod internal_tests {
         assert!(!violations.is_empty());
     }
 
-    // check_lit: Int マジックナンバー (L329-342)
+    // check_lit: Int magic numbers (L329-342)
     #[test]
     fn lint_magic_numbers_detects_int_literal() {
         let code = r#"fn foo() -> i32 { let x = 42; x }"#;
@@ -901,7 +901,7 @@ mod internal_tests {
         assert!(violations[0].to_string().contains("42"));
     }
 
-    // visit_expr_call: 非UI型のnew()は検出しない (L264-267)
+    // visit_expr_call: Ignores new() from non-UI types (L264-267)
     #[test]
     fn lint_i18n_ignores_non_ui_type_new() {
         let code = r#"fn render() { let _ = SomeOtherType::new("not flagged"); }"#;
@@ -910,16 +910,16 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // parse_file: ファイルが存在しない場合 (L435-442)
+    // parse_file: File does not exist (L435-442)
     #[test]
     fn parse_file_returns_error_for_nonexistent_file() {
         let result = parse_file(std::path::Path::new("/nonexistent/file.rs"));
         assert!(result.is_err());
         let errors = result.err().unwrap();
-        assert!(errors[0].to_string().contains("ファイル読み込みエラー"));
+        assert!(errors[0].to_string().contains("File read error"));
     }
 
-    // lint_magic_numbers: 負の値 -1 は許可される
+    // lint_magic_numbers: Negative value -1 is allowed
     #[test]
     fn lint_magic_numbers_allows_negative_one() {
         let code = r#"fn foo() -> i32 { -1 }"#;
@@ -928,7 +928,7 @@ mod internal_tests {
         assert_eq!(violations.len(), 0);
     }
 
-    // lint_magic_numbers: static 内の数値は許可される
+    // lint_magic_numbers: Numbers in static are allowed
     #[test]
     fn lint_magic_numbers_allows_static_context() {
         let code = r#"static FOO: i32 = 42;"#;
@@ -937,7 +937,7 @@ mod internal_tests {
         assert_eq!(violations.len(), 0);
     }
 
-    // format!() 内のハードコード検出 (L178-201)
+    // Detect hardcoded format in format!() (L178-201)
     #[test]
     fn lint_i18n_detects_format_in_button() {
         let code = r#"fn render(ui: &mut Ui) { ui.button(format!("Save {}", x)); }"#;
@@ -946,17 +946,18 @@ mod internal_tests {
         assert!(!violations.is_empty());
     }
 
-    // Expr::Group の再帰検査 (L211-213)
-    // Group 式は proc_macro2 のグループ化で発生する
+    // Recursive check for Expr::Group (L211-213)
+    // Group expressions appear when using proc_macro2 grouping
     #[test]
     fn check_expr_for_hardcoded_string_handles_group_expr() {
-        // Group 式を直接テストするため、lint_i18n を使わず Visitor を直接操作
+        // Direct test for Group expr handling, manipulating Visitor directly
+        // without lint_i18n
         let mut visitor = I18nHardcodeVisitor {
             file: PathBuf::from("test.rs"),
             violations: Vec::new(),
         };
-        // Group 式: syn::Expr::Group は通常マクロ展開で生成される
-        // proc_macro2::Group を含むコードで検出できることを確認
+        // Group expr: syn::Expr::Group is typically built through macro expansion
+        // Here we ensure proc_macro2::Group containing our string gets detected
         let lit = syn::parse_str::<syn::Expr>("\"hardcoded\"").unwrap();
         let group = syn::Expr::Group(syn::ExprGroup {
             attrs: vec![],
@@ -967,27 +968,27 @@ mod internal_tests {
         assert!(!visitor.violations.is_empty());
     }
 
-    // visit_expr_call: UI_FUNCTIONS に含まれるが UI_TYPES_FOR_NEW には含まれない型 (L264)
+    // visit_expr_call: Functions matching UI_FUNCTIONS but types without UI_TYPES_FOR_NEW (L264)
     #[test]
     fn lint_i18n_skips_non_ui_type_new_with_string() {
-        // 関数名は new (UI_FUNCTIONS に含まれる) だが型名が UI_TYPES_FOR_NEW に含まれない
+        // Function is named `new` (in UI_FUNCTIONS), but type is not in UI_TYPES_FOR_NEW
         let code = r#"fn render() { let _ = HashMap::new("some string"); }"#;
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
         assert!(violations.is_empty());
     }
 
-    // visit_expr_call: 単セグメントのパスでは extract_type_from_call が None (L266-267)
+    // visit_expr_call: extract_type_from_call returns None for single segment path (L266-267)
     #[test]
     fn lint_i18n_skips_simple_function_call() {
-        // 単セグメントパス: new("string") → extract_type_from_call は None
+        // Single segment path: new("string") -> extract_type_from_call becomes None
         let code = r#"fn render() { new("some string"); }"#;
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
         assert!(violations.is_empty());
     }
 
-    // lint_magic_numbers: 許可リスト内の Float (L342 の閉じ括弧)
+    // lint_magic_numbers: Allowed float (closing brace of L342)
     #[test]
     fn lint_magic_numbers_allows_zero_float() {
         let code = r#"fn foo() { let _ = 0.0; }"#;
@@ -996,7 +997,7 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // lint_magic_numbers: base10_parse 成功だが許可数値 (L357 の閉じ括弧)
+    // lint_magic_numbers: base10_parse succeeds and reaches allowed value check (closing brace of L357)
     #[test]
     fn lint_magic_numbers_allows_one_float() {
         let code = r#"fn foo() { let _ = 1.0; }"#;
@@ -1005,7 +1006,7 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // run_lint_on_dirs: 違反がある場合に panic する (L512-522)
+    // run_lint_on_dirs: Panics on violations (L512-522)
     #[test]
     #[should_panic(expected = "AST Linter")]
     fn run_lint_on_dirs_panics_on_violations() {
@@ -1024,7 +1025,7 @@ mod internal_tests {
         );
     }
 
-    // run_lint_on_dirs: パースエラーも violation として集約 (L504-506)
+    // run_lint_on_dirs: Gathers parse errors as violations (L504-506)
     #[test]
     #[should_panic(expected = "AST Linter")]
     fn run_lint_on_dirs_collects_parse_errors() {
@@ -1039,9 +1040,9 @@ mod internal_tests {
         );
     }
 
-    // run_lint_on_dirs: ファイルなしのディレクトリで panic (L495)
+    // run_lint_on_dirs: Panics when there are no files (L495)
     #[test]
-    #[should_panic(expected = "解析対象の .rs ファイルが見つかりません")]
+    #[should_panic(expected = "No .rs files found for analysis")]
     fn run_lint_on_dirs_panics_when_no_rs_files() {
         let tmp = tempfile::TempDir::new().unwrap();
         run_ast_lint(
@@ -1052,7 +1053,7 @@ mod internal_tests {
         );
     }
 
-    // check_expr_for_hardcoded_string: 非 Str リテラル（整数など）→ if let 不一致 (L178)
+    // check_expr_for_hardcoded_string: Non-String literals (like Integers) bypass condition (L178)
     #[test]
     fn lint_i18n_ignores_non_string_literal_in_label() {
         let code = r#"fn render(ui: &mut Ui) { ui.label(42); }"#;
@@ -1061,7 +1062,7 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // check_expr_for_hardcoded_string: 非 format! マクロ → is_format_macro が false (L201)
+    // check_expr_for_hardcoded_string: Non format! macro triggers false for is_format_macro (L201)
     #[test]
     fn lint_i18n_ignores_non_format_macro_in_label() {
         let code = r#"fn render(ui: &mut Ui) { ui.label(vec!["a"]); }"#;
@@ -1070,14 +1071,14 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // extract_type_from_call: 単セグメントパスは None を返す (L235)
+    // extract_type_from_call: Single segment path translates to None (L235)
     #[test]
     fn extract_type_from_call_returns_none_for_single_segment() {
         let expr = syn::parse_str::<syn::Expr>("foo()").unwrap();
         assert!(extract_type_from_call(&expr).is_none());
     }
 
-    // visit_expr_call: 非 UI_FUNCTIONS の関数名 (L266-267)
+    // visit_expr_call: Non UI_FUNCTIONS function name (L266-267)
     #[test]
     fn lint_i18n_ignores_non_ui_function_path() {
         let code = r#"fn render() { SomeType::render("not flagged"); }"#;
@@ -1086,17 +1087,18 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // check_lit: Int 許可値で分岐の閉じ括弧を通過 (L342)
+    // check_lit: Allowed int avoids triggering if block (L342)
     #[test]
     fn lint_magic_numbers_int_allowed_value_reaches_closing_brace() {
-        // 0, 1 は許可値。parse 成功 + is_allowed_number true → if ブロック非突入 → } に到達
+        // 0 and 1 are allowed values. parse succeeds + is_allowed_number is true -> doesn't hit `if`
+        // reaches `}`
         let code = r#"fn foo() { let _ = 0; let _ = 1; let _ = 2; }"#;
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
         assert!(violations.is_empty());
     }
 
-    // check_lit: Float 許可値で分岐の閉じ括弧を通過 (L357)
+    // check_lit: Allowed float avoids triggering if block (L357)
     #[test]
     fn lint_magic_numbers_float_allowed_value_reaches_closing_brace() {
         let code = r#"fn foo() { let _ = 0.0; let _ = 1.0; }"#;
@@ -1105,8 +1107,8 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // L221: check_call_for_ui_violation で node.func が Path 以外のケース
-    // パレン式呼び出し `(callback)("string")` は ExprCall だが func は ExprParen
+    // L221: check_call_for_ui_violation hitting `ExprCall` without a Path in `node.func`
+    // Paren wrapped function call like `(callback)("string")` generates ExprCall but func is ExprParen
     #[test]
     fn lint_i18n_ignores_paren_expr_call() {
         let code = r#"fn render() { (get_func())("some string"); }"#;
@@ -1115,10 +1117,10 @@ mod internal_tests {
         assert!(violations.is_empty());
     }
 
-    // L338/354: check_lit の let-else return（base10_parse が失敗しない構造的限界のテスト）
-    // syn の LitInt/LitFloat は常に正常にパースされるため、
-    // 許可されない値で violations が生成されることを確認し、
-    // 成功パス（if !is_allowed_number → true）を通す
+    // L338/354: let-else return check within `check_lit` (tests structural limits where base10_parse won't fail)
+    // syn's LitInt/LitFloat successfully parses strings natively,
+    // thereby triggering violations exclusively when the content value falls off the allowed list
+    // executing the successful pass (if !is_allowed_number -> true).
     #[test]
     fn lint_magic_numbers_non_allowed_int_triggers_violation() {
         let code = r#"fn foo() { let _ = 42; }"#;

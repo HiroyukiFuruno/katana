@@ -179,12 +179,12 @@ fn non_markdown_files_at_root_are_excluded() {
     assert!(paths.iter().any(|p| p.contains("README.md")));
 }
 
-// L106: has_any_markdown の再帰（ネストされたサブディレクトリ内のmd検出）
+// L106: Recursion for has_any_markdown (detecting md in nested subdirectories)
 #[test]
 fn nested_subdirectory_with_markdown_is_included() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("root.md"), "# Root").unwrap();
-    // 2階層深いサブディレクトリに .md ファイル
+    // .md file in a subdirectory 2 levels deep
     fs::create_dir_all(tmp.path().join("docs").join("deep")).unwrap();
     fs::write(
         tmp.path().join("docs").join("deep").join("spec.md"),
@@ -195,7 +195,7 @@ fn nested_subdirectory_with_markdown_is_included() {
     let svc = FilesystemService::new();
     let ws = svc.open_workspace(tmp.path()).unwrap();
 
-    // "docs" ディレクトリが含まれている（中に .md があるため）
+    // "docs" directory is included (because it contains a .md file inside)
     fn find_dir<'a>(tree: &'a [katana_core::workspace::TreeEntry], name: &str) -> bool {
         tree.iter().any(|e| match e {
             katana_core::workspace::TreeEntry::Directory { path, children } => {
@@ -212,7 +212,7 @@ fn nested_subdirectory_with_markdown_is_included() {
 #[test]
 fn filesystem_service_default_works() {
     let svc: FilesystemService = Default::default();
-    // Default::default() と new() は同じ
+    // Default::default() and new() are the same
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("note.md"), "# Note").unwrap();
     let ws = svc.open_workspace(tmp.path()).unwrap();

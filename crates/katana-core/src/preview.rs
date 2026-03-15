@@ -1,23 +1,23 @@
-//! プレビュー用ドキュメントセクションモデル。
+//! Document section model for preview.
 //!
-//! Markdown ソースを「通常テキスト」と「ダイアグラムブロック」に分割し、
-//! UI 層が各セクションを独立してレンダリングできるようにする。
+//! Splits Markdown source into "normal text" and "diagram blocks",
+//! allowing the UI layer to render each section independently.
 
 use crate::markdown::diagram::DiagramKind;
 
-/// ドキュメントを構成するセクションの種別。
+/// The type of section that makes up a document.
 #[derive(Debug, Clone)]
 pub enum PreviewSection {
-    /// 通常の Markdown テキスト。
+    /// Normal Markdown text.
     Markdown(String),
-    /// ダイアグラムフェンスブロック。
+    /// A diagram fence block.
     Diagram { kind: DiagramKind, source: String },
 }
 
-/// ソーステキストを `PreviewSection` のリストに分割する。
+/// Splits the source text into a list of `PreviewSection`s.
 ///
-/// ダイアグラムフェンス（` ```mermaid` / ` ```plantuml` / ` ```drawio` ）を検出し、
-/// それ以外を Markdown セクションとしてまとめる。
+/// Detects diagram fences (` ```mermaid` / ` ```plantuml` / ` ```drawio` ),
+/// and groups the rest as Markdown sections.
 pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     let mut sections = Vec::new();
     let mut markdown_acc = String::new();
@@ -36,7 +36,7 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
                 remaining = after;
             }
             None => {
-                // ダイアグラムでなければ Markdown としてそのまま扱う。
+                // If not a diagram, treat as plain Markdown.
                 markdown_acc.push_str("```");
                 remaining = &remaining["```".len()..];
             }
@@ -48,14 +48,14 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     sections
 }
 
-/// 蓄積された Markdown テキストが空でなければセクションに追加する。
+/// If the accumulated Markdown text is not empty, add it to the sections.
 fn flush_markdown(sections: &mut Vec<PreviewSection>, acc: &mut String) {
     if !acc.is_empty() {
         sections.push(PreviewSection::Markdown(std::mem::take(acc)));
     }
 }
 
-/// 先頭がダイアグラムフェンスであれば `(kind, source, after)` を返す。
+/// If the start is a diagram fence, returns `(kind, source, after)`.
 fn try_parse_diagram_fence(s: &str) -> Option<(DiagramKind, String, &str)> {
     let body = s.strip_prefix("```")?;
     let info_end = body.find('\n')?;

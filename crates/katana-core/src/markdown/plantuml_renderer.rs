@@ -1,11 +1,11 @@
-//! PlantUML サブプロセスレンダラー。
+//! PlantUML subprocess renderer.
 //!
-//! `java -jar plantuml.jar -pipe -tsvg` を起動し、
-//! stdin に PlantUML ソースを渡して stdout から SVG を読み取る。
+//! Runs `java -jar plantuml.jar -pipe -tsvg`,
+//! passes PlantUML source to stdin and reads SVG from stdout.
 //!
-//! MVP 制約:
-//! - 入力は `@startuml` / `@enduml` デリミタを含む生ソースのみ対応。
-//! - JAR の探索パスは `PLANTUML_JAR` 環境変数 → バイナリ隣 → XDG データディレクトリ。
+//! MVP constraints:
+//! - Only supports raw source containing `@startuml` / `@enduml` delimiters.
+//! - JAR search path is: `PLANTUML_JAR` environment variable -> adjacent to binary -> XDG data directory.
 
 use std::{
     io::Write,
@@ -15,9 +15,9 @@ use std::{
 
 use super::diagram::{DiagramBlock, DiagramResult};
 
-/// PlantUML JAR を探索する候補パスを返す。
+/// Returns candidate paths to search for the PlantUML JAR.
 pub fn jar_candidate_paths() -> Vec<PathBuf> {
-    // 環境変数が設定されている場合はそのパスのみを使用する（他の候補は無視）。
+    // If the environment variable is set, use only that path (ignore other candidates).
     if let Ok(env_path) = std::env::var("PLANTUML_JAR") {
         return vec![PathBuf::from(env_path)];
     }
@@ -26,31 +26,31 @@ pub fn jar_candidate_paths() -> Vec<PathBuf> {
     for prefix in &["/opt/homebrew", "/usr/local"] {
         paths.push(PathBuf::from(prefix).join("opt/plantuml/libexec/plantuml.jar"));
     }
-    // バイナリと同じディレクトリ
+    // Same directory as the binary
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             paths.push(dir.join("plantuml.jar"));
             paths.push(dir.join("renderers").join("plantuml.jar"));
         }
     }
-    // XDG / macOS アプリデータ
+    // XDG / macOS app data
     if let Some(home) = dirs_sys::home_dir() {
         paths.push(home.join(".local").join("katana").join("plantuml.jar"));
     }
     paths
 }
 
-/// Katana が自動インストールするデフォルトの JAR パス。
+/// Default JAR path where Katana automatically installs.
 pub fn default_install_path() -> Option<PathBuf> {
     dirs_sys::home_dir().map(|h| h.join(".local").join("katana").join("plantuml.jar"))
 }
 
-/// システムで利用可能な PlantUML JAR パスを返す。存在しなければ `None`。
+/// Returns the path to the available PlantUML JAR on the system. If it doesn't exist, returns `None`.
 pub fn find_plantuml_jar() -> Option<PathBuf> {
     jar_candidate_paths().into_iter().find(|p| p.exists())
 }
 
-/// PlantUML ソースを SVG に変換する。
+/// Converts PlantUML source to SVG.
 pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
     let Some(jar) = find_plantuml_jar() else {
         let install_path = default_install_path().unwrap_or_else(|| PathBuf::from("plantuml.jar"));
@@ -71,7 +71,7 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// `java -jar plantuml.jar` を起動してソースを渡し SVG を返す。
+/// Runs `java -jar plantuml.jar`, passes the source, and returns the SVG.
 pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let mut child = Command::new("java")
         .args([
@@ -85,27 +85,27 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("java 起動失敗: {e}"))?;
+        .map_err(|e| format!("java startup failed: {e}"))?;
 
-    // stdin への書き込みは別スコープで drop して EOF を送る。
+    // Write to stdin in a separate scope to drop it and send EOF.
     {
-        let stdin = child.stdin.as_mut().ok_or("stdin 取得失敗")?;
+        let stdin = child.stdin.as_mut().ok_or("stdin acquisition failed")?;
         stdin
             .write_all(source.as_bytes())
-            .map_err(|e| format!("stdin 書き込み失敗: {e}"))?;
+            .map_err(|e| format!("stdin write failed: {e}"))?;
     }
 
     let output = child
         .wait_with_output()
-        .map_err(|e| format!("プロセス待機失敗: {e}"))?;
+        .map_err(|e| format!("process wait failed: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(format!("PlantUML レンダリングエラー: {stderr}"));
+        return Err(format!("PlantUML rendering error: {stderr}"));
     }
-    String::from_utf8(output.stdout).map_err(|e| format!("SVG デコードエラー: {e}"))
+    String::from_utf8(output.stdout).map_err(|e| format!("SVG decode error: {e}"))
 }
 
-/// SVG テキストをプレビュー埋め込み用の HTML フラグメントに変換する。
+/// Converts SVG text into an HTML fragment for preview embedding.
 pub fn svg_to_html_fragment(svg: &str) -> String {
     format!(r#"<div class="katana-diagram plantuml">{svg}</div>"#)
 }

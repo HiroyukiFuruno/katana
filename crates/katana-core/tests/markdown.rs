@@ -116,9 +116,9 @@ fn drawio_renderer_escapes_html_in_fallback() {
     assert!(!out.html.is_empty());
 }
 
-// L127: DiagramResult::OkPng 分岐をカバーするテスト
+// L127: Test covering DiagramResult::OkPng branch
 #[test]
-fn okpng分岐はcore層で空文字列になる() {
+fn okpng_branch_becomes_empty_string_in_core_layer() {
     use katana_core::markdown::diagram::{DiagramBlock, DiagramRenderer, DiagramResult};
 
     struct PngRenderer;
@@ -130,7 +130,7 @@ fn okpng分岐はcore層で空文字列になる() {
 
     let md = "\n```mermaid\ngraph TD; A-->B\n```\n";
     let out = render(md, &PngRenderer).expect("render failed");
-    // OkPng は core 層では空文字列に変換される（UI 層で処理される）
-    // ダイアグラムブロックが figure タグ等に置き換わっていないことを確認
+    // OkPng is converted to an empty string in the core layer (processed in the UI layer)
+    // Ensures the diagram block is not replaced by figure tags etc.
     assert!(!out.html.contains("graph TD"));
 }

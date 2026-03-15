@@ -1,12 +1,12 @@
-//! Preview pane の純粋な egui UI 描画関数群。
+//! Pure egui UI rendering functions for the preview pane.
 //!
-//! このモジュールはすべて egui の UI コンテキスト（`egui::Ui`）に依存するコードを含む。
-//! - ボタンクリックイベント（`button().clicked()`）
-//! - テクスチャロード（`ui.ctx().load_texture()`）
-//! - UI コンポーネントの描画
+//! This module contains code that depends entirely on the egui UI context (`egui::Ui`).
+//! - Button click events (`button().clicked()`)
+//! - Texture loading (`ui.ctx().load_texture()`)
+//! - UI component rendering
 //!
-//! これらは egui のフレームコンテキストなしには実行できないため、
-//! カバレッジ計測では `--ignore-filename-regex` で除外する。
+//! Since these cannot be executed without an egui frame context,
+//! they are excluded from coverage measurement using `--ignore-filename-regex`.
 
 use eframe::egui::{self, Vec2};
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
@@ -14,11 +14,11 @@ use katana_core::markdown::svg_rasterize::RasterizedSvg;
 
 use crate::preview_pane::{DownloadRequest, RenderedSection};
 
-/// ツール未インストール警告のテキスト色 (オレンジ)。
+/// Text color for the tool not installed warning (orange).
 const WARNING_TEXT_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 165, 0);
 
-/// 単一セクションを描画する。
-/// ダウンロードボタンが押された場合は `Some(DownloadRequest)` を返す。
+/// Renders a single section.
+/// Returns `Some(DownloadRequest)` if the download button is pressed.
 pub(crate) fn show_section(
     ui: &mut egui::Ui,
     cache: &mut CommonMarkCache,
@@ -81,7 +81,7 @@ pub(crate) fn show_section(
     }
 }
 
-/// 未インストールツールのダウンロードボタン UI。
+/// Download button UI for uninstalled tools.
 pub(crate) fn show_not_installed(
     ui: &mut egui::Ui,
     kind: &str,
@@ -115,7 +115,7 @@ pub(crate) fn show_not_installed(
     request
 }
 
-/// ラスタライズ済み SVG を egui テクスチャとして表示する。
+/// Displays rasterized SVG as an egui texture.
 pub(crate) fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str, id: usize) {
     let color_img = egui::ColorImage::from_rgba_unmultiplied(
         [img.width as usize, img.height as usize],
@@ -132,7 +132,7 @@ pub(crate) fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str
     ui.add(egui::Image::new((texture.id(), size)));
 }
 
-/// セクションリストを順に描画し、ダウンロードリクエストがあれば返す。
+/// Renders the section list sequentially and returns a download request if any.
 pub(crate) fn render_sections(
     ui: &mut egui::Ui,
     cache: &mut CommonMarkCache,

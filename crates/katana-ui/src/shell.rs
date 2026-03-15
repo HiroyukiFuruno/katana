@@ -1,6 +1,6 @@
 //! Katana three-pane egui shell.
 //!
-//! ビジネスロジックのみを含む。egui 描画コードは shell_ui.rs に分離。
+//! Contains only business logic. egui rendering code is separated into shell_ui.rs.
 
 use std::collections::HashMap;
 
@@ -13,64 +13,64 @@ use crate::{
 };
 
 // ─────────────────────────────────────────────
-// レイアウト定数
+// Layout Constants
 // ─────────────────────────────────────────────
 
-/// サイドバー折りたたみ時に表示する「›」トグルボタンの幅 (px)。
+/// Width of the '›' toggle button displayed when the sidebar is collapsed (px).
 pub(crate) const SIDEBAR_COLLAPSED_TOGGLE_WIDTH: f32 = 24.0;
 
-/// ファイルツリーパネルのリサイズ最小幅 (px)。
+/// Minimum resize width of the file tree panel (px).
 pub(crate) const FILE_TREE_PANEL_MIN_WIDTH: f32 = 120.0;
 
-/// ファイルツリーパネルの初期表示幅 (px)。
+/// Initial display width of the file tree panel (px).
 pub(crate) const FILE_TREE_PANEL_DEFAULT_WIDTH: f32 = 220.0;
 
-/// Split モード時のプレビューパネル最小幅 (px)。
+/// Minimum width of the preview panel in Split mode (px).
 pub(crate) const SPLIT_PREVIEW_PANEL_MIN_WIDTH: f32 = 200.0;
 
-/// Split モード時のプレビューパネル初期幅 (px)。
+/// Initial width of the preview panel in Split mode (px).
 pub(crate) const SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH: f32 = 400.0;
 
-/// タブバー右端の ◀▶ ナビゲーションボタン領域幅 (px)。
+/// Width of the ◀▶ navigation button area at the right end of the tab bar (px).
 pub(crate) const TAB_NAV_BUTTONS_AREA_WIDTH: f32 = 80.0;
 
-/// 各タブの右側に設けるタブ間余白 (px)。
+/// Inter-tab spacing provided on the right side of each tab (px).
 pub(crate) const TAB_INTER_ITEM_SPACING: f32 = 4.0;
 
-/// テキストエディタ TextEdit の初期表示行数。
+/// Initial number of visible rows for the text editor TextEdit.
 pub(crate) const EDITOR_INITIAL_VISIBLE_ROWS: usize = 40;
 
-/// エディタ⇔プレビュー間スクロール同期の感度閾値。
-/// fraction 差分がこの値以下の場合はスクロールイベントを無視する。
+/// Sensitivity threshold for scroll synchronization between editor and preview.
+/// Scroll events are ignored if the fraction difference is less than or equal to this value.
 pub(crate) const SCROLL_SYNC_DEAD_ZONE: f32 = 0.002;
 
-/// タブのツールチップが表示されるまでの遅延 (秒)。
+/// Delay until the tab tooltip is displayed (seconds).
 pub(crate) const TAB_TOOLTIP_SHOW_DELAY_SECS: f32 = 0.25;
 
-/// ファイルツリーの「ワークスペース未選択」表示下の余白 (px)。
+/// Spacing below the 'No workspace selected' display in the file tree (px).
 pub(crate) const NO_WORKSPACE_BOTTOM_SPACING: f32 = 8.0;
 
-/// ダウンロード完了チェックのポーリング間隔 (ms)。
+/// Polling interval for checking download completion (ms).
 pub(crate) const DOWNLOAD_STATUS_CHECK_INTERVAL_MS: u64 = 200;
 
 // ─────────────────────────────────────────────
-// カラー定数
+// Color Constants
 // ─────────────────────────────────────────────
 
-/// アプリ内タイトルバーに表示するファイル名のテキスト色。
+/// Text color of the file name displayed in the in-app title bar.
 pub(crate) const TITLE_BAR_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(180);
 
-/// ファイルツリーの通常テキスト色（非アクティブファイル・ディレクトリ）。
+/// Normal text color of the file tree (inactive files/directories).
 pub(crate) const FILE_TREE_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(220);
 
-/// ファイルツリーでアクティブファイルを示す背景ハイライト色 (VSCode風半透明ブルー)。
+/// Background highlight color indicating the active file in the file tree (VSCode-like semi-transparent blue).
 pub(crate) const ACTIVE_FILE_HIGHLIGHT_BG: egui::Color32 =
     egui::Color32::from_rgba_premultiplied(40, 80, 160, 100);
 
-/// ファイルツリーのアクティブ行背景の角丸半径。
+/// Rounding radius of the active row background in the file tree.
 pub(crate) const ACTIVE_FILE_HIGHLIGHT_ROUNDING: f32 = 3.0;
 
-/// FNV-1a ハッシュで文字列をu64に変換する。
+/// Converts a string to u64 using FNV-1a hash.
 fn hash_str(s: &str) -> u64 {
     crate::shell_logic::hash_str(s)
 }
@@ -79,11 +79,11 @@ pub struct KatanaApp {
     pub(crate) state: AppState,
     pub(crate) fs: FilesystemService,
     pub(crate) pending_action: AppAction,
-    /// タブ別プレビューペイン。キーはファイルパス。タブ切り替え時にキャッシュを再利用する。
+    /// Per-tab preview pane. Key is the file path. Reuses cache on tab switch.
     pub(crate) tab_panes: HashMap<std::path::PathBuf, PreviewPane>,
-    /// タブ別の最終レンダリング済みコンテンツハッシュ。変化検知に使う。
+    /// Last rendered content hash per tab. Used for change detection.
     pub(crate) tab_hashes: HashMap<std::path::PathBuf, u64>,
-    /// バックグラウンドダウンロードの完了通知レシーバ。
+    /// Receiver for background download completion notifications.
     pub(crate) download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
 }
 
@@ -103,7 +103,7 @@ impl KatanaApp {
         std::mem::replace(&mut self.pending_action, AppAction::None)
     }
 
-    /// テキスト変更のみ反映（ダイアグラムは既存画像を保持）。
+    /// Reflects only text changes (keeps existing images for diagrams).
     fn refresh_preview(&mut self, path: &std::path::Path, source: &str) {
         self.tab_panes
             .entry(path.to_path_buf())
@@ -111,7 +111,7 @@ impl KatanaApp {
             .update_markdown_sections(source);
     }
 
-    /// 全セクション再レンダリング。コンテンツハッシュも更新する。
+    /// Re-renders all sections. Updates the content hash as well.
     fn full_refresh_preview(&mut self, path: &std::path::Path, source: &str) {
         let h = hash_str(source);
         self.tab_hashes.insert(path.to_path_buf(), h);
@@ -144,7 +144,7 @@ impl KatanaApp {
     }
 
     fn handle_select_document(&mut self, path: std::path::PathBuf) {
-        // すでに開いているタブならフォーカスを移す。内容が変化していない場合はキャッシュを再利用。
+        // If the tab is already open, move focus to it. Reuse cache if the content hasn't changed.
         if let Some(existing_idx) = self
             .state
             .open_documents
@@ -156,10 +156,10 @@ impl KatanaApp {
             let h = hash_str(&src);
             let last_h = self.tab_hashes.get(&path).copied().unwrap_or(0);
             if h != last_h {
-                // 内容が変化した場合のみ再レンダリング
+                // Re-render only if the content has changed
                 self.full_refresh_preview(&path, &src);
             }
-            // 変化なし → 既存の PreviewPane をそのまま使う（キャッシュ済み）
+            // No change -> reuse existing PreviewPane (cached)
             return;
         }
 
@@ -234,7 +234,7 @@ impl KatanaApp {
         }
     }
 
-    /// ダウンロードリクエストをバックグラウンドスレッドで処理する。
+    /// Processes a download request in a background thread.
     pub(crate) fn start_download(&mut self, req: DownloadRequest) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.download_rx = Some(rx);
@@ -247,7 +247,7 @@ impl KatanaApp {
         });
     }
 
-    /// ダウンロード完了をポーリングし、完了時にプレビューを再レンダリングする。
+    /// Polls for download completion and re-renders the preview when done.
     pub(crate) fn poll_download(&mut self, ctx: &egui::Context) {
         let done = if let Some(rx) = &self.download_rx {
             match rx.try_recv() {
@@ -277,21 +277,21 @@ impl KatanaApp {
         }
     }
 
-    /// テスト時などにプログラムからアクションを注入するためのメソッド
+    /// Method for injecting actions from the program, e.g., during testing
     pub fn trigger_action(&mut self, action: AppAction) {
         self.pending_action = action;
     }
 
-    /// テスト時などに AppState のメソッドを呼び出すためのヘルパー
+    /// Helper for calling AppState methods, e.g., during testing
     #[doc(hidden)]
     pub fn app_state_mut(&mut self) -> &mut AppState {
         &mut self.state
     }
 }
 
-/// `curl` をサブプロセスとして呼び出し、ファイルをダウンロードする。
+/// Calls `curl` as a subprocess to download a file.
 fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
-    // 親ディレクトリが存在しない場合は作成する
+    // Create parent directory if it does not exist
     if let Some(p) = dest.parent() {
         std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
     }
@@ -306,7 +306,7 @@ fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
     }
 }
 
-// impl eframe::App for KatanaApp は shell_ui.rs に移動済み
+// impl eframe::App for KatanaApp has been moved to shell_ui.rs
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -323,12 +323,12 @@ mod tests {
 
     fn make_temp_workspace() -> TempDir {
         let dir = tempfile::tempdir().unwrap();
-        // ワークスペースに md ファイルを作成
+        // Create an md file in the workspace
         std::fs::write(dir.path().join("test.md"), "# Test").unwrap();
         dir
     }
 
-    // handle_open_workspace: 有効なパスで成功 (L149-160)
+    // handle_open_workspace: Success with valid path (L149-160)
     #[test]
     fn handle_open_workspace_success_sets_workspace() {
         let mut app = make_app();
@@ -338,56 +338,56 @@ mod tests {
         assert!(app.state.status_message.is_some());
     }
 
-    // handle_open_workspace: 無効なパスでエラー (L161-167)
+    // handle_open_workspace: Error with invalid path (L161-167)
     #[test]
     fn handle_open_workspace_error_sets_status_message() {
         let mut app = make_app();
         app.handle_open_workspace(PathBuf::from("/nonexistent/path/that/cannot/exist"));
-        // 存在しないパスなので workspace は None（空ディレクトリとして開かれる可能性も）
-        // エラーが記録される or workspace が空で開かれる
+        // Non-existent path, so workspace might be None (or opened as an empty directory)
+        // Either an error is recorded or an empty workspace is opened
         assert!(
             app.state.workspace.is_some() || app.state.status_message.is_some(),
-            "エラーまたはワークスペースが設定されるべき"
+            "Error or workspace should be set"
         );
     }
 
-    // handle_select_document: 存在しないファイルのロードエラー (L198-204)
+    // handle_select_document: Load error for non-existent file (L198-204)
     #[test]
     fn handle_select_document_file_not_found_sets_status_message() {
         let mut app = make_app();
         app.handle_select_document(PathBuf::from("/nonexistent/file.md"));
-        // ロードエラー → status_message に記録
+        // Load error -> recorded in status_message
         assert!(app.state.status_message.is_some());
     }
 
-    // handle_select_document: 既存タブ選択でフォーカス移動 (L173-188)
+    // handle_select_document: Move focus by selecting existing tab (L173-188)
     #[test]
     fn handle_select_document_switches_to_existing_tab() {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
 
-        // 最初のロード
+        // Initial load
         app.handle_select_document(path.clone());
         assert_eq!(app.state.active_doc_idx, Some(0));
         assert_eq!(app.state.open_documents.len(), 1);
 
-        // 同じファイルを再度選択 → 新しいタブは開かない
+        // Re-select the same file -> does not open a new tab
         app.handle_select_document(path.clone());
         assert_eq!(app.state.open_documents.len(), 1);
         assert_eq!(app.state.active_doc_idx, Some(0));
     }
 
-    // handle_update_buffer: アクティブドキュメントなし (L213)
+    // handle_update_buffer: No active document (L213)
     #[test]
     fn handle_update_buffer_without_active_doc_does_nothing() {
         let mut app = make_app();
-        // ドキュメントを開かずに UpdateBuffer → パニックしない
+        // UpdateBuffer without opening a document -> does not panic
         app.handle_update_buffer("new content".to_string());
         assert!(app.state.open_documents.is_empty());
     }
 
-    // handle_update_buffer: アクティブドキュメントあり (L209-215)
+    // handle_update_buffer: Active document exists (L209-215)
     #[test]
     fn handle_update_buffer_updates_active_doc_buffer() {
         let mut app = make_app();
@@ -401,16 +401,16 @@ mod tests {
         assert!(doc.is_dirty);
     }
 
-    // handle_save_document: アクティブドキュメントなし (L219-220)
+    // handle_save_document: No active document (L219-220)
     #[test]
     fn handle_save_document_without_active_doc_does_nothing() {
         let mut app = make_app();
         app.handle_save_document();
-        // ステータスメッセージは設定されない（ドキュメントなし）
+        // Status message is not set (no document)
         assert!(app.state.status_message.is_none());
     }
 
-    // handle_save_document: 正常保存 (L222-223)
+    // handle_save_document: Successful save (L222-223)
     #[test]
     fn handle_save_document_success_sets_status() {
         let mut app = make_app();
@@ -437,7 +437,7 @@ mod tests {
         assert!(app.state.active_doc_idx.is_none());
     }
 
-    // process_action: CloseDocument - インデックス外はパニックしない (L237)
+    // process_action: CloseDocument - out of bounds does not panic (L237)
     #[test]
     fn process_action_close_document_out_of_bounds_does_nothing() {
         let mut app = make_app();
@@ -454,15 +454,15 @@ mod tests {
         app.handle_select_document(path.clone());
 
         app.process_action(AppAction::RefreshDiagrams);
-        // クラッシュしなければOK
+        // OK as long as no crash occurs
     }
 
-    // process_action: RefreshDiagrams ドキュメントなし (L249 early return)
+    // process_action: RefreshDiagrams no document (L249 early return)
     #[test]
     fn process_action_refresh_diagrams_no_doc_does_nothing() {
         let mut app = make_app();
         app.process_action(AppAction::RefreshDiagrams);
-        // ドキュメントなし → クラッシュしない
+        // No document -> does not crash
     }
 
     // process_action: ChangeLanguage (L255-257)
@@ -470,7 +470,7 @@ mod tests {
     fn process_action_change_language_sets_language() {
         let mut app = make_app();
         app.process_action(AppAction::ChangeLanguage("ja".to_string()));
-        // i18n の言語が変更されたことを確認（直接アクセス困難なのでパニックしないことを確認）
+        // Verify i18n language was changed (since direct access is hard, ensure no panic)
     }
 
     // process_action: None (L258)
@@ -506,7 +506,7 @@ mod tests {
         assert!(app.state.status_message.is_some());
     }
 
-    // start_download: スレッドが起動する (L263-273)
+    // start_download: Thread starts (L263-273)
     #[test]
     fn start_download_sets_download_state() {
         let mut app = make_app();
@@ -514,25 +514,25 @@ mod tests {
             url: "http://example.com/plantuml.jar".to_string(),
             dest: PathBuf::from("/tmp/test_plantuml.jar"),
         });
-        // status_message が設定される
+        // status_message is set
         assert!(app.state.status_message.is_some());
-        // download_rx が設定される
+        // download_rx is set
         assert!(app.download_rx.is_some());
     }
 
-    // download_with_curl: 親ディレクトリ作成が必要なパス (L319-320)
+    // download_with_curl: Parent directory creation required (L319-320)
     #[test]
     fn download_with_curl_creates_parent_dir() {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("subdir").join("file.jar");
-        // curl コマンドが失敗しても親ディレクトリが作成される
-        // (curl は存在しない URL で失敗するが、dir_all は成功する)
+        // Parent directory is created even if curl fails
+        // (curl fails with a non-existent URL, but dir_all succeeds)
         let _ = download_with_curl("http://127.0.0.1:0/nonexistent", &dest);
-        // 親ディレクトリが作成されたことを確認
+        // Verify that the parent directory was created
         assert!(dest.parent().unwrap().exists());
     }
 
-    // take_action: pending_action を返してリセット (L127-129)
+    // take_action: Return pending_action and reset (L127-129)
     #[test]
     fn take_action_returns_and_resets_pending_action() {
         let mut app = make_app();
@@ -548,18 +548,18 @@ mod tests {
         );
     }
 
-    // poll_download: download_rx がない場合 (L297-299)
+    // poll_download: If no download_rx (L297-299)
     #[test]
     fn poll_download_without_rx_does_nothing() {
         let app = make_app();
         assert!(app.download_rx.is_none());
-        // download_rx なしで poll しても問題ない
-        // egui Context を作れないため内部的な poll は呼べないが、
-        // download_rx = None の場合は early exit する (L297-299)
+        // Polling without download_rx is fine
+        // Internal poll cannot be called without an egui Context, but
+        // it early exits if download_rx = None (L297-299)
     }
 }
 
-// shell.rs の追加テスト: 前のモジュールから分離して未カバー行を追加カバー
+// shell.rs additional tests: separated from previous module to increase coverage
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests_extra {
@@ -577,28 +577,28 @@ mod tests_extra {
         dir
     }
 
-    // handle_select_document: ハッシュ不一致で再レンダリング (L184-185)
+    // handle_select_document: Re-render on hash mismatch (L184-185)
     #[test]
     fn handle_select_document_rerenders_when_hash_changed() {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
 
-        // 最初のロード
+        // Initial load
         app.handle_select_document(path.clone());
         assert_eq!(app.state.open_documents.len(), 1);
 
-        // tab_hashes に古いハッシュを設定（バッファとは異なる）
+        // Set an old hash in tab_hashes (different from buffer)
         app.tab_hashes.insert(path.clone(), 0xDEADBEEF);
 
-        // 再選択 → ハッシュ不一致で full_refresh_preview が呼ばれる (L184-185)
+        // Re-select -> full_refresh_preview is called due to hash mismatch (L184-185)
         app.handle_select_document(path.clone());
 
-        // タブ数は変わらない
+        // Tab count remains unchanged
         assert_eq!(app.state.open_documents.len(), 1);
     }
 
-    // handle_save_document: fs.save_document が失敗するケース (L224-228)
+    // handle_save_document: Case where fs.save_document fails (L224-228)
     #[test]
     fn handle_save_document_error_sets_error_status_message() {
         use std::os::unix::fs::PermissionsExt;
@@ -609,21 +609,21 @@ mod tests_extra {
         app.handle_select_document(path.clone());
         app.handle_update_buffer("# Modified content".to_string());
 
-        // ファイルを読み取り専用にする
+        // Make file read-only
         let perms = std::fs::Permissions::from_mode(0o444);
         std::fs::set_permissions(&path, perms).unwrap();
 
         app.handle_save_document();
 
-        // 書き込み失敗 → status_message に記録
+        // Write failure -> recorded in status_message
         assert!(app.state.status_message.is_some());
 
-        // クリーンアップ: 書き込み可能に戻す
+        // Cleanup: restore writability
         let perms = std::fs::Permissions::from_mode(0o644);
         let _ = std::fs::set_permissions(&path, perms);
     }
 
-    // download_with_curl: 成功ケース (L326-327) — ローカルfile:// URL
+    // download_with_curl: Success case (L326-327) — local file:// URL
     #[test]
     fn download_with_curl_success_with_local_file_url() {
         let dir = tempfile::tempdir().unwrap();
@@ -633,7 +633,7 @@ mod tests_extra {
 
         let url = format!("file://{}", src.display());
         let result = download_with_curl(&url, &dest);
-        // macOS では curl が利用可能
+        // curl is available on macOS
         assert!(result.is_ok());
         assert!(dest.exists());
     }
@@ -657,7 +657,7 @@ mod tests_extra {
         assert_eq!(app.state.open_documents.len(), 1);
     }
 
-    // full_refresh_preview: ハッシュが更新される (L140-147)
+    // full_refresh_preview: Hash is updated (L140-147)
     #[test]
     fn full_refresh_preview_updates_tab_hash() {
         let mut app = make_app();
@@ -667,7 +667,7 @@ mod tests_extra {
         assert!(app.tab_hashes.contains_key(&path));
     }
 
-    // refresh_preview: 既存エントリを更新する (L131-137)
+    // refresh_preview: Existing entry is updated (L131-137)
     #[test]
     fn refresh_preview_updates_existing_pane() {
         let mut app = make_app();
@@ -677,7 +677,7 @@ mod tests_extra {
         app.refresh_preview(&path, "# Updated");
     }
 
-    // poll_download: download_rx が None の場合は何もしない
+    // poll_download: Does nothing if download_rx is None
     #[test]
     fn poll_download_does_nothing_when_no_rx() {
         let mut app = make_app();
@@ -686,7 +686,7 @@ mod tests_extra {
         assert!(app.download_rx.is_none());
     }
 
-    // poll_download: Ok(Ok(())) で完了 → status_message設定, download_rx=None
+    // poll_download: Completes with Ok(Ok(())) -> sets status_message, download_rx=None
     #[test]
     fn poll_download_sets_status_on_success() {
         let mut app = make_app();
@@ -704,7 +704,7 @@ mod tests_extra {
         );
     }
 
-    // poll_download: Ok(Err(e)) でエラー → error status_message
+    // poll_download: Errors with Ok(Err(e)) -> error status_message
     #[test]
     fn poll_download_sets_error_on_failure() {
         let mut app = make_app();
@@ -718,7 +718,7 @@ mod tests_extra {
         assert!(app.download_rx.is_none());
     }
 
-    // poll_download: Err(Empty) → まだ受信中
+    // poll_download: Err(Empty) -> Still receiving
     #[test]
     fn poll_download_keeps_rx_when_empty() {
         let mut app = make_app();
@@ -726,33 +726,33 @@ mod tests_extra {
         app.download_rx = Some(rx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        // Empty なので rx は維持される
+        // rx is maintained because it's Empty
         assert!(app.download_rx.is_some());
     }
 
-    // poll_download: Err(Disconnected) → 完了として処理
+    // poll_download: Err(Disconnected) -> Processed as complete
     #[test]
     fn poll_download_clears_rx_on_disconnect() {
         let mut app = make_app();
         let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
-        drop(tx); // sender ドロップで Disconnected
+        drop(tx); // Disconnected on sender drop
         app.download_rx = Some(rx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
         assert!(app.download_rx.is_none());
     }
 
-    // download_with_curl: 失敗パス（不正URL → exit code 非0）
+    // download_with_curl: Failure path (invalid URL -> non-zero exit code)
     #[test]
     fn download_with_curl_failure_returns_error() {
         let dir = tempfile::TempDir::new().unwrap();
         let dest = dir.path().join("nonexistent.jar");
-        // 存在しないファイルURL → curl が失敗する
+        // Non-existent file URL -> curl fails
         let result = download_with_curl("file:///nonexistent/path/to/file", &dest);
         assert!(result.is_err());
     }
 
-    // download_with_curl: create_dir_all パスをカバー（親ディレクトリが存在しない場合）
+    // download_with_curl: Covers create_dir_all path (when parent directory doesn't exist)
     #[test]
     fn download_with_curl_creates_parent_dirs() {
         let dir = tempfile::TempDir::new().unwrap();
@@ -761,24 +761,24 @@ mod tests_extra {
         let dest = dir.path().join("subdir").join("deep").join("dest.txt");
         let url = format!("file://{}", src.display());
         let result = download_with_curl(&url, &dest);
-        // ディレクトリは作成される
+        // Directory is created
         assert!(dest.parent().unwrap().exists());
         assert!(result.is_ok());
         assert!(dest.exists());
     }
 
-    // download_with_curl: parent() が None のケース（ルートレベルのファイル名のみのパス）
+    // download_with_curl: Case where parent() is None (path with only a root-level filename)
     #[test]
     fn download_with_curl_no_parent_path() {
         let result = download_with_curl("file:///nonexistent/file", std::path::Path::new(""));
         assert!(result.is_err());
     }
 
-    // download_with_curl: create_dir_all がエラーになるケース（map_err クロージャをカバー）
+    // download_with_curl: Case where create_dir_all returns an error (covering map_err closure)
     #[test]
     fn download_with_curl_create_dir_error() {
-        // /proc/... のような書き込み不可のパスで create_dir_all を失敗させる
-        // macOS では /dev/ 配下に新ディレクトリは作れない
+        // Cause create_dir_all to fail using a read-only path like /proc/...
+        // On macOS, new directories cannot be created under /dev/
         let dest = std::path::Path::new("/dev/null/impossible_dir/file.jar");
         let result = download_with_curl("file:///nonexistent/file", dest);
         assert!(result.is_err());

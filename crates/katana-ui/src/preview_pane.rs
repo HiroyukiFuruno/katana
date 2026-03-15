@@ -1,10 +1,10 @@
-//! プレビューペイン — egui_commonmark によるネイティブ Markdown レンダリング
-//! + ダイアグラムブロックのラスタライズ画像表示。
+//! Preview pane — native Markdown rendering with egui_commonmark
+//! + rasterized image display of diagram blocks.
 //!
-//! 設計方針（MVP）:
-//! - テキスト変更のたびに Markdown 部分は即座に更新する（egui_commonmark）。
-//! - ダイアグラムはサブプロセスを伴うため、「🔄 Refresh」ボタン or
-//!   ドキュメント選択時にのみ再レンダリングする。
+//! Design considerations (MVP):
+//! - The Markdown part is updated immediately on every text change (egui_commonmark).
+//! - Diagrams involve sub-processes, so they are re-rendered only when
+//!   the "🔄 Refresh" button is clicked or a document is selected.
 
 use eframe::egui::{self, ScrollArea};
 use egui_commonmark::CommonMarkCache;
@@ -19,45 +19,45 @@ use katana_core::{
 };
 
 // ─────────────────────────────────────────────
-// 定数
+// Constants
 // ─────────────────────────────────────────────
 
-/// ダイアグラム SVG をピクセル画像に変換する際の表示スケール。
+/// Display scale when converting diagram SVG to pixel images.
 const DIAGRAM_SVG_DISPLAY_SCALE: f32 = 1.5;
 
-/// UI 層で保持するレンダリング済みセクション。
+/// Rendered sections held in the UI layer.
 #[derive(Debug, Clone)]
 pub enum RenderedSection {
-    /// egui_commonmark で描画する Markdown テキスト。
+    /// Markdown text rendered by egui_commonmark.
     Markdown(String),
-    /// ラスタライズ済みダイアグラム画像。
+    /// Rasterized diagram image.
     Image {
         svg_data: RasterizedSvg,
         alt: String,
     },
-    /// レンダリングエラー（ソースとメッセージを保持）。
+    /// Rendering error (holds source and message).
     Error {
         kind: String,
         _source: String,
         message: String,
     },
-    /// コマンドラインツールが見つからない（パスの問題など）。
+    /// Command line tool not found (path issues, etc.).
     CommandNotFound {
         tool_name: String,
         install_hint: String,
         _source: String,
     },
-    /// 必要なツールが未インストール— UI からダウンロードできる。
+    /// Required tool is not installed — can be downloaded from the UI.
     NotInstalled {
         kind: String,
         download_url: String,
         install_path: std::path::PathBuf,
     },
-    /// バックグラウンドレンダリング中のプレースホルダー。
+    /// Placeholder during background rendering.
     Pending { kind: String },
 }
 
-/// プレビューペインから返されるダウンロードリクエスト。
+/// Download request returned by the preview pane.
 #[derive(Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
@@ -68,12 +68,12 @@ pub struct DownloadRequest {
 pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
     pub sections: Vec<RenderedSection>,
-    /// バックグラウンドレンダリング完了通知チャネル。
+    /// Channel for background rendering completion notifications.
     render_rx: Option<std::sync::mpsc::Receiver<(usize, RenderedSection)>>,
 }
 
 impl PreviewPane {
-    /// Markdown ソースからテキストセクションのみ即時更新する（ダイアグラムは保持）。
+    /// Immediately updates only text sections from the Markdown source (diagrams are preserved).
     pub fn update_markdown_sections(&mut self, source: &str) {
         let raw = split_into_sections(source);
         let mut new_sections = Vec::with_capacity(raw.len());
@@ -87,7 +87,7 @@ impl PreviewPane {
                     new_sections.push(RenderedSection::Markdown(md.clone()));
                 }
                 PreviewSection::Diagram { kind, source } => {
-                    // 既存のレンダリング済み画像があれば再利用する。
+                    // Reuse existing rendered image if available.
                     let reused =
                         diagram_iter
                             .next()
@@ -95,7 +95,7 @@ impl PreviewPane {
                             .unwrap_or_else(|| RenderedSection::Error {
                                 kind: format!("{kind:?}"),
                                 _source: source.clone(),
-                                message: "🔄 プレビューを更新してください".to_string(),
+                                message: "🔄 Please refresh the preview".to_string(),
                             });
                     new_sections.push(reused);
                 }
@@ -104,13 +104,13 @@ impl PreviewPane {
         self.sections = new_sections;
     }
 
-    /// 全セクション（ダイアグラム含む）を完全に再レンダリングする。
+    /// Completely re-renders all sections (including diagrams).
     ///
-    /// Markdown セクションは即座に返す。ダイアグラムは `Pending` にせて
-    /// バックグラウンドスレッドでレンダリングする。
+    /// Returns Markdown sections immediately. Diagrams are set to `Pending`
+    /// and rendered in a background thread.
     pub fn full_render(&mut self, source: &str) {
         let raw = split_into_sections(source);
-        // 前回レンダリングをキャンセル。
+        // Cancel previous rendering.
         self.render_rx = None;
 
         let mut sections = Vec::with_capacity(raw.len());
@@ -140,18 +140,18 @@ impl PreviewPane {
             for (index, kind, src) in jobs {
                 let section = render_diagram(&kind, &src);
                 if tx.send((index, section)).is_err() {
-                    break; // レシーバがドロップされた。
+                    break; // Receiver was dropped.
                 }
             }
         });
     }
 
-    /// プレビューペインの内容を描画する（ScrollArea 込み）。
-    /// PreviewOnly モードなどスクロール同期が不要な場面で使う。
-    /// ダウンロードボタンが押された場合は `Some(DownloadRequest)` を返す。
+    /// Renders the preview pane content (including ScrollArea).
+    /// Used when scroll sync is not needed, such as in PreviewOnly mode.
+    /// Returns `Some(DownloadRequest)` if the download button is pressed.
     #[allow(dead_code)]
     pub fn show(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
-        // バックグラウンドレンダリング完了をポーリング。
+        // Poll for background rendering completion.
         self.poll_renders(ui.ctx());
 
         let mut request: Option<DownloadRequest> = None;
@@ -163,20 +163,20 @@ impl PreviewPane {
         request
     }
 
-    /// ScrollArea なしでプレビューコンテンツだけを描画する。
-    /// 外側で ScrollArea を制御したい場合（スクロール同期など）に使う。
+    /// Renders only the preview content without a ScrollArea.
+    /// Used when you want to control the outer ScrollArea (e.g. for scroll sync).
     pub fn show_content(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
         self.poll_renders(ui.ctx());
         self.render_sections(ui)
     }
 
-    /// セクションを順に描画する内部メソッド。
-    /// UI 描画の実体は preview_pane_ui::render_sections に委譲。
+    /// Internal method to sequentially render sections.
+    /// Actual UI rendering is delegated to preview_pane_ui::render_sections.
     fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
         crate::preview_pane_ui::render_sections(ui, &mut self.commonmark_cache, &self.sections)
     }
 
-    /// バックグラウンドレンダリング完了をポーリングし、届いた結果でセクションを更新する。
+    /// Polls for background rendering completion and updates sections with received results.
     fn poll_renders(&mut self, ctx: &egui::Context) {
         let still_pending = if let Some(rx) = &self.render_rx {
             let mut updated = false;
@@ -202,7 +202,7 @@ impl PreviewPane {
         }
     }
 
-    /// テスト用: Pending がなくなるまでバックグラウンドスレッドをブロック待機する。
+    /// For testing: Block and wait on the background thread until there are no Pending sections.
     #[cfg(test)]
     #[allow(dead_code)]
     pub fn wait_for_renders(&mut self) {
@@ -226,8 +226,8 @@ impl PreviewPane {
     }
 }
 
-/// `PreviewSection` をレンダリングして `RenderedSection` に変換する。
-/// ダイアグラムブロックをレンダラー経由で変換し、SVG ラスタライズを試みる。
+/// Renders a `PreviewSection` into a `RenderedSection`.
+/// Converts diagram blocks via the renderer and attempts SVG rasterization.
 fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     let block = DiagramBlock {
         kind: kind.clone(),
@@ -237,7 +237,7 @@ fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     map_diagram_result(kind, source, result)
 }
 
-/// `DiagramResult` を `RenderedSection` に変換する純粋関数。テスト用に公開。
+/// Pure function converting a `DiagramResult` into a `RenderedSection`. Exposed for testing.
 pub(crate) fn map_diagram_result(
     kind: &DiagramKind,
     source: &str,
@@ -272,7 +272,7 @@ pub(crate) fn map_diagram_result(
     }
 }
 
-/// ダイアグラム種別ごとのレンダラーに委譲する。
+/// Delegates to the appropriate renderer per diagram kind.
 fn dispatch_renderer(block: &DiagramBlock) -> DiagramResult {
     match block.kind {
         DiagramKind::Mermaid => mermaid_renderer::render_mermaid(block),
@@ -281,13 +281,13 @@ fn dispatch_renderer(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// HTML フラグメントから SVG を抽出してラスタライズする。
+/// Extracts SVG from an HTML fragment and rasterizes it.
 fn try_rasterize(kind: &DiagramKind, source: &str, html: &str) -> RenderedSection {
     let Some(svg) = extract_svg(html) else {
         return RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source.to_string(),
-            message: "SVG の抽出に失敗しました".to_string(),
+            message: "Failed to extract SVG".to_string(),
         };
     };
     match rasterize_svg(svg, DIAGRAM_SVG_DISPLAY_SCALE) {
@@ -303,17 +303,17 @@ fn try_rasterize(kind: &DiagramKind, source: &str, html: &str) -> RenderedSectio
     }
 }
 
-/// HTML フラグメントから `<svg...>...</svg>` を抽出する。
+/// Extracts `<svg...>...</svg>` from an HTML fragment.
 pub fn extract_svg(html: &str) -> Option<&str> {
     let start = html.find("<svg")?;
     let end = html.rfind("</svg>")? + "</svg>".len();
     Some(&html[start..end])
 }
 
-/// PNG バイト列を `RenderedSection::Image` に変換する。
+/// Converts PNG bytes to `RenderedSection::Image`.
 ///
-/// mmdc の PNG 出力を `image` クレートでデコードし、RGBA ピクセルバッファを取得する。
-/// これにより resvg の `<foreignObject>` 非対応を完全に回避できる。
+/// Decodes mmdc PNG output using the `image` crate to get an RGBA pixel buffer.
+/// This completely avoids resvg's lack of support for `<foreignObject>`.
 fn decode_png_to_section(kind: &DiagramKind, source: &str, bytes: Vec<u8>) -> RenderedSection {
     match decode_png_rgba(&bytes) {
         Ok(rasterized) => RenderedSection::Image {
@@ -323,12 +323,12 @@ fn decode_png_to_section(kind: &DiagramKind, source: &str, bytes: Vec<u8>) -> Re
         Err(e) => RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source.to_string(),
-            message: format!("PNG デコード失敗: {e}"),
+            message: format!("PNG decode failed: {e}"),
         },
     }
 }
 
-/// PNG バイト列を RGBA ピクセルに変換する。
+/// Converts PNG bytes to RGBA pixels.
 pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
     let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
     let rgba = img.into_rgba8();
@@ -345,8 +345,8 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 mod tests {
     use super::*;
 
-    /// `matches!` マクロの代替。LLVM が `matches!` の else 分岐に
-    /// 生成するサブリージョン（`^0`）による Lines 未カバー問題を回避する。
+    /// Alternative to `matches!` macro. Avoids uncovered lines issue caused by
+    /// subregions (`^0`) generated by LLVM in the else branch of `matches!`.
     macro_rules! assert_variant {
         ($expr:expr, $pat:pat) => {
             let val = &$expr;
@@ -358,7 +358,7 @@ mod tests {
             );
         };
     }
-    // render_diagram: DrawIO の結果を RenderedSection にマップ
+    // render_diagram: Maps DrawIo result to RenderedSection
     #[test]
     fn render_diagram_drawio_returns_ok_section() {
         let xml = r#"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>"#;
@@ -369,7 +369,7 @@ mod tests {
         );
     }
 
-    // dispatch_renderer: DrawIo 分岐
+    // dispatch_renderer: DrawIo branch
     #[test]
     fn dispatch_renderer_drawio_returns_result() {
         let block = DiagramBlock {
@@ -380,7 +380,7 @@ mod tests {
         assert_variant!(result, DiagramResult::Ok(_) | DiagramResult::Err { .. });
     }
 
-    // dispatch_renderer: Mermaid 分岐
+    // dispatch_renderer: Mermaid branch
     #[test]
     fn dispatch_renderer_mermaid_when_no_mmdc_returns_command_not_found() {
         let block = DiagramBlock {
@@ -396,7 +396,7 @@ mod tests {
         );
     }
 
-    // dispatch_renderer: PlantUml 分岐
+    // dispatch_renderer: PlantUml branch
     #[test]
     fn dispatch_renderer_plantuml_when_no_jar_returns_not_installed() {
         std::env::set_var("PLANTUML_JAR", "/nonexistent/plantuml.jar");
@@ -409,7 +409,7 @@ mod tests {
         assert_variant!(result, DiagramResult::NotInstalled { .. });
     }
 
-    // try_rasterize: SVG 抽出失敗ケース
+    // try_rasterize: SVG extraction failure case
     #[test]
     fn try_rasterize_returns_error_when_no_svg_in_html() {
         let kind = DiagramKind::DrawIo;
@@ -417,7 +417,7 @@ mod tests {
         assert_variant!(section, RenderedSection::Error { .. });
     }
 
-    // try_rasterize: 有効な SVG で成功
+    // try_rasterize: Success with valid SVG
     #[test]
     fn try_rasterize_returns_image_for_valid_svg() {
         let kind = DiagramKind::DrawIo;
@@ -429,7 +429,7 @@ mod tests {
         );
     }
 
-    // decode_png_to_section: 有効 PNG
+    // decode_png_to_section: Valid PNG
     #[test]
     fn decode_png_to_section_returns_image_for_valid_png() {
         use image::{ImageBuffer, Rgba};
@@ -441,14 +441,14 @@ mod tests {
         assert_variant!(section, RenderedSection::Image { .. });
     }
 
-    // decode_png_to_section: 無効データ
+    // decode_png_to_section: Invalid data
     #[test]
     fn decode_png_to_section_returns_error_for_invalid_data() {
         let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec());
         assert_variant!(section, RenderedSection::Error { .. });
     }
 
-    // map_diagram_result: 全バリアント網羅テスト
+    // map_diagram_result: Exhaustive test for all variants
     #[test]
     fn map_diagram_result_ok_delegates_to_try_rasterize() {
         let section = map_diagram_result(
@@ -514,46 +514,46 @@ mod tests {
         assert_variant!(section, RenderedSection::NotInstalled { .. });
     }
 
-    // render_diagram_mermaid: 統合テスト（mmdc の有無に依存しない）
+    // render_diagram_mermaid: Integration test (independent of mmdc presence)
     #[test]
     fn render_diagram_mermaid_produces_valid_section() {
         let section = render_diagram(&DiagramKind::Mermaid, "graph TD; A-->B");
-        // mmdc がなければ CommandNotFound、あれば Image
+        // CommandNotFound if mmdc is absent, Image if present
         assert!(!matches!(section, RenderedSection::Pending { .. }));
     }
 
-    // poll_renders: バックグラウンドスレッドから結果を受信してセクションを更新 (L200-206)
+    // poll_renders: Receives results from the background thread and updates sections (L200-206)
     #[test]
     fn poll_renders_receives_background_result_and_updates_section() {
         use std::sync::mpsc;
         let mut pane = PreviewPane::default();
 
-        // Pending セクションを設定
+        // Set Pending section
         pane.sections = vec![RenderedSection::Pending {
             kind: "DrawIo".to_string(),
         }];
 
-        // mpsc channel を作成して render_rx に設定
+        // Create an mpsc channel and set it to render_rx
         let (tx, rx) = mpsc::channel();
         pane.render_rx = Some(rx);
 
-        // バックグラウンドスレッドから結果を送信
+        // Send a result from the background thread
         tx.send((0, RenderedSection::Markdown("# Result".to_string())))
             .unwrap();
-        // tx をドロップして receiver が Disconnected になるようにする
+        // Drop tx so the receiver becomes Disconnected
         drop(tx);
 
-        // poll_renders を呼ぶために egui Context が必要
+        // egui Context is required to call poll_renders
         let ctx = egui::Context::default();
         pane.poll_renders(&ctx);
 
-        // セクションが更新されている
+        // The section has been updated
         assert_variant!(pane.sections[0], RenderedSection::Markdown(_));
-        // render_rx は None になっている（Pendingがなくなったため）
+        // render_rx is None (Pending removed)
         assert!(pane.render_rx.is_none());
     }
 
-    // wait_for_renders: Pending がなくなるまで待機する (L224-242)
+    // wait_for_renders: Wait until Pending sections are gone (L224-242)
     #[test]
     fn wait_for_renders_blocks_until_all_rendered() {
         use std::sync::mpsc;
@@ -566,7 +566,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         pane.render_rx = Some(rx);
 
-        // 別スレッドで送信
+        // Send in another thread
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(10));
             let _ = tx.send((0, RenderedSection::Markdown("# Done".to_string())));
@@ -574,34 +574,34 @@ mod tests {
 
         pane.wait_for_renders();
 
-        // 完了後は Pending でない
+        // No longer Pending after completion
         assert!(pane.render_rx.is_none());
         assert_variant!(pane.sections[0], RenderedSection::Markdown(_));
     }
 
-    // poll_renders: render_rx なしは何もしない (L211-213)
+    // poll_renders: Do nothing without render_rx (L211-213)
     #[test]
     fn poll_renders_without_rx_does_nothing() {
         let mut pane = PreviewPane::default();
-        // render_rx は None のまま
+        // render_rx remains None
         let ctx = egui::Context::default();
         pane.poll_renders(&ctx);
-        // クラッシュしなければOK
+        // OK as long as no crash occurs
         assert!(pane.render_rx.is_none());
     }
 
-    // full_render: スレッドが起動して Pending セクションが生成される (L140-149)
+    // full_render: Starts thread and generates Pending section (L140-149)
     #[test]
     fn full_render_with_diagram_creates_pending_section_then_renders() {
         let mut pane = PreviewPane::default();
-        // DrawIO ダイアグラムを含む内容 → Pending になる
+        // Content containing a DrawIo diagram -> evaluates to Pending
         let source = "# Title\n```drawio\n<mxGraphModel><root></root></mxGraphModel>\n```";
         pane.full_render(source);
 
-        // render_rx が設定される（ダイアグラムがあるため）
+        // render_rx is set (because there is a diagram)
         assert!(pane.render_rx.is_some());
 
-        // クラッシュしないことを確認して待機
+        // Wait and confirm that there are no crashes
         pane.wait_for_renders();
         assert!(pane.render_rx.is_none());
     }

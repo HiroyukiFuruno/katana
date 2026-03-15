@@ -4,10 +4,10 @@ use std::collections::{HashMap, HashSet};
 const EN_JSON: &str = include_str!("../locales/en.json");
 const JA_JSON: &str = include_str!("../locales/ja.json");
 
-/// en.json と ja.json のキーが完全に一致することを確認する。
-/// キー漏れは自動検出される。
+/// Verify that all keys in en.json and ja.json match perfectly.
+/// Key omissions are detected automatically.
 #[test]
-fn 全ロケールキーが両言語に存在する() {
+fn all_locale_keys_exist_in_both_languages() {
     let en: HashMap<String, serde_json::Value> =
         serde_json::from_str(EN_JSON).expect("en.json must be valid JSON");
     let ja: HashMap<String, serde_json::Value> =
@@ -21,67 +21,67 @@ fn 全ロケールキーが両言語に存在する() {
 
     assert!(
         missing_in_ja.is_empty(),
-        "ja.json にキーが不足しています: {missing_in_ja:?}"
+        "ja.json is missing keys: {missing_in_ja:?}"
     );
     assert!(
         missing_in_en.is_empty(),
-        "en.json にキーが不足しています: {missing_in_en:?}"
+        "en.json is missing keys: {missing_in_en:?}"
     );
 }
 
-/// tf() がパラメータを正しく置換することを確認する。
+/// Verify that tf() correctly substitutes parameters.
 #[test]
-fn tf関数がパラメータを正しく置換する() {
+fn tf_function_correctly_substitutes_parameters() {
     let result = tf("__test_key__", &[("name", "world")]);
-    // キーが存在しない場合はキー自体が返る（置換なし）
+    // If the key does not exist, the key itself is returned (no substitution)
     assert_eq!(result, "__test_key__");
 }
 
-/// shell.rs が i18n を通さずに UI 文字列をハードコードしていないことを静的解析で確認する。
+/// Verify via static analysis that shell.rs does not hardcode UI strings without using i18n.
 ///
-/// これは「UT でも弾く」要件のための静的解析テスト。
-/// 翻訳可能なテキストを含む高リスクな呼び出しパターンを禁止する。
+/// This is a static analysis test to fulfill the "reject even in UT" requirement.
+/// Prohibits high-risk call patterns that contain translatable text.
 #[test]
-fn shellrsにi18n漏れがない() {
+fn shell_rs_has_no_i18n_leaks() {
     let source = include_str!("../src/shell.rs");
 
-    // 「ホバーテキスト」や「見出し」に直接リテラルを渡すパターンを禁止する。
-    // i18n::t() / i18n::tf() を経由しなければならない。
+    // Prohibit patterns that pass string literals directly to "hover text" or "headings".
+    // Must go through i18n::t() / i18n::tf().
     let forbidden_patterns = [
-        // on_hover_text に直接文字列リテラルを渡しているパターン
+        // Pattern passing string literal directly to on_hover_text
         ".on_hover_text(\"",
-        // ui.heading に直接文字列リテラルを渡しているパターン
+        // Pattern passing string literal directly to ui.heading
         "ui.heading(\"",
     ];
 
     for pattern in &forbidden_patterns {
         assert!(
             !source.contains(pattern),
-            "shell.rs にハードコードされた UI 文字列が検出されました: {pattern}\n\
-             i18n::t() または i18n::tf() を使用してください。"
+            "Hardcoded UI strings detected in shell.rs: {pattern}\n\
+             Please use i18n::t() or i18n::tf()."
         );
     }
 }
 
-// L14-31: supported_languages() と display_name()
+// L14-31: supported_languages() and display_name()
 #[test]
-fn supported_languagesはen_jaを含む() {
+fn supported_languages_includes_en_and_ja() {
     let langs = supported_languages();
     let codes: Vec<&str> = langs.iter().map(|(c, _)| c.as_str()).collect();
     assert!(codes.contains(&"en"), "en should be in supported languages");
     assert!(codes.contains(&"ja"), "ja should be in supported languages");
 }
 
-// L30: display_name フォールバック（無効コードは "???" を返す）
+// L30: display_name fallback (invalid code returns "???")
 #[test]
-fn display_name未知コードはフォールバックする() {
+fn display_name_falls_back_for_unknown_code() {
     let name = display_name("zz");
     assert_eq!(name, "???");
 }
 
 // L25-31: display_name() for known codes
 #[test]
-fn display_name既知コードを返す() {
+fn display_name_returns_known_codes() {
     let en_name = display_name("en");
     assert!(!en_name.is_empty() && en_name != "???");
     let ja_name = display_name("ja");
@@ -90,7 +90,7 @@ fn display_name既知コードを返す() {
 
 // L61-65: set_language() and get_language()
 #[test]
-fn set_languageが言語を変更する() {
+fn set_language_changes_language() {
     // Initial set to "en"
     set_language("en");
     assert_eq!(get_language(), "en");
@@ -105,7 +105,7 @@ fn set_languageが言語を変更する() {
 
 // L74-83: t() - key not found returns the key itself
 #[test]
-fn t関数は存在しないキーをそのまま返す() {
+fn t_function_returns_key_unmodified_for_non_existent_key() {
     set_language("en");
     let result = t("key_that_does_not_exist_in_any_locale");
     assert_eq!(result, "key_that_does_not_exist_in_any_locale");
@@ -113,7 +113,7 @@ fn t関数は存在しないキーをそのまま返す() {
 
 // L74-83: t() - exists in 'en', not in 'ja' → key fallback for ja
 #[test]
-fn t関数はen言語で既知キーを翻訳する() {
+fn t_function_translates_known_key_in_en_language() {
     set_language("en");
     let result = t("status_ready");
     // Should return translated string, not the key itself
@@ -123,7 +123,7 @@ fn t関数はen言語で既知キーを翻訳する() {
 
 // L74-83: t() with 'ja' language
 #[test]
-fn t関数はja言語で既知キーを翻訳する() {
+fn t_function_translates_known_key_in_ja_language() {
     set_language("ja");
     let result = t("status_ready");
     assert_ne!(result, "status_ready");
@@ -135,7 +135,7 @@ fn t関数はja言語で既知キーを翻訳する() {
 
 // tf() with actual i18n key and params
 #[test]
-fn tf関数は実際のキーのパラメータを置換する() {
+fn tf_function_substitutes_parameters_for_actual_keys() {
     set_language("en");
     // Use a key that has a param like {name}, {error}, etc.
     // "status_opened_workspace" with {name}
@@ -143,10 +143,10 @@ fn tf関数は実際のキーのパラメータを置換する() {
     assert!(result.contains("my-project"));
 }
 
-// L81: 辞書が見つからない言語コードで t() を呼ぶとキー自体が返る
+// L81: Calling t() with a language code where dictionary isn't found returns the key itself
 #[test]
-fn t関数は未知言語でキーをそのまま返す() {
-    set_language("zz"); // 存在しない言語コード
+fn t_function_returns_key_unmodified_for_unknown_language() {
+    set_language("zz"); // Non-existent language code
     let result = t("status_ready");
     assert_eq!(result, "status_ready");
     set_language("en"); // reset
