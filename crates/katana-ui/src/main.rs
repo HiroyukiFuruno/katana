@@ -57,6 +57,10 @@ fn main() -> eframe::Result<()> {
     let repo = JsonFileRepository::with_default_path();
     let settings = SettingsService::new(Box::new(repo));
 
+    // Read saved values before moving settings into AppState.
+    let saved_language = settings.settings().language.clone();
+    let saved_workspace = settings.settings().last_workspace.clone();
+
     let state = AppState::new(ai_registry, plugin_registry, settings);
 
     let native_options = eframe::NativeOptions {
@@ -82,7 +86,21 @@ fn main() -> eframe::Result<()> {
                 shell_ui::native_set_app_icon_png(png_bytes.as_ptr(), png_bytes.len());
             }
 
-            Ok(Box::new(KatanaApp::new(state)))
+            // Restore saved language.
+            katana_ui::i18n::set_language(&saved_language);
+
+            let mut app = KatanaApp::new(state);
+
+            // Restore last opened workspace.
+            if let Some(ws_path) = saved_workspace {
+                let path = std::path::PathBuf::from(&ws_path);
+                if path.is_dir() {
+                    app.trigger_action(katana_ui::app_state::AppAction::OpenWorkspace(path));
+                    tracing::info!("Restored workspace: {ws_path}");
+                }
+            }
+
+            Ok(Box::new(app))
         }),
     )
 }
