@@ -481,3 +481,241 @@ fn test_integration_refresh_diagrams_action() {
         .trigger_action(AppAction::RefreshDiagrams);
     harness.step();
 }
+
+// サイドバーの show_workspace フラグ切替（shell.rs L406-407）
+#[test]
+fn test_integration_sidebar_collapse_expand() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("test.md"), "# Test").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+
+    // サイドバーを閉じる
+    harness.state_mut().app_state_mut().show_workspace = false;
+    harness.step();
+    // 再描画で collapsed panel が表示される
+    harness.step();
+
+    // サイドバーを再展開
+    harness.state_mut().app_state_mut().show_workspace = true;
+    harness.step();
+}
+
+// + / - ボタンをクリックしてツリー全展開/全折畳
+#[test]
+fn test_integration_tree_toggle_buttons() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(temp_dir.path().join("sub")).unwrap();
+    std::fs::write(temp_dir.path().join("root.md"), "# Root").unwrap();
+    std::fs::write(temp_dir.path().join("sub").join("child.md"), "# Child").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+
+    // + ボタンクリック → 全展開
+    if let Some(btn) = harness.get_all_by_label("+").next() {
+        btn.click();
+    }
+    harness.step();
+
+    // - ボタンクリック → 全折畳
+    if let Some(btn) = harness.get_all_by_label("-").next() {
+        btn.click();
+    }
+    harness.step();
+}
+
+// タブの ◀ / ▶ ナビゲーション + タブクリック + x (close) ボタン
+#[test]
+fn test_integration_tab_navigation_and_close() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("a.md"), "# A").unwrap();
+    std::fs::write(temp_dir.path().join("b.md"), "# B").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+
+    // 2ファイルを開く
+    let a_path = temp_dir.path().join("a.md");
+    let b_path = temp_dir.path().join("b.md");
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(a_path.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(b_path.clone()));
+    harness.step();
+
+    // ◀ ボタンクリック → 前のタブに移動
+    if let Some(btn) = harness.get_all_by_label("◀").next() {
+        btn.click();
+    }
+    harness.step();
+
+    // ▶ ボタンクリック → 次のタブに移動
+    if let Some(btn) = harness.get_all_by_label("▶").next() {
+        btn.click();
+    }
+    harness.step();
+
+    // タブの x ボタンクリック → タブを閉じる
+    if let Some(btn) = harness.get_all_by_label("x").next() {
+        btn.click();
+    }
+    harness.step();
+}
+
+// ビューモード選択ボタン (shell_ui.rs L366)
+#[test]
+fn test_integration_view_mode_selection_via_button() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("test.md"), "# Test content").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(temp_dir.path().join("test.md")));
+    harness.step();
+
+    // "Code" モードボタンをクリック
+    let code_label = katana_ui::i18n::t("view_mode_code");
+    if let Some(btn) = harness.get_all_by_label(&code_label).next() {
+        btn.click();
+    }
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_view_mode(),
+        ViewMode::CodeOnly
+    );
+
+    // "Preview" モードボタンをクリック
+    let preview_label = katana_ui::i18n::t("view_mode_preview");
+    if let Some(btn) = harness.get_all_by_label(&preview_label).next() {
+        btn.click();
+    }
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_view_mode(),
+        ViewMode::PreviewOnly
+    );
+
+    // "Split" モードボタンをクリック
+    let split_label = katana_ui::i18n::t("view_mode_split");
+    if let Some(btn) = harness.get_all_by_label(&split_label).next() {
+        btn.click();
+    }
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_view_mode(),
+        ViewMode::Split
+    );
+}
+
+// ディレクトリエントリの展開/折畳（state で force_tree_open を制御）
+#[test]
+fn test_integration_directory_entry_click_toggle() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(temp_dir.path().join("mydir")).unwrap();
+    std::fs::write(temp_dir.path().join("mydir").join("inner.md"), "# Inner").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+
+    // 全展開 → force_tree_open = Some(true)
+    harness.state_mut().app_state_mut().force_tree_open = Some(true);
+    harness.step();
+
+    // 全折畳 → force_tree_open = Some(false)
+    harness.state_mut().app_state_mut().force_tree_open = Some(false);
+    harness.step();
+}
+
+// エディタでテキスト変更 → UpdateBuffer (shell_ui.rs L395)
+#[test]
+fn test_integration_text_edit_triggers_update_buffer() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("edit.md");
+    std::fs::write(&md_path, "# Editable").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+
+    // テキストエディタの CodeOnly ビューを使って入力
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::CodeOnly);
+    harness.step();
+
+    // UpdateBuffer アクション直接注入
+    harness
+        .state_mut()
+        .trigger_action(AppAction::UpdateBuffer("# Modified content".to_string()));
+    harness.step();
+}
+
+// Refresh diagrams ボタン (🔄) クリック (shell_ui.rs L248-249)
+#[test]
+fn test_integration_refresh_button_click() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("diag.md");
+    std::fs::write(
+        &md_path,
+        "# Diagram\n```drawio\n<mxGraphModel></mxGraphModel>\n```",
+    )
+    .unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+
+    // 🔄 ボタンクリック
+    if let Some(btn) = harness.get_all_by_label("🔄").next() {
+        btn.click();
+    }
+    harness.step();
+}

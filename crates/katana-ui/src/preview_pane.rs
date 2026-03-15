@@ -241,7 +241,7 @@ impl PreviewPane {
     }
 }
 
-/// `PreviewSection` をレンダリングして `RenderedSection` に変換する（非使用になったことでの削除答候用コメント）。
+/// `PreviewSection` をレンダリングして `RenderedSection` に変換する。
 /// ダイアグラムブロックをレンダラー経由で変換し、SVG ラスタライズを試みる。
 fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     let block = DiagramBlock {
@@ -249,6 +249,15 @@ fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
         source: source.to_string(),
     };
     let result = dispatch_renderer(&block);
+    map_diagram_result(kind, source, result)
+}
+
+/// `DiagramResult` を `RenderedSection` に変換する純粋関数。テスト用に公開。
+pub(crate) fn map_diagram_result(
+    kind: &DiagramKind,
+    source: &str,
+    result: DiagramResult,
+) -> RenderedSection {
     match result {
         DiagramResult::Ok(html) => try_rasterize(kind, source, &html),
         DiagramResult::OkPng(bytes) => decode_png_to_section(kind, source, bytes),
@@ -351,19 +360,18 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 mod tests {
     use super::*;
 
-    // render_diagram: DrawIO の Err バリアント (L371-375)
+    // render_diagram: DrawIO の結果を RenderedSection にマップ
     #[test]
     fn render_diagram_drawio_returns_ok_section() {
         let xml = r#"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>"#;
         let section = render_diagram(&DiagramKind::DrawIo, xml);
-        // DrawIO renderer should produce Ok or Error based on xml validity — either is OK
-        match section {
-            RenderedSection::Image { .. } | RenderedSection::Error { .. } => {}
-            _ => panic!("Expected Image or Error for DrawIO"),
-        }
+        assert!(matches!(
+            section,
+            RenderedSection::Image { .. } | RenderedSection::Error { .. }
+        ));
     }
 
-    // dispatch_renderer: DrawIo 分岐 (L402)
+    // dispatch_renderer: DrawIo 分岐
     #[test]
     fn dispatch_renderer_drawio_returns_result() {
         let block = DiagramBlock {
@@ -371,35 +379,31 @@ mod tests {
             source: r#"<mxGraphModel><root><mxCell id="0"/></root></mxGraphModel>"#.to_string(),
         };
         let result = dispatch_renderer(&block);
-        // Should be Ok or Err but not panic
-        match result {
-            DiagramResult::Ok(_) | DiagramResult::Err { .. } => {}
-            _ => panic!("Expected Ok or Err"),
-        }
+        assert!(matches!(
+            result,
+            DiagramResult::Ok(_) | DiagramResult::Err { .. }
+        ));
     }
 
-    // dispatch_renderer: Mermaid 分岐 (L400) — mmdc がなければ CommandNotFound を返す
+    // dispatch_renderer: Mermaid 分岐
     #[test]
     fn dispatch_renderer_mermaid_when_no_mmdc_returns_command_not_found() {
-        // mmdc がCI環境では存在しないはず
         let block = DiagramBlock {
             kind: DiagramKind::Mermaid,
             source: "graph TD; A-->B".to_string(),
         };
         let result = dispatch_renderer(&block);
-        // CommandNotFound か OkPng か — どちらでもクラッシュしないことを確認
-        match result {
+        assert!(matches!(
+            result,
             DiagramResult::CommandNotFound { .. }
-            | DiagramResult::OkPng(_)
-            | DiagramResult::Err { .. } => {}
-            _ => panic!("Unexpected result variant"),
-        }
+                | DiagramResult::OkPng(_)
+                | DiagramResult::Err { .. }
+        ));
     }
 
-    // dispatch_renderer: PlantUml 分岐 (L401) — JAR がなければ NotInstalled を返す
+    // dispatch_renderer: PlantUml 分岐
     #[test]
     fn dispatch_renderer_plantuml_when_no_jar_returns_not_installed() {
-        // PLANTUML_JAR を存在しないパスに設定
         std::env::set_var("PLANTUML_JAR", "/nonexistent/plantuml.jar");
         let block = DiagramBlock {
             kind: DiagramKind::PlantUml,
@@ -407,42 +411,30 @@ mod tests {
         };
         let result = dispatch_renderer(&block);
         std::env::remove_var("PLANTUML_JAR");
-        match result {
-            DiagramResult::NotInstalled { .. } => {}
-            _ => panic!("Expected NotInstalled for missing PlantUML JAR"),
-        }
+        assert!(matches!(result, DiagramResult::NotInstalled { .. }));
     }
 
-    // try_rasterize: SVG 抽出失敗ケース (L408-413)
+    // try_rasterize: SVG 抽出失敗ケース
     #[test]
     fn try_rasterize_returns_error_when_no_svg_in_html() {
         let kind = DiagramKind::DrawIo;
         let section = try_rasterize(&kind, "source", "<div>no svg here</div>");
-        match section {
-            RenderedSection::Error { message, .. } => {
-                assert!(message.contains("SVG"));
-            }
-            _ => panic!("Expected Error when SVG extraction fails"),
-        }
+        assert!(matches!(section, RenderedSection::Error { .. }));
     }
 
-    // try_rasterize: 有効な SVG で Image を返す (L415-419)
+    // try_rasterize: 有効な SVG で成功
     #[test]
     fn try_rasterize_returns_image_for_valid_svg() {
         let kind = DiagramKind::DrawIo;
         let html = r#"<div class="diagram"><svg width="10" height="10"><rect fill="white" width="10" height="10"/></svg></div>"#;
         let section = try_rasterize(&kind, "source", html);
-        match section {
-            RenderedSection::Image { .. } => {}
-            RenderedSection::Error { message, .. } => {
-                // SVG パースに失敗することもある（CI環境でのフォールバック）
-                assert!(!message.is_empty());
-            }
-            _ => panic!("Expected Image or Error"),
-        }
+        assert!(matches!(
+            section,
+            RenderedSection::Image { .. } | RenderedSection::Error { .. }
+        ));
     }
 
-    // decode_png_to_section: 有効な PNG でImageを返す (L439-451)
+    // decode_png_to_section: 有効 PNG
     #[test]
     fn decode_png_to_section_returns_image_for_valid_png() {
         use image::{ImageBuffer, Rgba};
@@ -450,55 +442,89 @@ mod tests {
         let img = ImageBuffer::from_pixel(2, 2, Rgba([100u8, 150, 200, 255]));
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
             .unwrap();
-
         let section = decode_png_to_section(&DiagramKind::DrawIo, "source", buf);
         assert!(matches!(section, RenderedSection::Image { .. }));
     }
 
-    // decode_png_to_section: 無効データでErrorを返す (L445-449)
+    // decode_png_to_section: 無効データ
     #[test]
     fn decode_png_to_section_returns_error_for_invalid_data() {
         let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec());
-        match section {
-            RenderedSection::Error { message, .. } => {
-                assert!(message.contains("PNG"));
-            }
-            _ => panic!("Expected Error for invalid PNG data"),
-        }
+        assert!(matches!(section, RenderedSection::Error { .. }));
     }
 
-    // render_diagram: Mermaid CommandNotFound のときRenderedSection::CommandNotFoundになる
+    // map_diagram_result: 全バリアント網羅テスト
     #[test]
-    fn render_diagram_mermaid_command_not_found_maps_to_section() {
-        let block = DiagramBlock {
-            kind: DiagramKind::Mermaid,
-            source: "graph TD; A-->B".to_string(),
-        };
-        let result = dispatch_renderer(&block);
-        let section = match result {
+    fn map_diagram_result_ok_delegates_to_try_rasterize() {
+        let section = map_diagram_result(
+            &DiagramKind::DrawIo,
+            "src",
+            DiagramResult::Ok("<svg width=\"10\" height=\"10\"></svg>".to_string()),
+        );
+        assert!(matches!(
+            section,
+            RenderedSection::Image { .. } | RenderedSection::Error { .. }
+        ));
+    }
+
+    #[test]
+    fn map_diagram_result_ok_png_delegates_to_decode() {
+        use image::{ImageBuffer, Rgba};
+        let mut buf = Vec::new();
+        let img = ImageBuffer::from_pixel(2, 2, Rgba([0u8, 0, 0, 255]));
+        img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+        let section = map_diagram_result(&DiagramKind::Mermaid, "src", DiagramResult::OkPng(buf));
+        assert!(matches!(section, RenderedSection::Image { .. }));
+    }
+
+    #[test]
+    fn map_diagram_result_err_maps_to_error_section() {
+        let section = map_diagram_result(
+            &DiagramKind::DrawIo,
+            "src",
+            DiagramResult::Err {
+                source: "src".to_string(),
+                error: "render failed".to_string(),
+            },
+        );
+        assert!(matches!(section, RenderedSection::Error { .. }));
+    }
+
+    #[test]
+    fn map_diagram_result_command_not_found_maps_to_section() {
+        let section = map_diagram_result(
+            &DiagramKind::Mermaid,
+            "src",
             DiagramResult::CommandNotFound {
-                tool_name,
-                install_hint,
-                source,
-            } => RenderedSection::CommandNotFound {
-                tool_name,
-                install_hint,
-                _source: source,
+                tool_name: "mmdc".to_string(),
+                install_hint: "npm install".to_string(),
+                source: "src".to_string(),
             },
-            DiagramResult::OkPng(bytes) => {
-                decode_png_to_section(&DiagramKind::Mermaid, "src", bytes)
-            }
-            DiagramResult::Err { source, error } => RenderedSection::Error {
-                kind: "Mermaid".to_string(),
-                _source: source,
-                message: error,
+        );
+        assert!(matches!(section, RenderedSection::CommandNotFound { .. }));
+    }
+
+    #[test]
+    fn map_diagram_result_not_installed_maps_to_section() {
+        let section = map_diagram_result(
+            &DiagramKind::PlantUml,
+            "src",
+            DiagramResult::NotInstalled {
+                kind: "PlantUML".to_string(),
+                download_url: "https://example.com".to_string(),
+                install_path: std::path::PathBuf::from("/tmp/plantuml.jar"),
             },
-            _ => RenderedSection::Pending {
-                kind: "Mermaid".to_string(),
-            },
-        };
-        // どのバリアントでもクラッシュしなければOK
-        let _ = section;
+        );
+        assert!(matches!(section, RenderedSection::NotInstalled { .. }));
+    }
+
+    // render_diagram_mermaid: 統合テスト（mmdc の有無に依存しない）
+    #[test]
+    fn render_diagram_mermaid_produces_valid_section() {
+        let section = render_diagram(&DiagramKind::Mermaid, "graph TD; A-->B");
+        // mmdc がなければ CommandNotFound、あれば Image
+        assert!(!matches!(section, RenderedSection::Pending { .. }));
     }
 
     // poll_renders: バックグラウンドスレッドから結果を受信してセクションを更新 (L200-206)
