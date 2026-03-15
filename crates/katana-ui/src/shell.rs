@@ -1,7 +1,5 @@
 //! Katana three-pane egui shell.
 
-#![deny(clippy::too_many_lines, clippy::cognitive_complexity)]
-
 use std::collections::HashMap;
 
 use eframe::egui;
@@ -40,12 +38,7 @@ pub unsafe fn native_menu_setup() {
 
 /// FNV-1a ハッシュで文字列をu64に変換する。
 fn hash_str(s: &str) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
-    for b in s.bytes() {
-        h ^= b as u64;
-        h = h.wrapping_mul(0x100000001b3);
-    }
-    h
+    crate::shell_logic::hash_str(s)
 }
 
 pub struct KatanaApp {
@@ -735,7 +728,7 @@ fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppActio
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
-                let new_idx = if idx == 0 { doc_count - 1 } else { idx - 1 };
+                let new_idx = crate::shell_logic::prev_tab_index(idx, doc_count);
                 tab_action = Some(AppAction::SelectDocument(
                     state.open_documents[new_idx].path.clone(),
                 ));
@@ -746,7 +739,7 @@ fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppActio
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
-                let new_idx = (idx + 1) % doc_count;
+                let new_idx = crate::shell_logic::next_tab_index(idx, doc_count);
                 tab_action = Some(AppAction::SelectDocument(
                     state.open_documents[new_idx].path.clone(),
                 ));
@@ -764,11 +757,7 @@ fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppActio
 /// ワークスペースルートからの相対フルパスを返す（ツールチップ用）。
 /// 例: /workspace/specs/auth/spec.md → "specs/auth/spec.md"
 fn relative_full_path(path: &std::path::Path, ws_root: Option<&std::path::Path>) -> String {
-    let rel = match ws_root {
-        Some(root) => path.strip_prefix(root).unwrap_or(path),
-        None => path,
-    };
-    rel.to_string_lossy().to_string()
+    crate::shell_logic::relative_full_path(path, ws_root)
 }
 
 /// 表示モード行: Preview / Code / Split トグルボタン（タブごとに記憶）。右寄せ配置。

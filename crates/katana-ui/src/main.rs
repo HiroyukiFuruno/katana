@@ -1,16 +1,12 @@
+#![deny(warnings)]
 //! Katana UI application entry point.
 
-mod app_state;
-mod i18n;
-mod preview_pane;
-mod shell;
-
-use app_state::AppState;
 use katana_core::{
     ai::AiProviderRegistry,
     plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API_VERSION},
 };
-use shell::KatanaApp;
+use katana_ui::app_state::AppState;
+use katana_ui::shell::{self, KatanaApp};
 
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
