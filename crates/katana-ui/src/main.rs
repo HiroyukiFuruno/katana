@@ -5,6 +5,8 @@
 use katana_core::ai::AiProviderRegistry;
 use katana_core::plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API_VERSION};
 #[cfg(not(test))]
+use katana_platform::{JsonFileRepository, SettingsService};
+#[cfg(not(test))]
 use katana_ui::app_state::AppState;
 #[cfg(not(test))]
 use katana_ui::shell::KatanaApp;
@@ -51,7 +53,11 @@ fn main() -> eframe::Result<()> {
     let mut plugin_registry = PluginRegistry::new();
     register_builtin_plugins(&mut plugin_registry);
 
-    let state = AppState::new(ai_registry, plugin_registry);
+    // Initialize settings with JSON file persistence.
+    let repo = JsonFileRepository::with_default_path();
+    let settings = SettingsService::new(Box::new(repo));
+
+    let state = AppState::new(ai_registry, plugin_registry, settings);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

@@ -8,7 +8,11 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
     Harness::builder().build_eframe(|_cc| {
         let ai_registry = AiProviderRegistry::new();
         let plugin_registry = PluginRegistry::new();
-        let state = AppState::new(ai_registry, plugin_registry);
+        let state = AppState::new(
+            ai_registry,
+            plugin_registry,
+            katana_platform::SettingsService::default(),
+        );
         katana_ui::i18n::set_language("en");
         KatanaApp::new(state)
     })
