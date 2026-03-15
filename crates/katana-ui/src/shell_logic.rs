@@ -4,12 +4,18 @@
 
 use std::path::Path;
 
+/// FNV-1a ハッシュのオフセットベース値。
+const FNV1A_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+
+/// FNV-1a ハッシュのプライム値。
+const FNV1A_PRIME: u64 = 0x100000001b3;
+
 /// FNV-1a ハッシュで文字列をu64に変換する。
 pub fn hash_str(s: &str) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
+    let mut h: u64 = FNV1A_OFFSET_BASIS;
     for b in s.bytes() {
         h ^= b as u64;
-        h = h.wrapping_mul(0x100000001b3);
+        h = h.wrapping_mul(FNV1A_PRIME);
     }
     h
 }

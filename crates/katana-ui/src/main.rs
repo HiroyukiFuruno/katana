@@ -10,6 +10,12 @@ use katana_ui::app_state::AppState;
 use katana_ui::shell::{self, KatanaApp};
 
 #[cfg(not(test))]
+const INITIAL_WINDOW_SIZE: [f32; 2] = [1280.0, 800.0];
+
+#[cfg(not(test))]
+const MIN_WINDOW_SIZE: [f32; 2] = [800.0, 500.0];
+
+#[cfg(not(test))]
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
@@ -33,8 +39,8 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Katana")
-            .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([800.0, 500.0]),
+            .with_inner_size(INITIAL_WINDOW_SIZE)
+            .with_min_inner_size(MIN_WINDOW_SIZE),
         ..Default::default()
     };
 

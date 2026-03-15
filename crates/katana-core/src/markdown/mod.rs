@@ -11,6 +11,12 @@ pub mod svg_rasterize;
 pub use diagram::NoOpRenderer;
 use diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
 
+/// フェンスブロック開始デリミタ「```」のバイト長。
+const FENCE_OPEN_LEN: usize = 3;
+
+/// フェンスブロック終了デリミタ「\n```」のバイト長。
+const FENCE_CLOSE_LEN: usize = 4;
+
 /// 本番用レンダラー: 各図ブロック種別を実際のサブプロセス / XML パーサーに委譲する。
 #[derive(Debug, Default)]
 pub struct KatanaRenderer;
@@ -88,9 +94,9 @@ fn extract_fence_block(s: &str) -> Option<(FenceBlock, &str)> {
     let close = after_info.find("\n```")?;
     let content = after_info[..close].to_string();
     let raw = format!("```{info}\n{content}\n```");
-    let rest = after_info[close + 4..]
+    let rest = after_info[close + FENCE_CLOSE_LEN..]
         .strip_prefix('\n')
-        .unwrap_or(&after_info[close + 4..]);
+        .unwrap_or(&after_info[close + FENCE_CLOSE_LEN..]);
     Some((FenceBlock { info, content, raw }, rest))
 }
 
@@ -136,7 +142,7 @@ fn render_diagram_block<R: DiagramRenderer>(block: &FenceBlock, renderer: &R) ->
 fn process_fence<R: DiagramRenderer>(output: &mut String, remaining: &mut &str, renderer: &R) {
     let Some((block, after)) = extract_fence_block(remaining) else {
         output.push_str("```");
-        *remaining = &remaining[3..];
+        *remaining = &remaining[FENCE_OPEN_LEN..];
         return;
     };
     if let Some(html) = render_diagram_block(&block, renderer) {
