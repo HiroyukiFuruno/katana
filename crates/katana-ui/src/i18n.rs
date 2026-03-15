@@ -1,6 +1,35 @@
 use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 
+/// 言語定義 JSON のエントリ。
+#[derive(serde::Deserialize)]
+struct LanguageEntry {
+    code: String,
+    name: String,
+}
+
+/// サポートする言語一覧。`locales/languages.json` から読み込む。
+/// 各要素は (言語コード, 自称名) のペア。
+/// 言語を追加する場合は `languages.json` に1行追加するだけでよい。
+pub fn supported_languages() -> &'static [(String, String)] {
+    static LANGS: OnceLock<Vec<(String, String)>> = OnceLock::new();
+    LANGS.get_or_init(|| {
+        let json = include_str!("../locales/languages.json");
+        let entries: Vec<LanguageEntry> =
+            serde_json::from_str(json).expect("languages.json の解析に失敗");
+        entries.into_iter().map(|e| (e.code, e.name)).collect()
+    })
+}
+
+/// 言語コードから自称名を返す。
+pub fn display_name(lang_code: &str) -> &'static str {
+    supported_languages()
+        .iter()
+        .find(|(code, _)| code == lang_code)
+        .map(|(_, name)| name.as_str())
+        .unwrap_or("???")
+}
+
 /// ロケールJSONデータの定義。
 const EN_JSON: &str = include_str!("../locales/en.json");
 const JA_JSON: &str = include_str!("../locales/ja.json");
