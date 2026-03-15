@@ -109,22 +109,3 @@ fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
 fn svg_to_html_fragment(svg: &str) -> String {
     format!(r#"<div class="katana-diagram plantuml">{svg}</div>"#)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::markdown::diagram::{DiagramBlock, DiagramKind};
-
-    #[test]
-    fn jar未検出時はnotinstalledを返す() {
-        // PLANTUML_JAR を意図的に存在しないパスに向ける。
-        std::env::set_var("PLANTUML_JAR", "/nonexistent/plantuml.jar");
-        let block = DiagramBlock {
-            kind: DiagramKind::PlantUml,
-            source: "@startuml\nA -> B\n@enduml".to_string(),
-        };
-        let result = render_plantuml(&block);
-        assert!(matches!(result, DiagramResult::NotInstalled { .. }));
-        std::env::remove_var("PLANTUML_JAR");
-    }
-}

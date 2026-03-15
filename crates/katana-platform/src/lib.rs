@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub mod filesystem;
 pub mod settings;
 
