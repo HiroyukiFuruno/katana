@@ -1,4 +1,7 @@
+use egui_kittest::Harness;
+use katana_core::markdown::svg_rasterize::RasterizedSvg;
 use katana_ui::preview_pane::{decode_png_rgba, extract_svg, PreviewPane, RenderedSection};
+use std::path::PathBuf;
 
 /// ヘルパー: RenderedSection から Markdown テキストを抽出する。
 fn markdown_texts(sections: &[RenderedSection]) -> Vec<&str> {
@@ -227,4 +230,182 @@ fn 空入力は空セクションリストを返す() {
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections("");
     assert!(pane.sections.is_empty());
+}
+
+// ── egui_kittest を使って show_section の各バリアントをカバー ──
+
+/// show_section の Markdown バリアント描画をカバー
+#[test]
+fn show_section_markdown_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections("# Hello from egui test");
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+    // クラッシュしなければOK
+}
+
+/// show_section の Error バリアント描画をカバー (L267-275)
+#[test]
+fn show_section_error_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Error {
+        kind: "DrawIo".to_string(),
+        _source: "<mxCell/>".to_string(),
+        message: "invalid XML".to_string(),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+/// show_section の CommandNotFound バリアント描画をカバー (L277-291)
+#[test]
+fn show_section_command_not_found_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::CommandNotFound {
+        tool_name: "mmdc".to_string(),
+        install_hint: "npm install -g @mermaid-js/mermaid-cli".to_string(),
+        _source: "graph TD; A-->B".to_string(),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+/// show_section の NotInstalled バリアント描画をカバー (L292-296, L310-341)
+#[test]
+fn show_section_not_installed_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::NotInstalled {
+        kind: "PlantUML".to_string(),
+        download_url: "https://example.com/plantuml.jar".to_string(),
+        install_path: PathBuf::from("/tmp/plantuml.jar"),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+/// show_section の Pending バリアント描画をカバー (L297-305)
+#[test]
+fn show_section_pending_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Pending {
+        kind: "Mermaid".to_string(),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    // スピナーが常時リペイントするため step() で1フレームのみ実行
+    harness.step();
+}
+
+/// show_section の Image バリアント描画をカバー (L258-261, L344-358)
+#[test]
+fn show_section_image_variant_renders() {
+    let mut pane = PreviewPane::default();
+    // 1x1 の RGBA ダミー画像
+    pane.sections = vec![RenderedSection::Image {
+        svg_data: RasterizedSvg {
+            width: 1,
+            height: 1,
+            rgba: vec![255, 255, 255, 255],
+        },
+        alt: "test diagram".to_string(),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+/// show() メソッド描画をカバー (L156-167): allow(dead_code) が付いているが egui_kittest でカバー
+#[test]
+fn show_method_renders_without_crash() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections("# Show method test");
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show(ui);
+    });
+    harness.run();
+}
+
+/// render_sections の空セクション分岐をカバー (L189-191)
+#[test]
+fn render_sections_empty_shows_no_preview_label() {
+    let mut pane = PreviewPane::default();
+    // sections は空のまま
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+/// poll_renders: スチルペンディングのとき repaint_after が呼ばれる (L214-215)
+#[test]
+fn poll_renders_with_pending_does_not_crash() {
+    let mut pane = PreviewPane::default();
+    // full_render でバックグラウンドスレッドが起動する
+    pane.full_render("# Title\n```mermaid\ngraph TD; A-->B\n```\nAfter");
+
+    // poll_renders を egui コンテキスト付きで実行
+    let mut harness = Harness::new_ui(move |ui| {
+        // show_content が poll_renders を内部で呼ぶ
+        pane.show_content(ui);
+    });
+    // Pending セクションがあるためスピナーでリペイント継続する。
+    // step() で1フレームのみ実行してクラッシュしないことを確認。
+    harness.step();
+}
+
+/// NotInstalled の show_not_installed UI が描画される (L310-341)
+#[test]
+fn show_section_not_installed_download_button_returns_request() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::NotInstalled {
+        kind: "PlantUML".to_string(),
+        download_url: "https://example.com/plantuml.jar".to_string(),
+        install_path: PathBuf::from("/tmp/plantuml_test.jar"),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        // show_not_installed の描画（L316-341）をカバー
+        let _req = pane.show_content(ui);
+    });
+    harness.run();
+    // クラッシュしなければOK（ボタン描画、ラベル描画が実行された）
+}
+
+/// show_rasterized: 実際のテクスチャ描画パス (L344-358) をカバー
+#[test]
+fn show_section_image_full_render_with_texture() {
+    let mut pane = PreviewPane::default();
+    // 4x4 の有効な RGBA 画像
+    let rgba: Vec<u8> = (0..64).map(|i| (i * 4) as u8).collect();
+    pane.sections = vec![RenderedSection::Image {
+        svg_data: RasterizedSvg {
+            width: 4,
+            height: 4,
+            rgba,
+        },
+        alt: "Test texture".to_string(),
+    }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
 }

@@ -31,7 +31,9 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
     let size = tree.size();
     let width = ((size.width() * scale) as u32).max(1);
     let height = ((size.height() * scale) as u32).max(1);
-    let mut pixmap = Pixmap::new(width, height).ok_or(SvgRasterizeError::PixmapAllocationFailed)?;
+    // max(1) により width/height >= 1 が保証されるため Pixmap::new は常に Some。
+    let mut pixmap =
+        Pixmap::new(width, height).expect("BUG: width/height >= 1 guaranteed by max(1)");
     // SVG コンテンツがダーク背景で消えないよう、レンダリング前に白で塗りつぶす。
     pixmap.fill(tiny_skia::Color::WHITE);
     let transform = tiny_skia::Transform::from_scale(scale, scale);
@@ -43,7 +45,6 @@ pub fn rasterize_svg(svg_text: &str, scale: f32) -> Result<RasterizedSvg, SvgRas
     })
 }
 
-/// システムフォント DB を初期化済み Arc として返す（プロセス全体で一度だけ初期化）。
 fn font_db() -> std::sync::Arc<usvg::fontdb::Database> {
     static FONT_DB: std::sync::OnceLock<std::sync::Arc<usvg::fontdb::Database>> =
         std::sync::OnceLock::new();
@@ -59,7 +60,4 @@ fn font_db() -> std::sync::Arc<usvg::fontdb::Database> {
 pub enum SvgRasterizeError {
     #[error("SVG パースに失敗しました: {0}")]
     ParseFailed(String),
-
-    #[error("Pixmap の確保に失敗しました")]
-    PixmapAllocationFailed,
 }

@@ -31,10 +31,10 @@ impl TreeEntry {
 
     pub fn is_markdown(&self) -> bool {
         match self {
-            Self::File { path } => path
-                .extension()
-                .map(|ext| ext.eq_ignore_ascii_case("md"))
-                .unwrap_or(false),
+            Self::File { path } => {
+                let ext = path.extension();
+                ext.map(|e| e.eq_ignore_ascii_case("md")).unwrap_or(false)
+            }
             _ => false,
         }
     }

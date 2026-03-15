@@ -45,3 +45,27 @@ fn 複数ダイアグラムが正しく分割される() {
         .count();
     assert_eq!(diagram_count, 2);
 }
+
+// try_parse_diagram_fence: 閉じフェンスなし → None パス (L65の?)
+#[test]
+fn 閉じフェンスなしのダイアグラムはmarkdownとして残る() {
+    // ``` で始まるが閉じ ``` がない → Diagram にならない
+    let src = "before\n```mermaid\ngraph TD; A-->B";
+    let sections = split_into_sections(src);
+    // すべて Markdown として扱われる
+    assert!(sections
+        .iter()
+        .all(|s| matches!(s, PreviewSection::Markdown(_))));
+}
+
+// try_parse_diagram_fence: インフォ行に改行なし → None パス (L61の?)
+// ファイル末尾で ``` の直後に何もない場合
+#[test]
+fn フェンス直後が改行なしで終わる場合はmarkdown() {
+    // ``` の後に info 行なし（EOF）
+    let src = "text\n```";
+    let sections = split_into_sections(src);
+    assert!(sections
+        .iter()
+        .all(|s| matches!(s, PreviewSection::Markdown(_))));
+}

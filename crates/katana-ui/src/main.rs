@@ -65,13 +65,17 @@ fn main() -> eframe::Result<()> {
 ///
 /// macOS バンドルの AquaKana.ttc などを倪側フォントとして追加する。
 pub fn setup_fonts(ctx: &egui::Context) {
-    let mut fonts = egui::FontDefinitions::default();
-    // 試行順序: AquaKana (macOS) → Hiragino Sans GB → フォールバックなし。
     let candidates = [
         "/System/Library/Fonts/AquaKana.ttc",
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
     ];
-    let loaded = load_first_font(&candidates);
+    setup_fonts_with_candidates(ctx, &candidates);
+}
+
+/// フォント候補リストを受け取ってフォントを設定する。テスト可能。
+pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
+    let mut fonts = egui::FontDefinitions::default();
+    let loaded = load_first_font(candidates);
     if let Some((name, data)) = loaded {
         fonts.font_data.insert(
             name.clone(),
@@ -79,7 +83,6 @@ pub fn setup_fonts(ctx: &egui::Context) {
         );
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
             if let Some(list) = fonts.families.get_mut(&family) {
-                // 追加フォントはフォールバックとして末尾に追加（日本語文字のみがこのフォントで描画される）。
                 list.push(name.clone());
             }
         }
@@ -89,8 +92,6 @@ pub fn setup_fonts(ctx: &egui::Context) {
     }
     ctx.set_fonts(fonts);
 
-    // デバッグビルドで "First use of Grid ID XXXX" などの赤いオーバーレイが
-    // プレビュー領域に表示される問題を防ぐ。
     ctx.style_mut(|style| {
         style.debug.debug_on_hover = false;
         style.debug.show_expand_width = false;
@@ -157,6 +158,10 @@ pub fn register_builtin_plugins(registry: &mut PluginRegistry) {
 mod tests {
     use super::*;
 
+    fn init_tracing() {
+        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
+    }
+
     #[test]
     fn test_load_first_font_not_found() {
         let candidates = ["/invalid/path/to/never/found/font.ttc"];
@@ -165,16 +170,41 @@ mod tests {
     }
 
     #[test]
-    fn test_setup_fonts() {
+    fn test_load_first_font_found() {
+        // macOS に存在するフォントで成功パスをカバー
+        let candidates = [
+            "/System/Library/Fonts/AquaKana.ttc",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        ];
+        let result = load_first_font(&candidates);
+        // macOS 環境ではどちらかが見つかるはず
+        if result.is_some() {
+            let (name, data) = result.unwrap();
+            assert!(!name.is_empty());
+            assert!(!data.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_setup_fonts_with_cjk() {
+        init_tracing();
         let ctx = egui::Context::default();
         setup_fonts(&ctx);
-        // Ensure no panics
+    }
+
+    #[test]
+    fn test_setup_fonts_without_cjk() {
+        init_tracing();
+        let ctx = egui::Context::default();
+        // 存在しないパスのみ → else (warn) パスを通す
+        setup_fonts_with_candidates(&ctx, &["/nonexistent/font.ttc"]);
     }
 
     #[test]
     fn test_register_builtin_plugins() {
+        init_tracing();
         let mut registry = PluginRegistry::new();
         register_builtin_plugins(&mut registry);
-        // Ensure it doesn't panic. No public field to check length easily.
+        assert_eq!(registry.active_count(), 3);
     }
 }

@@ -23,7 +23,7 @@ use super::diagram::{DiagramBlock, DiagramResult};
 /// 2. ログインシェル経由で `which mmdc` を実行し、nvm 等のパスも含めて探す。
 ///    GUI アプリはシェルの PATH を引き継がないため、`sh -l -c` でログインシェルを使う。
 /// 3. どちらも見つからなければフォールバックとして `mmdc` を返す。
-fn resolve_mmdc_binary() -> PathBuf {
+pub fn resolve_mmdc_binary() -> PathBuf {
     if let Ok(env_path) = std::env::var("MERMAID_MMDC") {
         return PathBuf::from(env_path);
     }
@@ -82,7 +82,7 @@ pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
 ///
 /// PNG 出力により mmdc (Puppeteer) がすべての SVG 要素を正しくレンダリングする。
 /// resvg が非対応の `<foreignObject>` によるテキスト消失を回避できる。
-fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
+pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     let input_file = create_input_file(source)?;
     // mmdc は出力ファイルの拡張子で形式を判断する。
     let output_path = input_file.path().with_extension("png");
@@ -111,7 +111,7 @@ fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
 }
 
 /// Mermaid ソースを一時ファイルに書き出す。
-fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
+pub fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
     let mut file =
         NamedTempFile::with_suffix(".mmd").map_err(|e| format!("一時ファイル作成失敗: {e}"))?;
     file.write_all(source.as_bytes())

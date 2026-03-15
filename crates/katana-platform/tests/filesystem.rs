@@ -70,3 +70,151 @@ fn load_nonexistent_document_returns_error() {
     let result = svc.load_document("/this/does/not/exist.md");
     assert!(result.is_err());
 }
+
+// L64-70: hidden files/dirs are excluded from workspace tree
+#[test]
+fn hidden_files_are_excluded_from_workspace() {
+    let tmp = TempDir::new().unwrap();
+    // Regular md file
+    fs::write(tmp.path().join("visible.md"), "# Visible").unwrap();
+    // Hidden file (starts with '.')
+    fs::write(tmp.path().join(".hidden.md"), "# Hidden").unwrap();
+    // Hidden directory
+    fs::create_dir(tmp.path().join(".git")).unwrap();
+    fs::write(tmp.path().join(".git").join("README.md"), "# Not shown").unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    let paths: Vec<_> = ws
+        .tree
+        .iter()
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+    assert!(paths.iter().any(|p| p.contains("visible.md")));
+    assert!(!paths.iter().any(|p| p.contains(".hidden.md")));
+    assert!(!paths.iter().any(|p| p.contains(".git")));
+}
+
+// L66: "target" directory is excluded
+#[test]
+fn target_directory_is_excluded_from_workspace() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("docs.md"), "# Docs").unwrap();
+    // Create target/ dir with a .md file inside
+    fs::create_dir(tmp.path().join("target")).unwrap();
+    fs::write(tmp.path().join("target").join("build.md"), "# Build output").unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    let paths: Vec<_> = ws
+        .tree
+        .iter()
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+    assert!(!paths.iter().any(|p| p.contains("target")));
+}
+
+// L67: "node_modules" directory is excluded
+#[test]
+fn node_modules_directory_is_excluded_from_workspace() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("index.md"), "# Index").unwrap();
+    fs::create_dir(tmp.path().join("node_modules")).unwrap();
+    fs::write(tmp.path().join("node_modules").join("pkg.md"), "# Package").unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    let paths: Vec<_> = ws
+        .tree
+        .iter()
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+    assert!(!paths.iter().any(|p| p.contains("node_modules")));
+}
+
+// L75-79: directories without any markdown are excluded
+#[test]
+fn directories_without_markdown_are_excluded() {
+    let tmp = TempDir::new().unwrap();
+    // A md file at root so workspace is valid
+    fs::write(tmp.path().join("root.md"), "# Root").unwrap();
+    // A subdirectory with only non-md files
+    fs::create_dir(tmp.path().join("assets")).unwrap();
+    fs::write(tmp.path().join("assets").join("image.png"), b"PNG data").unwrap();
+    fs::write(tmp.path().join("assets").join("style.css"), "body{}").unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    let paths: Vec<_> = ws
+        .tree
+        .iter()
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+    // 'assets' dir has no md files so should be excluded
+    assert!(!paths.iter().any(|p| p.contains("assets")));
+}
+
+// L80-88: non-markdown files at root level are excluded
+#[test]
+fn non_markdown_files_at_root_are_excluded() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Read").unwrap();
+    fs::write(tmp.path().join("config.toml"), "[config]").unwrap();
+    fs::write(tmp.path().join("script.sh"), "#!/bin/bash").unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    let paths: Vec<_> = ws
+        .tree
+        .iter()
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+    assert!(!paths.iter().any(|p| p.contains("config.toml")));
+    assert!(!paths.iter().any(|p| p.contains("script.sh")));
+    assert!(paths.iter().any(|p| p.contains("README.md")));
+}
+
+// L106: has_any_markdown の再帰（ネストされたサブディレクトリ内のmd検出）
+#[test]
+fn nested_subdirectory_with_markdown_is_included() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("root.md"), "# Root").unwrap();
+    // 2階層深いサブディレクトリに .md ファイル
+    fs::create_dir_all(tmp.path().join("docs").join("deep")).unwrap();
+    fs::write(
+        tmp.path().join("docs").join("deep").join("spec.md"),
+        "# Spec",
+    )
+    .unwrap();
+
+    let svc = FilesystemService::new();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+
+    // "docs" ディレクトリが含まれている（中に .md があるため）
+    fn find_dir<'a>(tree: &'a [katana_core::workspace::TreeEntry], name: &str) -> bool {
+        tree.iter().any(|e| match e {
+            katana_core::workspace::TreeEntry::Directory { path, children } => {
+                path.file_name().and_then(|n| n.to_str()) == Some(name) || find_dir(children, name)
+            }
+            _ => false,
+        })
+    }
+    assert!(find_dir(&ws.tree, "docs"));
+    assert!(find_dir(&ws.tree, "deep"));
+}
+
+// L109-112: FilesystemService::default()
+#[test]
+fn filesystem_service_default_works() {
+    let svc: FilesystemService = Default::default();
+    // Default::default() と new() は同じ
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("note.md"), "# Note").unwrap();
+    let ws = svc.open_workspace(tmp.path()).unwrap();
+    assert!(!ws.tree.is_empty());
+}

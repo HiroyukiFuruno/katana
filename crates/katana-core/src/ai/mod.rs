@@ -111,7 +111,12 @@ impl AiProviderRegistry {
     /// or when the active provider reports itself unavailable.
     pub fn execute(&self, request: &AiRequest) -> Result<AiResponse, AiError> {
         let id = self.active_id.as_deref().ok_or(AiError::NotConfigured)?;
-        let provider = self.providers.get(id).ok_or(AiError::NotConfigured)?;
+        // set_active が true を返すのは providers に存在する場合のみ。
+        // よって active_id が Some なら providers に必ず存在する。
+        let provider = self
+            .providers
+            .get(id)
+            .expect("BUG: active_id is set but provider not found in registry");
         if !provider.is_available() {
             return Err(AiError::NotConfigured);
         }

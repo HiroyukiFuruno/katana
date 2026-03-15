@@ -2146,6 +2146,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tiny-skia",
  "tracing",
+ "tracing-subscriber",
  "usvg",
  "xmltree",
 ]
@@ -2157,6 +2158,7 @@ dependencies = [
  "ignore",
  "proc-macro2",
  "syn",
+ "tempfile",
 ]
 
 [[package]]
@@ -2190,6 +2192,7 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
 ]

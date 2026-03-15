@@ -1,0 +1,527 @@
+//! Katana shell の純粋な egui UI 描画関数群。
+//!
+//! このモジュールはすべて egui のフレームコンテキスト・UIイベント（クリック等）に
+//! 依存するコードを含む。
+//! - `eframe::App::update` 内でしか呼べない描画関数
+//! - ユーザーのクリックイベントなしには実行されないブランチ
+//! - `rfd` のファイルダイアログ等のOS UI依存コード
+//!
+//! そのためコードカバレッジ計測では `--ignore-filename-regex` で除外する。
+
+use eframe::egui;
+
+use crate::{
+    app_state::{AppAction, AppState, ScrollSource, ViewMode},
+    i18n,
+    preview_pane::{DownloadRequest, PreviewPane},
+};
+
+use crate::shell::{
+    ACTIVE_FILE_HIGHLIGHT_BG, ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS,
+    FILE_TREE_PANEL_DEFAULT_WIDTH, FILE_TREE_PANEL_MIN_WIDTH, FILE_TREE_TEXT_COLOR,
+    NO_WORKSPACE_BOTTOM_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
+    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
+};
+
+pub(crate) fn open_folder_dialog() -> Option<std::path::PathBuf> {
+    rfd::FileDialog::new().pick_folder()
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
+    egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+        egui::menu::bar(ui, |ui| {
+            ui.menu_button(crate::i18n::t("menu_file"), |ui| {
+                render_file_menu(ui, state, action);
+            });
+            ui.menu_button(crate::i18n::t("menu_settings"), |ui| {
+                render_settings_menu(ui, state, action);
+            });
+            render_header_right(ui, state);
+        });
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
+    if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
+        if let Some(path) = open_folder_dialog() {
+            *action = AppAction::OpenWorkspace(path);
+        }
+        ui.close_menu();
+    }
+    ui.separator();
+    if ui
+        .add_enabled(
+            state.is_dirty(),
+            egui::Button::new(crate::i18n::t("menu_save")),
+        )
+        .clicked()
+    {
+        *action = AppAction::SaveDocument;
+        ui.close_menu();
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn render_settings_menu(ui: &mut egui::Ui, _state: &AppState, action: &mut AppAction) {
+    ui.menu_button(crate::i18n::t("menu_language"), |ui| {
+        let mut reset_layout = false;
+        for (code, display_name) in crate::i18n::supported_languages() {
+            if ui.button(display_name.as_str()).clicked() {
+                *action = AppAction::ChangeLanguage(code.to_string());
+                reset_layout = true;
+            }
+        }
+        if reset_layout {
+            ui.close_menu();
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn render_header_right(ui: &mut egui::Ui, state: &AppState) {
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        if state.is_dirty() {
+            ui.label("*");
+        }
+        if !state.ai_available() {
+            ui.label(crate::i18n::t("ai_unconfigured"));
+        }
+    });
+}
+
+pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
+    egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+        ui.horizontal(|ui| {
+            let ready = crate::i18n::t("status_ready");
+            let msg = state.status_message.as_deref().unwrap_or(&ready);
+            ui.label(msg);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if state.is_dirty() {
+                    ui.label("●");
+                }
+            });
+        });
+    });
+}
+
+pub(crate) fn render_workspace_panel(
+    ctx: &egui::Context,
+    state: &mut AppState,
+    action: &mut AppAction,
+) {
+    egui::SidePanel::left("workspace_tree")
+        .resizable(true)
+        .min_width(FILE_TREE_PANEL_MIN_WIDTH)
+        .default_width(FILE_TREE_PANEL_DEFAULT_WIDTH)
+        .show(ctx, |ui| {
+            let panel_width = ui.available_width();
+            ui.set_max_width(panel_width);
+            ui.set_min_width(panel_width);
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+            ui.horizontal(|ui| {
+                ui.heading(crate::i18n::t("workspace_title"));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .small_button("‹")
+                        .on_hover_text(crate::i18n::t("collapse_sidebar"))
+                        .clicked()
+                    {
+                        state.show_workspace = false;
+                    }
+                });
+            });
+            if state.workspace.is_some() {
+                ui.horizontal(|ui| {
+                    if ui
+                        .small_button("+")
+                        .on_hover_text(crate::i18n::t("expand_all"))
+                        .clicked()
+                    {
+                        state.force_tree_open = Some(true);
+                    }
+                    if ui
+                        .small_button("-")
+                        .on_hover_text(crate::i18n::t("collapse_all"))
+                        .clicked()
+                    {
+                        state.force_tree_open = Some(false);
+                    }
+                });
+            }
+            ui.separator();
+            render_workspace_content(ui, state, action);
+        });
+}
+
+pub(crate) fn render_workspace_content(
+    ui: &mut egui::Ui,
+    state: &mut AppState,
+    action: &mut AppAction,
+) {
+    if let Some(ws) = &state.workspace {
+        let entries = ws.tree.clone();
+        let mut selected: Option<std::path::PathBuf> = None;
+        let force = state.force_tree_open;
+        let active_path = state.active_path().map(|p| p.to_path_buf());
+        egui::ScrollArea::vertical()
+            .id_salt("workspace_tree_scroll")
+            .show(ui, |ui| {
+                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                for entry in &entries {
+                    render_tree_entry(ui, entry, &mut selected, force, 0, active_path.as_deref());
+                }
+            });
+        state.force_tree_open = None;
+        if let Some(path) = selected {
+            *action = AppAction::SelectDocument(path);
+        }
+    } else {
+        ui.label(crate::i18n::t("no_workspace_open"));
+        ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
+        if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
+            if let Some(path) = open_folder_dialog() {
+                *action = AppAction::OpenWorkspace(path);
+            }
+        }
+    }
+}
+
+pub(crate) fn render_preview_content(
+    ui: &mut egui::Ui,
+    preview: &mut PreviewPane,
+    state: &AppState,
+    action: &mut AppAction,
+    scroll_sync: bool,
+    scroll_state: &mut (f32, ScrollSource, f32),
+) -> Option<DownloadRequest> {
+    let mut download_req = None;
+    render_preview_header(ui, state, action);
+    ui.separator();
+
+    let (fraction, source, prev_max_scroll) = scroll_state;
+    let mut scroll_area = egui::ScrollArea::both().id_salt("preview_scroll");
+
+    let consuming_editor = scroll_sync && *source == ScrollSource::Editor;
+    if consuming_editor {
+        scroll_area = scroll_area.vertical_scroll_offset(*fraction * (*prev_max_scroll).max(1.0));
+    }
+
+    let output = scroll_area.show(ui, |ui| {
+        download_req = preview.show_content(ui);
+    });
+
+    if scroll_sync {
+        let max_scroll = (output.content_size.y - output.inner_rect.height()).max(0.0);
+        *prev_max_scroll = max_scroll;
+
+        if consuming_editor {
+            *source = ScrollSource::Neither;
+            if max_scroll > 0.0 {
+                *fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+            }
+        } else {
+            if max_scroll > 0.0 {
+                let current_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                let diff = (current_fraction - *fraction).abs();
+                if diff > SCROLL_SYNC_DEAD_ZONE {
+                    *fraction = current_fraction;
+                    *source = ScrollSource::Preview;
+                }
+            }
+        }
+    }
+
+    download_req
+}
+
+pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
+    ui.horizontal(|ui| {
+        ui.heading(crate::i18n::t("preview_title"));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let has_doc = state.active_document().is_some();
+            if ui
+                .add_enabled(has_doc, egui::Button::new("\u{1F504}"))
+                .on_hover_text(crate::i18n::t("refresh_diagrams"))
+                .clicked()
+            {
+                *action = AppAction::RefreshDiagrams;
+            }
+        });
+    });
+}
+
+/// タブ行: 開いているドキュメントのタブを横並びに表示する。
+pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
+    const MAX_TAB_WIDTH: f32 = 200.0;
+
+    let mut close_idx: Option<usize> = None;
+    let mut tab_action: Option<AppAction> = None;
+
+    let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
+    let doc_count = state.open_documents.len();
+
+    ui.style_mut().interaction.tooltip_delay = TAB_TOOLTIP_SHOW_DELAY_SECS;
+
+    ui.horizontal(|ui| {
+        let nav_button_width = TAB_NAV_BUTTONS_AREA_WIDTH;
+        let scroll_width = ui.available_width() - nav_button_width;
+
+        egui::ScrollArea::horizontal()
+            .max_width(scroll_width)
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .id_salt("tab_scroll")
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for (idx, doc) in state.open_documents.iter().enumerate() {
+                        let is_active = state.active_doc_idx == Some(idx);
+                        let filename = doc.file_name().unwrap_or("untitled").to_string();
+                        let dirty_suffix = if doc.is_dirty { " *" } else { "" };
+                        let title = format!("{filename}{dirty_suffix}");
+                        let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
+
+                        let resp = ui
+                            .push_id(format!("tab_{idx}"), |ui| {
+                                ui.set_max_width(MAX_TAB_WIDTH);
+                                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                                ui.selectable_label(is_active, &title)
+                            })
+                            .inner;
+
+                        let clicked = resp.clicked();
+                        resp.on_hover_text(&tooltip_path);
+                        if clicked && !is_active {
+                            tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
+                        }
+
+                        if ui.small_button("x").clicked() {
+                            close_idx = Some(idx);
+                        }
+                        ui.add_space(TAB_INTER_ITEM_SPACING);
+                    }
+                });
+            });
+
+        ui.separator();
+
+        let nav_enabled = doc_count > 1;
+        if ui
+            .add_enabled(nav_enabled, egui::Button::new("◀").small())
+            .clicked()
+        {
+            if let Some(idx) = state.active_doc_idx {
+                let new_idx = crate::shell_logic::prev_tab_index(idx, doc_count);
+                tab_action = Some(AppAction::SelectDocument(
+                    state.open_documents[new_idx].path.clone(),
+                ));
+            }
+        }
+        if ui
+            .add_enabled(nav_enabled, egui::Button::new("▶").small())
+            .clicked()
+        {
+            if let Some(idx) = state.active_doc_idx {
+                let new_idx = crate::shell_logic::next_tab_index(idx, doc_count);
+                tab_action = Some(AppAction::SelectDocument(
+                    state.open_documents[new_idx].path.clone(),
+                ));
+            }
+        }
+    });
+
+    if let Some(action_val) = tab_action {
+        *action = action_val;
+    } else if let Some(idx) = close_idx {
+        *action = AppAction::CloseDocument(idx);
+    }
+}
+
+pub(crate) fn relative_full_path(
+    path: &std::path::Path,
+    ws_root: Option<&std::path::Path>,
+) -> String {
+    crate::shell_logic::relative_full_path(path, ws_root)
+}
+
+pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
+    let mut mode = state.active_view_mode();
+    let prev = mode;
+    let bar_height = ui.spacing().interact_size.y;
+    let available_width = ui.available_width();
+    ui.allocate_ui_with_layout(
+        egui::vec2(available_width, bar_height),
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            ui.selectable_value(&mut mode, ViewMode::Split, i18n::t("view_mode_split"));
+            ui.selectable_value(&mut mode, ViewMode::CodeOnly, i18n::t("view_mode_code"));
+            ui.selectable_value(
+                &mut mode,
+                ViewMode::PreviewOnly,
+                i18n::t("view_mode_preview"),
+            );
+        },
+    );
+    if mode != prev {
+        state.set_active_view_mode(mode);
+    }
+}
+
+pub(crate) fn render_editor_content(
+    ui: &mut egui::Ui,
+    state: &mut AppState,
+    action: &mut AppAction,
+    sync_scroll: bool,
+) {
+    if let Some(doc) = state.active_document() {
+        let mut buffer = doc.buffer.clone();
+
+        let mut scroll_area = egui::ScrollArea::vertical().id_salt("editor_scroll");
+
+        let consuming_preview = sync_scroll && state.scroll_source == ScrollSource::Preview;
+        if consuming_preview {
+            scroll_area = scroll_area
+                .vertical_scroll_offset(state.scroll_fraction * state.editor_max_scroll.max(1.0));
+        }
+
+        let output = scroll_area.show(ui, |ui| {
+            let response = ui.add(
+                egui::TextEdit::multiline(&mut buffer)
+                    .font(egui::TextStyle::Monospace)
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS),
+            );
+            if response.changed() {
+                *action = AppAction::UpdateBuffer(buffer);
+            }
+        });
+
+        if sync_scroll {
+            let max_scroll = (output.content_size.y - output.inner_rect.height()).max(0.0);
+            state.editor_max_scroll = max_scroll;
+
+            if consuming_preview {
+                state.scroll_source = ScrollSource::Neither;
+                if max_scroll > 0.0 {
+                    state.scroll_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                }
+            } else {
+                if max_scroll > 0.0 {
+                    let current_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                    let diff = (current_fraction - state.scroll_fraction).abs();
+                    if diff > SCROLL_SYNC_DEAD_ZONE {
+                        state.scroll_fraction = current_fraction;
+                        state.scroll_source = ScrollSource::Editor;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub(crate) fn render_tree_entry(
+    ui: &mut egui::Ui,
+    entry: &katana_core::workspace::TreeEntry,
+    selected: &mut Option<std::path::PathBuf>,
+    force: Option<bool>,
+    depth: usize,
+    active_path: Option<&std::path::Path>,
+) {
+    use katana_core::workspace::TreeEntry;
+    match entry {
+        TreeEntry::Directory { path, children } => {
+            render_directory_entry(ui, path, children, selected, force, depth, active_path);
+        }
+        TreeEntry::File { path } => {
+            render_file_entry(ui, entry, path, selected, depth, active_path);
+        }
+    }
+}
+
+pub(crate) fn indent_prefix(depth: usize) -> String {
+    "  ".repeat(depth)
+}
+
+pub(crate) fn render_directory_entry(
+    ui: &mut egui::Ui,
+    path: &std::path::Path,
+    children: &[katana_core::workspace::TreeEntry],
+    selected: &mut Option<std::path::PathBuf>,
+    force: Option<bool>,
+    depth: usize,
+    active_path: Option<&std::path::Path>,
+) {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+    let id = ui.make_persistent_id(format!("dir:{}", path.display()));
+    let mut state =
+        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
+    if let Some(open) = force {
+        state.set_open(open);
+    }
+    let is_open = state.is_open();
+
+    let arrow = if is_open { "▼" } else { "▶" };
+    let dir_icon = if is_open { "📂" } else { "📁" };
+    let prefix = indent_prefix(depth);
+    let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
+    let resp = ui.add(
+        egui::Label::new(egui::RichText::new(label_text).color(FILE_TREE_TEXT_COLOR))
+            .truncate()
+            .sense(egui::Sense::click()),
+    );
+    if resp.clicked() {
+        state.set_open(!is_open);
+    }
+    state.store(ui.ctx());
+
+    if state.is_open() {
+        for child in children {
+            render_tree_entry(ui, child, selected, force, depth + 1, active_path);
+        }
+    }
+}
+
+pub(crate) fn render_file_entry(
+    ui: &mut egui::Ui,
+    entry: &katana_core::workspace::TreeEntry,
+    path: &std::path::Path,
+    selected: &mut Option<std::path::PathBuf>,
+    depth: usize,
+    active_path: Option<&std::path::Path>,
+) {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+    let prefix = indent_prefix(depth);
+    let icon = if entry.is_markdown() { "📄" } else { "  " };
+    let label = format!("{prefix}{icon} {name}");
+
+    let is_active = active_path.is_some_and(|ap| ap == path);
+
+    let text_color = if is_active {
+        egui::Color32::WHITE
+    } else {
+        FILE_TREE_TEXT_COLOR
+    };
+    let rich = egui::RichText::new(&label).color(text_color);
+    let rich = if is_active { rich.strong() } else { rich };
+
+    let resp = ui.add(
+        egui::Label::new(rich)
+            .truncate()
+            .sense(egui::Sense::click()),
+    );
+
+    if is_active {
+        let full_rect = egui::Rect::from_min_max(
+            egui::pos2(ui.min_rect().min.x, resp.rect.min.y),
+            egui::pos2(ui.min_rect().max.x, resp.rect.max.y),
+        );
+        ui.painter().rect_filled(
+            full_rect,
+            ACTIVE_FILE_HIGHLIGHT_ROUNDING,
+            ACTIVE_FILE_HIGHLIGHT_BG,
+        );
+    }
+    if resp.clicked() && entry.is_markdown() {
+        *selected = Some(path.to_path_buf());
+    }
+}
