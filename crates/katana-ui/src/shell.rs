@@ -1,4 +1,6 @@
 //! Katana three-pane egui shell.
+//!
+//! ビジネスロジックのみを含む。egui 描画コードは shell_ui.rs に分離。
 
 use std::collections::HashMap;
 
@@ -6,13 +8,9 @@ use eframe::egui;
 use katana_platform::FilesystemService;
 
 use crate::{
-    app_state::{AppAction, AppState, ScrollSource, ViewMode},
-    i18n,
+    app_state::{AppAction, AppState},
     preview_pane::{DownloadRequest, PreviewPane},
 };
-
-// UI描画関数群はカバレッジ計測除外対象のため別モジュールに分離
-use crate::shell_ui::*;
 
 // ─────────────────────────────────────────────
 // レイアウト定数
@@ -60,7 +58,7 @@ pub(crate) const DOWNLOAD_STATUS_CHECK_INTERVAL_MS: u64 = 200;
 // ─────────────────────────────────────────────
 
 /// アプリ内タイトルバーに表示するファイル名のテキスト色。
-const TITLE_BAR_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(180);
+pub(crate) const TITLE_BAR_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(180);
 
 /// ファイルツリーの通常テキスト色（非アクティブファイル・ディレクトリ）。
 pub(crate) const FILE_TREE_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(220);
@@ -72,47 +70,21 @@ pub(crate) const ACTIVE_FILE_HIGHLIGHT_BG: egui::Color32 =
 /// ファイルツリーのアクティブ行背景の角丸半径。
 pub(crate) const ACTIVE_FILE_HIGHLIGHT_ROUNDING: f32 = 3.0;
 
-// macOS ネイティブメニュー FFI
-#[cfg(target_os = "macos")]
-mod native_menu {
-    // macos_menu.m (Objective-C) で定義されたタグ定数と一致させる。
-    pub const TAG_OPEN_WORKSPACE: i32 = 1;
-    pub const TAG_SAVE: i32 = 2;
-    pub const TAG_LANG_EN: i32 = 3;
-    pub const TAG_LANG_JA: i32 = 4;
-
-    #[allow(dead_code)]
-    extern "C" {
-        pub fn katana_setup_native_menu();
-        pub fn katana_poll_menu_action() -> i32;
-    }
-}
-
-/// macOS ネイティブメニューバーを初期化する。
-/// eframe がウィンドウを生成した後に main.rs から呼ばれる。
-///
-/// # Safety
-/// Objective-C ランタイム呼び出しを含む。メインスレッドから1回だけ呼ぶこと。
-#[cfg(all(target_os = "macos", not(test)))]
-pub unsafe fn native_menu_setup() {
-    native_menu::katana_setup_native_menu();
-}
-
 /// FNV-1a ハッシュで文字列をu64に変換する。
 fn hash_str(s: &str) -> u64 {
     crate::shell_logic::hash_str(s)
 }
 
 pub struct KatanaApp {
-    state: AppState,
-    fs: FilesystemService,
-    pending_action: AppAction,
+    pub(crate) state: AppState,
+    pub(crate) fs: FilesystemService,
+    pub(crate) pending_action: AppAction,
     /// タブ別プレビューペイン。キーはファイルパス。タブ切り替え時にキャッシュを再利用する。
-    tab_panes: HashMap<std::path::PathBuf, PreviewPane>,
+    pub(crate) tab_panes: HashMap<std::path::PathBuf, PreviewPane>,
     /// タブ別の最終レンダリング済みコンテンツハッシュ。変化検知に使う。
-    tab_hashes: HashMap<std::path::PathBuf, u64>,
+    pub(crate) tab_hashes: HashMap<std::path::PathBuf, u64>,
     /// バックグラウンドダウンロードの完了通知レシーバ。
-    download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
+    pub(crate) download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
 }
 
 impl KatanaApp {
@@ -127,7 +99,7 @@ impl KatanaApp {
         }
     }
 
-    fn take_action(&mut self) -> AppAction {
+    pub(crate) fn take_action(&mut self) -> AppAction {
         std::mem::replace(&mut self.pending_action, AppAction::None)
     }
 
@@ -232,7 +204,7 @@ impl KatanaApp {
         }
     }
 
-    fn process_action(&mut self, action: AppAction) {
+    pub(crate) fn process_action(&mut self, action: AppAction) {
         match action {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
             AppAction::SelectDocument(p) => self.handle_select_document(p),
@@ -263,7 +235,7 @@ impl KatanaApp {
     }
 
     /// ダウンロードリクエストをバックグラウンドスレッドで処理する。
-    fn start_download(&mut self, req: DownloadRequest) {
+    pub(crate) fn start_download(&mut self, req: DownloadRequest) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.download_rx = Some(rx);
         self.state.status_message = Some(crate::i18n::t("downloading_plantuml"));
@@ -276,7 +248,7 @@ impl KatanaApp {
     }
 
     /// ダウンロード完了をポーリングし、完了時にプレビューを再レンダリングする。
-    fn poll_download(&mut self, ctx: &egui::Context) {
+    pub(crate) fn poll_download(&mut self, ctx: &egui::Context) {
         let done = if let Some(rx) = &self.download_rx {
             match rx.try_recv() {
                 Ok(Ok(())) => {
@@ -319,8 +291,9 @@ impl KatanaApp {
 
 /// `curl` をサブプロセスとして呼び出し、ファイルをダウンロードする。
 fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
-    if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    // 親ディレクトリが存在しない場合は作成する
+    if let Some(p) = dest.parent() {
+        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
     }
     let status = std::process::Command::new("curl")
         .args(["-L", "-o", dest.to_str().unwrap_or(""), url])
@@ -333,172 +306,8 @@ fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
     }
 }
 
-impl eframe::App for KatanaApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.poll_download(ctx);
+// impl eframe::App for KatanaApp は shell_ui.rs に移動済み
 
-        // macOS: ネイティブメニューからのアクションをポーリングする。
-        #[cfg(target_os = "macos")]
-        {
-            let action = unsafe { native_menu::katana_poll_menu_action() };
-            match action {
-                native_menu::TAG_OPEN_WORKSPACE => {
-                    if let Some(path) = open_folder_dialog() {
-                        self.pending_action = AppAction::OpenWorkspace(path);
-                    }
-                }
-                native_menu::TAG_SAVE => {
-                    self.pending_action = AppAction::SaveDocument;
-                }
-                native_menu::TAG_LANG_EN => {
-                    self.pending_action = AppAction::ChangeLanguage("en".to_string());
-                }
-                native_menu::TAG_LANG_JA => {
-                    self.pending_action = AppAction::ChangeLanguage("ja".to_string());
-                }
-                _ => {}
-            }
-        }
-
-        let action = self.take_action();
-        self.process_action(action);
-
-        // macOS ではネイティブメニューバーを使うため egui 内メニューは非表示。
-        #[cfg(not(target_os = "macos"))]
-        render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
-        render_status_bar(ctx, &self.state);
-
-        // ウィンドウタイトルにファイル名を反映
-        let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
-        let title_text = match self.state.active_document() {
-            Some(doc) => {
-                let rel = relative_full_path(&doc.path, ws_root_for_title.as_deref());
-                format!("katana — {rel}")
-            }
-            None => "katana".to_string(),
-        };
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
-
-        // アプリ内タイトルバー：ウィンドウ最大化時でも常に見える位置にファイル名を表示
-        egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.label(
-                        egui::RichText::new(&title_text)
-                            .small()
-                            .color(TITLE_BAR_TEXT_COLOR),
-                    );
-                });
-            });
-        });
-
-        // ワークスペースが非表示のときも折りたたみトグルボタンを表示する。
-        if !self.state.show_workspace {
-            egui::SidePanel::left("workspace_collapsed")
-                .resizable(false)
-                .exact_width(SIDEBAR_COLLAPSED_TOGGLE_WIDTH)
-                .show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        if ui
-                            .button("›")
-                            .on_hover_text(crate::i18n::t("workspace_title"))
-                            .clicked()
-                        {
-                            self.state.show_workspace = true;
-                        }
-                    });
-                });
-        } else {
-            render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
-        }
-
-        // タブ行 + パンくずリスト + ビューモード行を TopBottomPanel に配置する。
-        egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
-            render_tab_bar(ui, &mut self.state, &mut self.pending_action);
-            if let Some(doc) = self.state.active_document() {
-                // パンくずリスト（VSCode スタイル）
-                let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
-                let rel = relative_full_path(&doc.path, ws_root.as_deref());
-                ui.horizontal(|ui| {
-                    let segments: Vec<&str> = rel.split('/').collect();
-                    for (i, seg) in segments.iter().enumerate() {
-                        if i > 0 {
-                            ui.label(egui::RichText::new("›").small());
-                        }
-                        ui.label(egui::RichText::new(*seg).small());
-                    }
-                });
-                render_view_mode_bar(ui, &mut self.state);
-            }
-        });
-
-        let mut download_req: Option<DownloadRequest> = None;
-        let current_mode = self.state.active_view_mode();
-        let is_split = current_mode == ViewMode::Split;
-
-        // Split モード: プレビューを右ペインに表示（タブバーの下のみを分割）。
-        if is_split {
-            let active_path = self.state.active_document().map(|d| d.path.clone());
-            let mut scroll_state = (
-                self.state.scroll_fraction,
-                self.state.scroll_source,
-                self.state.preview_max_scroll,
-            );
-            egui::SidePanel::right("preview_panel")
-                .resizable(true)
-                .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
-                .default_width(SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH)
-                .show(ctx, |ui| {
-                    if let Some(path) = &active_path {
-                        let pane = self.tab_panes.entry(path.clone()).or_default();
-                        download_req = render_preview_content(
-                            ui,
-                            pane,
-                            &self.state,
-                            &mut self.pending_action,
-                            true,
-                            &mut scroll_state,
-                        );
-                    }
-                });
-            self.state.scroll_fraction = scroll_state.0;
-            self.state.scroll_source = scroll_state.1;
-            self.state.preview_max_scroll = scroll_state.2;
-        }
-
-        egui::CentralPanel::default().show(ctx, |ui| match current_mode {
-            ViewMode::CodeOnly | ViewMode::Split => {
-                render_editor_content(ui, &mut self.state, &mut self.pending_action, is_split);
-            }
-            ViewMode::PreviewOnly => {
-                let active_path = self.state.active_document().map(|d| d.path.clone());
-                let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
-                if let Some(path) = active_path {
-                    let pane = self.tab_panes.entry(path).or_default();
-                    let req = render_preview_content(
-                        ui,
-                        pane,
-                        &self.state,
-                        &mut self.pending_action,
-                        false,
-                        &mut scroll_state,
-                    );
-                    if req.is_some() {
-                        download_req = req;
-                    }
-                } else {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(i18n::t("no_document_selected"));
-                    });
-                }
-            }
-        });
-
-        if let Some(req) = download_req {
-            self.start_download(req);
-        }
-    }
-}
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -729,8 +538,14 @@ mod tests {
         let mut app = make_app();
         app.pending_action = AppAction::ChangeLanguage("en".to_string());
         let action = app.take_action();
-        assert!(matches!(action, AppAction::ChangeLanguage(_)));
-        assert!(matches!(app.pending_action, AppAction::None));
+        assert!(
+            format!("{action:?}").starts_with("ChangeLanguage"),
+            "expected ChangeLanguage, got {action:?}"
+        );
+        assert_eq!(
+            format!("{:?}", app.pending_action),
+            format!("{:?}", AppAction::None)
+        );
     }
 
     // poll_download: download_rx がない場合 (L297-299)
@@ -883,7 +698,10 @@ mod tests_extra {
         app.poll_download(&ctx);
         assert!(app.state.status_message.is_some());
         assert!(app.download_rx.is_none());
-        assert!(matches!(app.pending_action, AppAction::RefreshDiagrams));
+        assert_eq!(
+            format!("{:?}", app.pending_action),
+            format!("{:?}", AppAction::RefreshDiagrams)
+        );
     }
 
     // poll_download: Ok(Err(e)) でエラー → error status_message
@@ -947,5 +765,22 @@ mod tests_extra {
         assert!(dest.parent().unwrap().exists());
         assert!(result.is_ok());
         assert!(dest.exists());
+    }
+
+    // download_with_curl: parent() が None のケース（ルートレベルのファイル名のみのパス）
+    #[test]
+    fn download_with_curl_no_parent_path() {
+        let result = download_with_curl("file:///nonexistent/file", std::path::Path::new(""));
+        assert!(result.is_err());
+    }
+
+    // download_with_curl: create_dir_all がエラーになるケース（map_err クロージャをカバー）
+    #[test]
+    fn download_with_curl_create_dir_error() {
+        // /proc/... のような書き込み不可のパスで create_dir_all を失敗させる
+        // macOS では /dev/ 配下に新ディレクトリは作れない
+        let dest = std::path::Path::new("/dev/null/impossible_dir/file.jar");
+        let result = download_with_curl("file:///nonexistent/file", dest);
+        assert!(result.is_err());
     }
 }

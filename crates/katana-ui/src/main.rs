@@ -7,7 +7,9 @@ use katana_core::plugin::{ExtensionPoint, PluginMeta, PluginRegistry, PLUGIN_API
 #[cfg(not(test))]
 use katana_ui::app_state::AppState;
 #[cfg(not(test))]
-use katana_ui::shell::{self, KatanaApp};
+use katana_ui::shell::KatanaApp;
+#[cfg(all(target_os = "macos", not(test)))]
+use katana_ui::shell_ui;
 
 #[cfg(not(test))]
 const INITIAL_WINDOW_SIZE: [f32; 2] = [1280.0, 800.0];
@@ -53,7 +55,7 @@ fn main() -> eframe::Result<()> {
             // macOS: eframe がウィンドウを生成した後にネイティブメニューバーを構築する。
             #[cfg(target_os = "macos")]
             unsafe {
-                shell::native_menu_setup();
+                shell_ui::native_menu_setup();
             }
 
             Ok(Box::new(KatanaApp::new(state)))

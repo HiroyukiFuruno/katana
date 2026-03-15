@@ -131,3 +131,24 @@ pub(crate) fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str
     let size = Vec2::new(img.width as f32 * scale, img.height as f32 * scale);
     ui.add(egui::Image::new((texture.id(), size)));
 }
+
+/// セクションリストを順に描画し、ダウンロードリクエストがあれば返す。
+pub(crate) fn render_sections(
+    ui: &mut egui::Ui,
+    cache: &mut CommonMarkCache,
+    sections: &[RenderedSection],
+) -> Option<DownloadRequest> {
+    let mut request: Option<DownloadRequest> = None;
+    for (i, section) in sections.iter().enumerate() {
+        ui.push_id(format!("section_{i}"), |ui| {
+            if let Some(req) = show_section(ui, cache, section, i) {
+                request = Some(req);
+            }
+            ui.separator();
+        });
+    }
+    if sections.is_empty() {
+        ui.label(egui::RichText::new(crate::i18n::t("no_preview")).weak());
+    }
+    request
+}

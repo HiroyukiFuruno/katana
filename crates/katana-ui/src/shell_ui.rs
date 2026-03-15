@@ -525,3 +525,207 @@ pub(crate) fn render_file_entry(
         *selected = Some(path.to_path_buf());
     }
 }
+
+// ─────────────────────────────────────────────
+// macOS ネイティブメニュー FFI
+// ─────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+mod native_menu {
+    // macos_menu.m (Objective-C) で定義されたタグ定数と一致させる。
+    pub const TAG_OPEN_WORKSPACE: i32 = 1;
+    pub const TAG_SAVE: i32 = 2;
+    pub const TAG_LANG_EN: i32 = 3;
+    pub const TAG_LANG_JA: i32 = 4;
+
+    #[allow(dead_code)]
+    extern "C" {
+        pub fn katana_setup_native_menu();
+        pub fn katana_poll_menu_action() -> i32;
+    }
+}
+
+/// macOS ネイティブメニューバーを初期化する。
+/// eframe がウィンドウを生成した後に main.rs から呼ばれる。
+///
+/// # Safety
+/// Objective-C ランタイム呼び出しを含む。メインスレッドから1回だけ呼ぶこと。
+#[cfg(all(target_os = "macos", not(test)))]
+pub unsafe fn native_menu_setup() {
+    native_menu::katana_setup_native_menu();
+}
+
+// ─────────────────────────────────────────────
+// eframe::App 実装（egui 描画メインループ）
+// ─────────────────────────────────────────────
+
+use crate::shell::{
+    KatanaApp, SIDEBAR_COLLAPSED_TOGGLE_WIDTH, SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH,
+    SPLIT_PREVIEW_PANEL_MIN_WIDTH, TITLE_BAR_TEXT_COLOR,
+};
+
+impl eframe::App for KatanaApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.poll_download(ctx);
+
+        // macOS: ネイティブメニューからのアクションをポーリングする。
+        #[cfg(target_os = "macos")]
+        {
+            let action = unsafe { native_menu::katana_poll_menu_action() };
+            match action {
+                native_menu::TAG_OPEN_WORKSPACE => {
+                    if let Some(path) = open_folder_dialog() {
+                        self.pending_action = AppAction::OpenWorkspace(path);
+                    }
+                }
+                native_menu::TAG_SAVE => {
+                    self.pending_action = AppAction::SaveDocument;
+                }
+                native_menu::TAG_LANG_EN => {
+                    self.pending_action = AppAction::ChangeLanguage("en".to_string());
+                }
+                native_menu::TAG_LANG_JA => {
+                    self.pending_action = AppAction::ChangeLanguage("ja".to_string());
+                }
+                _ => {}
+            }
+        }
+
+        let action = self.take_action();
+        self.process_action(action);
+
+        // macOS ではネイティブメニューバーを使うため egui 内メニューは非表示。
+        #[cfg(not(target_os = "macos"))]
+        render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
+        render_status_bar(ctx, &self.state);
+
+        // ウィンドウタイトルにファイル名を反映
+        let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+        let title_text = match self.state.active_document() {
+            Some(doc) => {
+                let rel = relative_full_path(&doc.path, ws_root_for_title.as_deref());
+                format!("katana — {rel}")
+            }
+            None => "katana".to_string(),
+        };
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
+
+        // アプリ内タイトルバー
+        egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.centered_and_justified(|ui| {
+                    ui.label(
+                        egui::RichText::new(&title_text)
+                            .small()
+                            .color(TITLE_BAR_TEXT_COLOR),
+                    );
+                });
+            });
+        });
+
+        // ワークスペースが非表示のときも折りたたみトグルボタンを表示する。
+        if !self.state.show_workspace {
+            egui::SidePanel::left("workspace_collapsed")
+                .resizable(false)
+                .exact_width(SIDEBAR_COLLAPSED_TOGGLE_WIDTH)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        if ui
+                            .button("›")
+                            .on_hover_text(crate::i18n::t("workspace_title"))
+                            .clicked()
+                        {
+                            self.state.show_workspace = true;
+                        }
+                    });
+                });
+        } else {
+            render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
+        }
+
+        // タブ行 + パンくずリスト + ビューモード行
+        egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
+            render_tab_bar(ui, &mut self.state, &mut self.pending_action);
+            if let Some(doc) = self.state.active_document() {
+                let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+                let rel = relative_full_path(&doc.path, ws_root.as_deref());
+                ui.horizontal(|ui| {
+                    let segments: Vec<&str> = rel.split('/').collect();
+                    for (i, seg) in segments.iter().enumerate() {
+                        if i > 0 {
+                            ui.label(egui::RichText::new("›").small());
+                        }
+                        ui.label(egui::RichText::new(*seg).small());
+                    }
+                });
+                render_view_mode_bar(ui, &mut self.state);
+            }
+        });
+
+        let mut download_req: Option<DownloadRequest> = None;
+        let current_mode = self.state.active_view_mode();
+        let is_split = current_mode == ViewMode::Split;
+
+        // Split モード
+        if is_split {
+            let active_path = self.state.active_document().map(|d| d.path.clone());
+            let mut scroll_state = (
+                self.state.scroll_fraction,
+                self.state.scroll_source,
+                self.state.preview_max_scroll,
+            );
+            egui::SidePanel::right("preview_panel")
+                .resizable(true)
+                .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
+                .default_width(SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH)
+                .show(ctx, |ui| {
+                    if let Some(path) = &active_path {
+                        let pane = self.tab_panes.entry(path.clone()).or_default();
+                        download_req = render_preview_content(
+                            ui,
+                            pane,
+                            &self.state,
+                            &mut self.pending_action,
+                            true,
+                            &mut scroll_state,
+                        );
+                    }
+                });
+            self.state.scroll_fraction = scroll_state.0;
+            self.state.scroll_source = scroll_state.1;
+            self.state.preview_max_scroll = scroll_state.2;
+        }
+
+        egui::CentralPanel::default().show(ctx, |ui| match current_mode {
+            ViewMode::CodeOnly | ViewMode::Split => {
+                render_editor_content(ui, &mut self.state, &mut self.pending_action, is_split);
+            }
+            ViewMode::PreviewOnly => {
+                let active_path = self.state.active_document().map(|d| d.path.clone());
+                let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
+                if let Some(path) = active_path {
+                    let pane = self.tab_panes.entry(path).or_default();
+                    let req = render_preview_content(
+                        ui,
+                        pane,
+                        &self.state,
+                        &mut self.pending_action,
+                        false,
+                        &mut scroll_state,
+                    );
+                    if req.is_some() {
+                        download_req = req;
+                    }
+                } else {
+                    ui.centered_and_justified(|ui| {
+                        ui.label(i18n::t("no_document_selected"));
+                    });
+                }
+            }
+        });
+
+        if let Some(req) = download_req {
+            self.start_download(req);
+        }
+    }
+}

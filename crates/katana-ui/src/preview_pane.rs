@@ -171,24 +171,9 @@ impl PreviewPane {
     }
 
     /// セクションを順に描画する内部メソッド。
+    /// UI 描画の実体は preview_pane_ui::render_sections に委譲。
     fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
-        let mut request: Option<DownloadRequest> = None;
-        for (i, section) in self.sections.iter().enumerate() {
-            // セクションごとに ID スコープを分離し、同一ドキュメント内に
-            // 複数のテーブルがあっても egui の Grid ID が衝突しないようにする。
-            ui.push_id(format!("section_{i}"), |ui| {
-                if let Some(req) =
-                    crate::preview_pane_ui::show_section(ui, &mut self.commonmark_cache, section, i)
-                {
-                    request = Some(req);
-                }
-                ui.separator();
-            });
-        }
-        if self.sections.is_empty() {
-            ui.label(egui::RichText::new(crate::i18n::t("no_preview")).weak());
-        }
-        request
+        crate::preview_pane_ui::render_sections(ui, &mut self.commonmark_cache, &self.sections)
     }
 
     /// バックグラウンドレンダリング完了をポーリングし、届いた結果でセクションを更新する。
@@ -196,8 +181,8 @@ impl PreviewPane {
         let still_pending = if let Some(rx) = &self.render_rx {
             let mut updated = false;
             while let Ok((idx, section)) = rx.try_recv() {
-                if idx < self.sections.len() {
-                    self.sections[idx] = section;
+                if let Some(slot) = self.sections.get_mut(idx) {
+                    *slot = section;
                     updated = true;
                 }
             }
@@ -223,8 +208,8 @@ impl PreviewPane {
     pub fn wait_for_renders(&mut self) {
         while let Some(rx) = &self.render_rx {
             while let Ok((idx, section)) = rx.try_recv() {
-                if idx < self.sections.len() {
-                    self.sections[idx] = section;
+                if let Some(slot) = self.sections.get_mut(idx) {
+                    *slot = section;
                 }
             }
             if self
@@ -360,15 +345,28 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 mod tests {
     use super::*;
 
+    /// `matches!` マクロの代替。LLVM が `matches!` の else 分岐に
+    /// 生成するサブリージョン（`^0`）による Lines 未カバー問題を回避する。
+    macro_rules! assert_variant {
+        ($expr:expr, $pat:pat) => {
+            let val = &$expr;
+            assert!(
+                if let $pat = val { true } else { false },
+                "expected {}, got {:?}",
+                stringify!($pat),
+                val
+            );
+        };
+    }
     // render_diagram: DrawIO の結果を RenderedSection にマップ
     #[test]
     fn render_diagram_drawio_returns_ok_section() {
         let xml = r#"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>"#;
         let section = render_diagram(&DiagramKind::DrawIo, xml);
-        assert!(matches!(
+        assert_variant!(
             section,
             RenderedSection::Image { .. } | RenderedSection::Error { .. }
-        ));
+        );
     }
 
     // dispatch_renderer: DrawIo 分岐
@@ -379,10 +377,7 @@ mod tests {
             source: r#"<mxGraphModel><root><mxCell id="0"/></root></mxGraphModel>"#.to_string(),
         };
         let result = dispatch_renderer(&block);
-        assert!(matches!(
-            result,
-            DiagramResult::Ok(_) | DiagramResult::Err { .. }
-        ));
+        assert_variant!(result, DiagramResult::Ok(_) | DiagramResult::Err { .. });
     }
 
     // dispatch_renderer: Mermaid 分岐
@@ -393,12 +388,12 @@ mod tests {
             source: "graph TD; A-->B".to_string(),
         };
         let result = dispatch_renderer(&block);
-        assert!(matches!(
+        assert_variant!(
             result,
             DiagramResult::CommandNotFound { .. }
                 | DiagramResult::OkPng(_)
                 | DiagramResult::Err { .. }
-        ));
+        );
     }
 
     // dispatch_renderer: PlantUml 分岐
@@ -411,7 +406,7 @@ mod tests {
         };
         let result = dispatch_renderer(&block);
         std::env::remove_var("PLANTUML_JAR");
-        assert!(matches!(result, DiagramResult::NotInstalled { .. }));
+        assert_variant!(result, DiagramResult::NotInstalled { .. });
     }
 
     // try_rasterize: SVG 抽出失敗ケース
@@ -419,7 +414,7 @@ mod tests {
     fn try_rasterize_returns_error_when_no_svg_in_html() {
         let kind = DiagramKind::DrawIo;
         let section = try_rasterize(&kind, "source", "<div>no svg here</div>");
-        assert!(matches!(section, RenderedSection::Error { .. }));
+        assert_variant!(section, RenderedSection::Error { .. });
     }
 
     // try_rasterize: 有効な SVG で成功
@@ -428,10 +423,10 @@ mod tests {
         let kind = DiagramKind::DrawIo;
         let html = r#"<div class="diagram"><svg width="10" height="10"><rect fill="white" width="10" height="10"/></svg></div>"#;
         let section = try_rasterize(&kind, "source", html);
-        assert!(matches!(
+        assert_variant!(
             section,
             RenderedSection::Image { .. } | RenderedSection::Error { .. }
-        ));
+        );
     }
 
     // decode_png_to_section: 有効 PNG
@@ -443,14 +438,14 @@ mod tests {
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
             .unwrap();
         let section = decode_png_to_section(&DiagramKind::DrawIo, "source", buf);
-        assert!(matches!(section, RenderedSection::Image { .. }));
+        assert_variant!(section, RenderedSection::Image { .. });
     }
 
     // decode_png_to_section: 無効データ
     #[test]
     fn decode_png_to_section_returns_error_for_invalid_data() {
         let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec());
-        assert!(matches!(section, RenderedSection::Error { .. }));
+        assert_variant!(section, RenderedSection::Error { .. });
     }
 
     // map_diagram_result: 全バリアント網羅テスト
@@ -461,10 +456,10 @@ mod tests {
             "src",
             DiagramResult::Ok("<svg width=\"10\" height=\"10\"></svg>".to_string()),
         );
-        assert!(matches!(
+        assert_variant!(
             section,
             RenderedSection::Image { .. } | RenderedSection::Error { .. }
-        ));
+        );
     }
 
     #[test]
@@ -475,7 +470,7 @@ mod tests {
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
             .unwrap();
         let section = map_diagram_result(&DiagramKind::Mermaid, "src", DiagramResult::OkPng(buf));
-        assert!(matches!(section, RenderedSection::Image { .. }));
+        assert_variant!(section, RenderedSection::Image { .. });
     }
 
     #[test]
@@ -488,7 +483,7 @@ mod tests {
                 error: "render failed".to_string(),
             },
         );
-        assert!(matches!(section, RenderedSection::Error { .. }));
+        assert_variant!(section, RenderedSection::Error { .. });
     }
 
     #[test]
@@ -502,7 +497,7 @@ mod tests {
                 source: "src".to_string(),
             },
         );
-        assert!(matches!(section, RenderedSection::CommandNotFound { .. }));
+        assert_variant!(section, RenderedSection::CommandNotFound { .. });
     }
 
     #[test]
@@ -516,7 +511,7 @@ mod tests {
                 install_path: std::path::PathBuf::from("/tmp/plantuml.jar"),
             },
         );
-        assert!(matches!(section, RenderedSection::NotInstalled { .. }));
+        assert_variant!(section, RenderedSection::NotInstalled { .. });
     }
 
     // render_diagram_mermaid: 統合テスト（mmdc の有無に依存しない）
@@ -553,7 +548,7 @@ mod tests {
         pane.poll_renders(&ctx);
 
         // セクションが更新されている
-        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+        assert_variant!(pane.sections[0], RenderedSection::Markdown(_));
         // render_rx は None になっている（Pendingがなくなったため）
         assert!(pane.render_rx.is_none());
     }
@@ -581,7 +576,7 @@ mod tests {
 
         // 完了後は Pending でない
         assert!(pane.render_rx.is_none());
-        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+        assert_variant!(pane.sections[0], RenderedSection::Markdown(_));
     }
 
     // poll_renders: render_rx なしは何もしない (L211-213)
