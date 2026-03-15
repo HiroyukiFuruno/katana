@@ -178,6 +178,20 @@ fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
     append_label(cell, cx, cy, labels);
 }
 
+/// 矩形の位置・サイズを保持する構造体。
+struct Rect {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+impl Rect {
+    fn center(&self) -> (f64, f64) {
+        (self.x + self.w / 2.0, self.y + self.h / 2.0)
+    }
+}
+
 /// エッジセルを矢印付き折れ線（ポリライン）として描画する。
 ///
 /// ソース・ターゲットの矩形ボーダー上の最近点を接続点とし、
@@ -202,35 +216,37 @@ fn render_edge(
         return;
     };
 
-    // 各ボックスの中心を求める。
-    let scx = sx + sw / 2.0;
-    let scy = sy + sh / 2.0;
-    let tcx = tx + tw / 2.0;
-    let tcy = ty + th / 2.0;
-
-    // mxGeometry 内の Array/mxPoint から中間ウェイポイントを収集する。
+    let src = Rect { x: sx, y: sy, w: sw, h: sh };
+    let tgt = Rect { x: tx, y: ty, w: tw, h: th };
+    let (scx, scy) = src.center();
+    let (tcx, tcy) = tgt.center();
     let waypoints = collect_waypoints(cell);
 
-    // 最初のウェイポイント（または最終ターゲット中心）への方向でソース接続点を算出する。
     let first_target = waypoints.first().copied().unwrap_or((tcx, tcy));
-    let (x1, y1) = border_point(sx, sy, sw, sh, scx, scy, first_target.0, first_target.1);
-
-    // 最後のウェイポイント（またはソース中心）からの方向でターゲット接続点を算出する。
+    let (x1, y1) = border_point(&src, scx, scy, first_target.0, first_target.1);
     let last_source = waypoints.last().copied().unwrap_or((scx, scy));
-    let (x2, y2) = border_point(tx, ty, tw, th, tcx, tcy, last_source.0, last_source.1);
+    let (x2, y2) = border_point(&tgt, tcx, tcy, last_source.0, last_source.1);
 
-    // ポリライン座標列を組み立てる。
-    let mut points_str = format!("{x1:.1},{y1:.1}");
-    for (wx, wy) in &waypoints {
-        points_str.push_str(&format!(" {wx:.1},{wy:.1}"));
-    }
-    points_str.push_str(&format!(" {x2:.1},{y2:.1}"));
-
+    let points_str = build_polyline_points(x1, y1, &waypoints, x2, y2);
     shapes.push_str(&format!(
         "<polyline points=\"{points_str}\" fill=\"none\" stroke=\"#555555\" stroke-width=\"1.5\" marker-end=\"url(#katana-arrow)\"/>"
     ));
 
-    // エッジラベルがあれば中間地点に描画する。
+    append_edge_label(cell, shapes, x1, y1, x2, y2);
+}
+
+/// ポリライン座標列を組み立てる。
+fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2: f64) -> String {
+    let mut s = format!("{x1:.1},{y1:.1}");
+    for (wx, wy) in waypoints {
+        s.push_str(&format!(" {wx:.1},{wy:.1}"));
+    }
+    s.push_str(&format!(" {x2:.1},{y2:.1}"));
+    s
+}
+
+/// エッジラベルがあれば中間地点に描画する。
+fn append_edge_label(cell: &Element, shapes: &mut String, x1: f64, y1: f64, x2: f64, y2: f64) {
     if let Some(label) = cell.attributes.get("value") {
         if !label.is_empty() {
             let mid_x = (x1 + x2) / 2.0;
@@ -270,35 +286,26 @@ fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
     points
 }
 
-/// 矩形のボーダー上で、(fx, fy) から (tx, ty) への方向ベクトルに沿った接続点を返す。
-fn border_point(
-    rx: f64,
-    ry: f64,
-    rw: f64,
-    rh: f64,
-    cx: f64,
-    cy: f64,
-    tx: f64,
-    ty: f64,
-) -> (f64, f64) {
+/// 矩形のボーダー上で、(cx, cy) から (tx, ty) への方向ベクトルに沿った接続点を返す。
+fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
     let dx = tx - cx;
     let dy = ty - cy;
     if dx.abs() < 0.001 && dy.abs() < 0.001 {
         return (cx, cy);
     }
-    if dx.abs() * rh >= dy.abs() * rw {
+    if dx.abs() * rect.h >= dy.abs() * rect.w {
         // 左右のボーダーに当たる
         if dx >= 0.0 {
-            (rx + rw, cy + dy * (rw / 2.0) / dx.abs())
+            (rect.x + rect.w, cy + dy * (rect.w / 2.0) / dx.abs())
         } else {
-            (rx, cy - dy * (rw / 2.0) / dx.abs())
+            (rect.x, cy - dy * (rect.w / 2.0) / dx.abs())
         }
     } else {
         // 上下のボーダーに当たる
         if dy >= 0.0 {
-            (cx + dx * (rh / 2.0) / dy.abs(), ry + rh)
+            (cx + dx * (rect.h / 2.0) / dy.abs(), rect.y + rect.h)
         } else {
-            (cx - dx * (rh / 2.0) / dy.abs(), ry)
+            (cx - dx * (rect.h / 2.0) / dy.abs(), rect.y)
         }
     }
 }
