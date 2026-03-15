@@ -65,3 +65,6 @@ docs/blog
 # mcp
 .serena
 openspec
+
+# Coverage
+target/llvm-cov/

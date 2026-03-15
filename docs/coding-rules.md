@@ -187,26 +187,30 @@ fn unsaved_buffer_does_not_write_to_disk() { ... }
 
 ### 7.2 テストファイル配置
 
-テストは **対象ファイルの末尾に `#[cfg(test)] mod tests { ... }`** として同居させる。
-400 行を超えて肥大化した場合は、`<module>/` ディレクトリを作成して分割を許可する:
+テストは **クレートルートの `tests/` ディレクトリ** に配置する。
+`src/` 内の `#[cfg(test)] mod tests { ... }` は禁止（テストヘルパー関数の `#[cfg(test)]` アトリビュートは許容）。
 
 ```
-src/
-  document.rs           // 実装 + 小規模テスト（末尾 #[cfg(test)]）
-  document/
-    tests_buffer.rs     // 肥大化した場合のみ分割
-    tests_save.rs
+crates/katana-core/
+  src/              # 実装コードのみ
+  tests/
+    document.rs     # document.rs のテスト
+    workspace.rs    # workspace.rs のテスト
+    preview.rs      # preview.rs のテスト
+    ai.rs           # AI モジュールのテスト
+    markdown_*.rs   # 各レンダラーのテスト
+    plugin.rs       # プラグインのテスト
 ```
 
 ### 7.3 テストピラミッド
 
 | 種別 | 配置 | カバレッジ目標 |
-|------|------|--------------|
-| Unit Test | `#[cfg(test)]` in same file | **100%（例外なし）** |
+|------|------|--------------| 
+| Unit Test | `tests/` ディレクトリ | **100%（例外なし）** |
 | Integration Test | `tests/` ディレクトリ | 主要フロー網羅 |
 | E2E Test | `tests/e2e/` | MVP の全シナリオ |
 
-カバレッジ測定: `cargo llvm-cov --workspace --fail-under 100`（CI 強制）
+カバレッジ測定: `cargo llvm-cov --workspace --fail-under-lines 100`（CI 強制）
 
 ---
 
@@ -266,6 +270,18 @@ for plugin_meta in registry.active_plugins_for(&point) { ... }
 too-many-lines-threshold = 30
 cognitive-complexity-threshold = 10
 ```
+
+### 9.2 品質ゲート（完了の定義 / Definition of Done）
+
+PR をマージ可能とするための必須条件:
+
+1. **フォーマット**: `cargo fmt --all -- --check` パス
+2. **Clippy**: `cargo clippy --workspace -- -D warnings` パス（warning ゼロ）
+3. **テスト**: `cargo test --workspace` 全パス
+4. **テスト配置**: 新規ロジックには `tests/` ディレクトリにテストが付随している
+5. **カバレッジ**: `cargo llvm-cov --workspace --fail-under-lines 100` パス
+
+一括チェック: `make ci`（pre-push フックと同等）
 
 ---
 
