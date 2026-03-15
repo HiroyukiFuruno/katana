@@ -115,4 +115,5 @@ jobs:
             ${{ runner.os }}-cargo-cov-
 
       - name: Run coverage
+        # 絶対にこの 100% 条件（--fail-under-lines 100）を緩和・削除しないこと（妥協禁止）
         run: cargo llvm-cov --workspace --fail-under-lines 100
