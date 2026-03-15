@@ -208,7 +208,7 @@ crates/katana-core/
 |------|------|--------------| 
 | Unit Test | `tests/` ディレクトリ | **100%（例外なし）** |
 | Integration Test | `tests/` ディレクトリ | 主要フロー網羅 |
-| E2E Test | `tests/e2e/` | MVP の全シナリオ |
+| Integration Test | `tests/integration/` (egui_kittest予定) | MVP の全シナリオ、スナップショット回帰監視 |
 
 カバレッジ測定: `cargo llvm-cov --workspace --fail-under-lines 100`（CI 強制）
 
@@ -277,9 +277,10 @@ PR をマージ可能とするための必須条件:
 
 1. **フォーマット**: `cargo fmt --all -- --check` パス
 2. **Clippy**: `cargo clippy --workspace -- -D warnings` パス（warning ゼロ）
-3. **テスト**: `cargo test --workspace` 全パス
-4. **テスト配置**: 新規ロジックには `tests/` ディレクトリにテストが付随している
-5. **カバレッジ**: `cargo llvm-cov --workspace --fail-under-lines 100` パス
+3. **テスト (ロジック)**: `cargo test --workspace` 全パス
+4. **テスト (統合)**: `make test-integration` パス（UI スナップショット回帰なし）
+5. **テスト配置**: 新規ロジックには `tests/` ディレクトリにテストが付随している
+6. **カバレッジ**: `cargo llvm-cov --workspace --fail-under-lines 100` パス
 
 一括チェック: `make ci`（pre-push フックと同等）
 
@@ -303,63 +304,52 @@ fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) { ... }
 
 ---
 
-## 11. i18n（国際化）規約 【最重要・違反ゼロを維持すること】
+## 11. i18n（国際化）規約 【最重要・違反ゼロ維持】
 
 **UI に表示するすべての文字列は `i18n::t()` または `i18n::tf()` を経由しなければならない。**
 ハードコーディングは言語問わず **一切禁止**（英語・日本語・記号以外のすべて）。
 
-### 11.1 対象となる呼び出し
+本プロジェクトの哲学「定義はあるが守られる保証がない規約は無意味」に基づき、このルールは第12章で定義される **カスタム AST Linter によって機械的に強制** される。
 
-以下の呼び出しに文字列リテラルを直接渡すことを禁止する：
+### 11.1 対象となる呼び出しと AST 検知
 
-| 禁止パターン | 正しいパターン |
-|------------|--------------|
-| `ui.heading("Preview")` | `ui.heading(i18n::t("preview_title"))` |
-| `ui.label("Ready")` | `ui.label(i18n::t("status_ready"))` |
-| `ui.button("Save")` | `ui.button(i18n::t("menu_save"))` |
-| `.on_hover_text("Expand all")` | `.on_hover_text(i18n::t("expand_all"))` |
-| `format!("Saved: {name}")` | `i18n::tf("status_saved_as", &[("name", &name)])` |
+以下の呼び出しメソッド群の引数において、文字列リテラル（`"..."` や `String::from("...")` などのハードコード）を直接渡すことは AST 解析によってエラーとして弾かれる。
 
-### 11.2 例外（記号・非テキスト）
+| メソッド名 / 検知対象 | 正しいパターン (Linter通過) | ❌ 禁止パターン (Linterで弾かれる) |
+|---|---|---|
+| `ui.label(...)` | `ui.label(i18n::t("status_ready"))` | `ui.label("Ready")` |
+| `ui.heading(...)` | `ui.heading(i18n::t("preview_title"))` | `ui.heading("Preview")` |
+| `ui.button(...)` | `ui.button(i18n::t("menu_save"))` | `ui.button("Save")` |
+| `RichText::new(...)` | `RichText::new(i18n::t("alert"))` | `RichText::new("Alert")` |
+| `.on_hover_text(...)` | `.on_hover_text(i18n::t("expand"))` | `.on_hover_text("Expand all")` |
+| 文字列の合成（`format!`等） | `i18n::tf("saved", &[("key", val)])` | `format!("Saved: {}", val)` |
 
-以下は翻訳不要として許容する：
+### 11.2 i18n 例外（自動許可リスト）
 
-- 単一記号: `"*"`, `"x"`, `"+"`, `"-"`, `"▼"`, `"▶"` など
-- アイコン絵文字: `"🔄"` など UI コントロール用記号
-- パス区切り: `"/"` のみの文字列
+純粋な記号のみの文字列などは「AST解析器自体が許可リスト（Allowlist）として判定」し、エラーをバイパスする。
+
+- **単一記号**: `"*"`, `"x"`, `"+"`, `"-"`, `"▼"`, `"▶"` など
+- **アイコン絵文字**: `"🔄"` などの UI コントロール用単独記号
+- **パス区切り・レイアウト空白**: `"/"`, `" "`, `"\n"` など
+- **デバッグ文字列**: `tracing::info!` 内など、egui非依存の出力
 
 ### 11.3 ロケールファイル管理
 
-- 新しいキーは **en.json と ja.json に同時追加** する（片方だけの追加は禁止）
-- キーは `snake_case` で命名する
-- パラメータは `{param_name}` 形式のプレースホルダを使う
+- 新しいキーは **en.json と ja.json に同時追加** する（片方だけの追加は禁止）。
+- キー漏れは統合テスト（`tests/i18n.rs`等）により自動検知する。
 
-```json
-// ✅ Good
-"status_opened_workspace": "Opened workspace: {name}"
+---
 
-// ❌ Bad — ハードコード
-self.state.status_message = Some(format!("Opened workspace: {name}"));
-```
+## 12. カスタム静的解析 (AST Linter) による規約強制
 
-### 11.4 UT による自動検出（ルール + UT の二重拘束）
+本コーディング規約（i18nルールや禁止型制約などを含む）を人手ではなくCI上で自動強制するため、Rust の `syn` クレートによる AST（抽象構文木）トラバースを用いたカスタムLinterを運用する。
 
-`i18n.rs` の `#[cfg(test)]` に以下のテストを維持すること：
+> ※ 仕様詳細は `docs/ast-linter-plan.md` を参照のこと。
 
-1. **`全ロケールキーが両言語に存在する`**: en.json と ja.json のキー差分をゼロにする
-2. **`shellrsにi18n漏れがない`**: `shell.rs` のソースコードを静的解析し、高リスクな
-   ハードコードパターン（`.on_hover_text("`, `ui.heading("` 等）を検出する
+### 12.1 強制のフロー (`pre-commit` / `pre-push`)
 
-新しいファイルに UI を追加した場合は、対応する静的解析テストも追加すること。
-
-### 11.5 違反検出フロー
+開発者がコードを変更してコミットする際、以下のハードゲートを通る。規約違反があった場合、コミット自体が `lefthook` に拒否される。
 
 ```
-コード変更
-  ↓
-cargo test (UT で自動検出)  ← 一次防衛
-  ↓
-PR レビュー (AI セルフレビューで確認)  ← 二次防衛
-  ↓
-マージ
+[コード変更] → [lefthook 検査] → [cargo test (ast_linter.rs)] → [AST 解析・合否]
 ```

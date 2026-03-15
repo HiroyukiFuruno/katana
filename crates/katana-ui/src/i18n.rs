@@ -50,15 +50,6 @@ pub fn t(key: &str) -> String {
             return val.clone();
         }
     }
-    // Fallback to english if missing in current lang
-    if lang != "en" {
-        if let Some(d) = dict.get("en") {
-            if let Some(val) = d.get(key) {
-                return val.clone();
-            }
-        }
-    }
-
     key.to_string()
 }
 

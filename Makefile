@@ -67,6 +67,14 @@ test-verbose: ## テスト実行 (詳細出力)
 test-specific: ## 特定テスト実行 (例: make test-specific T=test_name)
 	cargo test --workspace -- $(T)
 
+.PHONY: test-integration
+test-integration: ## 統合試験 (UI テスト) を実行 (要: egui_kittest 導入)
+	cargo test --workspace --test integration
+
+.PHONY: test-update-snapshots
+test-update-snapshots: ## UI スナップショット画像を更新 (UPDATE_SNAPSHOTS=true)
+	UPDATE_SNAPSHOTS=true cargo test --workspace --test integration
+
 # ---------- CI / 品質ゲート ----------
 
 .PHONY: ci

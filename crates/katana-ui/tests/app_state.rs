@@ -43,3 +43,30 @@ fn is_dirty_reflects_active_document_state() {
 
     assert!(state.is_dirty());
 }
+
+#[test]
+fn active_document_mut_returns_correct_mut_doc() {
+    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let doc1 = Document::new("doc1.md", "Doc1");
+    state.open_documents.push(doc1);
+    state.active_doc_idx = Some(0);
+
+    if let Some(mut_doc) = state.active_document_mut() {
+        mut_doc.buffer = "Updated".to_string();
+    }
+
+    assert_eq!(state.active_document().unwrap().buffer, "Updated");
+}
+
+#[test]
+fn active_path_returns_path_of_active_document() {
+    let mut state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new());
+    let doc1 = Document::new("doc1.md", "Doc1");
+    state.open_documents.push(doc1);
+    state.active_doc_idx = Some(0);
+
+    assert_eq!(state.active_path(), Some(std::path::Path::new("doc1.md")));
+
+    state.active_doc_idx = None;
+    assert_eq!(state.active_path(), None);
+}
