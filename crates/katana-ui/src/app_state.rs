@@ -10,6 +10,7 @@
 use katana_core::{
     ai::AiProviderRegistry, document::Document, plugin::PluginRegistry, workspace::Workspace,
 };
+use katana_platform::SettingsService;
 use std::collections::HashMap;
 
 /// Display mode for the UI layout
@@ -68,6 +69,8 @@ pub struct AppState {
     pub editor_max_scroll: f32,
     /// Previous frame's preview-side max_scroll (content_height - viewport_height).
     pub preview_max_scroll: f32,
+    /// Settings persistence service.
+    pub settings: SettingsService,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -83,7 +86,11 @@ pub enum ScrollSource {
 }
 
 impl AppState {
-    pub fn new(ai_registry: AiProviderRegistry, plugin_registry: PluginRegistry) -> Self {
+    pub fn new(
+        ai_registry: AiProviderRegistry,
+        plugin_registry: PluginRegistry,
+        settings: SettingsService,
+    ) -> Self {
         // ai_registry is planned for future AI integration. Currently unused.
         let _ = ai_registry;
         Self {
@@ -99,6 +106,7 @@ impl AppState {
             scroll_source: ScrollSource::Neither,
             editor_max_scroll: 0.0,
             preview_max_scroll: 0.0,
+            settings,
         }
     }
 
