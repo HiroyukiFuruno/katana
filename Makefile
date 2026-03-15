@@ -77,8 +77,13 @@ test-update-snapshots: ## UI スナップショット画像を更新 (UPDATE_SNA
 
 # ---------- CI / 品質ゲート ----------
 
+.PHONY: coverage
+coverage: ## テスト実行とカバレッジ100%達成の検証 (cargo-llvm-cov 必要)
+	# 絶対にこの 100% 条件（--fail-under-lines 100）を緩和・削除しないこと（妥協禁止）
+	cargo llvm-cov --workspace --fail-under-lines 100
+
 .PHONY: ci
-ci: fmt-check lint test ## CI 再現 (fmt + clippy + test の一括実行)
+ci: fmt-check lint test-integration coverage ## CI 再現 (fmt + clippy + IT + カバレッジ100%強制・条件緩和NG)
 	@echo "✅ 全チェック通過"
 
 .PHONY: pre-push
