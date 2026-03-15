@@ -1,8 +1,13 @@
 use egui_kittest::kittest::Queryable;
-use egui_kittest::Harness;
+use egui_kittest::{Harness, SnapshotOptions};
 use katana_core::{ai::AiProviderRegistry, plugin::PluginRegistry};
 use katana_ui::app_state::{AppAction, AppState, ViewMode};
 use katana_ui::shell::KatanaApp;
+
+/// Snapshot pixel tolerance to absorb non-deterministic rendering differences.
+/// egui_kittest defaults to 0, but font hinting and anti-aliasing vary between runs.
+/// Max observed diff: ~1508 pixels, so 2000 provides comfortable margin.
+const SNAPSHOT_PIXEL_TOLERANCE: usize = 2000;
 
 fn setup_harness() -> Harness<'static, KatanaApp> {
     Harness::builder().build_eframe(|_cc| {
@@ -23,7 +28,10 @@ fn test_integration_application_startup() {
     let mut harness = setup_harness();
     harness.step();
     let _node = harness.get_by_label("No workspace open.");
-    harness.snapshot("startup_screen");
+    harness.snapshot_options(
+        "startup_screen",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 }
 
 #[test]
@@ -57,7 +65,10 @@ fn test_integration_workspace_and_tabs() {
 
     // Verify it opened and editor handles it (Title will be "katana — test1.md")
     // In kittest, `kittest::Queryable` can query values. Let's just do a snapshot.
-    harness.snapshot("editor_opened");
+    harness.snapshot_options(
+        "editor_opened",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Close the document (tab 'x' button or close action)
     harness
@@ -66,7 +77,10 @@ fn test_integration_workspace_and_tabs() {
     harness.step();
 
     // Tab is closed, fallback to workspace view
-    harness.snapshot("editor_closed");
+    harness.snapshot_options(
+        "editor_closed",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -101,7 +115,10 @@ fn test_integration_view_modes() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::PreviewOnly);
     harness.step();
-    harness.snapshot("view_mode_preview_only");
+    harness.snapshot_options(
+        "view_mode_preview_only",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Switch to Split
     harness
@@ -109,7 +126,10 @@ fn test_integration_view_modes() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::Split);
     harness.step();
-    harness.snapshot("view_mode_split");
+    harness.snapshot_options(
+        "view_mode_split",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Switch to Code Only
     harness
@@ -117,7 +137,10 @@ fn test_integration_view_modes() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::CodeOnly);
     harness.step();
-    harness.snapshot("view_mode_code_only");
+    harness.snapshot_options(
+        "view_mode_code_only",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -151,7 +174,10 @@ fn test_integration_update_buffer() {
         "# Updated\n\nNew content".to_string(),
     ));
     harness.step();
-    harness.snapshot("buffer_updated");
+    harness.snapshot_options(
+        "buffer_updated",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -185,7 +211,10 @@ fn test_integration_save_document() {
     harness.step();
     harness.state_mut().trigger_action(AppAction::SaveDocument);
     harness.step();
-    harness.snapshot("document_saved");
+    harness.snapshot_options(
+        "document_saved",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -220,14 +249,20 @@ fn test_integration_multiple_documents_and_navigation() {
         .trigger_action(AppAction::SelectDocument(abs2));
     harness.step();
 
-    harness.snapshot("multiple_docs_open");
+    harness.snapshot_options(
+        "multiple_docs_open",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Close document 1
     harness
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
     harness.step();
-    harness.snapshot("after_close_first");
+    harness.snapshot_options(
+        "after_close_first",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -261,7 +296,10 @@ fn test_integration_preview_with_diagram_content() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::PreviewOnly);
     harness.step();
-    harness.snapshot("preview_with_diagrams");
+    harness.snapshot_options(
+        "preview_with_diagrams",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -282,7 +320,10 @@ fn test_integration_workspace_with_subdirectory() {
         .state_mut()
         .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
     harness.step();
-    harness.snapshot("workspace_with_subdirs");
+    harness.snapshot_options(
+        "workspace_with_subdirs",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -296,7 +337,10 @@ fn test_integration_workspace_panel_collapsed() {
     // Set show_workspace to false and then draw
     harness.state_mut().app_state_mut().show_workspace = false;
     harness.step();
-    harness.snapshot("workspace_collapsed");
+    harness.snapshot_options(
+        "workspace_collapsed",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Try to click the "›" expand button using kittest (covers shell.rs L403-404)
     // If the button is not found, skip it (in kittest, button strings are
@@ -347,7 +391,10 @@ fn test_integration_split_mode_with_document() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::Split);
     harness.step();
-    harness.snapshot("split_mode");
+    harness.snapshot_options(
+        "split_mode",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Switch to Code Only mode
     harness
@@ -355,7 +402,10 @@ fn test_integration_split_mode_with_document() {
         .app_state_mut()
         .set_active_view_mode(ViewMode::CodeOnly);
     harness.step();
-    harness.snapshot("code_only_mode");
+    harness.snapshot_options(
+        "code_only_mode",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -397,7 +447,10 @@ fn test_integration_multiple_tabs_close() {
         .trigger_action(AppAction::SelectDocument(p2));
     harness.step();
 
-    harness.snapshot("two_tabs_open");
+    harness.snapshot_options(
+        "two_tabs_open",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     // Close tab 0 (the remaining tab appropriately updates active_doc_idx)
     harness
@@ -410,7 +463,10 @@ fn test_integration_multiple_tabs_close() {
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
     harness.step();
-    harness.snapshot("all_tabs_closed");
+    harness.snapshot_options(
+        "all_tabs_closed",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -439,7 +495,10 @@ fn test_integration_workspace_tree_expand_collapse() {
     // Collapse all
     harness.state_mut().app_state_mut().force_tree_open = Some(false);
     harness.step();
-    harness.snapshot("tree_collapse");
+    harness.snapshot_options(
+        "tree_collapse",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -456,7 +515,10 @@ fn test_integration_preview_only_no_document() {
         .app_state_mut()
         .set_active_view_mode(katana_ui::app_state::ViewMode::PreviewOnly);
     harness.step();
-    harness.snapshot("preview_only_no_doc");
+    harness.snapshot_options(
+        "preview_only_no_doc",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
 }
 
 // RefreshDiagrams action is processed (equivalent to shell.rs L542)
