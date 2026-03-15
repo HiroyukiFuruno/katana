@@ -214,6 +214,27 @@ impl I18nHardcodeVisitor {
             _ => {}
         }
     }
+
+    /// `Type::func(args)` 形式の関数呼び出しで UI 型のコンストラクタに文字列が渡されていないか検査する。
+    fn check_call_for_ui_violation(&mut self, node: &syn::ExprCall) {
+        let syn::Expr::Path(expr_path) = &*node.func else {
+            return;
+        };
+        let Some(last_segment) = expr_path.path.segments.last() else {
+            return;
+        };
+        let func_name = last_segment.ident.to_string();
+        if !UI_FUNCTIONS.contains(&func_name.as_str()) {
+            return;
+        }
+        let Some(type_name) = extract_type_from_call(&node.func) else {
+            return;
+        };
+        if !UI_TYPES_FOR_NEW.contains(&type_name.as_str()) {
+            return;
+        }
+        self.check_string_literal_args(&node.args, &format!("{type_name}::{func_name}"));
+    }
 }
 
 /// `format!` マクロかどうかを判定する。
@@ -250,21 +271,7 @@ impl<'ast> Visit<'ast> for I18nHardcodeVisitor {
 
     /// 関数呼び出し: `Type::func(args)` を検査する。
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
-        if let syn::Expr::Path(expr_path) = &*node.func {
-            if let Some(last_segment) = expr_path.path.segments.last() {
-                let func_name = last_segment.ident.to_string();
-                if UI_FUNCTIONS.contains(&func_name.as_str()) {
-                    if let Some(type_name) = extract_type_from_call(&node.func) {
-                        if UI_TYPES_FOR_NEW.contains(&type_name.as_str()) {
-                            self.check_string_literal_args(
-                                &node.args,
-                                &format!("{type_name}::{func_name}"),
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        self.check_call_for_ui_violation(node);
 
         // 子ノードの探索を続行
         syn::visit::visit_expr_call(self, node);
@@ -327,33 +334,35 @@ impl MagicNumberVisitor {
         }
         match lit {
             syn::Lit::Int(lit_int) => {
-                if let Ok(value) = lit_int.base10_parse::<i64>() {
-                    if !is_allowed_number(value as f64) {
-                        let (line, column) = span_location(lit_int.span());
-                        self.violations.push(Violation {
-                            file: self.file.clone(),
-                            line,
-                            column,
-                            message: format!(
-                                "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
-                            ),
-                        });
-                    }
+                let Ok(value) = lit_int.base10_parse::<i64>() else {
+                    return;
+                };
+                if !is_allowed_number(value as f64) {
+                    let (line, column) = span_location(lit_int.span());
+                    self.violations.push(Violation {
+                        file: self.file.clone(),
+                        line,
+                        column,
+                        message: format!(
+                            "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
+                        ),
+                    });
                 }
             }
             syn::Lit::Float(lit_float) => {
-                if let Ok(value) = lit_float.base10_parse::<f64>() {
-                    if !is_allowed_number(value) {
-                        let (line, column) = span_location(lit_float.span());
-                        self.violations.push(Violation {
-                            file: self.file.clone(),
-                            line,
-                            column,
-                            message: format!(
-                                "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
-                            ),
-                        });
-                    }
+                let Ok(value) = lit_float.base10_parse::<f64>() else {
+                    return;
+                };
+                if !is_allowed_number(value) {
+                    let (line, column) = span_location(lit_float.span());
+                    self.violations.push(Violation {
+                        file: self.file.clone(),
+                        line,
+                        column,
+                        message: format!(
+                            "マジックナンバー {value} を検出。名前付き定数に抽出してください。"
+                        ),
+                    });
                 }
             }
             _ => {}
@@ -930,5 +939,164 @@ mod internal_tests {
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
         assert!(!violations.is_empty());
+    }
+
+    // Expr::Group の再帰検査 (L211-213)
+    // Group 式は proc_macro2 のグループ化で発生する
+    #[test]
+    fn check_expr_for_hardcoded_string_handles_group_expr() {
+        // Group 式を直接テストするため、lint_i18n を使わず Visitor を直接操作
+        let mut visitor = I18nHardcodeVisitor {
+            file: PathBuf::from("test.rs"),
+            violations: Vec::new(),
+        };
+        // Group 式: syn::Expr::Group は通常マクロ展開で生成される
+        // proc_macro2::Group を含むコードで検出できることを確認
+        let lit = syn::parse_str::<syn::Expr>("\"hardcoded\"").unwrap();
+        let group = syn::Expr::Group(syn::ExprGroup {
+            attrs: vec![],
+            group_token: syn::token::Group::default(),
+            expr: Box::new(lit),
+        });
+        visitor.check_expr_for_hardcoded_string(&group, "label");
+        assert!(!visitor.violations.is_empty());
+    }
+
+    // visit_expr_call: UI_FUNCTIONS に含まれるが UI_TYPES_FOR_NEW には含まれない型 (L264)
+    #[test]
+    fn lint_i18n_skips_non_ui_type_new_with_string() {
+        // 関数名は new (UI_FUNCTIONS に含まれる) だが型名が UI_TYPES_FOR_NEW に含まれない
+        let code = r#"fn render() { let _ = HashMap::new("some string"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // visit_expr_call: 単セグメントのパスでは extract_type_from_call が None (L266-267)
+    #[test]
+    fn lint_i18n_skips_simple_function_call() {
+        // 単セグメントパス: new("string") → extract_type_from_call は None
+        let code = r#"fn render() { new("some string"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // lint_magic_numbers: 許可リスト内の Float (L342 の閉じ括弧)
+    #[test]
+    fn lint_magic_numbers_allows_zero_float() {
+        let code = r#"fn foo() { let _ = 0.0; }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // lint_magic_numbers: base10_parse 成功だが許可数値 (L357 の閉じ括弧)
+    #[test]
+    fn lint_magic_numbers_allows_one_float() {
+        let code = r#"fn foo() { let _ = 1.0; }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // run_lint_on_dirs: 違反がある場合に panic する (L512-522)
+    #[test]
+    #[should_panic(expected = "AST Linter")]
+    fn run_lint_on_dirs_panics_on_violations() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let file = tmp.path().join("bad.rs");
+        std::fs::write(
+            &file,
+            r#"fn render(ui: &mut Ui) { ui.label("Bad String"); }"#,
+        )
+        .unwrap();
+        run_ast_lint(
+            "test_rule",
+            "fix it",
+            &[tmp.path().to_path_buf()],
+            lint_i18n,
+        );
+    }
+
+    // run_lint_on_dirs: パースエラーも violation として集約 (L504-506)
+    #[test]
+    #[should_panic(expected = "AST Linter")]
+    fn run_lint_on_dirs_collects_parse_errors() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let file = tmp.path().join("broken.rs");
+        std::fs::write(&file, "fn broken(").unwrap();
+        run_ast_lint(
+            "test_rule",
+            "fix it",
+            &[tmp.path().to_path_buf()],
+            lint_i18n,
+        );
+    }
+
+    // run_lint_on_dirs: ファイルなしのディレクトリで panic (L495)
+    #[test]
+    #[should_panic(expected = "解析対象の .rs ファイルが見つかりません")]
+    fn run_lint_on_dirs_panics_when_no_rs_files() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        run_ast_lint(
+            "test_rule",
+            "fix it",
+            &[tmp.path().to_path_buf()],
+            lint_i18n,
+        );
+    }
+
+    // check_expr_for_hardcoded_string: 非 Str リテラル（整数など）→ if let 不一致 (L178)
+    #[test]
+    fn lint_i18n_ignores_non_string_literal_in_label() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(42); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // check_expr_for_hardcoded_string: 非 format! マクロ → is_format_macro が false (L201)
+    #[test]
+    fn lint_i18n_ignores_non_format_macro_in_label() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(vec!["a"]); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // extract_type_from_call: 単セグメントパスは None を返す (L235)
+    #[test]
+    fn extract_type_from_call_returns_none_for_single_segment() {
+        let expr = syn::parse_str::<syn::Expr>("foo()").unwrap();
+        assert!(extract_type_from_call(&expr).is_none());
+    }
+
+    // visit_expr_call: 非 UI_FUNCTIONS の関数名 (L266-267)
+    #[test]
+    fn lint_i18n_ignores_non_ui_function_path() {
+        let code = r#"fn render() { SomeType::render("not flagged"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // check_lit: Int 許可値で分岐の閉じ括弧を通過 (L342)
+    #[test]
+    fn lint_magic_numbers_int_allowed_value_reaches_closing_brace() {
+        // 0, 1 は許可値。parse 成功 + is_allowed_number true → if ブロック非突入 → } に到達
+        let code = r#"fn foo() { let _ = 0; let _ = 1; let _ = 2; }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // check_lit: Float 許可値で分岐の閉じ括弧を通過 (L357)
+    #[test]
+    fn lint_magic_numbers_float_allowed_value_reaches_closing_brace() {
+        let code = r#"fn foo() { let _ = 0.0; let _ = 1.0; }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
     }
 }

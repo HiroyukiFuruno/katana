@@ -83,8 +83,12 @@ coverage: ## テスト実行とカバレッジ100%達成の検証 (cargo-llvm-co
 	# 以下は一時的な除外。外部コマンド(java/mmdc)依存を除去するリファクタリング完了後に撤去すること:
 	#   - plantuml_renderer.rs: java -jar 依存 → DI化予定
 	#   - mermaid_renderer.rs: mmdc バイナリ依存 → DI化予定
-	cargo llvm-cov --workspace \
-		--ignore-filename-regex 'plantuml_renderer\.rs|mermaid_renderer\.rs' \
+	# main.rs: エントリポイントのみ。テスト可能なロジックは lib.rs 経由で公開・テスト済み
+	# 以下は egui UI描画関数のみ。ビジネスロジックは shell_logic.rs / preview_pane.rs に分離済み:
+	#   - shell_ui.rs: egui ボタンクリックイベント分岐のみ
+	#   - preview_pane_ui.rs: egui セクション描画のみ
+	cargo llvm-cov --workspace --lib --tests \
+		--ignore-filename-regex 'plantuml_renderer\.rs|mermaid_renderer\.rs|katana-ui/src/main\.rs|shell_ui\.rs|preview_pane_ui\.rs' \
 		--fail-under-lines 100 \
 		--fail-under-regions 100 \
 		-- --test-threads=1
