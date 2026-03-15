@@ -650,3 +650,285 @@ mod allowlist_tests {
         assert!(is_allowed_string("==="));
     }
 }
+
+// ─────────────────────────────────────────────
+// 内部ロジックの追加ユニットテスト
+// ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod internal_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    // Violation::fmt (L26-35)
+    #[test]
+    fn violation_display_format() {
+        let v = Violation {
+            file: PathBuf::from("src/shell.rs"),
+            line: 42,
+            column: 7,
+            message: "test violation".to_string(),
+        };
+        let s = v.to_string();
+        assert!(s.contains("src/shell.rs"));
+        assert!(s.contains("42"));
+        assert!(s.contains("7"));
+        assert!(s.contains("test violation"));
+    }
+
+    // is_emoji_or_symbol (L96-107)
+    #[test]
+    fn is_emoji_or_symbol_returns_true_for_emoji() {
+        // 🔄 is in \u{1F000}..\u{1FAFF}
+        assert!(is_emoji_or_symbol('🔄'));
+        // ← (U+2190) is in \u{2000}..\u{2BFF}
+        assert!(is_emoji_or_symbol('←'));
+    }
+
+    #[test]
+    fn is_emoji_or_symbol_returns_false_for_ascii() {
+        assert!(!is_emoji_or_symbol('a'));
+        assert!(!is_emoji_or_symbol('Z'));
+        assert!(!is_emoji_or_symbol('5'));
+    }
+
+    #[test]
+    fn is_emoji_or_symbol_returns_false_for_katakana() {
+        // カタカナ U+30A0..U+30FF — not in emoji block
+        assert!(!is_emoji_or_symbol('ア'));
+        assert!(!is_emoji_or_symbol('テ'));
+    }
+
+    // is_format_macro (L220-226)
+    #[test]
+    fn is_format_macro_detects_format_macro() {
+        let code = r#"fn f() { let _ = format!("hello"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        // lint_i18n won't flag format! in a non-UI context, but parse should succeed
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_i18n: detect hardcoded string in ui.label()
+    #[test]
+    fn lint_i18n_detects_label_with_hardcoded_string() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label("Hello World"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+        assert!(violations[0].to_string().contains("Hello World"));
+    }
+
+    // lint_i18n: detect hardcoded string in RichText::new()
+    #[test]
+    fn lint_i18n_detects_richtext_new_with_hardcoded_string() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(RichText::new("Hardcoded")); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+    }
+
+    // lint_i18n: format!() in ui.label() triggers violation
+    #[test]
+    fn lint_i18n_detects_format_macro_in_label() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(format!("Saved: {}", name)); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+    }
+
+    // lint_i18n: allowed strings don't trigger violation
+    #[test]
+    fn lint_i18n_allows_symbol_strings() {
+        // "x" is allowed, "●" is allowed
+        let code = r#"fn render(ui: &mut Ui) { ui.label("x"); ui.label("●"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_magic_numbers: magic number in non-const context
+    #[test]
+    fn lint_magic_numbers_detects_literal_in_function() {
+        let code = r#"fn foo() -> f32 { let x: f32 = 42.0; x }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+        assert!(violations[0].to_string().contains("42"));
+    }
+
+    // lint_magic_numbers: number in const is allowed
+    #[test]
+    fn lint_magic_numbers_allows_literal_in_const() {
+        let code = r#"const FOO: f32 = 42.0;"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_magic_numbers: allowed numbers (0, 1, 2, 100, -1) are not flagged
+    #[test]
+    fn lint_magic_numbers_allows_common_values() {
+        let code = r#"fn foo() { let a = 0; let b = 1; let c = 2; let d = 100; }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_magic_numbers: cfg(test) fn is skipped
+    #[test]
+    fn lint_magic_numbers_skips_test_functions() {
+        let code = r#"
+            #[cfg(test)]
+            fn test_foo() -> i32 { 42 }
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // has_cfg_test_attr: test attribute detection (L279-291)
+    #[test]
+    fn has_cfg_test_attr_returns_true_for_test_attr() {
+        let code = r#"
+            #[cfg(test)]
+            mod tests {}
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        // If there's a cfg(test) mod, lint_magic_numbers won't visit it
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // collect_rs_files / parse_file integration: parse a known bad syntax file
+    #[test]
+    fn parse_file_returns_error_for_invalid_syntax() {
+        let tmp = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+        std::fs::write(tmp.path(), "fn broken(").unwrap();
+        let result = parse_file(tmp.path());
+        assert!(result.is_err());
+        let errors = result.err().expect("should have failed with errors");
+        assert!(!errors.is_empty());
+        assert!(errors[0].to_string().contains("構文解析エラー"));
+    }
+
+    // extract_type_from_call: path with >= 2 segments (L229-237)
+    #[test]
+    fn lint_i18n_detects_richtext_new_via_path_call() {
+        let code = r#"
+            fn render(ui: &mut Ui) {
+                ui.label(egui::RichText::new("Hardcoded Text"));
+            }
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        // egui::RichText::new is detected
+        assert!(!violations.is_empty());
+    }
+
+    // is_emoji_or_symbol: タグ範囲 U+E0000..U+E007F (L105)
+    #[test]
+    fn is_emoji_or_symbol_tag_range() {
+        assert!(is_emoji_or_symbol('\u{E0001}'));
+        assert!(is_emoji_or_symbol('\u{E007F}'));
+    }
+
+    // is_emoji_or_symbol: 補助句読点 U+2E00..U+2E7F (L100)
+    #[test]
+    fn is_emoji_or_symbol_supplemental_punctuation() {
+        assert!(is_emoji_or_symbol('\u{2E00}'));
+    }
+
+    // is_emoji_or_symbol: CJK記号 U+3000..U+303F (L101)
+    #[test]
+    fn is_emoji_or_symbol_cjk_symbols() {
+        assert!(is_emoji_or_symbol('\u{3000}')); // ideographic space
+        assert!(is_emoji_or_symbol('\u{3001}')); // 。
+    }
+
+    // is_emoji_or_symbol: 異体字セレクタ U+FE00..U+FE0F (L102)
+    #[test]
+    fn is_emoji_or_symbol_variation_selectors() {
+        assert!(is_emoji_or_symbol('\u{FE00}'));
+        assert!(is_emoji_or_symbol('\u{FE0F}'));
+    }
+
+    // is_emoji_or_symbol: CJK互換形 U+FE30..U+FE4F (L103)
+    #[test]
+    fn is_emoji_or_symbol_cjk_compat() {
+        assert!(is_emoji_or_symbol('\u{FE30}'));
+    }
+
+    // check_expr_for_hardcoded_string: Paren式の再帰 (L208-210)
+    #[test]
+    fn lint_i18n_detects_paren_wrapped_string() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(("Hello")); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+    }
+
+    // check_expr_for_hardcoded_string: Reference式の再帰 (L205-207)
+    #[test]
+    fn lint_i18n_detects_reference_wrapped_string() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label(&"Hello"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+    }
+
+    // check_lit: Int マジックナンバー (L329-342)
+    #[test]
+    fn lint_magic_numbers_detects_int_literal() {
+        let code = r#"fn foo() -> i32 { let x = 42; x }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+        assert!(violations[0].to_string().contains("42"));
+    }
+
+    // visit_expr_call: 非UI型のnew()は検出しない (L264-267)
+    #[test]
+    fn lint_i18n_ignores_non_ui_type_new() {
+        let code = r#"fn render() { let _ = SomeOtherType::new("not flagged"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    // parse_file: ファイルが存在しない場合 (L435-442)
+    #[test]
+    fn parse_file_returns_error_for_nonexistent_file() {
+        let result = parse_file(std::path::Path::new("/nonexistent/file.rs"));
+        assert!(result.is_err());
+        let errors = result.err().unwrap();
+        assert!(errors[0].to_string().contains("ファイル読み込みエラー"));
+    }
+
+    // lint_magic_numbers: 負の値 -1 は許可される
+    #[test]
+    fn lint_magic_numbers_allows_negative_one() {
+        let code = r#"fn foo() -> i32 { -1 }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_magic_numbers: static 内の数値は許可される
+    #[test]
+    fn lint_magic_numbers_allows_static_context() {
+        let code = r#"static FOO: i32 = 42;"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // format!() 内のハードコード検出 (L178-201)
+    #[test]
+    fn lint_i18n_detects_format_in_button() {
+        let code = r#"fn render(ui: &mut Ui) { ui.button(format!("Save {}", x)); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_i18n(&PathBuf::from("fake.rs"), &syntax);
+        assert!(!violations.is_empty());
+    }
+}

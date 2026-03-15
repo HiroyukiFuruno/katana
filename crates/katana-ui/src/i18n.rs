@@ -47,12 +47,15 @@ fn init_current_language() {
 fn get_dictionary() -> &'static HashMap<&'static str, HashMap<String, String>> {
     DICTIONARY.get_or_init(|| {
         let mut map = HashMap::new();
-        if let Ok(json) = serde_json::from_str(EN_JSON) {
-            map.insert("en", json);
-        }
-        if let Ok(json) = serde_json::from_str(JA_JSON) {
-            map.insert("ja", json);
-        }
+        // include_str! でコンパイル時に埋め込まれた定数 JSON。パース失敗はあり得ない。
+        map.insert(
+            "en",
+            serde_json::from_str(EN_JSON).expect("BUG: en.json is invalid"),
+        );
+        map.insert(
+            "ja",
+            serde_json::from_str(JA_JSON).expect("BUG: ja.json is invalid"),
+        );
         map
     })
 }

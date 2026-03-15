@@ -62,3 +62,92 @@ fn shellrsにi18n漏れがない() {
         );
     }
 }
+
+// L14-31: supported_languages() と display_name()
+#[test]
+fn supported_languagesはen_jaを含む() {
+    let langs = supported_languages();
+    let codes: Vec<&str> = langs.iter().map(|(c, _)| c.as_str()).collect();
+    assert!(codes.contains(&"en"), "en should be in supported languages");
+    assert!(codes.contains(&"ja"), "ja should be in supported languages");
+}
+
+// L30: display_name フォールバック（無効コードは "???" を返す）
+#[test]
+fn display_name未知コードはフォールバックする() {
+    let name = display_name("zz");
+    assert_eq!(name, "???");
+}
+
+// L25-31: display_name() for known codes
+#[test]
+fn display_name既知コードを返す() {
+    let en_name = display_name("en");
+    assert!(!en_name.is_empty() && en_name != "???");
+    let ja_name = display_name("ja");
+    assert!(!ja_name.is_empty() && ja_name != "???");
+}
+
+// L61-65: set_language() and get_language()
+#[test]
+fn set_languageが言語を変更する() {
+    // Initial set to "en"
+    set_language("en");
+    assert_eq!(get_language(), "en");
+
+    // Switch to "ja"
+    set_language("ja");
+    assert_eq!(get_language(), "ja");
+
+    // Reset to "en"
+    set_language("en");
+}
+
+// L74-83: t() - key not found returns the key itself
+#[test]
+fn t関数は存在しないキーをそのまま返す() {
+    set_language("en");
+    let result = t("key_that_does_not_exist_in_any_locale");
+    assert_eq!(result, "key_that_does_not_exist_in_any_locale");
+}
+
+// L74-83: t() - exists in 'en', not in 'ja' → key fallback for ja
+#[test]
+fn t関数はen言語で既知キーを翻訳する() {
+    set_language("en");
+    let result = t("status_ready");
+    // Should return translated string, not the key itself
+    assert_ne!(result, "status_ready");
+    assert!(!result.is_empty());
+}
+
+// L74-83: t() with 'ja' language
+#[test]
+fn t関数はja言語で既知キーを翻訳する() {
+    set_language("ja");
+    let result = t("status_ready");
+    assert_ne!(result, "status_ready");
+    assert!(!result.is_empty());
+
+    // Reset
+    set_language("en");
+}
+
+// tf() with actual i18n key and params
+#[test]
+fn tf関数は実際のキーのパラメータを置換する() {
+    set_language("en");
+    // Use a key that has a param like {name}, {error}, etc.
+    // "status_opened_workspace" with {name}
+    let result = tf("status_opened_workspace", &[("name", "my-project")]);
+    assert!(result.contains("my-project"));
+}
+
+// L81: 辞書が見つからない言語コードで t() を呼ぶとキー自体が返る
+#[test]
+fn t関数は未知言語でキーをそのまま返す() {
+    set_language("zz"); // 存在しない言語コード
+    let result = t("status_ready");
+    assert_eq!(result, "status_ready");
+    set_language("en"); // reset
+}

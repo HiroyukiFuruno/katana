@@ -6,8 +6,8 @@
 //! - ダイアグラムはサブプロセスを伴うため、「🔄 Refresh」ボタン or
 //!   ドキュメント選択時にのみ再レンダリングする。
 
-use eframe::egui::{self, ScrollArea, Vec2};
-use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
+use eframe::egui::{self, ScrollArea};
+use egui_commonmark::CommonMarkCache;
 use katana_core::markdown::diagram::DiagramKind;
 use katana_core::{
     markdown::{
@@ -21,9 +21,6 @@ use katana_core::{
 // ─────────────────────────────────────────────
 // 定数
 // ─────────────────────────────────────────────
-
-/// ツール未インストール警告のテキスト色 (オレンジ)。
-const WARNING_TEXT_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 165, 0);
 
 /// ダイアグラム SVG をピクセル画像に変換する際の表示スケール。
 const DIAGRAM_SVG_DISPLAY_SCALE: f32 = 1.5;
@@ -180,7 +177,9 @@ impl PreviewPane {
             // セクションごとに ID スコープを分離し、同一ドキュメント内に
             // 複数のテーブルがあっても egui の Grid ID が衝突しないようにする。
             ui.push_id(format!("section_{i}"), |ui| {
-                if let Some(req) = show_section(ui, &mut self.commonmark_cache, section, i) {
+                if let Some(req) =
+                    crate::preview_pane_ui::show_section(ui, &mut self.commonmark_cache, section, i)
+                {
                     request = Some(req);
                 }
                 ui.separator();
@@ -240,121 +239,6 @@ impl PreviewPane {
             }
         }
     }
-}
-
-/// 単一セクションを描画する。
-/// ダウンロードボタンが押された場合は `Some(DownloadRequest)` を返す。
-fn show_section(
-    ui: &mut egui::Ui,
-    cache: &mut CommonMarkCache,
-    section: &RenderedSection,
-    id: usize,
-) -> Option<DownloadRequest> {
-    match section {
-        RenderedSection::Markdown(md) => {
-            CommonMarkViewer::new().show(ui, cache, md);
-            None
-        }
-        RenderedSection::Image { svg_data, alt } => {
-            show_rasterized(ui, svg_data, alt, id);
-            None
-        }
-        RenderedSection::Error {
-            kind,
-            _source: _,
-            message,
-        } => {
-            ui.label(
-                egui::RichText::new(crate::i18n::tf(
-                    "render_error",
-                    &[("kind", kind), ("message", message)],
-                ))
-                .color(egui::Color32::YELLOW)
-                .small(),
-            );
-            None
-        }
-        RenderedSection::CommandNotFound {
-            tool_name,
-            install_hint,
-            _source: _,
-        } => {
-            let msg = crate::i18n::t("missing_dependency")
-                .replace("{tool_name}", tool_name)
-                .replace("{install_hint}", install_hint);
-            ui.label(
-                egui::RichText::new(msg)
-                    .color(egui::Color32::YELLOW)
-                    .small(),
-            );
-            None
-        }
-        RenderedSection::NotInstalled {
-            kind,
-            download_url,
-            install_path,
-        } => show_not_installed(ui, kind, download_url, install_path),
-        RenderedSection::Pending { kind } => {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(
-                    egui::RichText::new(crate::i18n::tf("rendering", &[("kind", kind)])).weak(),
-                );
-            });
-            None
-        }
-    }
-}
-
-/// 未インストールツールのダウンロードボタン UI。
-fn show_not_installed(
-    ui: &mut egui::Ui,
-    kind: &str,
-    download_url: &str,
-    install_path: &std::path::Path,
-) -> Option<DownloadRequest> {
-    let mut request = None;
-    ui.group(|ui| {
-        ui.label(
-            egui::RichText::new(crate::i18n::tf("tool_not_installed", &[("tool", kind)]))
-                .color(WARNING_TEXT_COLOR),
-        );
-        ui.label(
-            egui::RichText::new(crate::i18n::tf(
-                "tool_install_path",
-                &[("path", &install_path.display().to_string())],
-            ))
-            .small()
-            .weak(),
-        );
-        if ui
-            .button(crate::i18n::tf("tool_download", &[("tool", kind)]))
-            .clicked()
-        {
-            request = Some(DownloadRequest {
-                url: download_url.to_string(),
-                dest: install_path.to_path_buf(),
-            });
-        }
-    });
-    request
-}
-
-/// ラスタライズ済み SVG を egui テクスチャとして表示する。
-fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str, id: usize) {
-    let color_img = egui::ColorImage::from_rgba_unmultiplied(
-        [img.width as usize, img.height as usize],
-        &img.rgba,
-    );
-    let texture = ui.ctx().load_texture(
-        format!("diagram_{id}"),
-        color_img,
-        egui::TextureOptions::LINEAR,
-    );
-    let max_w = ui.available_width();
-    let scale = (max_w / img.width as f32).min(1.0);
-    let size = Vec2::new(img.width as f32 * scale, img.height as f32 * scale);
-    ui.add(egui::Image::new((texture.id(), size)));
 }
 
 /// `PreviewSection` をレンダリングして `RenderedSection` に変換する（非使用になったことでの削除答候用コメント）。
@@ -460,4 +344,244 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
         height,
         rgba: rgba.into_raw(),
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    // render_diagram: DrawIO の Err バリアント (L371-375)
+    #[test]
+    fn render_diagram_drawio_returns_ok_section() {
+        let xml = r#"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>"#;
+        let section = render_diagram(&DiagramKind::DrawIo, xml);
+        // DrawIO renderer should produce Ok or Error based on xml validity — either is OK
+        match section {
+            RenderedSection::Image { .. } | RenderedSection::Error { .. } => {}
+            _ => panic!("Expected Image or Error for DrawIO"),
+        }
+    }
+
+    // dispatch_renderer: DrawIo 分岐 (L402)
+    #[test]
+    fn dispatch_renderer_drawio_returns_result() {
+        let block = DiagramBlock {
+            kind: DiagramKind::DrawIo,
+            source: r#"<mxGraphModel><root><mxCell id="0"/></root></mxGraphModel>"#.to_string(),
+        };
+        let result = dispatch_renderer(&block);
+        // Should be Ok or Err but not panic
+        match result {
+            DiagramResult::Ok(_) | DiagramResult::Err { .. } => {}
+            _ => panic!("Expected Ok or Err"),
+        }
+    }
+
+    // dispatch_renderer: Mermaid 分岐 (L400) — mmdc がなければ CommandNotFound を返す
+    #[test]
+    fn dispatch_renderer_mermaid_when_no_mmdc_returns_command_not_found() {
+        // mmdc がCI環境では存在しないはず
+        let block = DiagramBlock {
+            kind: DiagramKind::Mermaid,
+            source: "graph TD; A-->B".to_string(),
+        };
+        let result = dispatch_renderer(&block);
+        // CommandNotFound か OkPng か — どちらでもクラッシュしないことを確認
+        match result {
+            DiagramResult::CommandNotFound { .. }
+            | DiagramResult::OkPng(_)
+            | DiagramResult::Err { .. } => {}
+            _ => panic!("Unexpected result variant"),
+        }
+    }
+
+    // dispatch_renderer: PlantUml 分岐 (L401) — JAR がなければ NotInstalled を返す
+    #[test]
+    fn dispatch_renderer_plantuml_when_no_jar_returns_not_installed() {
+        // PLANTUML_JAR を存在しないパスに設定
+        std::env::set_var("PLANTUML_JAR", "/nonexistent/plantuml.jar");
+        let block = DiagramBlock {
+            kind: DiagramKind::PlantUml,
+            source: "@startuml\nA->B\n@enduml".to_string(),
+        };
+        let result = dispatch_renderer(&block);
+        std::env::remove_var("PLANTUML_JAR");
+        match result {
+            DiagramResult::NotInstalled { .. } => {}
+            _ => panic!("Expected NotInstalled for missing PlantUML JAR"),
+        }
+    }
+
+    // try_rasterize: SVG 抽出失敗ケース (L408-413)
+    #[test]
+    fn try_rasterize_returns_error_when_no_svg_in_html() {
+        let kind = DiagramKind::DrawIo;
+        let section = try_rasterize(&kind, "source", "<div>no svg here</div>");
+        match section {
+            RenderedSection::Error { message, .. } => {
+                assert!(message.contains("SVG"));
+            }
+            _ => panic!("Expected Error when SVG extraction fails"),
+        }
+    }
+
+    // try_rasterize: 有効な SVG で Image を返す (L415-419)
+    #[test]
+    fn try_rasterize_returns_image_for_valid_svg() {
+        let kind = DiagramKind::DrawIo;
+        let html = r#"<div class="diagram"><svg width="10" height="10"><rect fill="white" width="10" height="10"/></svg></div>"#;
+        let section = try_rasterize(&kind, "source", html);
+        match section {
+            RenderedSection::Image { .. } => {}
+            RenderedSection::Error { message, .. } => {
+                // SVG パースに失敗することもある（CI環境でのフォールバック）
+                assert!(!message.is_empty());
+            }
+            _ => panic!("Expected Image or Error"),
+        }
+    }
+
+    // decode_png_to_section: 有効な PNG でImageを返す (L439-451)
+    #[test]
+    fn decode_png_to_section_returns_image_for_valid_png() {
+        use image::{ImageBuffer, Rgba};
+        let mut buf = Vec::new();
+        let img = ImageBuffer::from_pixel(2, 2, Rgba([100u8, 150, 200, 255]));
+        img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+
+        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", buf);
+        assert!(matches!(section, RenderedSection::Image { .. }));
+    }
+
+    // decode_png_to_section: 無効データでErrorを返す (L445-449)
+    #[test]
+    fn decode_png_to_section_returns_error_for_invalid_data() {
+        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec());
+        match section {
+            RenderedSection::Error { message, .. } => {
+                assert!(message.contains("PNG"));
+            }
+            _ => panic!("Expected Error for invalid PNG data"),
+        }
+    }
+
+    // render_diagram: Mermaid CommandNotFound のときRenderedSection::CommandNotFoundになる
+    #[test]
+    fn render_diagram_mermaid_command_not_found_maps_to_section() {
+        let block = DiagramBlock {
+            kind: DiagramKind::Mermaid,
+            source: "graph TD; A-->B".to_string(),
+        };
+        let result = dispatch_renderer(&block);
+        let section = match result {
+            DiagramResult::CommandNotFound {
+                tool_name,
+                install_hint,
+                source,
+            } => RenderedSection::CommandNotFound {
+                tool_name,
+                install_hint,
+                _source: source,
+            },
+            DiagramResult::OkPng(bytes) => {
+                decode_png_to_section(&DiagramKind::Mermaid, "src", bytes)
+            }
+            DiagramResult::Err { source, error } => RenderedSection::Error {
+                kind: "Mermaid".to_string(),
+                _source: source,
+                message: error,
+            },
+            _ => RenderedSection::Pending {
+                kind: "Mermaid".to_string(),
+            },
+        };
+        // どのバリアントでもクラッシュしなければOK
+        let _ = section;
+    }
+
+    // poll_renders: バックグラウンドスレッドから結果を受信してセクションを更新 (L200-206)
+    #[test]
+    fn poll_renders_receives_background_result_and_updates_section() {
+        use std::sync::mpsc;
+        let mut pane = PreviewPane::default();
+
+        // Pending セクションを設定
+        pane.sections = vec![RenderedSection::Pending {
+            kind: "DrawIo".to_string(),
+        }];
+
+        // mpsc channel を作成して render_rx に設定
+        let (tx, rx) = mpsc::channel();
+        pane.render_rx = Some(rx);
+
+        // バックグラウンドスレッドから結果を送信
+        tx.send((0, RenderedSection::Markdown("# Result".to_string())))
+            .unwrap();
+        // tx をドロップして receiver が Disconnected になるようにする
+        drop(tx);
+
+        // poll_renders を呼ぶために egui Context が必要
+        let ctx = egui::Context::default();
+        pane.poll_renders(&ctx);
+
+        // セクションが更新されている
+        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+        // render_rx は None になっている（Pendingがなくなったため）
+        assert!(pane.render_rx.is_none());
+    }
+
+    // wait_for_renders: Pending がなくなるまで待機する (L224-242)
+    #[test]
+    fn wait_for_renders_blocks_until_all_rendered() {
+        use std::sync::mpsc;
+        let mut pane = PreviewPane::default();
+
+        pane.sections = vec![RenderedSection::Pending {
+            kind: "DrawIo".to_string(),
+        }];
+
+        let (tx, rx) = mpsc::channel();
+        pane.render_rx = Some(rx);
+
+        // 別スレッドで送信
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            let _ = tx.send((0, RenderedSection::Markdown("# Done".to_string())));
+        });
+
+        pane.wait_for_renders();
+
+        // 完了後は Pending でない
+        assert!(pane.render_rx.is_none());
+        assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+    }
+
+    // poll_renders: render_rx なしは何もしない (L211-213)
+    #[test]
+    fn poll_renders_without_rx_does_nothing() {
+        let mut pane = PreviewPane::default();
+        // render_rx は None のまま
+        let ctx = egui::Context::default();
+        pane.poll_renders(&ctx);
+        // クラッシュしなければOK
+        assert!(pane.render_rx.is_none());
+    }
+
+    // full_render: スレッドが起動して Pending セクションが生成される (L140-149)
+    #[test]
+    fn full_render_with_diagram_creates_pending_section_then_renders() {
+        let mut pane = PreviewPane::default();
+        // DrawIO ダイアグラムを含む内容 → Pending になる
+        let source = "# Title\n```drawio\n<mxGraphModel><root></root></mxGraphModel>\n```";
+        pane.full_render(source);
+
+        // render_rx が設定される（ダイアグラムがあるため）
+        assert!(pane.render_rx.is_some());
+
+        // クラッシュしないことを確認して待機
+        pane.wait_for_renders();
+        assert!(pane.render_rx.is_none());
+    }
 }

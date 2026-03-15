@@ -16,7 +16,7 @@ use std::{
 use super::diagram::{DiagramBlock, DiagramResult};
 
 /// PlantUML JAR を探索する候補パスを返す。
-fn jar_candidate_paths() -> Vec<PathBuf> {
+pub fn jar_candidate_paths() -> Vec<PathBuf> {
     // 環境変数が設定されている場合はそのパスのみを使用する（他の候補は無視）。
     if let Ok(env_path) = std::env::var("PLANTUML_JAR") {
         return vec![PathBuf::from(env_path)];
@@ -46,7 +46,7 @@ pub fn default_install_path() -> Option<PathBuf> {
 }
 
 /// システムで利用可能な PlantUML JAR パスを返す。存在しなければ `None`。
-fn find_plantuml_jar() -> Option<PathBuf> {
+pub fn find_plantuml_jar() -> Option<PathBuf> {
     jar_candidate_paths().into_iter().find(|p| p.exists())
 }
 
@@ -72,7 +72,7 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
 }
 
 /// `java -jar plantuml.jar` を起動してソースを渡し SVG を返す。
-fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
+pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let mut child = Command::new("java")
         .args([
             "-Djava.awt.headless=true",
@@ -106,6 +106,6 @@ fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
 }
 
 /// SVG テキストをプレビュー埋め込み用の HTML フラグメントに変換する。
-fn svg_to_html_fragment(svg: &str) -> String {
+pub fn svg_to_html_fragment(svg: &str) -> String {
     format!(r#"<div class="katana-diagram plantuml">{svg}</div>"#)
 }

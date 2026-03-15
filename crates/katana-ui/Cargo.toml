@@ -29,3 +29,4 @@ path = "src/main.rs"
 
 [dev-dependencies]
 egui_kittest = { version = "0.33", features = ["snapshot", "wgpu", "eframe"] }
+tempfile = "3"

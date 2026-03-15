@@ -13,3 +13,4 @@ path = "ast_linter.rs"
 syn.workspace = true
 ignore.workspace = true
 proc-macro2 = { version = "1", features = ["span-locations"] }
+tempfile.workspace = true

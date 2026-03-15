@@ -76,3 +76,72 @@ fn noop_renderer_returns_ok_with_code_block() {
         assert!(html.contains("mermaid"));
     }
 }
+
+// L27-33: display_name() for PlantUML and DrawIO
+#[test]
+fn display_name_returns_correct_strings() {
+    assert_eq!(DiagramKind::Mermaid.display_name(), "Mermaid");
+    assert_eq!(DiagramKind::PlantUml.display_name(), "PlantUML");
+    assert_eq!(DiagramKind::DrawIo.display_name(), "Draw.io");
+}
+
+// L50-54: validate() for Mermaid with empty source
+#[test]
+fn mermaid_validation_fails_with_empty_source() {
+    let block = DiagramBlock {
+        kind: DiagramKind::Mermaid,
+        source: "   ".to_string(),
+    };
+    assert!(block.validate().is_err());
+}
+
+#[test]
+fn mermaid_validation_passes_with_non_empty_source() {
+    let block = DiagramBlock {
+        kind: DiagramKind::Mermaid,
+        source: "graph TD; A-->B".to_string(),
+    };
+    assert!(block.validate().is_ok());
+}
+
+// L134-135: NoOpRenderer for PlantUML and DrawIO
+#[test]
+fn noop_renderer_handles_plantuml() {
+    let block = DiagramBlock {
+        kind: DiagramKind::PlantUml,
+        source: "@startuml\nA -> B\n@enduml".to_string(),
+    };
+    let result = NoOpRenderer.render(&block);
+    assert!(matches!(result, DiagramResult::Ok(_)));
+    if let DiagramResult::Ok(html) = result {
+        assert!(html.contains("plantuml"));
+    }
+}
+
+#[test]
+fn noop_renderer_handles_drawio() {
+    let block = DiagramBlock {
+        kind: DiagramKind::DrawIo,
+        source: "<mxGraphModel/>".to_string(),
+    };
+    let result = NoOpRenderer.render(&block);
+    assert!(matches!(result, DiagramResult::Ok(_)));
+    if let DiagramResult::Ok(html) = result {
+        assert!(html.contains("drawio"));
+    }
+}
+
+// NoOpRenderer html_escape: source with special characters
+#[test]
+fn noop_renderer_escapes_html_chars_in_source() {
+    let block = DiagramBlock {
+        kind: DiagramKind::Mermaid,
+        source: "A & B <-> C".to_string(),
+    };
+    let result = NoOpRenderer.render(&block);
+    if let DiagramResult::Ok(html) = result {
+        assert!(html.contains("&amp;"));
+        assert!(html.contains("&lt;"));
+        assert!(html.contains("&gt;"));
+    }
+}
