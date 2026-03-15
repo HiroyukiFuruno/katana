@@ -1,16 +1,16 @@
-# Katana Rust コーディングルール
+# Katana Rust Coding Rules
 
-本ドキュメントはプロジェクト全体で遵守すべき Rust コーディング規約を定義する。
-linter で自動検査できるルールは `.clippy.toml` と各クレートの `#![deny(...)]` で強制する。
+This document defines the Rust coding conventions to be followed throughout the project.
+Rules that can be checked automatically by linters are enforced via `.clippy.toml` and `#![deny(...)]` in each crate.
 
 ---
 
-## 1. 構造と責務
+## 1. Structure and Responsibility
 
-### 1.1 struct + impl ベース設計
+### 1.1 `struct` + `impl` Based Design
 
-**ドメインロジックは必ず `struct` + `impl` ブロックで実装する。**
-自由関数（free function）はモジュールプライベート（`pub` なし）の内部処理にのみ許容する。
+**Domain logic must always be implemented within `struct` + `impl` blocks.**
+Free functions are only allowed for internal processing that is module-private (no `pub`).
 
 ```rust
 // ✅ Good — struct + impl
@@ -19,44 +19,44 @@ impl DocumentLoader {
     pub fn load(&self, path: &Path) -> Result<Document, DocumentError> { ... }
 }
 
-// ❌ Bad — pub な外部向け処理を free function で実装
+// ❌ Bad — pub external processing implemented as a free function
 pub fn load_document(path: &Path) -> Result<Document, DocumentError> { ... }
 
-// ✅ Good — モジュール内部の補助処理は free function OK
+// ✅ Good — Module-internal auxiliary processing is fine as a free function
 fn html_escape(s: &str) -> String { ... }
 ```
 
-### 1.2 SOLID 原則
+### 1.2 SOLID Principles
 
-| 原則 | Rust での適用 |
+| Principle | Application in Rust |
 |------|-------------|
-| S (単一責務) | 1 つの `struct` / `impl` は 1 つの責務。30行超の `fn` は責務分離のサイン |
-| O (開放閉鎖) | `trait` で拡張ポイントを定義し、`struct` への直接追加を避ける |
-| L (リスコフ) | `trait` 実装は契約（ドキュメントの事前/事後条件）を破らない |
-| I (インターフェース分離) | `trait` は小さく保ち、不要なメソッドをまとめない |
-| D (依存関係逆転) | 上位レイヤーは具体型ではなく `trait` に依存する |
+| S (Single Responsibility) | One `struct` / `impl` has one responsibility. Functions > 30 lines are a sign to separate responsibilities. |
+| O (Open-Closed) | Define extension points with `trait` and avoid direct additions to `struct`. |
+| L (Liskov Substitution) | `trait` implementations do not break the contract (pre/post-conditions of the documentation). |
+| I (Interface Segregation) | Keep `trait`s small and avoid clumping unnecessary methods together. |
+| D (Dependency Inversion) | Upper layers depend on `trait` rather than concrete types. |
 
 ---
 
-## 2. 関数サイズ
+## 2. Function Size
 
-**1 関数（メソッド・自由関数問わず）は 30 行を上限とする。**
-30 行を超える場合は SOLID の S 原則に従い責務を分離する。
+**A single function (method or free function) is limited to 30 lines.**
+If it exceeds 30 lines, apply the SOLID 'S' principle and separate the responsibilities.
 
-- linter: `clippy::too_many_lines`（`too-many-lines-threshold = 30`）で自動検出
-- `impl` ブロック自体の行数は対象外（メソッド単位で判定）
+- Linter: Automatically detected by `clippy::too_many_lines` (`too-many-lines-threshold = 30`)
+- The line count of the `impl` block itself is not targeted (evaluation is per method)
 
 ---
 
-## 3. ネスト深度
+## 3. Nesting Depth
 
-**コードのネストは最大 3 レベルまで。努力目標は 2 レベル。**
+**Code nesting is allowed up to 3 levels. The target is 2 levels.**
 
 ```rust
-// ✅ Good — let-else でアーリーリターン、ネスト 2
+// ✅ Good — Early return with let-else, nesting 2
 fn handle_save(&mut self) {
     let Some(doc) = &mut self.state.active_document else {
-        return; // ← エラーファーストでネストを浅く保つ
+        return; // ← Keep nesting shallow with error-first
     };
     match self.fs.save_document(doc) {
         Ok(()) => self.state.status_message = Some("Saved.".to_string()),
@@ -64,7 +64,7 @@ fn handle_save(&mut self) {
     }
 }
 
-// ❌ Bad — ネスト 4
+// ❌ Bad — Nesting 4
 fn handle_save(&mut self) {
     if let Some(doc) = &mut self.state.active_document {
         if doc.is_dirty {
@@ -79,25 +79,25 @@ fn handle_save(&mut self) {
 }
 ```
 
-- linter: `clippy::cognitive_complexity`（`cognitive-complexity-threshold = 10`）で自動検出
-- `Result` の `?` 演算子を積極的に使い、`match` / `if let` のネストを減らす
+- Linter: Automatically detected by `clippy::cognitive_complexity` (`cognitive-complexity-threshold = 10`)
+- Proactively use the `?` operator on `Result` to reduce the nesting of `match` / `if let`
 
 ---
 
-## 4. エラーファースト
+## 4. Error First
 
-**後続処理に必要な値が得られない場合は即リターン・即エラーを返す。**
-`?` 演算子と `let...else` が第一選択肢。
+**If values required for subsequent processing cannot be obtained, return immediately/return an error.**
+The `?` operator and `let...else` are the primary choices.
 
 ```rust
 // ✅ Good
 fn process(&self, path: &Path) -> Result<Output, MyError> {
-    let content = std::fs::read_to_string(path)?;      // ? でアーリーリターン
+    let content = std::fs::read_to_string(path)?;      // Early return with ?
     let parsed = parse(&content)?;
     Ok(transform(parsed))
 }
 
-// ❌ Bad — エラーを後回しにするネスト
+// ❌ Bad — Nesting that defers errors
 fn process(&self, path: &Path) -> Result<Output, MyError> {
     if let Ok(content) = std::fs::read_to_string(path) {
         if let Ok(parsed) = parse(&content) {
@@ -110,113 +110,109 @@ fn process(&self, path: &Path) -> Result<Output, MyError> {
 
 ---
 
-## 5. 型安全と非 null 設計
+## 5. Type Safety and Non-null Design
 
-### 5.1 禁止型
+### 5.1 Prohibited Types
 
-TypeScript の `any` / `unknown` / `Record<string, unknown>` に相当する以下の使用を禁止する:
+The use of the following types equivalent to TypeScript's `any` / `unknown` / `Record<string, unknown>` is prohibited:
 
-| 禁止 | 理由 | 代替 |
+| Prohibited | Reason | Alternative |
 |------|------|------|
-| `Box<dyn std::any::Any>` | 型消去 | 専用 `trait` / `enum` を定義する |
-| `HashMap<String, serde_json::Value>` | 非構造化データ | 型付き `struct` を定義する |
-| `serde_json::Value` (外部 API 境界以外) | 型安全の喪失 | 対応する `struct` + `#[derive(Deserialize)]` |
+| `Box<dyn std::any::Any>` | Type erasure | Define a dedicated `trait` / `enum` |
+| `HashMap<String, serde_json::Value>` | Unstructured data | Define a typed `struct` |
+| `serde_json::Value` (excluding external API boundaries) | Loss of type safety | Corresponding `struct` + `#[derive(Deserialize)]` |
 
-- linter: `clippy::wildcard_imports` で `use foo::*` を禁止
+- Linter: `use foo::*` is prohibited by `clippy::wildcard_imports`
 
-### 5.2 非 null 設計
+### 5.2 Non-null Design
 
-**必ず存在する値を `Option` で包まない。**
-`Option` が必要な個所は設計を見直し、`Option` が不要になるよう構造を変える。
+**Never wrap values that are guaranteed to exist in `Option`.**
+For places that need `Option`, review the design and change the structure so that `Option` is no longer necessary.
 
 ```rust
-// ✅ Good — 存在が保証される値は直接持つ
+// ✅ Good — Values guaranteed to exist are held directly
 pub struct ActiveDocument {
-    pub path: PathBuf,  // 常に存在する
-    pub buffer: String, // 常に存在する
+    pub path: PathBuf,  // Always exists
+    pub buffer: String, // Always exists
 }
 
-// ❌ Bad — 必ず初期化されるのに Option で包む
+// ❌ Bad — Wrapped in Option even though it's always initialized
 pub struct AppState {
-    pub active_path: Option<PathBuf>, // 本当に Optional か？
+    pub active_path: Option<PathBuf>, // Is it really Optional?
 }
 ```
 
-- `unwrap()` は `deny(clippy::unwrap_used)` で禁止
-  - テストコード内では `expect("明示的な理由")` のみ許容
-- `panic!` は `deny(clippy::panic)` で禁止（テスト外）
-- `todo!` / `unimplemented!` は `deny` で禁止（WIP ブランチを除く）
+- `unwrap()` is prohibited by `deny(clippy::unwrap_used)`
+  - Permitted only as `expect("Explicit reason")` in test code
+- `panic!` is prohibited by `deny(clippy::panic)` (outside of tests)
+- `todo!` / `unimplemented!` are prohibited by `deny` (except on WIP branches)
 
 ---
 
-## 6. コメント規約
+## 6. Comment Rules
 
-**コメントは「なぜ（WHY）」のみ。何をしているか（WHAT）はコードで表現する。**
-コメントは **日本語** で記載する。
+**Comments should only describe the "WHY". The "WHAT" should be expressed through code.**
+Comments must be written in **English** (following the English First Policy).
 
 ```rust
-// ✅ Good — WHY のみ、日本語
-// comrak はデフォルトで GFM 無効なので、拡張を明示的に有効化する。
+// ✅ Good — Only WHY, written in English
+// comrak disables GFM by default, so we explicitly enable the extension here.
 opts.extension.table = true;
 
-// ❌ Bad — WHAT をコメントしている（コードを読めばわかる）
-// テーブル拡張を有効にする
+// ❌ Bad — Commenting on the WHAT (obvious from reading the code)
+// Enable the table extension
 opts.extension.table = true;
 ```
 
-ドキュメンテーションコメント（`///`）は公開 API に対して英語で記載する（crates.io / rustdoc 慣習に従う）。
+Documentation comments (`///`) must be written in English for public APIs (following crates.io / rustdoc conventions).
 
 ---
 
-## 7. テスト規約
+## 7. Testing Rules
 
-### 7.1 テスト命名
+### 7.1 Test Naming
 
-**テストの `fn` 名は日本語スネークケース（ascii のみ）またはスネークケース英語で意味を表す。**
-`describe` に相当するグルーピングは `mod` で行う。
+**Test `fn` names should represent the meaning in English snake_case.**
+Grouping equivalent to `describe` is done with `mod`.
 
 ```rust
 // ✅ Good
 #[test]
-fn 未保存バッファはディスクに書き込まれない() { ... }
-
-// または英語スネークケース（長い日本語が難しい場合）
-#[test]
 fn unsaved_buffer_does_not_write_to_disk() { ... }
 ```
 
-### 7.2 テストファイル配置
+### 7.2 Test File Placement
 
-テストは **クレートルートの `tests/` ディレクトリ** に配置する。
-`src/` 内の `#[cfg(test)] mod tests { ... }` は禁止（テストヘルパー関数の `#[cfg(test)]` アトリビュートは許容）。
+Tests are placed in the **`tests/` directory at the crate root**.
+`#[cfg(test)] mod tests { ... }` in `src/` is prohibited (the `#[cfg(test)]` attribute for test helper functions is permitted).
 
 ```
 crates/katana-core/
-  src/              # 実装コードのみ
+  src/              # Implementation code only
   tests/
-    document.rs     # document.rs のテスト
-    workspace.rs    # workspace.rs のテスト
-    preview.rs      # preview.rs のテスト
-    ai.rs           # AI モジュールのテスト
-    markdown_*.rs   # 各レンダラーのテスト
-    plugin.rs       # プラグインのテスト
+    document.rs     # Tests for document.rs
+    workspace.rs    # Tests for workspace.rs
+    preview.rs      # Tests for preview.rs
+    ai.rs           # Tests for the AI module
+    markdown_*.rs   # Tests for each renderer
+    plugin.rs       # Tests for plugins
 ```
 
-### 7.3 テストピラミッド
+### 7.3 Test Pyramid
 
-| 種別 | 配置 | カバレッジ目標 |
+| Type | Placement | Coverage Target |
 |------|------|--------------| 
-| Unit Test | `tests/` ディレクトリ | **100%（例外なし）** |
-| Integration Test | `tests/` ディレクトリ | 主要フロー網羅 |
-| Integration Test | `tests/integration/` (egui_kittest予定) | MVP の全シナリオ、スナップショット回帰監視 |
+| Unit Test | `tests/` directory | **100% (No Exceptions)** |
+| Integration Test | `tests/` directory | Core flow coverage |
+| Integration Test | `tests/integration/` (Planned egui_kittest) | All MVP scenarios, Snapshot regression monitoring |
 
-カバレッジ測定: `cargo llvm-cov --workspace --fail-under-lines 100`（CI 強制）
+Coverage measurement: `cargo llvm-cov --workspace --fail-under-lines 100` (Forced in CI)
 
 ---
 
-## 8. 変数・型命名
+## 8. Variable and Type Naming
 
-**省略形は禁止。将来の読み手を意識した完全な名前を使う。**
+**Abbreviations are prohibited. Use full names considering future readers.**
 
 ```rust
 // ✅ Good
@@ -225,131 +221,131 @@ let active_document = Document::new(path, content);
 
 // ❌ Bad
 let ws = Path::new("/home/user/project");
-let doc = Document::new(path, content);  // ← 文脈が失われる
+let doc = Document::new(path, content);  // ← Context is lost
 ```
 
-**クロージャ引数**: Kotlin の `it` イディオムに倣い、単一引数クロージャは `it` を使う。
+**Closure parameters**: Emulating Kotlin's `it` idiom, use `it` for single-argument closures.
 
 ```rust
-// ✅ Good — 単一引数クロージャ
+// ✅ Good — Single-argument closure
 entries.iter().filter(|it| it.is_markdown())
 
-// ✅ Good — for 式は可読性重視の命名
+// ✅ Good — for expression with naming focused on readability
 for entry in &ws.tree { ... }
 for plugin_meta in registry.active_plugins_for(&point) { ... }
 ```
 
 ---
 
-## 9. Linter 設定サマリ
+## 9. Linter Setting Summary
 
-各クレートの `lib.rs` / `main.rs` の先頭に以下を付与する:
+Add the following to the top of `lib.rs` / `main.rs` of each crate:
 
 ```rust
 #![deny(
-    clippy::too_many_lines,         // 関数30行超を禁止
-    clippy::cognitive_complexity,   // ネスト深度プロキシ
-    clippy::wildcard_imports,       // use foo::* を禁止
-    clippy::unwrap_used,            // unwrap() を禁止
-    clippy::panic,                  // panic! を禁止
-    clippy::todo,                   // todo! を禁止
-    clippy::unimplemented,          // unimplemented! を禁止
-    clippy::exhaustive_structs,     // 公開 struct の非網羅的なパターン警告 (warn にする場合あり)
+    clippy::too_many_lines,         // Prohibit functions over 30 lines
+    clippy::cognitive_complexity,   // Nesting depth proxy
+    clippy::wildcard_imports,       // Prohibit use foo::*
+    clippy::unwrap_used,            // Prohibit unwrap()
+    clippy::panic,                  // Prohibit panic!
+    clippy::todo,                   // Prohibit todo!
+    clippy::unimplemented,          // Prohibit unimplemented!
+    clippy::exhaustive_structs,     // Non-exhaustive pattern warning on public struct (may be set to warn)
 )]
 #![warn(
-    clippy::expect_used,            // expect() は警告（理由付きなら許容）
-    clippy::indexing_slicing,       // インデックスアクセスを警告
-    clippy::missing_errors_doc,     // pub fn の Result に doc 必須
-    missing_docs,                   // pub アイテムに doc コメント必須
+    clippy::expect_used,            // Warn on expect() (permitted with a reason)
+    clippy::indexing_slicing,       // Warn on index access
+    clippy::missing_errors_doc,     // pub fn's Result requires doc
+    missing_docs,                   // pub items require doc comments
 )]
 ```
 
-`.clippy.toml` で閾値を設定:
+Set thresholds in `.clippy.toml`:
 
 ```toml
 too-many-lines-threshold = 30
 cognitive-complexity-threshold = 10
 ```
 
-### 9.2 品質ゲート（完了の定義 / Definition of Done）
+### 9.2 Quality Gates (Definition of Done)
 
-PR をマージ可能とするための必須条件:
+Prerequisites for allowing a PR to be merged:
 
-1. **フォーマット**: `cargo fmt --all -- --check` パス
-2. **Clippy**: `cargo clippy --workspace -- -D warnings` パス（warning ゼロ）
-3. **テスト (ロジック)**: `cargo test --workspace` 全パス
-4. **テスト (統合)**: `make test-integration` パス（UI スナップショット回帰なし）
-5. **テスト配置**: 新規ロジックには `tests/` ディレクトリにテストが付随している
-6. **カバレッジ**: `cargo llvm-cov --workspace --fail-under-lines 100` パス
+1. **Format**: Passes `cargo fmt --all -- --check`
+2. **Clippy**: Passes `cargo clippy --workspace -- -D warnings` (Zero warnings)
+3. **Tests (Logic)**: Passes all `cargo test --workspace`
+4. **Tests (Integration)**: Passes `make test-integration` (No UI Snapshot Regressions)
+5. **Test Placement**: New logic is accompanied by tests in the `tests/` directory
+6. **Coverage**: Passes `cargo llvm-cov --workspace --fail-under-lines 100`
 
-一括チェック: `make ci`（pre-push フックと同等）
+Batch check: `make ci` (equivalent to the pre-push hook)
 
 ---
 
-## 10. 例外申請プロセス
+## 10. Exception Request Process
 
-以下のいずれかに該当する場合のみ `#[allow(...)]` を許容する：
+`#[allow(...)]` is only permitted if any of the following apply:
 
-1. egui の `update()` など、フレームワーク都合で分割不能な場合
-2. 生成コードやマクロ展開結果
-3. PR レビューで合意を得た設計上の理由がある場合
+1. It cannot be split due to framework constraints, such as `update()` in egui
+2. Generated code or macro expansion results
+3. There is a design reason that obtained agreement during PR review
 
-`#[allow(...)]` には **必ず日本語コメントで理由を記載** すること：
+You must **always state the reason in an English comment** for `#[allow(...)]`:
 
 ```rust
-// egui の App::update は単一エントリポイントのためフレームワーク制約で分割不能。
+// App::update in egui is a single entry point and cannot be split due to framework constraints.
 #[allow(clippy::too_many_lines)]
 fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) { ... }
 ```
 
 ---
 
-## 11. i18n（国際化）規約 【最重要・違反ゼロ維持】
+## 11. i18n (Internationalization) Rules [Highest Priority - Maintain Zero Violations]
 
-**UI に表示するすべての文字列は `i18n::t()` または `i18n::tf()` を経由しなければならない。**
-ハードコーディングは言語問わず **一切禁止**（英語・日本語・記号以外のすべて）。
+**All strings displayed in the UI must go through `i18n::t()` or `i18n::tf()`.**
+Hardcoding is **strictly prohibited** regardless of the language (everything except English, Japanese, and symbols).
 
-本プロジェクトの哲学「定義はあるが守られる保証がない規約は無意味」に基づき、このルールは第12章で定義される **カスタム AST Linter によって機械的に強制** される。
+Based on the project's philosophy, "A convention that is defined but has no guarantee of being followed is meaningless," this rule is **mechanically enforced by a Custom AST Linter** defined in Chapter 12.
 
-### 11.1 対象となる呼び出しと AST 検知
+### 11.1 Target Calls and AST Detection
 
-以下の呼び出しメソッド群の引数において、文字列リテラル（`"..."` や `String::from("...")` などのハードコード）を直接渡すことは AST 解析によってエラーとして弾かれる。
+Passing string literals directly (hardcoded such as `"..."` or `String::from("...")`) in the arguments of the following method calls will be rejected as errors by AST analysis.
 
-| メソッド名 / 検知対象 | 正しいパターン (Linter通過) | ❌ 禁止パターン (Linterで弾かれる) |
+| Method Name / Target for Detection | Correct Pattern (Passes Linter) | ❌ Prohibited Pattern (Rejected by Linter) |
 |---|---|---|
 | `ui.label(...)` | `ui.label(i18n::t("status_ready"))` | `ui.label("Ready")` |
 | `ui.heading(...)` | `ui.heading(i18n::t("preview_title"))` | `ui.heading("Preview")` |
 | `ui.button(...)` | `ui.button(i18n::t("menu_save"))` | `ui.button("Save")` |
 | `RichText::new(...)` | `RichText::new(i18n::t("alert"))` | `RichText::new("Alert")` |
 | `.on_hover_text(...)` | `.on_hover_text(i18n::t("expand"))` | `.on_hover_text("Expand all")` |
-| 文字列の合成（`format!`等） | `i18n::tf("saved", &[("key", val)])` | `format!("Saved: {}", val)` |
+| String interpolation (e.g., `format!`) | `i18n::tf("saved", &[("key", val)])` | `format!("Saved: {}", val)` |
 
-### 11.2 i18n 例外（自動許可リスト）
+### 11.2 i18n Exceptions (Automatic Allowlist)
 
-純粋な記号のみの文字列などは「AST解析器自体が許可リスト（Allowlist）として判定」し、エラーをバイパスする。
+Strings consisting purely of symbols are automatically bypassed as the "AST parser itself evaluates them as an Allowlist".
 
-- **単一記号**: `"*"`, `"x"`, `"+"`, `"-"`, `"▼"`, `"▶"` など
-- **アイコン絵文字**: `"🔄"` などの UI コントロール用単独記号
-- **パス区切り・レイアウト空白**: `"/"`, `" "`, `"\n"` など
-- **デバッグ文字列**: `tracing::info!` 内など、egui非依存の出力
+- **Single Symbols**: `"*"`, `"x"`, `"+"`, `"-"`, `"▼"`, `"▶"`, etc.
+- **Icon Emojis**: Standalone symbols for UI controls such as `"🔄"`
+- **Path Separators / Layout Whitespace**: `"/"`, `" "`, `"\n"`, etc.
+- **Debug Strings**: Inside `tracing::info!`, output independent of egui
 
-### 11.3 ロケールファイル管理
+### 11.3 Locale File Management
 
-- 新しいキーは **en.json と ja.json に同時追加** する（片方だけの追加は禁止）。
-- キー漏れは統合テスト（`tests/i18n.rs`等）により自動検知する。
+- New keys must be **added simultaneously to en.json and ja.json** (adding to only one is prohibited).
+- Missing keys are automatically detected by integration tests (such as `tests/i18n.rs`).
 
 ---
 
-## 12. カスタム静的解析 (AST Linter) による規約強制
+## 12. Enforcement via Custom Static Analysis (AST Linter)
 
-本コーディング規約（i18nルールや禁止型制約などを含む）を人手ではなくCI上で自動強制するため、Rust の `syn` クレートによる AST（抽象構文木）トラバースを用いたカスタムLinterを運用する。
+To automatically enforce these coding conventions (including i18n rules and prohibited type constraints) in CI rather than manually, we operate a Custom Linter using AST (Abstract Syntax Tree) traversal with Rust's `syn` crate.
 
-> ※ 仕様詳細は `docs/ast-linter-plan.md` を参照のこと。
+> * For specification details, see `docs/ast-linter-plan.md`.
 
-### 12.1 強制のフロー (`pre-commit` / `pre-push`)
+### 12.1 Flow of Enforcement (`pre-commit` / `pre-push`)
 
-開発者がコードを変更してコミットする際、以下のハードゲートを通る。規約違反があった場合、コミット自体が `lefthook` に拒否される。
+When a developer changes code and commits, it goes through the following hard gate. If there is a convention violation, the commit itself will be rejected by `lefthook`.
 
 ```
-[コード変更] → [lefthook 検査] → [cargo test (ast_linter.rs)] → [AST 解析・合否]
+[Code Change] → [lefthook Inspection] → [cargo test (ast_linter.rs)] → [AST Analysis / Pass or Fail]
 ```

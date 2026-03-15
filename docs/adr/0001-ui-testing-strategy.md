@@ -1,50 +1,50 @@
-# ADR 0001: UI テスト戦略と egui_kittest の導入計画
+# ADR 0001: UI Testing Strategy and egui_kittest Implementation Plan
 
-## ステータス
+## Status
 
-承認済み (実装は egui 0.30 アップグレード後に保留)
+Approved (Implementation put on hold until after egui 0.30 upgrade)
 
-## 背景と課題
+## Background and Context
 
-katana は `egui` で構築されたデスクトップアプリケーションですが、現状は手動による UI テスト（画面確認）しか手段がありません。コードのモジュール化である程度ロジックテスト（UI と非依存な関数）は分離可能ですが、以下の観点を自動化することが急務です。
+Katana is a desktop application built with `egui`, but currently, there are only manual UI testing (visual confirmation) means available. While we can separate some logic tests (UI-independent functions) by modularizing the code, automating the following points is a pressing need:
 
-1. **ユーザーシナリオの検証**: 「ワークスペースを開き、ファイルをクリックしてプレビューを描画する」などのユースケース全体を通したテスト。
-2. **UI 回帰の検知**: ピクセルレベルの崩れ（スナップショットテスト）。
-3. **CI での自動継続実行**: 人手を介さないヘッドレス状態での動作担保。
+1. **Verification of User Scenarios**: Testing use cases end-to-end, such as "open a workspace, click a file, and render the preview."
+2. **Detection of UI Regressions**: Discovering pixel-level layout breaking (snapshot testing).
+3. **Automated Continuous Execution in CI**: Guaranteeing operations in a headless state without manual intervention.
 
-一般的なウェブアプリケーションでは Playwright を利用しますが、ネイティブの `egui` アプリであるため、これに特化したテストソリューションが必要です。
+While Playwright is commonly used for web applications, Katana is a native `egui` app, requiring a dedicated testing solution.
 
-## 検討肢
+## Considered Options
 
-| ツール/手法 | 特徴 | 評価 |
+| Tool/Method | Features | Evaluation |
 |---|---|---|
-| **手動テスト** | 低コストだがスケールしない | CI/CDの障害。非採用。 |
-| **ロジック分離 (Phase 1)** | UIコンポーネントを含まない状態遷移の単体テスト | すでに導入済み。しかし「実際に見えるか」「クリック可能か」は保証しない。 |
-| **`egui_kittest` (Phase 2)** | egui レンダリングと AccessKitを利用したUIテストおよびスナップショットテスト | 本プロジェクトの要件に合致。採用。 |
+| **Manual Testing** | Low cost but not scalable | Barrier to CI/CD. Rejected. |
+| **Logic Separation (Phase 1)** | Unit tests for state transitions without UI components | Already introduced. However, it does not guarantee "how it actually looks" or "whether it's clickable." |
+| **`egui_kittest` (Phase 2)** | UI and snapshot testing using egui rendering and AccessKit | Matches project requirements. Adopted. |
 
-## 決定
+## Decision
 
-UI シナリオおよびスナップショットテスト基盤として **`egui_kittest`** を正式に採用します。
+We formally adopt **`egui_kittest`** as our UI scenario and snapshot testing infrastructure.
 
-しかし、導入調査において以下の**バージョン互換性の問題**が判明しました。
+However, during the introduction investigation, the following **version compatibility issue** was discovered:
 
-* katana プロジェクトは現在 **egui 0.29** を使用している。
-* `egui_kittest` （crates.io で利用可能なもの）の最小要求バージョンは **egui 0.30**（初期リリースが 0.30.0）である。
+* The Katana project currently uses **egui 0.29**.
+* The minimum required version for `egui_kittest` (the one available on crates.io) is **egui 0.30** (initial release is 0.30.0).
 
-そのため、以下のフェーズに分けて導入を行います。
+Therefore, we will introduce it in the following phases:
 
-1. **準備フェーズ (現在)**
-   * ロジック分離によるユニットテストの拡充（Phase 1 完了）
-   * 本 ADR の作成と、テストシナリオの洗い出し（`docs/e2e_scenarios.md`）
-   * `Makefile` や `.gitignore` など周辺の基盤設備化
+1. **Preparation Phase (Current)**
+   * Expansion of unit tests through logic separation (Phase 1 completed)
+   * Creation of this ADR and identification of test scenarios (`docs/e2e_scenarios.md`)
+   * Surrounding infrastructure setup, such as `Makefile` and `.gitignore`
 
-2. **実装フェーズ (次フェーズ)**
-   * `egui 0.30` へのワークスペースアップデートの実施
-   * `egui_kittest` パッケージの導入
-   * 定義したテストシナリオに基づく `tests/e2e/` での E2E 実装と、CI ランナーへの組み込み
+2. **Implementation Phase (Next Phase)**
+   * Perform a workspace upgrade to `egui 0.30`
+   * Introduce the `egui_kittest` package
+   * E2E implementation in `tests/e2e/` based on defined test scenarios and integration into CI runners
 
-## 影響とリスク
+## Consequences and Risks
 
-* **スナップショットテストの環境差分**：macOS 環境・CI の Linux 環境での GPU 描画やフォントレンダリング差分により、意図しない画像差分が発生するリスクがある。
-  * **対策**: スナップショットの誤差許容設定（差分閾値）や、UIテスト時専用のモックフォントを利用するなどの設定工夫を次フェーズで適用する。
-* **アップグレードの依存関係**：`egui 0.30` はメジャーアップデート（互換性のない変更）の可能性が高いため、対応工数が掛かる。
+* **Environmental differences in snapshot testing**: There is a risk of unintended image differences occurring due to GPU rendering or font rendering differences between the macOS environment and the Linux CI environment.
+  * **Mitigation**: Adjust the snapshot error tolerance settings (difference threshold) or use mock fonts dedicated to UI testing in the next phase.
+* **Dependencies of the upgrade**: Since `egui 0.30` is highly likely to be a major update (breaking changes), there will be a corresponding implementation cost.
