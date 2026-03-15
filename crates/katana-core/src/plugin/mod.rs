@@ -103,24 +103,31 @@ impl PluginRegistry {
 
     /// Return metadata for all plugins that are active and contribute to `point`.
     pub fn active_plugins_for(&self, point: &ExtensionPoint) -> Vec<&PluginMeta> {
-        self.entries
-            .values()
-            .filter(|e| e.status == PluginStatus::Active)
-            .filter(|e| e.meta.extension_points.contains(point))
-            .map(|e| &e.meta)
-            .collect()
+        let mut result = Vec::new();
+        for entry in self.entries.values() {
+            if entry.status == PluginStatus::Active && entry.meta.extension_points.contains(point) {
+                result.push(&entry.meta);
+            }
+        }
+        result
     }
 
     /// Status of a plugin by ID.
     pub fn status(&self, id: &str) -> Option<&PluginStatus> {
-        self.entries.get(id).map(|e| &e.status)
+        match self.entries.get(id) {
+            Some(entry) => Some(&entry.status),
+            None => None,
+        }
     }
 
     /// Total number of active plugins.
     pub fn active_count(&self) -> usize {
-        self.entries
-            .values()
-            .filter(|e| e.status == PluginStatus::Active)
-            .count()
+        let mut count = 0;
+        for entry in self.entries.values() {
+            if entry.status == PluginStatus::Active {
+                count += 1;
+            }
+        }
+        count
     }
 }
