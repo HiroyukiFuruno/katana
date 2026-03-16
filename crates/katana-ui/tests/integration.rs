@@ -63,7 +63,7 @@ fn test_integration_workspace_and_tabs() {
         .click();
     harness.step();
 
-    // Verify it opened and editor handles it (Title will be "katana — test1.md")
+    // Verify it opened and editor handles it (Title will be "KatanA — test1.md")
     // In kittest, `kittest::Queryable` can query values. Let's just do a snapshot.
     harness.snapshot_options(
         "editor_opened",

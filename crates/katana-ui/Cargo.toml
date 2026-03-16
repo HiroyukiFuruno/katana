@@ -3,7 +3,7 @@ name = "katana-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Katana UI: egui application shell, panes, menu wiring, and presentation state"
+description = "KatanA UI: egui application shell, panes, menu wiring, and presentation state"
 
 [dependencies]
 katana-core = { path = "../katana-core" }
@@ -24,9 +24,10 @@ serde_json.workspace = true
 cc = "1"
 
 [[bin]]
-name = "katana"
+name = "KatanA"
 path = "src/main.rs"
 
 [dev-dependencies]
 egui_kittest = { version = "0.33", features = ["snapshot", "wgpu", "eframe"] }
 tempfile = "3"
+time = "0.3"

@@ -1,4 +1,4 @@
-//! Katana three-pane egui shell.
+//! KatanA three-pane egui shell.
 //!
 //! Contains only business logic. egui rendering code is separated into shell_ui.rs.
 
@@ -85,6 +85,11 @@ pub struct KatanaApp {
     pub(crate) tab_hashes: HashMap<std::path::PathBuf, u64>,
     /// Receiver for background download completion notifications.
     pub(crate) download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
+    /// Whether the About dialog is currently visible.
+    pub(crate) show_about: bool,
+    /// App icon texture for the About dialog.
+    /// Public because it is set from the binary crate (main.rs) during initialization.
+    pub about_icon: Option<egui::TextureHandle>,
 }
 
 impl KatanaApp {
@@ -96,6 +101,8 @@ impl KatanaApp {
             tab_panes: HashMap::new(),
             tab_hashes: HashMap::new(),
             download_rx: None,
+            show_about: false,
+            about_icon: None,
         }
     }
 

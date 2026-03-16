@@ -1,5 +1,5 @@
 # ============================================================
-# Katana — Development Makefile
+# KatanA — Development Makefile
 # ============================================================
 # Usage: make <target>
 #   make help   — Show a list of available commands
@@ -18,12 +18,12 @@ release: ## Release build (optimized)
 	cargo build --workspace --release
 
 .PHONY: run
-run: ## Run the application (katana)
-	cargo run --bin katana
+run: ## Run the application (KatanA)
+	cargo run --bin KatanA
 
 .PHONY: run-release
 run-release: ## Run the application in release mode
-	cargo run --bin katana --release
+	cargo run --bin KatanA --release
 
 # ---------- Formatters ----------
 
@@ -178,11 +178,11 @@ watch: ## Watch file changes & auto check (requires cargo-watch)
 
 .PHONY: watch-run
 watch-run: ## Watch file changes & auto restart (requires cargo-watch)
-	cargo watch -x 'run --bin katana'
+	cargo watch -x 'run --bin KatanA'
 
 .PHONY: bloat
 bloat: ## Binary size analysis (requires cargo-bloat)
-	cargo bloat --release --bin katana
+	cargo bloat --release --bin KatanA
 
 .PHONY: loc
 loc: ## Count lines of code (requires tokei)

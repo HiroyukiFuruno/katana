@@ -1,5 +1,5 @@
 #![deny(warnings)]
-//! Katana UI application entry point.
+//! KatanA UI application entry point.
 
 #[cfg(not(test))]
 use katana_core::ai::AiProviderRegistry;
@@ -44,7 +44,14 @@ fn main() -> eframe::Result<()> {
         )
         .init();
 
-    tracing::info!("Starting Katana");
+    tracing::info!("Starting KatanA");
+
+    // macOS: Set process name before any window is created.
+    // This ensures the Dock label shows "KatanA" instead of "katana".
+    #[cfg(target_os = "macos")]
+    unsafe {
+        shell_ui::native_set_process_name();
+    }
 
     // Initialize AI provider registry (no providers configured in MVP).
     let ai_registry = AiProviderRegistry::new();
@@ -65,7 +72,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Katana")
+            .with_title("KatanA")
             .with_icon(load_icon())
             .with_inner_size(INITIAL_WINDOW_SIZE)
             .with_min_inner_size(MIN_WINDOW_SIZE),
@@ -73,7 +80,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "Katana",
+        "KatanA",
         native_options,
         Box::new(|cc| {
             setup_fonts(&cc.egui_ctx);
@@ -92,6 +99,21 @@ fn main() -> eframe::Result<()> {
             katana_ui::i18n::set_language(&saved_language);
 
             let mut app = KatanaApp::new(state);
+
+            // Load icon texture for About dialog.
+            let icon_png = include_bytes!("../../../assets/icon.iconset/icon_128x128.png");
+            if let Ok(icon_image) = image::load_from_memory(icon_png) {
+                let rgba = icon_image.to_rgba8();
+                let size = [rgba.width() as usize, rgba.height() as usize];
+                let pixels = rgba.into_raw();
+                let color_image = egui::ColorImage::from_rgba_unmultiplied(size, &pixels);
+                let texture = cc.egui_ctx.load_texture(
+                    "about_icon",
+                    color_image,
+                    egui::TextureOptions::LINEAR,
+                );
+                app.about_icon = Some(texture);
+            }
 
             // Restore last opened workspace.
             if let Some(ws_path) = saved_workspace {

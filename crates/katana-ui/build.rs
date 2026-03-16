@@ -1,9 +1,23 @@
-// Build script for macOS native menu bar.
+// Build script for macOS native menu bar and compile-time metadata.
 // Compiles and links the Objective-C file (macos_menu.m).
+// Captures the rustc version for display in the About dialog.
 
 fn main() {
+    // Capture rustc version (e.g. "rustc 1.82.0 (f6e511eec 2024-10-15)")
+    // and expose it as KATANA_RUSTC_VERSION for use with env!() in about_info.rs.
+    if let Ok(output) = std::process::Command::new("rustc")
+        .arg("--version")
+        .output()
+    {
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        println!("cargo:rustc-env=KATANA_RUSTC_VERSION={version}");
+    }
+
     #[cfg(target_os = "macos")]
     {
+        println!("cargo:rerun-if-changed=src/macos_menu.m");
+        println!("cargo:rerun-if-changed=Info.plist");
+
         cc::Build::new()
             .file("src/macos_menu.m")
             .flag("-fobjc-arc")

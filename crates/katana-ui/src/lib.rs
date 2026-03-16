@@ -1,8 +1,9 @@
 #![deny(warnings)]
-//! Katana UI library.
+//! KatanA UI library.
 //!
 //! Exposes main editor components, allowing access for testing and external tools.
 
+pub mod about_info;
 pub mod app_state;
 pub mod i18n;
 pub mod preview_pane;

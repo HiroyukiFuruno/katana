@@ -1,4 +1,4 @@
-//! Pure egui UI rendering functions for the Katana shell.
+//! Pure egui UI rendering functions for the KatanA shell.
 //!
 //! This module contains code that depends entirely on the egui frame context
 //! and UI events (e.g., clicks).
@@ -537,12 +537,14 @@ mod native_menu {
     pub const TAG_SAVE: i32 = 2;
     pub const TAG_LANG_EN: i32 = 3;
     pub const TAG_LANG_JA: i32 = 4;
+    pub const TAG_ABOUT: i32 = 5;
 
     #[allow(dead_code)]
     extern "C" {
         pub fn katana_setup_native_menu();
         pub fn katana_poll_menu_action() -> i32;
         pub fn katana_set_app_icon_png(png_data: *const u8, png_len: std::ffi::c_ulong);
+        pub fn katana_set_process_name();
     }
 }
 
@@ -554,6 +556,17 @@ mod native_menu {
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     native_menu::katana_setup_native_menu();
+}
+
+/// Sets the macOS process name to "KatanA".
+/// Must be called at the very start of main(), BEFORE eframe creates the window,
+/// so that the Dock label shows "KatanA" instead of the binary name.
+///
+/// # Safety
+/// Contains Objective-C runtime calls. Must be called from the main thread.
+#[cfg(all(target_os = "macos", not(test)))]
+pub unsafe fn native_set_process_name() {
+    native_menu::katana_set_process_name();
 }
 
 /// Sets the macOS application icon dynamically from PNG data.
@@ -597,6 +610,9 @@ impl eframe::App for KatanaApp {
                 native_menu::TAG_LANG_JA => {
                     self.pending_action = AppAction::ChangeLanguage("ja".to_string());
                 }
+                native_menu::TAG_ABOUT => {
+                    self.show_about = !self.show_about;
+                }
                 _ => {}
             }
         }
@@ -614,9 +630,9 @@ impl eframe::App for KatanaApp {
         let title_text = match self.state.active_document() {
             Some(doc) => {
                 let rel = relative_full_path(&doc.path, ws_root_for_title.as_deref());
-                format!("katana — {rel}")
+                format!("KatanA — {rel}")
             }
-            None => "katana".to_string(),
+            None => "KatanA".to_string(),
         };
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
 
@@ -737,5 +753,119 @@ impl eframe::App for KatanaApp {
         if let Some(req) = download_req {
             self.start_download(req);
         }
+
+        // About dialog
+        if self.show_about {
+            render_about_window(ctx, &mut self.show_about, self.about_icon.as_ref());
+        }
     }
+}
+
+/// Renders the custom About window with all required OSS project information.
+fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui::TextureHandle>) {
+    const ABOUT_WINDOW_WIDTH: f32 = 400.0;
+    const INNER_PADDING: f32 = 8.0;
+    const ICON_SIZE: f32 = 64.0;
+    const HEADING_SIZE: f32 = 20.0;
+    const DESCRIPTION_SIZE: f32 = 12.0;
+    const SECTION_HEADER_SIZE: f32 = 13.0;
+    const SECTION_SPACING: f32 = 8.0;
+    const HEADING_SPACING: f32 = 8.0;
+    const SECTION_HEADER_BOTTOM: f32 = 2.0;
+
+    let info = crate::about_info::about_info();
+
+    egui::Window::new(format!("About {}", crate::about_info::APP_DISPLAY_NAME))
+        .open(open)
+        .resizable(false)
+        .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_width(ABOUT_WINDOW_WIDTH)
+        .frame(egui::Frame::window(&ctx.style()).inner_margin(INNER_PADDING))
+        .show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(HEADING_SPACING);
+                // App icon
+                if let Some(tex) = icon {
+                    ui.image(egui::load::SizedTexture::new(
+                        tex.id(),
+                        egui::vec2(ICON_SIZE, ICON_SIZE),
+                    ));
+                    ui.add_space(SECTION_SPACING);
+                }
+                ui.heading(
+                    egui::RichText::new(info.product_name)
+                        .strong()
+                        .size(HEADING_SIZE),
+                );
+                ui.label(
+                    egui::RichText::new(info.description)
+                        .weak()
+                        .size(DESCRIPTION_SIZE),
+                );
+                ui.add_space(HEADING_SPACING);
+            });
+
+            // ── 1. Basic Info ──
+            about_section_header(ui, "Basic Info", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            about_row(ui, "Version", &format!("v{}", info.version));
+            about_row(ui, "Build", info.build);
+            about_row(ui, "Copyright", info.copyright);
+            ui.add_space(SECTION_SPACING);
+
+            // ── 2. Runtime ──
+            about_section_header(ui, "Runtime", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            about_row(ui, "Platform", &info.system.os);
+            about_row(ui, "Architecture", &info.system.arch);
+            about_row(ui, "Rust", &info.system.rustc_version);
+            ui.add_space(SECTION_SPACING);
+
+            // ── 3. License ──
+            about_section_header(ui, "License", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            about_row(ui, "License", info.license);
+            ui.add_space(SECTION_SPACING);
+
+            // ── 4-6. Links ──
+            about_section_header(ui, "Links", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            about_link_row(ui, "Source Code", info.repository);
+            about_link_row(ui, "Documentation", info.docs_url);
+            about_link_row(ui, "Report Issue", info.issues_url);
+            ui.add_space(SECTION_SPACING);
+
+            // ── 7. Support / Sponsor ──
+            about_section_header(ui, "Support", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            if info.sponsor_url.is_empty() {
+                about_row(ui, "Sponsor", "Coming Soon");
+            } else {
+                about_link_row(ui, "Sponsor", info.sponsor_url);
+            }
+            ui.add_space(SECTION_SPACING);
+        });
+}
+
+/// Section header for the About dialog.
+fn about_section_header(ui: &mut egui::Ui, title: &str, size: f32, bottom: f32) {
+    ui.separator();
+    ui.label(egui::RichText::new(title).strong().size(size));
+    ui.add_space(bottom);
+}
+
+/// Key-value row (non-clickable).
+fn about_row(ui: &mut egui::Ui, label: &str, value: &str) {
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(label).weak());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(value);
+        });
+    });
+}
+
+/// Link row: label on the left, clickable short text on the right.
+fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(label).weak());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.hyperlink_to("↗", url);
+        });
+    });
 }

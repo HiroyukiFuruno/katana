@@ -5,7 +5,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.github.hiroyukifuruno.katana</string>
     <key>CFBundleName</key>
-    <string>Katana</string>
+    <string>KatanA</string>
+    <key>CFBundleDisplayName</key>
+    <string>KatanA</string>
     <key>CFBundleIconFile</key>
     <string>icon.icns</string>
     <key>CFBundlePackageType</key>

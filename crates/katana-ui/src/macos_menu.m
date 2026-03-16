@@ -7,6 +7,7 @@ enum {
     TAG_SAVE           = 2,
     TAG_LANG_EN        = 3,
     TAG_LANG_JA        = 4,
+    TAG_ABOUT          = 5,
 };
 
 // Global: Tag of the last selected menu action.
@@ -26,10 +27,60 @@ static volatile int g_last_action = 0;
 
 static KatanaMenuTarget *g_target = nil;
 
+/// Called from Rust at the very start of main(), before eframe creates the window.
+/// Must be called before the window server registers the process to ensure
+/// the Dock label shows "KatanA" instead of the binary name "katana".
+void katana_set_process_name(void) {
+    [[NSProcessInfo processInfo] setProcessName:@"KatanA"];
+}
+
 /// Called from Rust: Builds the native menu bar.
 void katana_setup_native_menu(void) {
     g_target = [[KatanaMenuTarget alloc] init];
     SEL action = @selector(menuAction:);
+
+    // --- Application Menu ---
+    NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@"KatanA"];
+
+    NSMenuItem *aboutItem = [[NSMenuItem alloc]
+        initWithTitle:@"About KatanA"
+        action:action
+        keyEquivalent:@""];
+    [aboutItem setTarget:g_target];
+    [aboutItem setTag:TAG_ABOUT];
+    [appMenu addItem:aboutItem];
+
+    [appMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *hideItem = [[NSMenuItem alloc]
+        initWithTitle:@"Hide KatanA"
+        action:@selector(hide:)
+        keyEquivalent:@"h"];
+    [appMenu addItem:hideItem];
+
+    NSMenuItem *hideOthersItem = [[NSMenuItem alloc]
+        initWithTitle:@"Hide Others"
+        action:@selector(hideOtherApplications:)
+        keyEquivalent:@"h"];
+    [hideOthersItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
+    [appMenu addItem:hideOthersItem];
+
+    NSMenuItem *showAllItem = [[NSMenuItem alloc]
+        initWithTitle:@"Show All"
+        action:@selector(unhideAllApplications:)
+        keyEquivalent:@""];
+    [appMenu addItem:showAllItem];
+
+    [appMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *quitItem = [[NSMenuItem alloc]
+        initWithTitle:@"Quit KatanA"
+        action:@selector(terminate:)
+        keyEquivalent:@"q"];
+    [appMenu addItem:quitItem];
+
+    NSMenuItem *appMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    [appMenuItem setSubmenu:appMenu];
 
     // --- File Menu ---
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
@@ -55,7 +106,7 @@ void katana_setup_native_menu(void) {
     NSMenuItem *fileMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [fileMenuItem setSubmenu:fileMenu];
 
-    // --- Settings > Language メニュー ---
+    // --- Settings > Language ---
     NSMenu *langMenu = [[NSMenu alloc] initWithTitle:@"Language"];
 
     NSMenuItem *enItem = [[NSMenuItem alloc]
@@ -83,12 +134,10 @@ void katana_setup_native_menu(void) {
     NSMenuItem *settingsMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [settingsMenuItem setSubmenu:settingsMenu];
 
-    // --- Add to Main Menu ---
-    NSMenu *mainMenu = [NSApp mainMenu];
-    if (!mainMenu) {
-        mainMenu = [[NSMenu alloc] initWithTitle:@""];
-        [NSApp setMainMenu:mainMenu];
-    }
+    // --- Build Main Menu ---
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+    [NSApp setMainMenu:mainMenu];
+    [mainMenu addItem:appMenuItem];
     [mainMenu addItem:fileMenuItem];
     [mainMenu addItem:settingsMenuItem];
 }
@@ -101,44 +150,7 @@ int katana_poll_menu_action(void) {
     return action;
 }
 
-#import <objc/runtime.h>
-
 static NSImage *g_app_icon = nil;
-
-@implementation NSApplication (KatanaSwizzle)
-- (void)katana_orderFrontStandardAboutPanel:(id)sender {
-    if (g_app_icon) {
-        [self katana_orderFrontStandardAboutPanelWithOptions:@{ @"ApplicationIcon": g_app_icon }];
-    } else {
-        [self katana_orderFrontStandardAboutPanel:sender]; // Calls original
-    }
-}
-
-- (void)katana_orderFrontStandardAboutPanelWithOptions:(NSDictionary *)options {
-    if (g_app_icon) {
-        NSMutableDictionary *newOptions = [NSMutableDictionary dictionaryWithDictionary:options];
-        newOptions[@"ApplicationIcon"] = g_app_icon;
-        [self katana_orderFrontStandardAboutPanelWithOptions:newOptions]; // Calls original
-    } else {
-        [self katana_orderFrontStandardAboutPanelWithOptions:options];
-    }
-}
-@end
-
-static void swizzle_about_panel() {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = [NSApplication class];
-        
-        Method orig1 = class_getInstanceMethod(cls, @selector(orderFrontStandardAboutPanel:));
-        Method swiz1 = class_getInstanceMethod(cls, @selector(katana_orderFrontStandardAboutPanel:));
-        method_exchangeImplementations(orig1, swiz1);
-        
-        Method orig2 = class_getInstanceMethod(cls, @selector(orderFrontStandardAboutPanelWithOptions:));
-        Method swiz2 = class_getInstanceMethod(cls, @selector(katana_orderFrontStandardAboutPanelWithOptions:));
-        method_exchangeImplementations(orig2, swiz2);
-    });
-}
 
 /// Called from Rust: Sets the application and dock icon from PNG bytes.
 void katana_set_app_icon_png(const unsigned char *png_data, unsigned long png_len) {
@@ -148,7 +160,6 @@ void katana_set_app_icon_png(const unsigned char *png_data, unsigned long png_le
         if (image) {
             g_app_icon = image;
             [NSApp setApplicationIconImage:image];
-            swizzle_about_panel();
         }
     }
 }
