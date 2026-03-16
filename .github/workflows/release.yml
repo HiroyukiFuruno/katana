@@ -1,0 +1,97 @@
+# =============================================================================
+# KatanA Desktop — Release CD
+# =============================================================================
+# Builds the macOS .app bundle and .dmg installer, then creates a GitHub Release
+# with the artifacts attached.
+#
+# Triggers:
+#   - Push of a version tag (v*)
+#   - Manual dispatch (workflow_dispatch)
+#
+# Security:
+#   - Only the repository owner can trigger this workflow
+#   - Fork PRs will NOT trigger this workflow
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: macos-latest
+    # Only allow the repository owner to run this workflow
+    if: github.actor == 'HiroyukiFuruno'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build .app bundle
+        run: make package-mac
+
+      - name: Build .dmg installer
+        run: make dmg
+
+      - name: Install git-cliff
+        run: cargo install git-cliff
+
+      - name: Generate changelog for this release
+        run: |
+          git-cliff --tag "${{ steps.tag.outputs.version }}" --latest --output RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.version }}
+          name: KatanA Desktop ${{ steps.tag.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            target/release/KatanA-Desktop-*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
