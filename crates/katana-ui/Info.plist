@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleIdentifier</key>
     <string>com.github.hiroyukifuruno.katana</string>
+    <key>CFBundleExecutable</key>
+    <string>KatanA</string>
     <key>CFBundleName</key>
     <string>KatanA</string>
     <key>CFBundleDisplayName</key>
@@ -16,5 +18,7 @@
     <string>v0.0.1</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
 </dict>
 </plist>

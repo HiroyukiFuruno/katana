@@ -39,6 +39,37 @@ package-mac: ## Build macOS .app bundle (release)
 	cp assets/icon.icns "$(CONTENTS)/Resources/icon.icns"
 	@echo "✅ $(APP_BUNDLE) created"
 
+VERSION      := $(shell grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+DMG_NAME     := KatanA-Desktop-$(VERSION).dmg
+DMG_OUT      := target/release/$(DMG_NAME)
+
+.PHONY: dmg
+dmg: package-mac ## Build macOS .dmg installer from .app bundle
+	@rm -f "$(DMG_OUT)"
+	@if command -v create-dmg >/dev/null 2>&1; then \
+		echo "Building DMG with create-dmg..."; \
+		create-dmg \
+			--volname "KatanA Desktop $(VERSION)" \
+			--window-pos 200 120 \
+			--window-size 600 400 \
+			--icon-size 100 \
+			--icon "KatanA Desktop.app" 150 190 \
+			--app-drop-link 450 190 \
+			--no-internet-enable \
+			"$(DMG_OUT)" \
+			"$(APP_BUNDLE)"; \
+	else \
+		echo "create-dmg not found, falling back to hdiutil..."; \
+		TMP_DMG=$$(mktemp -d)/staging; \
+		mkdir -p "$$TMP_DMG"; \
+		cp -R "$(APP_BUNDLE)" "$$TMP_DMG/"; \
+		ln -s /Applications "$$TMP_DMG/Applications"; \
+		hdiutil create -volname "KatanA Desktop $(VERSION)" \
+			-srcfolder "$$TMP_DMG" -ov -format UDZO "$(DMG_OUT)"; \
+		rm -rf "$$TMP_DMG"; \
+	fi
+	@echo "✅ $(DMG_OUT) created"
+
 # ---------- Formatters ----------
 
 .PHONY: fmt
