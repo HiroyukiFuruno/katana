@@ -1,8 +1,8 @@
-# Katana
+# KatanA
 
 > A fast, keyboard-driven Markdown editor for macOS — built with Rust and egui.
 
-Katana is a native desktop application for writing and previewing Markdown documents.
+KatanA is a native desktop application for writing and previewing Markdown documents.
 It renders your content in real time alongside your editor, supports diagram-as-code
 (Mermaid, PlantUML, Draw.io), and keeps the entire experience lightweight and snappy —
 no Electron, no Node.js, just a single native binary.
@@ -65,7 +65,7 @@ The script installs:
 ### Common `make` Commands
 
 ```sh
-make run          # Build and launch Katana
+make run          # Build and launch KatanA
 make test         # Run the full test suite
 make ci           # Full CI check: fmt + clippy + tests
 make watch-run    # Launch with auto-reload on file changes
@@ -101,7 +101,7 @@ katana/
 
 ## Contributing
 
-Katana is in early, active development. All contributions are welcome.
+KatanA is in early, active development. All contributions are welcome.
 
 ### Ways to Contribute
 
@@ -135,7 +135,7 @@ The key rules are:
 ### Sponsoring
 
 Sponsor support is coming soon. If you would like to support the development of
-Katana financially, please check back later or watch the repository for announcements.
+KatanA financially, please check back later or watch the repository for announcements.
 
 <!-- TODO: add GitHub Sponsors / Open Collective links once configured -->
 
@@ -147,12 +147,12 @@ A donation page is currently in preparation. Thank you for your patience.
 
 ### Other Ways to Support
 
-- ⭐ Star this repository — it helps others discover Katana
-- Share Katana with people who might find it useful
+- ⭐ Star this repository — it helps others discover KatanA
+- Share KatanA with people who might find it useful
 - Report bugs and suggest improvements through issues
 
 ---
 
 ## License
 
-Katana is released under the [MIT License](LICENSE).
+KatanA is released under the [MIT License](LICENSE).

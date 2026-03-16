@@ -3,7 +3,7 @@ name = "katana-platform"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Katana platform: filesystem access, settings persistence, keybindings, clipboard, and OS integrations"
+description = "KatanA platform: filesystem access, settings persistence, keybindings, clipboard, and OS integrations"
 
 [dependencies]
 katana-core = { path = "../katana-core" }

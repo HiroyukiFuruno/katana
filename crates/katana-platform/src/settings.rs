@@ -98,10 +98,10 @@ impl JsonFileRepository {
 
     /// Create a repository using the platform-standard config directory.
     ///
-    /// On macOS: `~/Library/Application Support/katana/settings.json`
+    /// On macOS: `~/Library/Application Support/KatanA/settings.json`
     pub fn with_default_path() -> Self {
         let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        Self::new(base.join("katana").join("settings.json"))
+        Self::new(base.join("KatanA").join("settings.json"))
     }
 }
 

@@ -1,8 +1,8 @@
 #!/bin/zsh
 # =============================================================================
-# Katana — Development Environment Setup
+# KatanA — Development Environment Setup
 # =============================================================================
-# This script installs and configures all tools required to develop Katana:
+# This script installs and configures all tools required to develop KatanA:
 #
 #   - Homebrew        : macOS package manager
 #   - git             : Latest Git (via Homebrew)
@@ -48,7 +48,7 @@ confirm() {
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
 echo "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${RESET}"
-echo "${BOLD}${CYAN}║         Katana — Development Environment Setup               ║${RESET}"
+echo "${BOLD}${CYAN}║         KatanA — Development Environment Setup               ║${RESET}"
 echo "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 echo "This script will check for and install the following:"

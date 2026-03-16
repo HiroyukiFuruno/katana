@@ -3,7 +3,7 @@ name = "katana-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Katana core: document model, workspace model, markdown pipeline, AI orchestration, and plugin contracts"
+description = "KatanA core: document model, workspace model, markdown pipeline, AI orchestration, and plugin contracts"
 
 [dependencies]
 comrak.workspace = true

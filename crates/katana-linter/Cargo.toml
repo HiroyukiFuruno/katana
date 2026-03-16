@@ -3,7 +3,7 @@ name = "katana-linter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Katana AST Linter: workspace-wide static analysis for coding standards enforcement"
+description = "KatanA AST Linter: workspace-wide static analysis for coding standards enforcement"
 
 [[test]]
 name = "ast_linter"
