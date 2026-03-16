@@ -409,6 +409,12 @@ impl<'ast> Visit<'ast> for MagicNumberVisitor {
         syn::visit::visit_impl_item_fn(self, node);
     }
 
+    fn visit_impl_item_const(&mut self, node: &'ast syn::ImplItemConst) {
+        self.in_const_context += 1;
+        syn::visit::visit_impl_item_const(self, node);
+        self.in_const_context -= 1;
+    }
+
     // `const` fields or local const (`const X: f32 = 42.0;` inside fn)
     fn visit_local(&mut self, node: &'ast syn::Local) {
         // `let` binding — inspect as usual
@@ -932,6 +938,20 @@ mod internal_tests {
     #[test]
     fn lint_magic_numbers_allows_static_context() {
         let code = r#"static FOO: i32 = 42;"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
+    // lint_magic_numbers: Associated const in impl block is allowed
+    #[test]
+    fn lint_magic_numbers_allows_impl_item_const() {
+        let code = r#"
+            struct Foo;
+            impl Foo {
+                const BAR: f32 = 14.0;
+            }
+        "#;
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
         assert_eq!(violations.len(), 0);

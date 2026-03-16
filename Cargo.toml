@@ -17,8 +17,8 @@ repository = "https://github.com/hiroyuki-furuno/katana"
 # UI
 eframe = { version = "0.33", features = ["default"] }
 egui = "0.33"
-egui_extras = "0.33"
-egui_commonmark = { version = "0.22", default-features = false }
+egui_extras = { version = "0.33", features = ["image", "file"] }
+egui_commonmark = { version = "0.22", default-features = false, features = ["better_syntax_highlighting", "load-images", "pulldown_cmark"] }
 
 # Markdown
 comrak = { version = "0.29", default-features = false, features = ["shortcodes"] }

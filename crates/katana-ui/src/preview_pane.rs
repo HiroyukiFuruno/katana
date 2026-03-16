@@ -15,7 +15,7 @@ use katana_core::{
         drawio_renderer, mermaid_renderer, plantuml_renderer,
         svg_rasterize::{rasterize_svg, RasterizedSvg},
     },
-    preview::{split_into_sections, PreviewSection},
+    preview::{flatten_list_code_blocks, resolve_image_paths, split_into_sections, PreviewSection},
 };
 
 // ─────────────────────────────────────────────
@@ -74,8 +74,10 @@ pub struct PreviewPane {
 
 impl PreviewPane {
     /// Immediately updates only text sections from the Markdown source (diagrams are preserved).
-    pub fn update_markdown_sections(&mut self, source: &str) {
-        let raw = split_into_sections(source);
+    pub fn update_markdown_sections(&mut self, source: &str, md_file_path: &std::path::Path) {
+        let resolved = resolve_image_paths(source, md_file_path);
+        let flattened = flatten_list_code_blocks(&resolved);
+        let raw = split_into_sections(&flattened);
         let mut new_sections = Vec::with_capacity(raw.len());
         let mut diagram_iter = self
             .sections
@@ -108,8 +110,10 @@ impl PreviewPane {
     ///
     /// Returns Markdown sections immediately. Diagrams are set to `Pending`
     /// and rendered in a background thread.
-    pub fn full_render(&mut self, source: &str) {
-        let raw = split_into_sections(source);
+    pub fn full_render(&mut self, source: &str, md_file_path: &std::path::Path) {
+        let resolved = resolve_image_paths(source, md_file_path);
+        let flattened = flatten_list_code_blocks(&resolved);
+        let raw = split_into_sections(&flattened);
         // Cancel previous rendering.
         self.render_rx = None;
 
@@ -596,7 +600,7 @@ mod tests {
         let mut pane = PreviewPane::default();
         // Content containing a DrawIo diagram -> evaluates to Pending
         let source = "# Title\n```drawio\n<mxGraphModel><root></root></mxGraphModel>\n```";
-        pane.full_render(source);
+        pane.full_render(source, std::path::Path::new("/tmp/test.md"));
 
         // render_rx is set (because there is a diagram)
         assert!(pane.render_rx.is_some());
