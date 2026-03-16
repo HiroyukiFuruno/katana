@@ -12,8 +12,10 @@
 #   - cargo-watch     : Auto-rebuild / auto-test on file changes
 #   - cargo-outdated  : Detect stale Cargo dependencies
 #   - cargo-bloat     : Analyse binary size (make bloat)
+#   - cargo-bundle    : macOS .app bundle packaging
 #   - tokei           : Count lines of source code (make loc)
 #   - lefthook        : Git hooks runner (pre-commit / pre-push)
+#   - create-dmg      : macOS .dmg installer builder
 #
 # =============================================================================
 
@@ -68,10 +70,12 @@ echo "    • cargo-llvm-cov  (coverage — pre-push gate: 100% line)"
 echo "    • cargo-watch     (make watch / make watch-run)"
 echo "    • cargo-outdated  (make outdated)"
 echo "    • cargo-bloat     (make bloat)"
+echo "    • cargo-bundle    (make package-mac)"
 echo ""
 echo "  ${BOLD}Development utilities${RESET}"
 echo "    • tokei           (make loc)"
 echo "    • lefthook        (Git hooks: pre-commit + pre-push)"
+echo "    • create-dmg      (make dmg)"
 echo ""
 
 if ! confirm "Proceed with the installation?"; then
@@ -209,6 +213,19 @@ else
 fi
 
 # =============================================================================
+# 8b. cargo-bundle
+# =============================================================================
+header "cargo-bundle"
+
+if cargo bundle --version &>/dev/null; then
+  success "cargo-bundle is already installed ($(cargo bundle --version))"
+else
+  info "Installing cargo-bundle..."
+  cargo install cargo-bundle
+  success "cargo-bundle installed"
+fi
+
+# =============================================================================
 # 9. tokei
 # =============================================================================
 header "tokei"
@@ -232,6 +249,19 @@ else
   info "Installing lefthook via Homebrew..."
   brew install lefthook
   success "lefthook installed ($(lefthook version))"
+fi
+
+# =============================================================================
+# 10b. create-dmg
+# =============================================================================
+header "create-dmg"
+
+if command -v create-dmg &>/dev/null; then
+  success "create-dmg is already installed ($(create-dmg --version 2>&1 | head -1))"
+else
+  info "Installing create-dmg via Homebrew..."
+  brew install create-dmg
+  success "create-dmg installed"
 fi
 
 # Install hooks into the repo (idempotent)
