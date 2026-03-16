@@ -75,13 +75,13 @@ jobs:
             ${{ runner.os }}-cargo-release-
 
       - name: Install cargo-bundle
-        run: command -v cargo-bundle || cargo install cargo-bundle
+        run: command -v cargo-bundle || RUSTC_WRAPPER= cargo install cargo-bundle
 
       - name: Install create-dmg
         run: brew install create-dmg
 
       - name: Install git-cliff
-        run: command -v git-cliff || cargo install git-cliff
+        run: command -v git-cliff || RUSTC_WRAPPER= cargo install git-cliff
 
       - name: Build .app bundle
         run: make package-mac
