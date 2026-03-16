@@ -164,3 +164,55 @@ fn resolve_image_paths_passes_through_non_image_text() {
     let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
+
+// ── flatten_list_code_blocks tests ───────────────────────────────────────
+
+use katana_core::preview::flatten_list_code_blocks;
+
+#[test]
+fn flatten_strips_indented_code_fence_in_list() {
+    let source = "1. Step one\n\n   ```bash\n   echo hello\n   ```\n\n1. Step two\n";
+    let result = flatten_list_code_blocks(source);
+    assert!(
+        result.contains("\n```bash\n"),
+        "Opening fence should be de-indented: {result:?}"
+    );
+    assert!(
+        result.contains("echo hello\n```\n"),
+        "Content and closing fence should be de-indented: {result:?}"
+    );
+}
+
+#[test]
+fn flatten_leaves_toplevel_code_block_unchanged() {
+    let source = "# Title\n\n```rust\nfn main() {}\n```\n";
+    let result = flatten_list_code_blocks(source);
+    assert_eq!(result, source);
+}
+
+#[test]
+fn flatten_handles_multiple_code_blocks_in_one_item() {
+    let source = "1. Step\n\n   ```bash\n   cmd1\n   ```\n\n   ```bash\n   cmd2\n   ```\n";
+    let result = flatten_list_code_blocks(source);
+    // Both fences should be de-indented.
+    let count = result.matches("\n```bash\n").count()
+        + if result.starts_with("```bash\n") {
+            1
+        } else {
+            0
+        };
+    assert!(
+        count >= 2,
+        "Expected 2 de-indented fences, got {count} in: {result:?}"
+    );
+}
+
+#[test]
+fn flatten_preserves_no_trailing_newline() {
+    let source = "text\n   ```\n   code\n   ```";
+    let result = flatten_list_code_blocks(source);
+    assert!(
+        !result.ends_with("\n\n"),
+        "Should not add extra trailing newline"
+    );
+}

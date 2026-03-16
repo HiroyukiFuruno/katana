@@ -15,7 +15,7 @@ use katana_core::{
         drawio_renderer, mermaid_renderer, plantuml_renderer,
         svg_rasterize::{rasterize_svg, RasterizedSvg},
     },
-    preview::{resolve_image_paths, split_into_sections, PreviewSection},
+    preview::{flatten_list_code_blocks, resolve_image_paths, split_into_sections, PreviewSection},
 };
 
 // ─────────────────────────────────────────────
@@ -76,7 +76,8 @@ impl PreviewPane {
     /// Immediately updates only text sections from the Markdown source (diagrams are preserved).
     pub fn update_markdown_sections(&mut self, source: &str, md_file_path: &std::path::Path) {
         let resolved = resolve_image_paths(source, md_file_path);
-        let raw = split_into_sections(&resolved);
+        let flattened = flatten_list_code_blocks(&resolved);
+        let raw = split_into_sections(&flattened);
         let mut new_sections = Vec::with_capacity(raw.len());
         let mut diagram_iter = self
             .sections
@@ -111,7 +112,8 @@ impl PreviewPane {
     /// and rendered in a background thread.
     pub fn full_render(&mut self, source: &str, md_file_path: &std::path::Path) {
         let resolved = resolve_image_paths(source, md_file_path);
-        let raw = split_into_sections(&resolved);
+        let flattened = flatten_list_code_blocks(&resolved);
+        let raw = split_into_sections(&flattened);
         // Cancel previous rendering.
         self.render_rx = None;
 
