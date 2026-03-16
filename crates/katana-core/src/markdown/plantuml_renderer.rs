@@ -13,6 +13,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+use super::color_preset::DiagramColorPreset;
 use super::diagram::{DiagramBlock, DiagramResult};
 
 /// Returns candidate paths to search for the PlantUML JAR.
@@ -71,8 +72,57 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
+/// Injects theme skinparams into PlantUML source based on the active color preset.
+///
+/// Inserts background + color defaults right after `@startuml`
+/// so that SVG renders blend naturally with the host UI theme.
+fn inject_theme(source: &str, preset: &DiagramColorPreset) -> String {
+    let skinparams = format!(
+        "\
+skinparam backgroundColor {bg}
+skinparam defaultFontColor {text}
+skinparam classBorderColor {stroke}
+skinparam classFontColor {text}
+skinparam classBackgroundColor {fill}
+skinparam arrowColor {arrow}
+skinparam noteBorderColor {stroke}
+skinparam noteBackgroundColor {note_bg}
+skinparam noteFontColor {note_text}
+skinparam sequenceLifeLineBorderColor {stroke}
+skinparam sequenceParticipantBackgroundColor {fill}
+skinparam sequenceParticipantBorderColor {stroke}
+skinparam sequenceParticipantFontColor {text}
+skinparam sequenceArrowColor {arrow}
+",
+        bg = preset.background,
+        text = preset.text,
+        stroke = preset.stroke,
+        fill = preset.plantuml_class_bg,
+        arrow = preset.arrow,
+        note_bg = preset.plantuml_note_bg,
+        note_text = preset.plantuml_note_text,
+    );
+    if let Some(pos) = source.find("@startuml") {
+        let insert_at = source[pos..]
+            .find('\n')
+            .map(|n| pos + n + 1)
+            .unwrap_or(source.len());
+        format!(
+            "{}{}{}",
+            &source[..insert_at],
+            skinparams,
+            &source[insert_at..]
+        )
+    } else {
+        // If no @startuml delimiter, wrap the source.
+        format!("@startuml\n{skinparams}{source}\n@enduml")
+    }
+}
+
 /// Runs `java -jar plantuml.jar`, passes the source, and returns the SVG.
 pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
+    let preset = DiagramColorPreset::current();
+    let themed_source = inject_theme(source, preset);
     let mut child = Command::new("java")
         .args([
             "-Djava.awt.headless=true",
@@ -80,6 +130,7 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
             jar.to_str().unwrap_or("plantuml.jar"),
             "-pipe",
             "-tsvg",
+            "-darkmode",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -91,7 +142,7 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
     {
         let stdin = child.stdin.as_mut().ok_or("stdin acquisition failed")?;
         stdin
-            .write_all(source.as_bytes())
+            .write_all(themed_source.as_bytes())
             .map_err(|e| format!("stdin write failed: {e}"))?;
     }
 
@@ -108,4 +159,46 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
 /// Converts SVG text into an HTML fragment for preview embedding.
 pub fn svg_to_html_fragment(svg: &str) -> String {
     format!(r#"<div class="katana-diagram plantuml">{svg}</div>"#)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inject_theme_inserts_after_startuml() {
+        let source = "@startuml\nA -> B\n@enduml";
+        let result = inject_theme(source, &DiagramColorPreset::DARK);
+        assert!(result.starts_with("@startuml\n"));
+        assert!(result.contains("skinparam backgroundColor transparent"));
+        assert!(result.contains("skinparam defaultFontColor #E0E0E0"));
+        assert!(result.contains("A -> B"));
+        assert!(result.ends_with("@enduml"));
+    }
+
+    #[test]
+    fn inject_theme_wraps_when_no_startuml() {
+        let source = "A -> B";
+        let result = inject_theme(source, &DiagramColorPreset::DARK);
+        assert!(result.starts_with("@startuml\n"));
+        assert!(result.contains("skinparam backgroundColor transparent"));
+        assert!(result.contains("A -> B"));
+        assert!(result.ends_with("@enduml"));
+    }
+
+    #[test]
+    fn inject_theme_startuml_without_newline() {
+        let source = "@startuml";
+        let result = inject_theme(source, &DiagramColorPreset::DARK);
+        assert!(result.starts_with("@startuml"));
+        assert!(result.contains("skinparam backgroundColor transparent"));
+    }
+
+    #[test]
+    fn inject_theme_with_light_preset() {
+        let source = "@startuml\nA -> B\n@enduml";
+        let result = inject_theme(source, &DiagramColorPreset::LIGHT);
+        assert!(result.contains("skinparam defaultFontColor #333333"));
+        assert!(result.contains("skinparam classBackgroundColor #FEFECE"));
+    }
 }

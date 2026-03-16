@@ -2,6 +2,7 @@
 
 use comrak::{markdown_to_html, ComrakOptions};
 
+pub mod color_preset;
 pub mod diagram;
 pub mod drawio_renderer;
 pub mod mermaid_renderer;
@@ -157,9 +158,17 @@ fn process_fence<R: DiagramRenderer>(output: &mut String, remaining: &mut &str, 
 fn transform_diagram_blocks<R: DiagramRenderer>(source: &str, renderer: &R) -> String {
     let mut output = String::with_capacity(source.len());
     let mut remaining = source;
-    while let Some(fence_start) = remaining.find("\n```") {
-        output.push_str(&remaining[..fence_start + 1]);
-        remaining = &remaining[fence_start + 1..];
+    loop {
+        let fence_offset = if remaining.starts_with("```") {
+            Some(0)
+        } else {
+            remaining.find("\n```").map(|pos| pos + 1)
+        };
+        let Some(offset) = fence_offset else {
+            break;
+        };
+        output.push_str(&remaining[..offset]);
+        remaining = &remaining[offset..];
         process_fence(&mut output, &mut remaining, renderer);
     }
     output.push_str(remaining);
@@ -199,5 +208,15 @@ mod tests {
         assert_eq!(block.info, "mermaid");
         assert_eq!(block.content, "graph TD; A-->B");
         assert_eq!(rest, "rest");
+    }
+
+    // transform_diagram_blocks: diagram fence at the very start of input
+    #[test]
+    fn transform_handles_fence_at_start_of_input() {
+        let source = "```mermaid\ngraph TD; A-->B\n```\nAfter";
+        let result = transform_diagram_blocks(source, &NoOpRenderer);
+        // NoOpRenderer returns empty string for OkPng, so diagram is replaced with nothing.
+        // But the key assertion is that the "After" text is preserved and no panic occurs.
+        assert!(result.contains("After"));
     }
 }

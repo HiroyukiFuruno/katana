@@ -1,9 +1,61 @@
-//! Document section model for preview.
-//!
-//! Splits Markdown source into "normal text" and "diagram blocks",
-//! allowing the UI layer to render each section independently.
+use std::path::Path;
 
 use crate::markdown::diagram::DiagramKind;
+
+/// Resolves relative image paths in Markdown source to absolute `file://` URIs.
+///
+/// Given the path to the Markdown file being previewed, rewrites image references
+/// like `![alt](../assets/image.png)` to `![alt](file:///absolute/path/assets/image.png)`.
+///
+/// Already-absolute paths, URLs (`http://`, `https://`), and `file://` URIs are left unchanged.
+pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> String {
+    let base_dir = md_file_path.parent().unwrap_or(Path::new("."));
+    let mut result = String::with_capacity(source.len());
+    let mut remaining = source;
+
+    while let Some(img_start) = remaining.find("![") {
+        result.push_str(&remaining[..img_start]);
+        remaining = &remaining[img_start..];
+
+        // Find the closing `]` of the alt text.
+        let Some(alt_end) = remaining.find("](") else {
+            result.push_str("![");
+            remaining = &remaining["![".len()..];
+            continue;
+        };
+        let alt_part = &remaining[..alt_end + "](".len()]; // "![alt]("
+        let after_paren = &remaining[alt_end + "](".len()..];
+
+        // Find the closing `)`.
+        let Some(close) = after_paren.find(')') else {
+            result.push_str(alt_part);
+            remaining = after_paren;
+            continue;
+        };
+        let raw_path = &after_paren[..close];
+
+        // Skip already-absolute or URL paths.
+        if raw_path.starts_with("http://")
+            || raw_path.starts_with("https://")
+            || raw_path.starts_with("file://")
+            || raw_path.starts_with('/')
+        {
+            result.push_str(alt_part);
+            result.push_str(raw_path);
+            result.push(')');
+        } else {
+            let resolved = base_dir.join(raw_path);
+            let canonical = resolved.canonicalize().unwrap_or(resolved);
+            result.push_str(alt_part);
+            result.push_str("file://");
+            result.push_str(&canonical.display().to_string());
+            result.push(')');
+        }
+        remaining = &after_paren[close + 1..];
+    }
+    result.push_str(remaining);
+    result
+}
 
 /// The type of section that makes up a document.
 #[derive(Debug, Clone)]
@@ -23,9 +75,19 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     let mut markdown_acc = String::new();
     let mut remaining = source;
 
-    while let Some(fence_pos) = remaining.find("\n```") {
-        markdown_acc.push_str(&remaining[..fence_pos + 1]);
-        remaining = &remaining[fence_pos + 1..];
+    loop {
+        // Find the next fence: either at the very start of remaining, or after a newline.
+        let fence_offset = if remaining.starts_with("```") {
+            Some(0)
+        } else {
+            remaining.find("\n```").map(|pos| pos + 1)
+        };
+        let Some(offset) = fence_offset else {
+            break;
+        };
+
+        markdown_acc.push_str(&remaining[..offset]);
+        remaining = &remaining[offset..];
         match try_parse_diagram_fence(remaining) {
             Some((kind, fence_source, after)) => {
                 flush_markdown(&mut sections, &mut markdown_acc);
