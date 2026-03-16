@@ -25,6 +25,20 @@ run: ## Run the application (KatanA)
 run-release: ## Run the application in release mode
 	cargo run --bin KatanA --release
 
+APP_NAME     := KatanA Desktop
+APP_BUNDLE   := target/release/bundle/osx/$(APP_NAME).app
+CONTENTS     := $(APP_BUNDLE)/Contents
+
+.PHONY: package-mac
+package-mac: ## Build macOS .app bundle (release)
+	cargo bundle --release --format osx --package katana-ui
+	@# Overlay project-specific Info.plist (cargo-bundle generates its own)
+	cp crates/katana-ui/Info.plist "$(CONTENTS)/Info.plist"
+	@# Copy icon into Resources/ (cargo-bundle does not handle icns correctly)
+	mkdir -p "$(CONTENTS)/Resources"
+	cp assets/icon.icns "$(CONTENTS)/Resources/icon.icns"
+	@echo "✅ $(APP_BUNDLE) created"
+
 # ---------- Formatters ----------
 
 .PHONY: fmt
