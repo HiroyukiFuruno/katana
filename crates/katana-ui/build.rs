@@ -13,8 +13,7 @@ fn main() {
         println!("cargo:rustc-env=KATANA_RUSTC_VERSION={version}");
     }
 
-    #[cfg(target_os = "macos")]
-    {
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "macos" {
         println!("cargo:rerun-if-changed=src/macos_menu.m");
         println!("cargo:rerun-if-changed=Info.plist");
 

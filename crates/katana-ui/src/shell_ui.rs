@@ -30,7 +30,7 @@ pub(crate) fn open_folder_dialog() -> Option<std::path::PathBuf> {
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
     egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-        egui::menu::bar(ui, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(crate::i18n::t("menu_file"), |ui| {
                 render_file_menu(ui, state, action);
             });
@@ -48,7 +48,7 @@ pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut
         if let Some(path) = open_folder_dialog() {
             *action = AppAction::OpenWorkspace(path);
         }
-        ui.close_menu();
+        ui.close();
     }
     ui.separator();
     if ui
@@ -59,7 +59,7 @@ pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut
         .clicked()
     {
         *action = AppAction::SaveDocument;
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -74,7 +74,7 @@ pub(crate) fn render_settings_menu(ui: &mut egui::Ui, _state: &AppState, action:
             }
         }
         if reset_layout {
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -84,9 +84,6 @@ pub(crate) fn render_header_right(ui: &mut egui::Ui, state: &AppState) {
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if state.is_dirty() {
             ui.label("*");
-        }
-        if !state.ai_available() {
-            ui.label(crate::i18n::t("ai_unconfigured"));
         }
     });
 }
