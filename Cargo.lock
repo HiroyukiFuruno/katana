@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "katana-core"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "comrak",
@@ -2138,7 +2138,7 @@ dependencies = [
 
 [[package]]
 name = "katana-linter"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "ignore",
  "proc-macro2",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "katana-platform"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2163,7 +2163,7 @@ dependencies = [
 
 [[package]]
 name = "katana-ui"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "cc",
