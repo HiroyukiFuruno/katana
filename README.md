@@ -1,11 +1,36 @@
-# KatanA
+<p align="center">
+  <img src="assets/icon.iconset/icon_128x128.png" width="128" alt="KatanA Desktop">
+</p>
 
-> A fast, keyboard-driven Markdown editor for macOS — built with Rust and egui.
+<h1 align="center">KatanA Desktop</h1>
 
-KatanA is a native desktop application for writing and previewing Markdown documents.
-It renders your content in real time alongside your editor, supports diagram-as-code
-(Mermaid, PlantUML, Draw.io), and keeps the entire experience lightweight and snappy —
-no Electron, no Node.js, just a single native binary.
+<p align="center">
+  A fast, lightweight Markdown workspace for macOS — built with Rust and egui.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml"><img src="https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/HiroyukiFuruno/katana/releases/latest"><img src="https://img.shields.io/github/v/release/HiroyukiFuruno/katana" alt="Latest Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform: macOS">
+</p>
+
+---
+
+## Background
+
+As of **2026**, software development is rapidly evolving with the rise of **AI agents** assisting engineers in writing, reviewing, and maintaining code.
+
+Alongside this shift, **Spec-Driven Development (SDD)** is gaining attention as a development methodology where specifications, architecture descriptions, and tasks are defined before implementation. These specifications are typically written in **Markdown documents** and serve as the central source of truth for both developers and AI agents.
+
+However, existing Markdown tools are often either:
+
+- general-purpose editors not optimized for technical documentation workflows, or
+- heavy knowledge-management tools with unnecessary complexity.
+
+**KatanA Desktop was created to solve this problem.**
+
+The goal of KatanA is to provide a **simple, fast, and workspace-oriented Markdown environment** where developers can easily **browse and edit documentation used in SDD workflows**.
 
 ---
 
@@ -17,142 +42,142 @@ no Electron, no Node.js, just a single native binary.
 - **Workspace-aware** — Open a folder and navigate files from the integrated file tree
 - **Tab bar** — Multiple documents open simultaneously with VSCode-style tabs
 - **i18n** — UI strings fully localised (English / Japanese bundled)
-- **Plugin system** — Extensible renderer extension points for future diagram backends
-- **AI integration hooks** — Provider registry scaffold for future AI-assisted workflows
-- **macOS native** — Native menu bar, CJK font support (AquaKana / Hiragino Sans)
+- **Fast native performance** — Built with Rust and egui, no Electron, no Node.js — just a single native binary
 
 ---
 
-## Getting Started (for Users)
+## Installation
 
 > **macOS only** at this time. Apple Silicon and Intel are both supported.
 
-Pre-built binaries are not yet available. Please build from source (see below).
+### Download
 
----
+1. Go to the [Releases page](https://github.com/HiroyukiFuruno/katana/releases/latest)
+2. Download the latest `KatanA-Desktop-x.y.z.dmg`
+3. Open the DMG and drag **KatanA Desktop.app** into your **Applications** folder
 
-## Development Setup
+### First Launch (Important)
 
-### Prerequisites
+Since KatanA Desktop is not yet signed with an Apple Developer certificate, macOS may block the first launch.
 
-- macOS 13 Ventura or later
-- [Homebrew](https://brew.sh) (the setup script will install it if missing)
+**Option A: Right-click to open**
 
-### One-command Setup
+1. Right-click (or Control-click) on **KatanA Desktop.app** in your Applications folder
+2. Select **"Open"** from the context menu
+3. Click **"Open"** in the confirmation dialog
 
-Run the setup script from the project root. It will check for and install every
-required tool interactively:
-
-```sh
-./scripts/setup.sh
-```
-
-The script installs:
-
-| Tool | Purpose |
-| --- | --- |
-| **Homebrew** | macOS package manager |
-| **git** (latest) | Version control |
-| **rustup** | Rust toolchain manager |
-| **Rust stable** + clippy / rustfmt / llvm-tools | Compiler and linters |
-| **cargo-llvm-cov** | Line-coverage gate (100% enforced in CI) |
-| **cargo-watch** | Auto-rebuild on file changes |
-| **cargo-outdated** | Detect stale dependencies |
-| **cargo-bloat** | Binary size analysis |
-| **tokei** | Source line count |
-| **lefthook** | Git hook runner (pre-commit + pre-push) |
-
-### Common `make` Commands
+**Option B: Command line**
 
 ```sh
-make run          # Build and launch KatanA
-make test         # Run the full test suite
-make ci           # Full CI check: fmt + clippy + tests
-make watch-run    # Launch with auto-reload on file changes
-make doc-open     # Build and open API docs in your browser
+xattr -cr /Applications/KatanA\ Desktop.app
 ```
 
-Run `make help` for a complete list.
-
-### Project Structure
-
-```text
-katana/
-├── crates/
-│   ├── katana-core/      # Markdown pipeline, document model, workspace, AI registry
-│   ├── katana-ui/        # egui application shell, preview pane, i18n, snapshots
-│   └── katana-platform/  # Filesystem abstraction, settings persistence
-├── scripts/
-│   └── setup.sh          # Development environment installer
-├── docs/                 # Architecture decisions, coding rules
-├── fixtures/             # Test fixtures (sample Markdown files)
-└── Makefile              # Developer task runner
-```
-
-### Quality Gates
-
-| Gate | Trigger | Checks |
-| --- | --- | --- |
-| pre-commit | Every `git commit` | `cargo fmt --check`, `cargo clippy -D warnings` |
-| pre-push | Every `git push` | Full test suite + `cargo llvm-cov` (100% line coverage) |
-| CI | Every PR / push to `master` | fmt · clippy · tests · coverage · CodeQL security scan |
+After the first successful launch, macOS will remember your choice and the app will open normally.
 
 ---
 
-## Contributing
+## First Release: v0.0.1
 
-KatanA is in early, active development. All contributions are welcome.
+This release is the **first public version** of KatanA Desktop.
 
-### Ways to Contribute
+Version **v0.0.1** is intentionally minimal and focuses primarily on **Markdown viewing and workspace navigation**.
 
-- **Bug reports** — Open an [issue](../../issues) with a description and reproduction steps
-- **Feature requests** — Open an issue to discuss ideas before writing code
-- **Code** — Fork the repo, implement your change on a branch, and open a pull request
-- **Documentation** — Corrections, clarifications, and translations are always appreciated
+Key features currently include:
 
-### Pull Request Guidelines
+- Workspace-based Markdown browsing
+- Diagram support (Mermaid / PlantUML / draw.io)
+- Split preview with synchronized scrolling
+- Fast native desktop performance (Rust-based)
 
-1. Fork the repository and create a branch from `master`
-2. Ensure `make ci` passes completely before opening a PR
-3. Write tests for new behaviour (coverage gate: 100% lines)
-4. Keep commits focused and atomic; write clear, descriptive messages
-5. Open a draft PR early if you want feedback on an approach
-
-### Code Style
-
-The project enforces strict formatting and linting automatically via lefthook.
-The key rules are:
-
-- **rustfmt** — `max_width = 100`, Unix newlines (enforced by `cargo fmt`)
-- **clippy** — All warnings are errors (`-D warnings`); function body ≤ 30 lines; cognitive complexity ≤ 10
-- **i18n** — All user-visible strings must go through the `i18n!()` macro — no hardcoded UI text
-- See `docs/coding-rules.md` for the complete coding standards
+This version should be considered an **MVP (Minimum Viable Product)** and the foundation for future development.
 
 ---
 
-## Support & Sponsorship
+## Project Goals
 
-### Sponsoring
+KatanA aims to become a tool that helps developers:
 
-Sponsor support is coming soon. If you would like to support the development of
-KatanA financially, please check back later or watch the repository for announcements.
+- Read and navigate Markdown documentation efficiently
+- Work with specification-driven workflows
+- Integrate documentation with modern AI-assisted development
 
-<!-- TODO: add GitHub Sponsors / Open Collective links once configured -->
+The long-term vision is to build a **lightweight documentation workspace** that complements modern development tools.
 
-### Donations
+---
 
-A donation page is currently in preparation. Thank you for your patience.
+## We Want Your Ideas
 
-<!-- TODO: add donation link -->
+This project is still in its early stages.
 
-### Other Ways to Support
+We welcome:
+
+- feature ideas
+- usability suggestions
+- bug reports
+- design feedback
+- contributions from developers
+
+If you have thoughts on how KatanA can improve the documentation workflow for developers, please open an [issue](https://github.com/HiroyukiFuruno/katana/issues) or [discussion](https://github.com/HiroyukiFuruno/katana/discussions).
+
+Your feedback will directly influence the direction of the project.
+
+---
+
+## Open Source Commitment
+
+KatanA Desktop is an open source project.
+
+We are committed to keeping the **core functionality available for free**, especially features that do not incur ongoing operational costs.
+
+These include:
+
+- Markdown viewing
+- Workspace navigation
+- Documentation browsing
+- Diagram rendering
+
+---
+
+## Future Plans
+
+Some advanced features may require external services or operational costs.
+
+For sustainability, the project may introduce:
+
+- optional paid features (e.g., AI-assisted tools)
+- small advertisements within the application
+
+However, the **core documentation functionality will remain free**.
+
+---
+
+## For Developers
+
+If you want to build from source, contribute, or understand the architecture:
+
+- 📖 **[Development Guide](docs/development-guide.md)** — Setup, build, test, and project structure
+- 📐 **[Coding Rules](docs/coding-rules.md)** — Code style, conventions, and quality gates
+- 🏗️ **[Architecture Decisions](docs/adr/)** — Design rationale and ADRs
+
+---
+
+## Support the Project
+
+If you find KatanA useful and would like to support its development, you can do so through sponsorship.
+
+Support helps cover:
+
+- development time
+- infrastructure
+- tooling costs
+
+(Sponsorship links will be added soon.)
 
 - ⭐ Star this repository — it helps others discover KatanA
 - Share KatanA with people who might find it useful
-- Report bugs and suggest improvements through issues
 
 ---
 
 ## License
 
-KatanA is released under the [MIT License](LICENSE).
+KatanA Desktop is released under the [MIT License](LICENSE).
