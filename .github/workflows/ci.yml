@@ -27,7 +27,7 @@ jobs:
         uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@7e95e0f4af121f39112bf92b52913136c7fab6a3 # v0.0.7
+        uses: mozilla-actions/sccache-action@054db53350805f83040bf3e6e9b8cf5a139aa7c9 # v0.0.7
 
       - name: Cache Cargo registry
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -58,7 +58,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@7e95e0f4af121f39112bf92b52913136c7fab6a3 # v0.0.7
+        uses: mozilla-actions/sccache-action@054db53350805f83040bf3e6e9b8cf5a139aa7c9 # v0.0.7
 
       - name: Cache Cargo registry
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -116,7 +116,7 @@ jobs:
         uses: taiki-e/install-action@25e0a26e71c260a3adfeb4840c30f5aeaca0999e # cargo-llvm-cov
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@7e95e0f4af121f39112bf92b52913136c7fab6a3 # v0.0.7
+        uses: mozilla-actions/sccache-action@054db53350805f83040bf3e6e9b8cf5a139aa7c9 # v0.0.7
 
       - name: Cache Cargo registry
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
