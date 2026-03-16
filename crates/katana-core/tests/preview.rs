@@ -69,3 +69,98 @@ fn markdown_if_fence_ends_without_newline() {
         .iter()
         .all(|s| matches!(s, PreviewSection::Markdown(_))));
 }
+
+// Diagram fence at the very start of the file (no preceding newline).
+#[test]
+fn diagram_fence_at_start_of_file_is_detected() {
+    let src = "```mermaid\ngraph TD; A-->B\n```\n";
+    let sections = split_into_sections(src);
+    assert_eq!(sections.len(), 1);
+    assert!(matches!(
+        sections[0],
+        PreviewSection::Diagram {
+            kind: DiagramKind::Mermaid,
+            ..
+        }
+    ));
+}
+
+// Diagram fence at the start with trailing text.
+#[test]
+fn diagram_fence_at_start_with_trailing_text() {
+    let src = "```mermaid\ngraph TD; A-->B\n```\nSome text after";
+    let sections = split_into_sections(src);
+    assert_eq!(sections.len(), 2);
+    assert!(matches!(
+        sections[0],
+        PreviewSection::Diagram {
+            kind: DiagramKind::Mermaid,
+            ..
+        }
+    ));
+    assert!(matches!(sections[1], PreviewSection::Markdown(_)));
+}
+
+// ── resolve_image_paths tests ────────────────────────────────────────────
+
+use katana_core::preview::resolve_image_paths;
+use std::path::Path;
+
+#[test]
+fn resolve_image_paths_converts_relative_to_absolute() {
+    let dir = tempfile::tempdir().unwrap();
+    let md_path = dir.path().join("docs").join("readme.md");
+    std::fs::create_dir_all(md_path.parent().unwrap()).unwrap();
+    // Create the image file so canonicalize works.
+    let img_dir = dir.path().join("assets");
+    std::fs::create_dir_all(&img_dir).unwrap();
+    std::fs::write(img_dir.join("logo.png"), b"png").unwrap();
+
+    let source = "![logo](../assets/logo.png)";
+    let result = resolve_image_paths(source, &md_path);
+    assert!(result.starts_with("![logo](file://"));
+    assert!(result.contains("assets/logo.png"));
+    assert!(!result.contains(".."));
+}
+
+#[test]
+fn resolve_image_paths_preserves_http_urls() {
+    let source = "![img](https://example.com/image.png)";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert_eq!(result, source);
+}
+
+#[test]
+fn resolve_image_paths_preserves_absolute_paths() {
+    let source = "![img](/absolute/path/image.png)";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert_eq!(result, source);
+}
+
+#[test]
+fn resolve_image_paths_preserves_file_uris() {
+    let source = "![img](file:///some/image.png)";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert_eq!(result, source);
+}
+
+#[test]
+fn resolve_image_paths_handles_no_closing_paren() {
+    let source = "![alt](path/without/close";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert!(result.contains("![alt]("));
+}
+
+#[test]
+fn resolve_image_paths_handles_no_alt_close_bracket() {
+    let source = "![alt without close bracket";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert_eq!(result, source);
+}
+
+#[test]
+fn resolve_image_paths_passes_through_non_image_text() {
+    let source = "# Hello\n\nSome text without images.";
+    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    assert_eq!(result, source);
+}

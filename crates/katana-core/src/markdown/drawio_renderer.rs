@@ -8,6 +8,7 @@
 
 use xmltree::Element;
 
+use super::color_preset::DiagramColorPreset;
 use super::diagram::{DiagramBlock, DiagramResult};
 
 /// Minimum width of the Draw.io canvas (fallback when there are no elements).
@@ -111,14 +112,16 @@ fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
             }
         }
     }
+    let preset = DiagramColorPreset::current();
     let mut shapes = String::new();
     let mut labels = String::new();
     // Defines the SVG arrow marker.
-    shapes.push_str(
-        "<defs><marker id=\"katana-arrow\" markerWidth=\"8\" markerHeight=\"6\" refX=\"8\" refY=\"3\" orient=\"auto\"><polygon points=\"0 0, 8 3, 0 6\" fill=\"#555555\"/></marker></defs>"
-    );
+    shapes.push_str(&format!(
+        "<defs><marker id=\"katana-arrow\" markerWidth=\"8\" markerHeight=\"6\" refX=\"8\" refY=\"3\" orient=\"auto\"><polygon points=\"0 0, 8 3, 0 6\" fill=\"{}\"/></marker></defs>",
+        preset.arrow
+    ));
     for cell in cells {
-        render_cell(cell, &mut shapes, &mut labels, &geo_map);
+        render_cell(cell, &mut shapes, &mut labels, &geo_map, preset);
     }
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">{shapes}{labels}</svg>"#
@@ -131,6 +134,7 @@ fn render_cell(
     shapes: &mut String,
     labels: &mut String,
     geo_map: &std::collections::HashMap<String, (f64, f64, f64, f64)>,
+    preset: &DiagramColorPreset,
 ) {
     let is_vertex = cell
         .attributes
@@ -143,20 +147,20 @@ fn render_cell(
         .map(|v| v == "1")
         .unwrap_or(false);
     if is_vertex {
-        render_vertex(cell, shapes, labels);
+        render_vertex(cell, shapes, labels, preset);
     } else if is_edge {
-        render_edge(cell, shapes, geo_map);
+        render_edge(cell, shapes, geo_map, preset);
     }
 }
 
 /// Renders the shape part (rect/ellipse) of a vertex.
-fn render_shape(geo: &Element, style: &str, shapes: &mut String) {
+fn render_shape(geo: &Element, style: &str, shapes: &mut String, preset: &DiagramColorPreset) {
     let x = attr_f64(geo, "x");
     let y = attr_f64(geo, "y");
     let w = attr_f64(geo, "width").max(1.0);
     let h = attr_f64(geo, "height").max(1.0);
-    let fill = extract_style_value(style, "fillColor").unwrap_or("#fff2cc");
-    let stroke = extract_style_value(style, "strokeColor").unwrap_or("#d6b656");
+    let fill = extract_style_value(style, "fillColor").unwrap_or(preset.fill);
+    let stroke = extract_style_value(style, "strokeColor").unwrap_or(preset.stroke);
     if style.contains("ellipse") {
         shapes.push_str(&format!(
             r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>"#,
@@ -178,7 +182,12 @@ fn render_shape(geo: &Element, style: &str, shapes: &mut String) {
 }
 
 /// Renders a vertex cell as an SVG shape + label.
-fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
+fn render_vertex(
+    cell: &Element,
+    shapes: &mut String,
+    labels: &mut String,
+    preset: &DiagramColorPreset,
+) {
     let Some(geo) = cell.get_child("mxGeometry") else {
         return;
     };
@@ -189,8 +198,8 @@ fn render_vertex(cell: &Element, shapes: &mut String, labels: &mut String) {
         .unwrap_or("");
     let cx = attr_f64(geo, "x") + attr_f64(geo, "width").max(1.0) / 2.0;
     let cy = attr_f64(geo, "y") + attr_f64(geo, "height").max(1.0) / 2.0;
-    render_shape(geo, style, shapes);
-    append_label(cell, cx, cy, labels);
+    render_shape(geo, style, shapes, preset);
+    append_label(cell, cx, cy, labels, preset);
 }
 
 /// Struct holding the position and size of a rectangle.
@@ -215,6 +224,7 @@ fn render_edge(
     cell: &Element,
     shapes: &mut String,
     geo_map: &std::collections::HashMap<String, (f64, f64, f64, f64)>,
+    preset: &DiagramColorPreset,
 ) {
     let src_id = match cell.attributes.get("source") {
         Some(id) => id.as_str(),
@@ -254,10 +264,11 @@ fn render_edge(
 
     let points_str = build_polyline_points(x1, y1, &waypoints, x2, y2);
     shapes.push_str(&format!(
-        "<polyline points=\"{points_str}\" fill=\"none\" stroke=\"#555555\" stroke-width=\"1.5\" marker-end=\"url(#katana-arrow)\"/>"
+        "<polyline points=\"{points_str}\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.5\" marker-end=\"url(#katana-arrow)\"/>",
+        preset.arrow
     ));
 
-    append_edge_label(cell, shapes, x1, y1, x2, y2);
+    append_edge_label(cell, shapes, x1, y1, x2, y2, preset);
 }
 
 /// Assembles the polyline coordinate sequence.
@@ -271,14 +282,22 @@ fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2
 }
 
 /// Renders the edge label at the midpoint, if it exists.
-fn append_edge_label(cell: &Element, shapes: &mut String, x1: f64, y1: f64, x2: f64, y2: f64) {
+fn append_edge_label(
+    cell: &Element,
+    shapes: &mut String,
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    preset: &DiagramColorPreset,
+) {
     if let Some(label) = cell.attributes.get("value") {
         if !label.is_empty() {
             let mid_x = (x1 + x2) / 2.0;
             let mid_y = (y1 + y2) / 2.0 - EDGE_LABEL_VERTICAL_OFFSET;
-            const TEXT_COLOR: &str = "#333333";
+            let text_color = preset.text;
             shapes.push_str(&format!(
-                r#"<text x="{mid_x:.1}" y="{mid_y:.1}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="{TEXT_COLOR}">{}</text>"#,
+                r#"<text x="{mid_x:.1}" y="{mid_y:.1}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="{text_color}">{}</text>"#,
                 xml_escape(label)
             ));
         }
@@ -336,16 +355,22 @@ fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
 }
 
 /// Adds the cell's label text as an SVG `<text>` element.
-fn append_label(cell: &Element, cx: f64, cy: f64, labels: &mut String) {
+fn append_label(
+    cell: &Element,
+    cx: f64,
+    cy: f64,
+    labels: &mut String,
+    preset: &DiagramColorPreset,
+) {
     let label = match cell.attributes.get("value") {
         Some(v) if !v.is_empty() => v.as_str(),
         _ => return,
     };
     // Vertical centering with `dy="0.35em"` (because `dominant-baseline` is not supported by resvg).
     // If `fill` is not explicitly specified, resvg may skip the text.
-    const TEXT_COLOR: &str = "#333333";
+    let text_color = preset.text;
     labels.push_str(&format!(
-        r#"<text x="{cx}" y="{cy}" dy="0.35em" text-anchor="middle" font-family="sans-serif" font-size="12" fill="{TEXT_COLOR}">{}</text>"#,
+        r#"<text x="{cx}" y="{cy}" dy="0.35em" text-anchor="middle" font-family="sans-serif" font-size="12" fill="{text_color}">{}</text>"#,
         xml_escape(label)
     ));
 }
