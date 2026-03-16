@@ -226,6 +226,19 @@ else
 fi
 
 # =============================================================================
+# 8c. git-cliff
+# =============================================================================
+header "git-cliff"
+
+if command -v git-cliff &>/dev/null; then
+  success "git-cliff is already installed ($(git-cliff --version))"
+else
+  info "Installing git-cliff..."
+  cargo install git-cliff
+  success "git-cliff installed"
+fi
+
+# =============================================================================
 # 9. tokei
 # =============================================================================
 header "tokei"

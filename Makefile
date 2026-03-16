@@ -70,6 +70,30 @@ dmg: package-mac ## Build macOS .dmg installer from .app bundle
 	fi
 	@echo "✅ $(DMG_OUT) created"
 
+# ---------- Release ----------
+
+.PHONY: release
+release: ## Create a versioned release (usage: make release VERSION=x.y.z)
+ifndef VERSION
+	$(error VERSION is required. Usage: make release VERSION=x.y.z)
+endif
+	@echo "🚀 Releasing v$(VERSION)..."
+	@# 1. Update workspace version in root Cargo.toml
+	sed -i '' 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml
+	@# 2. Update Info.plist version
+	sed -i '' '/<key>CFBundleShortVersionString<\/key>/{n;s|<string>.*</string>|<string>v$(VERSION)</string>|}' crates/katana-ui/Info.plist
+	@# 3. Generate/update CHANGELOG.md
+	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
+	@# 4. Stage and commit
+	git add Cargo.toml Cargo.lock crates/*/Cargo.toml crates/katana-ui/Info.plist CHANGELOG.md
+	git commit -m "chore: v$(VERSION) リリース準備"
+	@# 5. Create annotated tag
+	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
+	@echo "✅ Release v$(VERSION) committed and tagged"
+	@echo "   Next steps:"
+	@echo "     make dmg                  # Build the DMG installer"
+	@echo "     git push && git push --tags  # Push to remote"
+
 # ---------- Formatters ----------
 
 .PHONY: fmt
