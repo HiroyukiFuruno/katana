@@ -81,7 +81,7 @@ endif
 	@# 1. Update workspace version in root Cargo.toml
 	sed -i '' 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml
 	@# 2. Update Info.plist version
-	sed -i '' '/<key>CFBundleShortVersionString<\/key>/{n;s|<string>.*</string>|<string>v$(VERSION)</string>|}' crates/katana-ui/Info.plist
+	perl -i -0pe 's/(<key>CFBundleShortVersionString<\/key>\s*<string>).*?(<\/string>)/$$1v$(VERSION)$$2/' crates/katana-ui/Info.plist
 	@# 3. Generate/update CHANGELOG.md
 	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
 	@# 4. Stage and commit
