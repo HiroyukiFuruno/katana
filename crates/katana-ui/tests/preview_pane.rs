@@ -21,13 +21,16 @@ fn unsaved_buffer_changes_are_reflected_in_preview() {
     let mut pane = PreviewPane::default();
 
     // Build preview with initial content
-    pane.update_markdown_sections("# Hello");
+    pane.update_markdown_sections("# Hello", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
     let texts = markdown_texts(&pane.sections);
     assert!(texts[0].contains("# Hello"));
 
     // Update buffer without saving to file -> Should be reflected in preview
-    pane.update_markdown_sections("# Hello World\n\nNew paragraph");
+    pane.update_markdown_sections(
+        "# Hello World\n\nNew paragraph",
+        std::path::Path::new("/tmp/test.md"),
+    );
     let texts = markdown_texts(&pane.sections);
     assert!(texts[0].contains("# Hello World"));
     assert!(texts[0].contains("New paragraph"));
@@ -45,7 +48,7 @@ fn consecutive_edits_are_immediately_reflected_in_preview() {
     ];
 
     for edit in &edits {
-        pane.update_markdown_sections(edit);
+        pane.update_markdown_sections(edit, std::path::Path::new("/tmp/test.md"));
         let texts = markdown_texts(&pane.sections);
         assert!(
             texts[0].contains(edit),
@@ -59,11 +62,11 @@ fn empty_buffer_does_not_crash_preview() {
     let mut pane = PreviewPane::default();
 
     // Input content
-    pane.update_markdown_sections("# Hello");
+    pane.update_markdown_sections("# Hello", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
 
     // Revert to empty -> Section count becomes 0 (empty string is not flushed)
-    pane.update_markdown_sections("");
+    pane.update_markdown_sections("", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 0);
 }
 
@@ -73,7 +76,7 @@ fn buffer_with_diagrams_immediately_updates_markdown_portion_only() {
 
     // Initial content with diagram
     let source = "# Title\n```mermaid\ngraph TD; A-->B\n```\n## Footer";
-    pane.full_render(source);
+    pane.full_render(source, std::path::Path::new("/tmp/test.md"));
 
     // Diagram is in Pending state
     assert!(pane.sections.len() >= 3);
@@ -81,7 +84,7 @@ fn buffer_with_diagrams_immediately_updates_markdown_portion_only() {
 
     // Update only the Markdown portion (diagram is retained)
     let modified = "# Updated Title\n```mermaid\ngraph TD; A-->B\n```\n## Updated Footer";
-    pane.update_markdown_sections(modified);
+    pane.update_markdown_sections(modified, std::path::Path::new("/tmp/test.md"));
 
     // Verify Markdown text is updated
     let texts = markdown_texts(&pane.sections);
@@ -94,7 +97,7 @@ fn full_render_splits_sections_correctly() {
     let mut pane = PreviewPane::default();
 
     let source = "Before\n```mermaid\ngraph TD; A-->B\n```\nAfter";
-    pane.full_render(source);
+    pane.full_render(source, std::path::Path::new("/tmp/test.md"));
 
     // 3 sections: Markdown, Diagram(Pending), Markdown
     assert_eq!(pane.sections.len(), 3);
@@ -107,7 +110,10 @@ fn full_render_splits_sections_correctly() {
 fn buffer_without_diagrams_does_not_generate_pending_sections() {
     let mut pane = PreviewPane::default();
 
-    pane.full_render("# Pure Markdown\n\nNo diagrams here.");
+    pane.full_render(
+        "# Pure Markdown\n\nNo diagrams here.",
+        std::path::Path::new("/tmp/test.md"),
+    );
 
     assert!(pane
         .sections
@@ -130,7 +136,7 @@ fn verification_that_preview_updates_do_not_depend_on_file_saves() {
     let mut pane = PreviewPane::default();
 
     // Initial preview
-    pane.update_markdown_sections(&doc.buffer);
+    pane.update_markdown_sections(&doc.buffer, std::path::Path::new("/tmp/test.md"));
     let texts = markdown_texts(&pane.sections);
     assert!(texts[0].contains("# Original"));
 
@@ -139,7 +145,7 @@ fn verification_that_preview_updates_do_not_depend_on_file_saves() {
     assert!(doc.is_dirty, "Document must be dirty");
 
     // Update preview with unsaved buffer
-    pane.update_markdown_sections(&doc.buffer);
+    pane.update_markdown_sections(&doc.buffer, std::path::Path::new("/tmp/test.md"));
     let texts = markdown_texts(&pane.sections);
     assert!(
         texts[0].contains("Modified by user"),
@@ -210,7 +216,10 @@ fn invalid_data_returns_error() {
 #[test]
 fn markdown_only_input_is_sectioned_correctly() {
     let mut pane = PreviewPane::default();
-    pane.update_markdown_sections("# Title\n\nParagraph 1\n\n## Subtitle\n\nParagraph 2");
+    pane.update_markdown_sections(
+        "# Title\n\nParagraph 1\n\n## Subtitle\n\nParagraph 2",
+        std::path::Path::new("/tmp/test.md"),
+    );
     assert_eq!(pane.sections.len(), 1);
     assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
 }
@@ -220,7 +229,7 @@ fn mixed_diagram_input_is_split_into_sections() {
     let mut pane = PreviewPane::default();
     let src =
         "Before\n```mermaid\ngraph TD; A-->B\n```\nMiddle\n```drawio\n<mxGraphModel/>\n```\nAfter";
-    pane.update_markdown_sections(src);
+    pane.update_markdown_sections(src, std::path::Path::new("/tmp/test.md"));
     // Markdown + Pending + Markdown + Pending + Markdown = 5 sections
     assert!(pane.sections.len() >= 3);
 }
@@ -228,7 +237,7 @@ fn mixed_diagram_input_is_split_into_sections() {
 #[test]
 fn empty_input_returns_empty_section_list() {
     let mut pane = PreviewPane::default();
-    pane.update_markdown_sections("");
+    pane.update_markdown_sections("", std::path::Path::new("/tmp/test.md"));
     assert!(pane.sections.is_empty());
 }
 
@@ -238,7 +247,10 @@ fn empty_input_returns_empty_section_list() {
 #[test]
 fn show_section_markdown_variant_renders() {
     let mut pane = PreviewPane::default();
-    pane.update_markdown_sections("# Hello from egui test");
+    pane.update_markdown_sections(
+        "# Hello from egui test",
+        std::path::Path::new("/tmp/test.md"),
+    );
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui);
@@ -334,7 +346,7 @@ fn show_section_image_variant_renders() {
 #[test]
 fn show_method_renders_without_crash() {
     let mut pane = PreviewPane::default();
-    pane.update_markdown_sections("# Show method test");
+    pane.update_markdown_sections("# Show method test", std::path::Path::new("/tmp/test.md"));
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show(ui);
@@ -359,7 +371,10 @@ fn render_sections_empty_shows_no_preview_label() {
 fn poll_renders_with_pending_does_not_crash() {
     let mut pane = PreviewPane::default();
     // background thread started with full_render
-    pane.full_render("# Title\n```mermaid\ngraph TD; A-->B\n```\nAfter");
+    pane.full_render(
+        "# Title\n```mermaid\ngraph TD; A-->B\n```\nAfter",
+        std::path::Path::new("/tmp/test.md"),
+    );
 
     // execute poll_renders with egui context
     let mut harness = Harness::new_ui(move |ui| {
@@ -403,6 +418,117 @@ fn show_section_image_full_render_with_texture() {
         },
         alt: "Test texture".to_string(),
     }];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+// ── Image Path Resolution Integration Tests ──
+
+#[test]
+fn image_path_resolved_in_rendered_markdown_section() {
+    let dir = tempfile::tempdir().unwrap();
+    // Create: project/docs/readme.md referencing project/assets/logo.png
+    let docs_dir = dir.path().join("docs");
+    let assets_dir = dir.path().join("assets");
+    std::fs::create_dir_all(&docs_dir).unwrap();
+    std::fs::create_dir_all(&assets_dir).unwrap();
+    std::fs::write(assets_dir.join("logo.png"), b"fake-png").unwrap();
+
+    let md_path = docs_dir.join("readme.md");
+    let source = "# Title\n\n![logo](../assets/logo.png)\n\nAfter image.";
+
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(source, &md_path);
+
+    let texts = markdown_texts(&pane.sections);
+    assert_eq!(texts.len(), 1);
+    // The relative path should be resolved to an absolute file:// URI.
+    assert!(
+        texts[0].contains("file://"),
+        "Image path should be resolved to file:// URI, got: {}",
+        texts[0]
+    );
+    assert!(
+        !texts[0].contains("../"),
+        "Relative path '..' should be resolved, got: {}",
+        texts[0]
+    );
+}
+
+#[test]
+fn http_image_url_preserved_in_rendered_markdown_section() {
+    let source = "# Title\n\n![logo](https://example.com/logo.png)\n";
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(source, std::path::Path::new("/tmp/test.md"));
+
+    let texts = markdown_texts(&pane.sections);
+    assert!(
+        texts[0].contains("https://example.com/logo.png"),
+        "HTTP URL should be preserved unchanged, got: {}",
+        texts[0]
+    );
+}
+
+#[test]
+fn multiple_images_all_resolved_in_single_section() {
+    let dir = tempfile::tempdir().unwrap();
+    let img_dir = dir.path().join("img");
+    std::fs::create_dir_all(&img_dir).unwrap();
+    std::fs::write(img_dir.join("a.png"), b"png-a").unwrap();
+    std::fs::write(img_dir.join("b.png"), b"png-b").unwrap();
+
+    let md_path = dir.path().join("doc.md");
+    let source = "![A](img/a.png)\n\n![B](img/b.png)\n";
+
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(source, &md_path);
+
+    let texts = markdown_texts(&pane.sections);
+    // Both images should be resolved.
+    let resolved_count = texts[0].matches("file://").count();
+    assert_eq!(
+        resolved_count, 2,
+        "Both images should be resolved, found {resolved_count} file:// URIs"
+    );
+}
+
+// ── Preset Color Application via egui_kittest ──
+
+#[test]
+fn preset_colors_applied_without_crash_in_harness() {
+    // Verifies that the full preset wiring (preview_text color + syntax themes)
+    // works through the real rendering pipeline without panicking.
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        "# Heading\n\nBody text.\n\n```rust\nfn main() {}\n```\n",
+        std::path::Path::new("/tmp/test.md"),
+    );
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+#[test]
+fn syntax_highlighted_code_block_renders_in_harness() {
+    // Specifically tests that the syntax theme names from the preset are
+    // valid syntect theme identifiers that don't cause panics.
+    let mut pane = PreviewPane::default();
+    let source = concat!(
+        "# Code\n\n",
+        "```python\n",
+        "def hello():\n",
+        "    print('world')\n",
+        "```\n\n",
+        "```json\n",
+        "{\"key\": \"value\"}\n",
+        "```\n",
+    );
+    pane.update_markdown_sections(source, std::path::Path::new("/tmp/test.md"));
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui);

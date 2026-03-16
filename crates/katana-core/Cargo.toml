@@ -16,7 +16,7 @@ resvg.workspace = true
 usvg.workspace = true
 tiny-skia.workspace = true
 xmltree.workspace = true
-dirs-sys = "0.4"
+dirs-sys = "0.5"
 tempfile.workspace = true
 
 [dev-dependencies]

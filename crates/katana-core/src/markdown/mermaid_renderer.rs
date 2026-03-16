@@ -15,6 +15,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+use super::color_preset::DiagramColorPreset;
 use super::diagram::{DiagramBlock, DiagramResult};
 
 /// Resolves the `mmdc` binary path to use.
@@ -87,6 +88,7 @@ pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     // mmdc determines the format by the output file's extension.
     let output_path = input_file.path().with_extension("png");
 
+    let preset = DiagramColorPreset::current();
     let status = Command::new(resolve_mmdc_binary())
         .args([
             "-i",
@@ -94,9 +96,9 @@ pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
             "-o",
             output_path.to_str().unwrap_or(""),
             "--backgroundColor",
-            "white",
+            preset.background,
             "--theme",
-            "default",
+            preset.mermaid_theme,
             "--quiet",
         ])
         .stdout(Stdio::null())

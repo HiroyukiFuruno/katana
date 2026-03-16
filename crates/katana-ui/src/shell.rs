@@ -108,7 +108,7 @@ impl KatanaApp {
         self.tab_panes
             .entry(path.to_path_buf())
             .or_default()
-            .update_markdown_sections(source);
+            .update_markdown_sections(source, path);
     }
 
     /// Re-renders all sections. Updates the content hash as well.
@@ -118,7 +118,7 @@ impl KatanaApp {
         self.tab_panes
             .entry(path.to_path_buf())
             .or_default()
-            .full_render(source);
+            .full_render(source, path);
     }
 
     fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
