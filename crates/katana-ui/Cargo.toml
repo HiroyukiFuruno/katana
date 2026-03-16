@@ -27,6 +27,14 @@ cc = "1"
 name = "KatanA"
 path = "src/main.rs"
 
+[package.metadata.bundle]
+name = "KatanA Desktop"
+identifier = "com.github.hiroyukifuruno.katana"
+icon = ["../../assets/icon.icns"]
+copyright = "Copyright © 2026 Hiroyuki Furuno"
+category = "public.app-category.developer-tools"
+short_description = "A fast, lightweight Markdown workspace for macOS"
+
 [dev-dependencies]
 egui_kittest = { version = "0.33", features = ["snapshot", "wgpu", "eframe"] }
 tempfile = "3"

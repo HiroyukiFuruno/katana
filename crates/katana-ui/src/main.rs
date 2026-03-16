@@ -150,6 +150,7 @@ pub fn setup_fonts_from_preset(
     );
     ctx.set_fonts(fonts);
 
+    #[cfg(debug_assertions)]
     ctx.style_mut(|style| {
         style.debug.debug_on_hover = false;
         style.debug.show_expand_width = false;
@@ -164,6 +165,7 @@ pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
     let fonts = build_font_definitions(candidates, &[]);
     ctx.set_fonts(fonts);
 
+    #[cfg(debug_assertions)]
     ctx.style_mut(|style| {
         style.debug.debug_on_hover = false;
         style.debug.show_expand_width = false;
