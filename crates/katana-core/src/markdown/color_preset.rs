@@ -56,6 +56,12 @@ pub struct DiagramColorPreset {
     pub proportional_font_candidates: &'static [&'static str],
     /// OS font paths for monospace (code) family, in priority order.
     pub monospace_font_candidates: &'static [&'static str],
+    /// OS font paths for emoji fallback family, in priority order.
+    ///
+    /// TODO: In the future, when fully supporting Windows / Linux, this should be modified
+    /// to dynamically switch the font candidate list using `cfg!(target_os)`.
+    /// Currently, candidates for all OSs are listed flatly, and the first found is used.
+    pub emoji_font_candidates: &'static [&'static str],
     /// Font size for the code editor TextEdit (in egui points).
     pub editor_font_size: f32,
 }
@@ -107,6 +113,13 @@ impl DiagramColorPreset {
             "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         ],
+        emoji_font_candidates: &[
+            // Windows — Segoe UI Emoji (standard since Windows 8.1)
+            "C:/Windows/Fonts/seguiemj.ttf",
+            // Linux — Noto Color Emoji (widely available via distro packages)
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+        ],
         editor_font_size: Self::DEFAULT_EDITOR_FONT_SIZE,
     };
 
@@ -152,6 +165,13 @@ impl DiagramColorPreset {
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        ],
+        emoji_font_candidates: &[
+            // Windows
+            "C:/Windows/Fonts/seguiemj.ttf",
+            // Linux
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
         ],
         editor_font_size: Self::DEFAULT_EDITOR_FONT_SIZE,
     };

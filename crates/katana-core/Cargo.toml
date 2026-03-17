@@ -21,5 +21,6 @@ tempfile.workspace = true
 regex = "1.12.3"
 
 [dev-dependencies]
+pulldown-cmark = "0.13.1"
 tempfile.workspace = true
 tracing-subscriber = "0.3"

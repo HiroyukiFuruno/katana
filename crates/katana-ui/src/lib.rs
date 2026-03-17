@@ -5,6 +5,7 @@
 
 pub mod about_info;
 pub mod app_state;
+pub mod html_renderer;
 pub mod i18n;
 pub mod preview_pane;
 pub mod preview_pane_ui;

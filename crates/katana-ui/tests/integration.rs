@@ -665,6 +665,7 @@ fn test_integration_view_mode_selection_via_button() {
         .state_mut()
         .trigger_action(AppAction::SelectDocument(temp_dir.path().join("test.md")));
     harness.step();
+    harness.step(); // Extra frame for UI layout stabilization
 
     // Click "Code" mode button
     let code_label = katana_ui::i18n::t("view_mode_code");

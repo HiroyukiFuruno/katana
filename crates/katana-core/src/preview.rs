@@ -58,6 +58,39 @@ pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> String {
     result
 }
 
+/// Resolves relative `src` attributes in HTML `<img>` tags to absolute `file://` URIs.
+///
+/// This is the HTML counterpart of [`resolve_image_paths`], handling raw HTML
+/// image tags within `HtmlBlock` sections.
+pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
+    /// Regex capture group index for the `<img ... src="` prefix.
+    const CAP_PREFIX: usize = 1;
+    /// Regex capture group index for the `src` attribute value.
+    const CAP_SRC: usize = 2;
+    /// Regex capture group index for the `" ...>` suffix.
+    const CAP_SUFFIX: usize = 3;
+
+    let base_dir = md_file_path.parent().unwrap_or(Path::new("."));
+    let re = Regex::new(r#"(<img\s[^>]*src\s*=\s*")([^"]+)("[^>]*>)"#).unwrap();
+    re.replace_all(html, |caps: &regex::Captures| {
+        let prefix = caps.get(CAP_PREFIX).unwrap().as_str();
+        let src = caps.get(CAP_SRC).unwrap().as_str();
+        let suffix = caps.get(CAP_SUFFIX).unwrap().as_str();
+        if src.starts_with("http://")
+            || src.starts_with("https://")
+            || src.starts_with("file://")
+            || src.starts_with('/')
+        {
+            format!("{prefix}{src}{suffix}")
+        } else {
+            let resolved = base_dir.join(src);
+            let canonical = resolved.canonicalize().unwrap_or(resolved);
+            format!("{prefix}file://{}{suffix}", canonical.display())
+        }
+    })
+    .into_owned()
+}
+
 /// Strips indentation from code fences that appear inside list items so
 /// that `pulldown_cmark` treats them as top-level block elements.
 ///
@@ -133,8 +166,6 @@ pub enum PreviewSection {
     Markdown(String),
     /// A diagram fence block.
     Diagram { kind: DiagramKind, source: String },
-    /// Centered Markdown text.
-    CenteredMarkdown(String),
 }
 
 /// Splits the source text into a list of `PreviewSection`s.
@@ -182,69 +213,71 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
 }
 
 /// If the accumulated Markdown text is not empty, add it to the sections.
+///
+/// HTML blocks within the text are handled by pulldown-cmark (via egui_commonmark's
+/// `render_html_fn` callback). However, pulldown-cmark only recognises certain tags
+/// as block-level HTML starters (p, div, h1-h6, table, etc. per CommonMark spec §4.6).
+/// Standalone `<a>` and `<img>` tags are NOT in that list, so they would be treated
+/// as inline HTML and rendered as plain text.
+///
+/// To handle this, we wrap standalone lines that consist entirely of an `<a>` or `<img>`
+/// tag in a `<div>` wrapper, converting them into block-level HTML for pulldown-cmark.
 fn flush_markdown(sections: &mut Vec<PreviewSection>, acc: &mut String) {
     if acc.is_empty() {
         return;
     }
     let text = std::mem::take(acc);
-    let re_centered =
-        Regex::new(r#"(?is)<(p|h1|div)\s+align="center"[^>]*>(.*?)</(?:p|h1|div)>"#).unwrap();
-
-    let mut last_end = 0;
-    for cap in re_centered.captures_iter(&text) {
-        let m = cap.get(0).unwrap();
-        if m.start() > last_end {
-            sections.push(PreviewSection::Markdown(
-                text[last_end..m.start()].to_string(),
-            ));
-        }
-
-        let tag = cap.get(1).unwrap().as_str().to_lowercase();
-        let inner = cap.get(2).unwrap().as_str();
-
-        let mut md = html_to_md(inner);
-        if tag == "h1" {
-            md = format!("# {}\n", md.trim());
-        }
-
-        sections.push(PreviewSection::CenteredMarkdown(md));
-        last_end = m.end();
-    }
-
-    if last_end < text.len() {
-        sections.push(PreviewSection::Markdown(text[last_end..].to_string()));
-    }
+    let processed = wrap_standalone_inline_html(&text);
+    sections.push(PreviewSection::Markdown(processed));
 }
 
-fn html_to_md(html: &str) -> String {
-    let mut s = html.to_string();
+/// Wraps standalone lines containing only `<a>` or `<img>` tags in `<div>` blocks.
+///
+/// A "standalone" line is one where the trimmed content starts with `<a ` or `<img `
+/// and ends with the corresponding closing (`</a>` or `>`), with no surrounding
+/// Markdown text on adjacent non-blank lines that would make it part of a paragraph.
+///
+/// This converts inline-level HTML into block-level HTML so that pulldown-cmark
+/// emits `Tag::HtmlBlock` events and our `render_html_fn` callback can handle them.
+pub fn wrap_standalone_inline_html(text: &str) -> String {
+    let inline_re =
+        Regex::new(r"^[ \t]*(<a\s[^>]*>.*?</a>|<img\s[^>]*>)[ \t]*$").expect("valid regex");
+    // Block-level HTML elements whose children should not be wrapped.
+    let open_re =
+        Regex::new(r"(?i)^[ \t]*<(p|div|h[1-6]|section|article|header|footer|nav|main|aside)\b")
+            .expect("valid regex");
+    let close_re =
+        Regex::new(r"(?i)</(p|div|h[1-6]|section|article|header|footer|nav|main|aside)>")
+            .expect("valid regex");
 
-    let re_a = Regex::new(r#"(?is)<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#).unwrap();
-    s = re_a.replace_all(&s, "[$2]($1)").into_owned();
+    let mut result = String::with_capacity(text.len());
+    let mut block_depth: usize = 0;
 
-    let re_img = Regex::new(r#"(?is)<img\s+([^>]+)>"#).unwrap();
-    s = re_img
-        .replace_all(&s, |caps: &regex::Captures| {
-            let attrs = caps.get(1).unwrap().as_str();
-            let src = extract_attr(attrs, "src").unwrap_or_default();
-            let alt = extract_attr(attrs, "alt").unwrap_or_default();
-            format!("![{}]({})", alt, src)
-        })
-        .into_owned();
+    for line in text.lines() {
+        // Track nesting: count opens before closes on this line.
+        if open_re.is_match(line) {
+            block_depth += 1;
+        }
+        let is_close = close_re.is_match(line);
 
-    let re_br = Regex::new(r#"(?is)<br\s*/?>"#).unwrap();
-    s = re_br.replace_all(&s, "\n").into_owned();
+        if block_depth == 0 && inline_re.is_match(line) {
+            result.push_str(&format!("<div>\n{}\n</div>", line.trim()));
+        } else {
+            result.push_str(line);
+        }
+        result.push('\n');
 
-    let re_tag_preserve_entities = Regex::new(r#"(?is)</?[a-zA-Z0-9]+[^>]*>"#).unwrap();
-    s = re_tag_preserve_entities.replace_all(&s, "").into_owned();
+        if is_close && block_depth > 0 {
+            block_depth -= 1;
+        }
+    }
 
-    s.trim().to_string()
-}
+    // Remove trailing newline added by the loop if the original didn't end with one.
+    if !text.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
 
-fn extract_attr(attrs: &str, attr: &str) -> Option<String> {
-    let re = Regex::new(&format!(r#"(?is){}\s*=\s*"([^"]+)""#, attr)).unwrap();
-    re.captures(attrs)
-        .map(|c| c.get(1).unwrap().as_str().to_string())
+    result
 }
 
 /// If the start is a diagram fence, returns `(kind, source, after)`.

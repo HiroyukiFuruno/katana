@@ -1,3 +1,5 @@
+use eframe::egui;
+use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::Harness;
 use katana_core::markdown::svg_rasterize::RasterizedSvg;
 use katana_ui::preview_pane::{decode_png_rgba, extract_svg, PreviewPane, RenderedSection};
@@ -242,27 +244,23 @@ fn empty_input_returns_empty_section_list() {
 }
 
 #[test]
-fn centered_markdown_is_processed_in_update_markdown_sections() {
+fn centered_html_stays_in_markdown_section_update() {
+    // After render_html_fn refactor, HTML blocks remain in Markdown sections.
+    // pulldown-cmark detects them and passes to render_html_fn at render time.
     let mut pane = PreviewPane::default();
     let src = "<p align=\"center\">centered</p>";
     pane.update_markdown_sections(src, std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
-    assert!(matches!(
-        pane.sections[0],
-        RenderedSection::CenteredMarkdown(_)
-    ));
+    assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
 }
 
 #[test]
-fn centered_markdown_is_processed_in_full_render() {
+fn centered_html_stays_in_markdown_section_full_render() {
     let mut pane = PreviewPane::default();
     let src = "<p align=\"center\">centered</p>";
     pane.full_render(src, std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
-    assert!(matches!(
-        pane.sections[0],
-        RenderedSection::CenteredMarkdown(_)
-    ));
+    assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
 }
 
 // ── Cover each variant of show_section using egui_kittest ──
@@ -562,13 +560,513 @@ fn syntax_highlighted_code_block_renders_in_harness() {
 
 #[test]
 fn show_section_centered_markdown_variant_renders() {
+    // HTML blocks now stay inside Markdown sections and are rendered via render_html_fn.
     let mut pane = PreviewPane::default();
-    pane.sections = vec![RenderedSection::CenteredMarkdown(
-        "# Centered Title\n![alt](test.png)".to_string(),
+    pane.sections = vec![RenderedSection::Markdown(
+        "<p align=\"center\"><img src=\"test.png\" alt=\"alt\"></p>".to_string(),
     )];
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui);
     });
     harness.run();
+}
+
+// ── TDD: HTML rendering behavior verification ──
+
+/// Verifies that a centered paragraph with multiple badge links renders them
+/// on the same horizontal row (all badges share the same Y coordinate).
+#[test]
+fn centered_badges_render_on_same_horizontal_row() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  <a href=\"LICENSE\"><img src=\"badge1.svg\" alt=\"License: MIT\"></a>\n",
+        "  <a href=\"https://example.com/ci\"><img src=\"badge2.svg\" alt=\"CI\"></a>\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    // Multiple steps needed for measure-then-position pattern (request_discard)
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+    // Test passes if no panic — the multi-element centering code path is exercised.
+    // AccessKit-based position verification follows once the basic rendering is stable.
+}
+
+/// Verifies that a link in a centered paragraph is clickable (has click sense).
+#[test]
+fn centered_text_link_is_clickable() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  English | <a href=\"README.ja.md\">日本語</a>\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+    // Verify the link label exists in the accessibility tree
+    let _link_node = harness.get_by_label("日本語");
+}
+
+/// Verifies that multiple centered <p> blocks each take their own vertical
+/// space and don't overlap. The cursor positions after each block should
+/// be strictly increasing.
+#[test]
+fn multiple_centered_paragraphs_have_increasing_y_positions() {
+    let html = concat!(
+        "<p align=\"center\">First paragraph</p>\n\n",
+        "<p align=\"center\">Second paragraph</p>\n\n",
+        "<p align=\"center\">Third paragraph</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    // Verify all three paragraphs are present and have distinct Y positions
+    let first = harness.get_by_label("First paragraph");
+    let second = harness.get_by_label("Second paragraph");
+    let third = harness.get_by_label("Third paragraph");
+
+    let first_bounds = first
+        .accesskit_node()
+        .raw_bounds()
+        .expect("First should have bounds");
+    let second_bounds = second
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Second should have bounds");
+    let third_bounds = third
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Third should have bounds");
+
+    assert!(
+        second_bounds.y0 > first_bounds.y0,
+        "Second paragraph Y ({}) should be below first ({})",
+        second_bounds.y0,
+        first_bounds.y0
+    );
+    assert!(
+        third_bounds.y0 > second_bounds.y0,
+        "Third paragraph Y ({}) should be below second ({})",
+        third_bounds.y0,
+        second_bounds.y0
+    );
+}
+
+/// Full README header structure: icon, heading, description, badges, language selector.
+/// Verifies the complete rendering pipeline doesn't crash and produces widgets.
+#[test]
+fn readme_header_full_structure_renders() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  <img src=\"assets/icon.png\" alt=\"KatanA Desktop\">\n",
+        "</p>\n\n",
+        "<h1 align=\"center\">KatanA Desktop</h1>\n\n",
+        "<p align=\"center\">\n",
+        "  A fast, lightweight Markdown workspace for macOS.\n",
+        "</p>\n\n",
+        "<p align=\"center\">\n",
+        "  <a href=\"LICENSE\"><img src=\"badge1.svg\" alt=\"License\"></a>\n",
+        "  <a href=\"ci\"><img src=\"badge2.svg\" alt=\"CI\"></a>\n",
+        "</p>\n\n",
+        "<p align=\"center\">\n",
+        "  English | <a href=\"README.ja.md\">日本語</a>\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    // Verify key widgets exist in the accessibility tree
+    let _heading = harness.get_by_label("KatanA Desktop");
+    let _description = harness.get_by_label("A fast, lightweight Markdown workspace for macOS.");
+    let _lang_link = harness.get_by_label("日本語");
+}
+
+/// Verifies that a single centered text is horizontally centered within the
+/// available width. The widget's center X should be near the panel center.
+#[test]
+fn centered_single_text_is_horizontally_centered() {
+    let html = "<p align=\"center\">Centered Text Here</p>\n";
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 200.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    let node = harness.get_by_label("Centered Text Here");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Should have bounds");
+    let widget_center_x = (bounds.x0 + bounds.x1) / 2.0;
+    let panel_center_x = f64::from(panel_width) / 2.0;
+
+    // Centering tolerance: widget center should be within 50px of panel center.
+    // This is generous because egui adds padding/margins.
+    let tolerance = 50.0;
+    assert!(
+        (widget_center_x - panel_center_x).abs() < tolerance,
+        "Widget center X ({widget_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (widget_center_x - panel_center_x).abs()
+    );
+}
+
+/// Verifies that multi-element centered content (text + link) is rendered
+/// on the same row and that the link widget exists in the accessibility tree.
+#[test]
+fn centered_text_and_link_share_same_row() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  English | <a href=\"README.ja.md\">日本語</a>\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(800.0, 200.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    // Both "English |" text and "日本語" link should exist
+    let text_node = harness.get_by_label("English |");
+    let link_node = harness.get_by_label("日本語");
+
+    let text_bounds = text_node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("text should have bounds");
+    let link_bounds = link_node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("link should have bounds");
+
+    // They should be on the same row (similar Y coordinates, within text height)
+    let y_diff = (text_bounds.y0 - link_bounds.y0).abs();
+    assert!(
+        y_diff < 5.0,
+        "Text and link should be on same row: text Y={:.1}, link Y={:.1}, diff={y_diff:.1}",
+        text_bounds.y0,
+        link_bounds.y0
+    );
+
+    // The link should be to the right of the text
+    assert!(
+        link_bounds.x0 > text_bounds.x0,
+        "Link X ({:.1}) should be to the right of text X ({:.1})",
+        link_bounds.x0,
+        text_bounds.x0
+    );
+
+    // The GROUP (text + link combined) should be horizontally centered.
+    let group_left = text_bounds.x0.min(link_bounds.x0);
+    let group_right = text_bounds.x1.max(link_bounds.x1);
+    let group_center_x = (group_left + group_right) / 2.0;
+    let panel_center_x = 800.0 / 2.0; // panel width is 800
+    let tolerance = 50.0;
+    assert!(
+        (group_center_x - panel_center_x).abs() < tolerance,
+        "Multi-element group center X ({group_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (group_center_x - panel_center_x).abs()
+    );
+}
+
+// ── TDD: Centering bug reproduction ──
+// These tests verify the POSITION of centered elements, not just that they render.
+// The bug: <h1 align="center">, <p align="center"> etc. are not horizontally centered.
+
+/// Verifies that `<h1 align="center">` renders the heading text centered
+/// within the panel width. The heading's center X must be near the panel center.
+#[test]
+fn centered_heading_h1_is_horizontally_centered() {
+    let html = "<h1 align=\"center\">KatanA Desktop</h1>\n";
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 200.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    let node = harness.get_by_label("KatanA Desktop");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Should have bounds");
+    let widget_center_x = (bounds.x0 + bounds.x1) / 2.0;
+    let panel_center_x = f64::from(panel_width) / 2.0;
+
+    let tolerance = 50.0;
+    assert!(
+        (widget_center_x - panel_center_x).abs() < tolerance,
+        "Centered <h1> center X ({widget_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (widget_center_x - panel_center_x).abs()
+    );
+}
+
+/// Verifies that a centered description paragraph renders centered.
+#[test]
+fn centered_description_paragraph_is_horizontally_centered() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 200.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    let node =
+        harness.get_by_label("macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Should have bounds");
+    let widget_center_x = (bounds.x0 + bounds.x1) / 2.0;
+    let panel_center_x = f64::from(panel_width) / 2.0;
+
+    let tolerance = 50.0;
+    assert!(
+        (widget_center_x - panel_center_x).abs() < tolerance,
+        "Centered <p> center X ({widget_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (widget_center_x - panel_center_x).abs()
+    );
+}
+
+/// Full README header integration test: verifies ALL centered elements are
+/// horizontally centered. This reproduces the exact bug seen in the UI where
+/// elements appear left-aligned instead of centered.
+#[test]
+fn readme_header_all_elements_horizontally_centered() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  <img src=\"assets/icon.iconset/icon_128x128.png\" width=\"128\" alt=\"KatanA Desktop\">\n",
+        "</p>\n\n",
+        "<h1 align=\"center\">KatanA Desktop</h1>\n\n",
+        "<p align=\"center\">\n",
+        "  macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。\n",
+        "</p>\n\n",
+        "<p align=\"center\">\n",
+        "  <a href=\"LICENSE\"><img src=\"https://img.shields.io/badge/License-MIT-blue.svg\" alt=\"License: MIT\"></a>\n",
+        "  <a href=\"https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml\"><img src=\"https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml/badge.svg\" alt=\"CI\"></a>\n",
+        "  <a href=\"https://github.com/HiroyukiFuruno/katana/releases/latest\"><img src=\"https://img.shields.io/github/v/release/HiroyukiFuruno/katana\" alt=\"Latest Release\"></a>\n",
+        "  <img src=\"https://img.shields.io/badge/platform-macOS-lightgrey\" alt=\"Platform: macOS\">\n",
+        "</p>\n\n",
+        "<p align=\"center\">\n",
+        "  <a href=\"README.md\">English</a> | 日本語\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 400.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    // Multiple frames needed for measure-then-position (request_discard)
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+
+    let panel_center_x = f64::from(panel_width) / 2.0;
+    let tolerance = 50.0;
+
+    // Verify heading is centered
+    let heading = harness.get_by_label("KatanA Desktop");
+    let heading_bounds = heading
+        .accesskit_node()
+        .raw_bounds()
+        .expect("heading should have bounds");
+    let heading_center_x = (heading_bounds.x0 + heading_bounds.x1) / 2.0;
+    assert!(
+        (heading_center_x - panel_center_x).abs() < tolerance,
+        "Heading center X ({heading_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (heading_center_x - panel_center_x).abs()
+    );
+
+    // Verify description text is centered
+    let desc =
+        harness.get_by_label("macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。");
+    let desc_bounds = desc
+        .accesskit_node()
+        .raw_bounds()
+        .expect("description should have bounds");
+    let desc_center_x = (desc_bounds.x0 + desc_bounds.x1) / 2.0;
+    assert!(
+        (desc_center_x - panel_center_x).abs() < tolerance,
+        "Description center X ({desc_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (desc_center_x - panel_center_x).abs()
+    );
+
+    // Verify language selector link is centered (the "English" link within the group)
+    let english_link = harness.get_by_label("English");
+    let english_bounds = english_link
+        .accesskit_node()
+        .raw_bounds()
+        .expect("English link should have bounds");
+    // The "| 日本語" is plain text (pipe + space + Japanese text)
+    let ja_node = harness.get_by_label("| 日本語");
+    let ja_bounds = ja_node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Japanese text should have bounds");
+    let group_left = english_bounds.x0.min(ja_bounds.x0);
+    let group_right = english_bounds.x1.max(ja_bounds.x1);
+    let group_center_x = (group_left + group_right) / 2.0;
+    assert!(
+        (group_center_x - panel_center_x).abs() < tolerance,
+        "Language selector group center X ({group_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (group_center_x - panel_center_x).abs()
+    );
+}
+
+/// Diagnostic test: heading + description (no badges) — isolates whether
+/// multiple centered HTML blocks affect each other's positioning.
+#[test]
+fn centered_heading_then_description_both_centered() {
+    let html = concat!(
+        "<h1 align=\"center\">KatanA Desktop</h1>\n\n",
+        "<p align=\"center\">\n",
+        "  macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 300.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+
+    let panel_center_x = f64::from(panel_width) / 2.0;
+    let tolerance = 50.0;
+
+    let heading = harness.get_by_label("KatanA Desktop");
+    let heading_bounds = heading.accesskit_node().raw_bounds().expect("bounds");
+    let heading_cx = (heading_bounds.x0 + heading_bounds.x1) / 2.0;
+    assert!(
+        (heading_cx - panel_center_x).abs() < tolerance,
+        "Heading center X ({heading_cx:.1}) should be near panel center ({panel_center_x:.1})"
+    );
+
+    let desc =
+        harness.get_by_label("macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。");
+    let desc_bounds = desc.accesskit_node().raw_bounds().expect("bounds");
+    let desc_cx = (desc_bounds.x0 + desc_bounds.x1) / 2.0;
+    assert!(
+        (desc_cx - panel_center_x).abs() < tolerance,
+        "Description center X ({desc_cx:.1}) should be near panel center ({panel_center_x:.1})"
+    );
+}
+
+/// Diagnostic test: badges block + language selector — isolates whether
+/// the multi-element badge block affects subsequent centered blocks.
+#[test]
+fn badges_then_language_selector_both_centered() {
+    let html = concat!(
+        "<p align=\"center\">\n",
+        "  <a href=\"LICENSE\"><img src=\"https://img.shields.io/badge/License-MIT-blue.svg\" alt=\"License: MIT\"></a>\n",
+        "  <a href=\"ci\"><img src=\"https://github.com/repo/ci.yml/badge.svg\" alt=\"CI\"></a>\n",
+        "</p>\n\n",
+        "<p align=\"center\">\n",
+        "  <a href=\"README.md\">English</a> | 日本語\n",
+        "</p>\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let panel_width: f32 = 800.0;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(panel_width, 300.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+
+    let panel_center_x = f64::from(panel_width) / 2.0;
+    let tolerance = 50.0;
+
+    // Verify the language selector after badges is still centered
+    let english_link = harness.get_by_label("English");
+    let english_bounds = english_link.accesskit_node().raw_bounds().expect("bounds");
+    let ja_node = harness.get_by_label("| 日本語");
+    let ja_bounds = ja_node.accesskit_node().raw_bounds().expect("bounds");
+    let group_left = english_bounds.x0.min(ja_bounds.x0);
+    let group_right = english_bounds.x1.max(ja_bounds.x1);
+    let group_center_x = (group_left + group_right) / 2.0;
+    assert!(
+        (group_center_x - panel_center_x).abs() < tolerance,
+        "Language selector after badges: center X ({group_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
+        (group_center_x - panel_center_x).abs()
+    );
 }

@@ -30,8 +30,6 @@ const DIAGRAM_SVG_DISPLAY_SCALE: f32 = 1.5;
 pub enum RenderedSection {
     /// Markdown text rendered by egui_commonmark.
     Markdown(String),
-    /// Centered Markdown text.
-    CenteredMarkdown(String),
     /// Rasterized diagram image.
     Image {
         svg_data: RasterizedSvg,
@@ -72,29 +70,26 @@ pub struct PreviewPane {
     pub sections: Vec<RenderedSection>,
     /// Channel for background rendering completion notifications.
     render_rx: Option<std::sync::mpsc::Receiver<(usize, RenderedSection)>>,
+    /// Path to the currently previewed Markdown file (for resolving relative paths in render_html_fn).
+    md_file_path: std::path::PathBuf,
 }
 
 impl PreviewPane {
     /// Immediately updates only text sections from the Markdown source (diagrams are preserved).
     pub fn update_markdown_sections(&mut self, source: &str, md_file_path: &std::path::Path) {
+        self.md_file_path = md_file_path.to_path_buf();
         let resolved = resolve_image_paths(source, md_file_path);
         let flattened = flatten_list_code_blocks(&resolved);
         let raw = split_into_sections(&flattened);
         let mut new_sections = Vec::with_capacity(raw.len());
-        let mut diagram_iter = self.sections.iter().filter(|s| {
-            !matches!(
-                s,
-                RenderedSection::Markdown(_) | RenderedSection::CenteredMarkdown(_)
-            )
-        });
+        let mut diagram_iter = self
+            .sections
+            .iter()
+            .filter(|s| !matches!(s, RenderedSection::Markdown(_)));
         for section in &raw {
             match section {
                 PreviewSection::Markdown(md) => {
                     new_sections.push(RenderedSection::Markdown(md.clone()));
-                }
-                PreviewSection::CenteredMarkdown(md) => {
-                    let resolved_md = resolve_image_paths(md, md_file_path);
-                    new_sections.push(RenderedSection::CenteredMarkdown(resolved_md));
                 }
                 PreviewSection::Diagram { kind, source } => {
                     // Reuse existing rendered image if available.
@@ -119,6 +114,7 @@ impl PreviewPane {
     /// Returns Markdown sections immediately. Diagrams are set to `Pending`
     /// and rendered in a background thread.
     pub fn full_render(&mut self, source: &str, md_file_path: &std::path::Path) {
+        self.md_file_path = md_file_path.to_path_buf();
         let resolved = resolve_image_paths(source, md_file_path);
         let flattened = flatten_list_code_blocks(&resolved);
         let raw = split_into_sections(&flattened);
@@ -132,10 +128,6 @@ impl PreviewPane {
             match section {
                 PreviewSection::Markdown(md) => {
                     sections.push(RenderedSection::Markdown(md.clone()));
-                }
-                PreviewSection::CenteredMarkdown(md) => {
-                    let resolved_md = resolve_image_paths(md, md_file_path);
-                    sections.push(RenderedSection::CenteredMarkdown(resolved_md));
                 }
                 PreviewSection::Diagram { kind, source: src } => {
                     sections.push(RenderedSection::Pending {
@@ -189,7 +181,12 @@ impl PreviewPane {
     /// Internal method to sequentially render sections.
     /// Actual UI rendering is delegated to preview_pane_ui::render_sections.
     fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
-        crate::preview_pane_ui::render_sections(ui, &mut self.commonmark_cache, &self.sections)
+        crate::preview_pane_ui::render_sections(
+            ui,
+            &mut self.commonmark_cache,
+            &self.sections,
+            &self.md_file_path,
+        )
     }
 
     /// Polls for background rendering completion and updates sections with received results.
@@ -360,6 +357,67 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 #[allow(clippy::unwrap_used, clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
+
+    // ── Markdown image parsing (test-only utilities) ──
+
+    /// Byte length of the badge image prefix `[![`.
+    const BADGE_PREFIX_LEN: usize = "[![".len();
+
+    /// Parsed Markdown image reference.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct MdImage {
+        src: String,
+        alt: String,
+        /// Number of characters consumed from the input string.
+        consumed: usize,
+    }
+
+    /// Finds the byte offset of the next image pattern (`![` or `[![`).
+    fn find_next_image(s: &str) -> Option<usize> {
+        let pos = s.find("![")?;
+        if pos > 0 && s.as_bytes()[pos - 1] == b'[' {
+            Some(pos - 1)
+        } else {
+            Some(pos)
+        }
+    }
+
+    /// Parses a Markdown image at the start of the given string.
+    fn parse_md_image(s: &str) -> Option<MdImage> {
+        if let Some(rest) = s.strip_prefix("[![") {
+            let alt_end = rest.find(']')?;
+            let alt = &rest[..alt_end];
+            let after_alt = &rest[alt_end + 1..];
+            let inner_src = after_alt.strip_prefix('(')?;
+            let src_end = inner_src.find(')')?;
+            let src = &inner_src[..src_end];
+            let after_inner = &inner_src[src_end + 1..];
+            let after_bracket = after_inner.strip_prefix("](")?;
+            let link_end = after_bracket.find(')')?;
+            let total = BADGE_PREFIX_LEN + alt_end + 1 + 1 + src_end + 1 + 2 + link_end + 1;
+            return Some(MdImage {
+                src: src.to_string(),
+                alt: alt.to_string(),
+                consumed: total,
+            });
+        }
+
+        let rest = s.strip_prefix("![")?;
+        let close_bracket = rest.find("](")?;
+        let alt = &rest[..close_bracket];
+        let after = &rest[close_bracket + 2..];
+        let close_paren = after.find(')')?;
+        let src = &after[..close_paren];
+        if src.is_empty() {
+            return None;
+        }
+        let total = 2 + close_bracket + 2 + close_paren + 1;
+        Some(MdImage {
+            src: src.to_string(),
+            alt: alt.to_string(),
+            consumed: total,
+        })
+    }
 
     /// Alternative to `matches!` macro. Avoids uncovered lines issue caused by
     /// subregions (`^0`) generated by LLVM in the else branch of `matches!`.
@@ -620,5 +678,104 @@ mod tests {
         // Wait and confirm that there are no crashes
         pane.wait_for_renders();
         assert!(pane.render_rx.is_none());
+    }
+
+    // ── parse_md_image / find_next_image unit tests ──
+
+    #[test]
+    fn parse_md_image_simple_image() {
+        let input = "![alt text](path/to/image.png)";
+        let img = parse_md_image(input).unwrap();
+        assert_eq!(img.src, "path/to/image.png");
+        assert_eq!(img.alt, "alt text");
+        assert_eq!(img.consumed, input.len());
+    }
+
+    #[test]
+    fn parse_md_image_simple_with_file_uri() {
+        let input = "![icon](file:///tmp/icon.png)";
+        let img = parse_md_image(input).unwrap();
+        assert_eq!(img.src, "file:///tmp/icon.png");
+        assert_eq!(img.alt, "icon");
+        assert_eq!(img.consumed, input.len());
+    }
+
+    #[test]
+    fn parse_md_image_badge_pattern() {
+        let input = "[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)";
+        let img = parse_md_image(input).unwrap();
+        assert_eq!(img.src, "https://img.shields.io/badge/License-MIT-blue.svg");
+        assert_eq!(img.alt, "License: MIT");
+        assert_eq!(img.consumed, input.len());
+    }
+
+    #[test]
+    fn parse_md_image_badge_with_url_link() {
+        let input =
+            "[![CI](https://github.com/org/repo/badge.svg)](https://github.com/org/repo/actions)";
+        let img = parse_md_image(input).unwrap();
+        assert_eq!(img.src, "https://github.com/org/repo/badge.svg");
+        assert_eq!(img.alt, "CI");
+        assert_eq!(img.consumed, input.len());
+    }
+
+    #[test]
+    fn parse_md_image_consumed_allows_continuation() {
+        let input = "[![A](https://a.svg)](link1) ![B](https://b.png)";
+        let first = parse_md_image(input).unwrap();
+        assert_eq!(first.alt, "A");
+        let remainder = &input[first.consumed..];
+        let trimmed = remainder.trim_start();
+        let second = parse_md_image(trimmed).unwrap();
+        assert_eq!(second.alt, "B");
+        assert_eq!(second.src, "https://b.png");
+    }
+
+    #[test]
+    fn parse_md_image_empty_src_returns_none() {
+        assert!(parse_md_image("![alt]()").is_none());
+    }
+
+    #[test]
+    fn parse_md_image_plain_text_returns_none() {
+        assert!(parse_md_image("just plain text").is_none());
+    }
+
+    #[test]
+    fn parse_md_image_incomplete_badge_returns_none() {
+        // Missing closing of outer link
+        assert!(parse_md_image("[![alt](src)](").is_none());
+    }
+
+    #[test]
+    fn find_next_image_simple() {
+        assert_eq!(find_next_image("hello ![img](src)"), Some(6));
+    }
+
+    #[test]
+    fn find_next_image_badge() {
+        assert_eq!(find_next_image("[![badge](url)](link)"), Some(0));
+    }
+
+    #[test]
+    fn find_next_image_badge_before_simple() {
+        // Badge starts at 0, simple at 1 — should return 0
+        assert_eq!(
+            find_next_image("[![badge](url)](link) ![img](src)"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn find_next_image_no_image() {
+        assert_eq!(find_next_image("no images here"), None);
+    }
+
+    #[test]
+    fn find_next_image_with_preceding_text() {
+        assert_eq!(
+            find_next_image("text before [![badge](url)](link)"),
+            Some(12)
+        );
     }
 }

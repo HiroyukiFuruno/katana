@@ -208,6 +208,50 @@ crates/katana-core/
 
 Coverage measurement: `cargo llvm-cov --workspace --fail-under-lines 100` (Forced in CI)
 
+### 7.4 TDD Enforcement (Test-Driven Development)
+
+**All new features and bugfixes MUST follow the TDD cycle: Red → Green → Refactor.**
+The convention "a defined rule without enforcement is meaningless" applies here as well.
+
+#### Mandatory Process
+
+1. **Red**: Write a failing test that defines the expected behavior BEFORE writing any implementation code.
+2. **Green**: Write the minimum implementation to make the test pass.
+3. **Refactor**: Clean up the implementation while keeping all tests green.
+
+#### What This Means in Practice
+
+| Scenario | Required Action |
+|---|---|
+| New feature (e.g., centering HTML elements) | Write a test that asserts the expected rendering position. **Verify the test FAILS** before implementing. |
+| Bugfix (e.g., elements not centered) | Write a test that reproduces the bug (assert the correct behavior). **Verify the test FAILS** to confirm the bug is captured. Then fix the code. |
+| Refactoring | Ensure all existing tests pass before and after the refactor. No test modifications unless the interface changes. |
+
+#### Anti-patterns (Strictly Prohibited)
+
+```
+❌ Implement first, write tests later (or never)
+❌ Modify implementation code and ask the user to "verify visually"
+❌ Make multiple implementation attempts without automated verification
+❌ Remove or weaken a test to make the implementation pass
+```
+
+#### UI Testing with egui_kittest
+
+For UI behavior (rendering positions, widget availability, clickability), use `egui_kittest::Harness`:
+
+```rust
+// ✅ Good — Test-first: verify centering behavior before implementation
+#[test]
+fn centered_paragraph_renders_badge_images_on_same_row() {
+    let mut harness = Harness::new_ui(|ui| {
+        // render HTML block with badges
+    });
+    harness.run();
+    // Assert all badges share the same Y coordinate
+}
+```
+
 ---
 
 ## 8. Variable and Type Naming

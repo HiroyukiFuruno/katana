@@ -19,6 +19,7 @@ tracing-subscriber.workspace = true
 rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }
 serde_json.workspace = true
+open = "5.3.3"
 
 [build-dependencies]
 cc = "1"

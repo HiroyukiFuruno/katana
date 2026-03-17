@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/hiroyuki-furuno/katana"
@@ -17,7 +17,7 @@ repository = "https://github.com/hiroyuki-furuno/katana"
 # UI
 eframe = { version = "0.33", features = ["default"] }
 egui = "0.33"
-egui_extras = { version = "0.33", features = ["image", "file"] }
+egui_extras = { version = "0.33", features = ["image", "file", "http", "svg", "svg_text"] }
 egui_commonmark = { version = "0.22", default-features = false, features = ["better_syntax_highlighting", "load-images", "pulldown_cmark"] }
 
 # Markdown

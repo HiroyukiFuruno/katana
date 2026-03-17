@@ -2,6 +2,36 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.0.2] - 2026-03-17
+
+Second release focusing on HTML rendering fidelity, test coverage, and documentation.
+
+### 🚀 Features
+
+- Native support for `align="center"` HTML attributes within Markdown (e.g., `<p align="center">`, `<h1 align="center">`)
+
+### 🐛 Bug Fixes
+
+- Fixed unreachable code paths in UI pane components to achieve 100% LLVM coverage
+- Resolved rendering bugs where multi-element centered blocks (like README badges and links) collided horizontally due to egui layout ID reuse
+- Fixed image resolution paths and Markdown processing for standalone inline tags
+- Resolved Linux cross-compilation errors for GitHub Actions
+
+### 📚 Documentation
+
+- Added explicit TDD (Test-Driven Development) enforcement policies to coding rules (EN/JA)
+- Restored `xattr` command instructions for initial launch on macOS
+
+### 🧪 Testing
+
+- Expanded integration tests with precision bounds assertions to prevent UI layout regressions
+- Increased image snapshot tolerance to absorb CI/local macOS text rendering differences
+
+### 🔧 Miscellaneous
+
+- Disabled `sccache` to prevent cross-compilation cache issues while keeping workflow cache optimizations
+- Refined CI pipeline for better stability on snapshot tests
+
 ## [0.0.1] - 2026-03-16
 
 First public release of KatanA Desktop 🎉

@@ -147,6 +147,7 @@ pub fn setup_fonts_from_preset(
     let fonts = build_font_definitions(
         preset.proportional_font_candidates,
         preset.monospace_font_candidates,
+        preset.emoji_font_candidates,
     );
     ctx.set_fonts(fonts);
 
@@ -162,7 +163,7 @@ pub fn setup_fonts_from_preset(
 /// Receives a list of font candidates and sets the fonts. Testable.
 /// Kept for backward compatibility with existing tests.
 pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
-    let fonts = build_font_definitions(candidates, &[]);
+    let fonts = build_font_definitions(candidates, &[], &[]);
     ctx.set_fonts(fonts);
 
     #[cfg(debug_assertions)]
@@ -180,11 +181,14 @@ pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
 ///   Also appended to Monospace as CJK fallback.
 /// - **Monospace**: loaded from `monospace_candidates`, inserted at position 0 in Monospace family.
 ///   Also appended to Proportional as fallback.
+/// - **Emoji**: loaded from `emoji_candidates`, appended to both Proportional and Monospace
+///   families as a fallback for rendering emoji characters.
 ///
 /// This is a pure function for testability.
 pub fn build_font_definitions(
     proportional_candidates: &[&str],
     monospace_candidates: &[&str],
+    emoji_candidates: &[&str],
 ) -> egui::FontDefinitions {
     let mut fonts = egui::FontDefinitions::default();
 
@@ -222,6 +226,25 @@ pub fn build_font_definitions(
         tracing::info!("Loaded monospace font={name}");
     } else {
         tracing::warn!("Monospace system font not found. Code blocks may render poorly.");
+    }
+
+    // Load emoji font as fallback in both families.
+    if let Some((name, data)) = load_first_font(emoji_candidates) {
+        fonts.font_data.insert(
+            name.clone(),
+            std::sync::Arc::new(egui::FontData::from_owned(data)),
+        );
+        // Append as fallback in Proportional.
+        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+            list.push(name.clone());
+        }
+        // Append as fallback in Monospace.
+        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+            list.push(name.clone());
+        }
+        tracing::info!("Loaded emoji font={name}");
+    } else {
+        tracing::warn!("Emoji font not found. Emoji characters may not render.");
     }
 
     fonts
@@ -361,7 +384,7 @@ mod tests {
         if load_first_font(PROP_CANDIDATES).is_none() {
             return;
         }
-        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES);
+        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let proportional = fonts
             .families
             .get(&egui::FontFamily::Proportional)
@@ -379,7 +402,7 @@ mod tests {
         if load_first_font(MONO_CANDIDATES).is_none() {
             return;
         }
-        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES);
+        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let monospace = fonts
             .families
             .get(&egui::FontFamily::Monospace)
@@ -398,7 +421,7 @@ mod tests {
         {
             return;
         }
-        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES);
+        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let monospace = fonts
             .families
             .get(&egui::FontFamily::Monospace)
@@ -420,7 +443,7 @@ mod tests {
     #[test]
     fn test_build_font_definitions_without_candidates_returns_defaults() {
         init_tracing();
-        let fonts = build_font_definitions(&["/nonexistent/font.ttc"], &[]);
+        let fonts = build_font_definitions(&["/nonexistent/font.ttc"], &[], &[]);
         let proportional = fonts
             .families
             .get(&egui::FontFamily::Proportional)
@@ -475,6 +498,71 @@ mod tests {
             DiagramColorPreset::DARK.preview_text,
             DiagramColorPreset::LIGHT.preview_text,
             "DARK and LIGHT presets should have different preview text colors"
+        );
+    }
+
+    // ── Emoji Font Tests ──
+
+    const EMOJI_CANDIDATES: &[&str] = &[
+        "/System/Library/Fonts/Apple Color Emoji.ttc",
+        "C:/Windows/Fonts/seguiemj.ttf",
+        "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+    ];
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_emoji_font_available_on_macos() {
+        let result = load_first_font(EMOJI_CANDIDATES);
+        assert!(
+            result.is_some(),
+            "Apple Color Emoji font should be available on macOS"
+        );
+    }
+
+    #[test]
+    fn test_emoji_font_is_fallback_in_proportional_family() {
+        init_tracing();
+        // Only run if emoji font is actually available
+        if load_first_font(EMOJI_CANDIDATES).is_none() {
+            return;
+        }
+        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, EMOJI_CANDIDATES);
+        let proportional = fonts
+            .families
+            .get(&egui::FontFamily::Proportional)
+            .expect("Proportional family missing");
+        let emoji_name = load_first_font(EMOJI_CANDIDATES).unwrap().0;
+        assert!(
+            proportional.contains(&emoji_name),
+            "Emoji font must be in Proportional family as fallback"
+        );
+    }
+
+    #[test]
+    fn test_emoji_font_is_fallback_in_monospace_family() {
+        init_tracing();
+        if load_first_font(EMOJI_CANDIDATES).is_none() {
+            return;
+        }
+        let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, EMOJI_CANDIDATES);
+        let monospace = fonts
+            .families
+            .get(&egui::FontFamily::Monospace)
+            .expect("Monospace family missing");
+        let emoji_name = load_first_font(EMOJI_CANDIDATES).unwrap().0;
+        assert!(
+            monospace.contains(&emoji_name),
+            "Emoji font must be in Monospace family as fallback"
+        );
+    }
+
+    #[test]
+    fn test_preset_has_emoji_font_candidates() {
+        use katana_core::markdown::color_preset::DiagramColorPreset;
+        let preset = DiagramColorPreset::current();
+        assert!(
+            !preset.emoji_font_candidates.is_empty(),
+            "Preset must have at least one emoji font candidate"
         );
     }
 }
