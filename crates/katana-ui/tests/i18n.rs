@@ -88,9 +88,9 @@ fn display_name_returns_known_codes() {
     assert!(!ja_name.is_empty() && ja_name != "???");
 }
 
-// L61-65: set_language() and get_language()
 #[test]
-fn set_language_changes_language() {
+fn single_threaded_mut_language_tests() {
+    // L61-65: set_language() and get_language()
     // Initial set to "en"
     set_language("en");
     assert_eq!(get_language(), "en");
@@ -101,53 +101,30 @@ fn set_language_changes_language() {
 
     // Reset to "en"
     set_language("en");
-}
 
-// L74-83: t() - key not found returns the key itself
-#[test]
-fn t_function_returns_key_unmodified_for_non_existent_key() {
-    set_language("en");
+    // L74-83: t() - key not found returns the key itself
     let result = t("key_that_does_not_exist_in_any_locale");
     assert_eq!(result, "key_that_does_not_exist_in_any_locale");
-}
 
-// L74-83: t() - exists in 'en', not in 'ja' → key fallback for ja
-#[test]
-fn t_function_translates_known_key_in_en_language() {
-    set_language("en");
+    // L74-83: t() - exists in 'en', not in 'ja' → key fallback for ja
     let result = t("status_ready");
-    // Should return translated string, not the key itself
     assert_ne!(result, "status_ready");
     assert!(!result.is_empty());
-}
 
-// L74-83: t() with 'ja' language
-#[test]
-fn t_function_translates_known_key_in_ja_language() {
+    // tf() with actual i18n key and params
+    let result = tf("status_opened_workspace", &[("name", "my-project")]);
+    assert!(result.contains("my-project"));
+
+    // L74-83: t() with 'ja' language
     set_language("ja");
     let result = t("status_ready");
     assert_ne!(result, "status_ready");
     assert!(!result.is_empty());
 
-    // Reset
-    set_language("en");
-}
-
-// tf() with actual i18n key and params
-#[test]
-fn tf_function_substitutes_parameters_for_actual_keys() {
-    set_language("en");
-    // Use a key that has a param like {name}, {error}, etc.
-    // "status_opened_workspace" with {name}
-    let result = tf("status_opened_workspace", &[("name", "my-project")]);
-    assert!(result.contains("my-project"));
-}
-
-// L81: Calling t() with a language code where dictionary isn't found returns the key itself
-#[test]
-fn t_function_returns_key_unmodified_for_unknown_language() {
+    // L81: Calling t() with a language code where dictionary isn't found returns the key itself
     set_language("zz"); // Non-existent language code
     let result = t("status_ready");
     assert_eq!(result, "status_ready");
+
     set_language("en"); // reset
 }
