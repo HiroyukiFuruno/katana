@@ -241,6 +241,24 @@ fn empty_input_returns_empty_section_list() {
     assert!(pane.sections.is_empty());
 }
 
+#[test]
+fn centered_markdown_is_processed_in_update_markdown_sections() {
+    let mut pane = PreviewPane::default();
+    let src = "<p align=\"center\">centered</p>";
+    pane.update_markdown_sections(src, std::path::Path::new("/tmp/test.md"));
+    assert_eq!(pane.sections.len(), 1);
+    assert!(matches!(pane.sections[0], RenderedSection::CenteredMarkdown(_)));
+}
+
+#[test]
+fn centered_markdown_is_processed_in_full_render() {
+    let mut pane = PreviewPane::default();
+    let src = "<p align=\"center\">centered</p>";
+    pane.full_render(src, std::path::Path::new("/tmp/test.md"));
+    assert_eq!(pane.sections.len(), 1);
+    assert!(matches!(pane.sections[0], RenderedSection::CenteredMarkdown(_)));
+}
+
 // ── Cover each variant of show_section using egui_kittest ──
 
 /// Covers rendering of the Markdown variant in show_section
@@ -529,6 +547,19 @@ fn syntax_highlighted_code_block_renders_in_harness() {
         "```\n",
     );
     pane.update_markdown_sections(source, std::path::Path::new("/tmp/test.md"));
+
+    let mut harness = Harness::new_ui(move |ui| {
+        pane.show_content(ui);
+    });
+    harness.run();
+}
+
+#[test]
+fn show_section_centered_markdown_variant_renders() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::CenteredMarkdown(
+        "# Centered Title\n![alt](test.png)".to_string(),
+    )];
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui);

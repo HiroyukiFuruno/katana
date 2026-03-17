@@ -30,6 +30,8 @@ const DIAGRAM_SVG_DISPLAY_SCALE: f32 = 1.5;
 pub enum RenderedSection {
     /// Markdown text rendered by egui_commonmark.
     Markdown(String),
+    /// Centered Markdown text.
+    CenteredMarkdown(String),
     /// Rasterized diagram image.
     Image {
         svg_data: RasterizedSvg,
@@ -79,14 +81,19 @@ impl PreviewPane {
         let flattened = flatten_list_code_blocks(&resolved);
         let raw = split_into_sections(&flattened);
         let mut new_sections = Vec::with_capacity(raw.len());
-        let mut diagram_iter = self
-            .sections
-            .iter()
-            .filter(|s| !matches!(s, RenderedSection::Markdown(_)));
+        let mut diagram_iter = self.sections.iter().filter(|s| {
+            !matches!(
+                s,
+                RenderedSection::Markdown(_) | RenderedSection::CenteredMarkdown(_)
+            )
+        });
         for section in &raw {
             match section {
                 PreviewSection::Markdown(md) => {
                     new_sections.push(RenderedSection::Markdown(md.clone()));
+                }
+                PreviewSection::CenteredMarkdown(md) => {
+                    new_sections.push(RenderedSection::CenteredMarkdown(md.clone()));
                 }
                 PreviewSection::Diagram { kind, source } => {
                     // Reuse existing rendered image if available.
@@ -124,6 +131,9 @@ impl PreviewPane {
             match section {
                 PreviewSection::Markdown(md) => {
                     sections.push(RenderedSection::Markdown(md.clone()));
+                }
+                PreviewSection::CenteredMarkdown(md) => {
+                    sections.push(RenderedSection::CenteredMarkdown(md.clone()));
                 }
                 PreviewSection::Diagram { kind, source: src } => {
                     sections.push(RenderedSection::Pending {
@@ -345,7 +355,7 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

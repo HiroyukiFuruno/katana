@@ -216,3 +216,25 @@ fn flatten_preserves_no_trailing_newline() {
         "Should not add extra trailing newline"
     );
 }
+
+#[test]
+fn html_centered_paragraphs_split_into_centered_markdown() {
+    let src = "text\n<p align=\"center\">\n  <img src=\"a.png\" alt=\"A\">\n</p>\nmore text\n<h1 align=\"center\">Title</h1>";
+    let sections = split_into_sections(src);
+    assert_eq!(sections.len(), 4);
+    assert!(matches!(sections[0], PreviewSection::Markdown(ref s) if s.trim() == "text"));
+
+    if let PreviewSection::CenteredMarkdown(ref s) = sections[1] {
+        assert!(s.contains("![A](a.png)"));
+    } else {
+        panic!("Expected CenteredMarkdown");
+    }
+
+    assert!(matches!(sections[2], PreviewSection::Markdown(ref s) if s.trim() == "more text"));
+
+    if let PreviewSection::CenteredMarkdown(ref s) = sections[3] {
+        assert!(s.contains("# Title"));
+    } else {
+        panic!("Expected CenteredMarkdown");
+    }
+}

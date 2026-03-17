@@ -41,6 +41,21 @@ pub(crate) fn show_section(
             ui.visuals_mut().override_text_color = prev_override;
             None
         }
+        RenderedSection::CenteredMarkdown(md) => {
+            ui.vertical_centered(|ui| {
+                let preset = DiagramColorPreset::current();
+                let prev_override = ui.visuals().override_text_color;
+                if let Some((r, g, b)) = DiagramColorPreset::parse_hex_rgb(preset.preview_text) {
+                    ui.visuals_mut().override_text_color = Some(egui::Color32::from_rgb(r, g, b));
+                }
+                CommonMarkViewer::new()
+                    .syntax_theme_dark(preset.syntax_theme_dark)
+                    .syntax_theme_light(preset.syntax_theme_light)
+                    .show(ui, cache, md);
+                ui.visuals_mut().override_text_color = prev_override;
+            });
+            None
+        }
         RenderedSection::Image { svg_data, alt } => {
             show_rasterized(ui, svg_data, alt, id);
             None

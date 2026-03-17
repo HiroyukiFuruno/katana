@@ -305,8 +305,7 @@ mod tests {
         ];
         let result = load_first_font(&candidates);
         // One of them should be found in a macOS environment
-        if result.is_some() {
-            let (name, data) = result.unwrap();
+        if let Some((name, data)) = result {
             assert!(!name.is_empty());
             assert!(!data.is_empty());
         }

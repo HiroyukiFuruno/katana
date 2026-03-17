@@ -214,9 +214,11 @@ mod tests {
         let path = tmp.path().join("settings.json");
         let repo = JsonFileRepository::new(path);
 
-        let mut settings = AppSettings::default();
-        settings.theme = "light".to_string();
-        settings.language = "ja".to_string();
+        let settings = AppSettings {
+            theme: "light".to_string(),
+            language: "ja".to_string(),
+            ..Default::default()
+        };
         repo.save(&settings).unwrap();
 
         let loaded = repo.load();
@@ -287,9 +289,11 @@ mod tests {
 
     #[test]
     fn test_app_settings_serde_roundtrip() {
-        let mut s = AppSettings::default();
-        s.theme = "light".to_string();
-        s.font_size = 16.0;
+        let mut s = AppSettings {
+            theme: "light".to_string(),
+            font_size: 16.0,
+            ..Default::default()
+        };
         s.extra.insert("key".to_string(), "value".to_string());
 
         let json = serde_json::to_string(&s).unwrap();

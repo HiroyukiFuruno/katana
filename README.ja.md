@@ -1,12 +1,23 @@
-# KatanA Desktop
+<p align="center">
+  <img src="assets/icon.iconset/icon_128x128.png" width="128" alt="KatanA Desktop">
+</p>
 
-![KatanA Desktop](assets/icon.iconset/icon_128x128.png)
+<h1 align="center">KatanA Desktop</h1>
 
-macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。
+<p align="center">
+  macOS向けの高速・軽量なMarkdownワークスペース — Rustとeguiで構築。
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml/badge.svg)](https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml) [![Latest Release](https://img.shields.io/github/v/release/HiroyukiFuruno/katana)](https://github.com/HiroyukiFuruno/katana/releases/latest) ![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml"><img src="https://github.com/HiroyukiFuruno/katana/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/HiroyukiFuruno/katana/releases/latest"><img src="https://img.shields.io/github/v/release/HiroyukiFuruno/katana" alt="Latest Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform: macOS">
+</p>
 
-[English](README.md) | 日本語
+<p align="center">
+  <a href="README.md">English</a> | 日本語
+</p>
 
 ---
 

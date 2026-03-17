@@ -326,6 +326,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn dark_preset_editor_font_size_is_positive() {
         assert!(
             DiagramColorPreset::DARK.editor_font_size > 0.0,

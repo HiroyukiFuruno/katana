@@ -2124,6 +2124,7 @@ dependencies = [
  "anyhow",
  "comrak",
  "dirs-sys",
+ "regex",
  "resvg",
  "serde",
  "serde_json",

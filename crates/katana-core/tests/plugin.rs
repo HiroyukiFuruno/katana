@@ -1,5 +1,4 @@
 use katana_core::plugin::*;
-use tracing_subscriber;
 
 /// Initialize the tracing subscriber (only once).
 /// Required to cover the code expanded by tracing::warn!/info! macros.

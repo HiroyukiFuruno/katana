@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::markdown::diagram::DiagramKind;
+use regex::Regex;
 
 /// Resolves relative image paths in Markdown source to absolute `file://` URIs.
 ///
@@ -132,6 +133,8 @@ pub enum PreviewSection {
     Markdown(String),
     /// A diagram fence block.
     Diagram { kind: DiagramKind, source: String },
+    /// Centered Markdown text.
+    CenteredMarkdown(String),
 }
 
 /// Splits the source text into a list of `PreviewSection`s.
@@ -180,9 +183,68 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
 
 /// If the accumulated Markdown text is not empty, add it to the sections.
 fn flush_markdown(sections: &mut Vec<PreviewSection>, acc: &mut String) {
-    if !acc.is_empty() {
-        sections.push(PreviewSection::Markdown(std::mem::take(acc)));
+    if acc.is_empty() {
+        return;
     }
+    let text = std::mem::take(acc);
+    let re_centered =
+        Regex::new(r#"(?is)<(p|h1|div)\s+align="center"[^>]*>(.*?)</(?:p|h1|div)>"#).unwrap();
+
+    let mut last_end = 0;
+    for cap in re_centered.captures_iter(&text) {
+        let m = cap.get(0).unwrap();
+        if m.start() > last_end {
+            sections.push(PreviewSection::Markdown(
+                text[last_end..m.start()].to_string(),
+            ));
+        }
+
+        let tag = cap.get(1).unwrap().as_str().to_lowercase();
+        let inner = cap.get(2).unwrap().as_str();
+
+        let mut md = html_to_md(inner);
+        if tag == "h1" {
+            md = format!("# {}\n", md.trim());
+        }
+
+        sections.push(PreviewSection::CenteredMarkdown(md));
+        last_end = m.end();
+    }
+
+    if last_end < text.len() {
+        sections.push(PreviewSection::Markdown(text[last_end..].to_string()));
+    }
+}
+
+fn html_to_md(html: &str) -> String {
+    let mut s = html.to_string();
+
+    let re_a = Regex::new(r#"(?is)<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#).unwrap();
+    s = re_a.replace_all(&s, "[$2]($1)").into_owned();
+
+    let re_img = Regex::new(r#"(?is)<img\s+([^>]+)>"#).unwrap();
+    s = re_img
+        .replace_all(&s, |caps: &regex::Captures| {
+            let attrs = caps.get(1).unwrap().as_str();
+            let src = extract_attr(attrs, "src").unwrap_or_default();
+            let alt = extract_attr(attrs, "alt").unwrap_or_default();
+            format!("![{}]({})", alt, src)
+        })
+        .into_owned();
+
+    let re_br = Regex::new(r#"(?is)<br\s*/?>"#).unwrap();
+    s = re_br.replace_all(&s, "\n").into_owned();
+
+    let re_tag_preserve_entities = Regex::new(r#"(?is)</?[a-zA-Z0-9]+[^>]*>"#).unwrap();
+    s = re_tag_preserve_entities.replace_all(&s, "").into_owned();
+
+    s.trim().to_string()
+}
+
+fn extract_attr(attrs: &str, attr: &str) -> Option<String> {
+    let re = Regex::new(&format!(r#"(?is){}\s*=\s*"([^"]+)""#, attr)).unwrap();
+    re.captures(attrs)
+        .map(|c| c.get(1).unwrap().as_str().to_string())
 }
 
 /// If the start is a diagram fence, returns `(kind, source, after)`.

@@ -196,7 +196,7 @@ fn nested_subdirectory_with_markdown_is_included() {
     let ws = svc.open_workspace(tmp.path()).unwrap();
 
     // "docs" directory is included (because it contains a .md file inside)
-    fn find_dir<'a>(tree: &'a [katana_core::workspace::TreeEntry], name: &str) -> bool {
+    fn find_dir(tree: &[katana_core::workspace::TreeEntry], name: &str) -> bool {
         tree.iter().any(|e| match e {
             katana_core::workspace::TreeEntry::Directory { path, children } => {
                 path.file_name().and_then(|n| n.to_str()) == Some(name) || find_dir(children, name)
