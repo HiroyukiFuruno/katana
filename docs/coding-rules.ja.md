@@ -190,6 +190,9 @@ fn unsaved_buffer_does_not_write_to_disk() { ... }
 テストは **クレートルートの `tests/` ディレクトリ** に配置する。
 `src/` 内の `#[cfg(test)] mod tests { ... }` は禁止（テストヘルパー関数の `#[cfg(test)]` アトリビュートは許容）。
 
+**「private 関数をテストするために `#[cfg(test)]` が必要」は設計不良のサインであり、言い訳として認めない。**
+テストで検証すべきロジックが private にある場合は、そのロジックを public なモジュール/関数に抽出して再設計すること。
+
 ```
 crates/katana-core/
   src/              # 実装コードのみ

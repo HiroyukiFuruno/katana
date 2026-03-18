@@ -17,11 +17,11 @@ use crate::{
 };
 
 use crate::shell::{
-    ACTIVE_FILE_HIGHLIGHT_BG, ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS,
-    FILE_TREE_PANEL_DEFAULT_WIDTH, FILE_TREE_PANEL_MIN_WIDTH, FILE_TREE_TEXT_COLOR,
-    NO_WORKSPACE_BOTTOM_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
-    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
+    ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
+    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, SCROLL_SYNC_DEAD_ZONE,
+    TAB_INTER_ITEM_SPACING, TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
 };
+use crate::theme_bridge;
 
 pub(crate) fn open_folder_dialog() -> Option<std::path::PathBuf> {
     rfd::FileDialog::new().pick_folder()
@@ -461,8 +461,9 @@ pub(crate) fn render_directory_entry(
     let dir_icon = if is_open { "📂" } else { "📁" };
     let prefix = indent_prefix(depth);
     let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
+    let file_tree_color = ui.visuals().text_color();
     let resp = ui.add(
-        egui::Label::new(egui::RichText::new(label_text).color(FILE_TREE_TEXT_COLOR))
+        egui::Label::new(egui::RichText::new(label_text).color(file_tree_color))
             .truncate()
             .sense(egui::Sense::click()),
     );
@@ -496,7 +497,7 @@ pub(crate) fn render_file_entry(
     let text_color = if is_active {
         egui::Color32::WHITE
     } else {
-        FILE_TREE_TEXT_COLOR
+        ui.visuals().text_color()
     };
     let rich = egui::RichText::new(&label).color(text_color);
     let rich = if is_active { rich.strong() } else { rich };
@@ -512,11 +513,9 @@ pub(crate) fn render_file_entry(
             egui::pos2(ui.min_rect().min.x, resp.rect.min.y),
             egui::pos2(ui.min_rect().max.x, resp.rect.max.y),
         );
-        ui.painter().rect_filled(
-            full_rect,
-            ACTIVE_FILE_HIGHLIGHT_ROUNDING,
-            ACTIVE_FILE_HIGHLIGHT_BG,
-        );
+        let highlight_color = ui.visuals().selection.bg_fill;
+        ui.painter()
+            .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
     }
     if resp.clicked() && entry.is_markdown() {
         *selected = Some(path.to_path_buf());
@@ -581,11 +580,18 @@ pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
 
 use crate::shell::{
     KatanaApp, SIDEBAR_COLLAPSED_TOGGLE_WIDTH, SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH,
-    SPLIT_PREVIEW_PANEL_MIN_WIDTH, TITLE_BAR_TEXT_COLOR,
+    SPLIT_PREVIEW_PANEL_MIN_WIDTH,
 };
 
 impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Apply theme colours to egui Visuals (only when the palette changed)
+        let theme_colors = self.state.settings.settings().effective_theme_colors();
+        if self.cached_theme.as_ref() != Some(&theme_colors) {
+            ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+            self.cached_theme = Some(theme_colors.clone());
+        }
+
         self.poll_download(ctx);
 
         // macOS: Poll actions from the native menu.
@@ -637,11 +643,8 @@ impl eframe::App for KatanaApp {
         egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.centered_and_justified(|ui| {
-                    ui.label(
-                        egui::RichText::new(&title_text)
-                            .small()
-                            .color(TITLE_BAR_TEXT_COLOR),
-                    );
+                    let title_color = theme_bridge::rgb_to_color32(theme_colors.title_bar_text);
+                    ui.label(egui::RichText::new(&title_text).small().color(title_color));
                 });
             });
         });
