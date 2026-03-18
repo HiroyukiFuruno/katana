@@ -25,6 +25,9 @@ use katana_core::{
 /// Display scale when converting diagram SVG to pixel images.
 const DIAGRAM_SVG_DISPLAY_SCALE: f32 = 1.5;
 
+/// Interval (in milliseconds) used to poll background render tasks.
+const RENDER_POLL_INTERVAL_MS: u64 = 50;
+
 /// Rendered sections held in the UI layer.
 #[derive(Debug, Clone)]
 pub enum RenderedSection {
@@ -216,8 +219,7 @@ impl PreviewPane {
     }
 
     /// For testing: Block and wait on the background thread until there are no Pending sections.
-    #[cfg(test)]
-    #[allow(dead_code)]
+    /// Available in release builds too (harmless no-op when no background render is running).
     pub fn wait_for_renders(&mut self) {
         while let Some(rx) = &self.render_rx {
             while let Ok((idx, section)) = rx.try_recv() {
@@ -230,7 +232,7 @@ impl PreviewPane {
                 .iter()
                 .any(|s| matches!(s, RenderedSection::Pending { .. }))
             {
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                std::thread::sleep(std::time::Duration::from_millis(RENDER_POLL_INTERVAL_MS));
             } else {
                 self.render_rx = None;
                 break;

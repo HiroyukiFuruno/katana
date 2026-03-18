@@ -807,6 +807,20 @@ mod internal_tests {
         assert_eq!(violations.len(), 0);
     }
 
+    // lint_magic_numbers: cfg(test) impl method is skipped
+    #[test]
+    fn lint_magic_numbers_skips_test_impl_methods() {
+        let code = r#"
+            impl Foo {
+                #[cfg(test)]
+                fn test_foo_method() -> i32 { 42 }
+            }
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 0);
+    }
+
     // has_cfg_test_attr: test attribute detection (L279-291)
     #[test]
     fn has_cfg_test_attr_returns_true_for_test_attr() {
