@@ -968,3 +968,333 @@ fn test_persistence_missing_file_uses_defaults() {
     assert_eq!(s.settings.settings().theme, "dark");
     assert_eq!(s.settings.settings().language, "en");
 }
+
+// ── Preview rendering regression tests ──
+//
+// Background: render_preview_header calling with_layout(right_to_left(Align::Center)) at the
+// top level consumes all available_height, causing the subsequent ScrollArea to have 0 height.
+// This test is to detect this regression early.
+#[test]
+fn test_regression_preview_content_visible_in_preview_only_mode() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("preview_regression.md");
+    std::fs::write(&md_path, "# RegressionTestHeading\n\nSome body text.").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::PreviewOnly);
+    harness.step();
+    harness.step();
+
+    // Regression if "(No preview)" is displayed
+    let no_preview_label = katana_ui::i18n::t("no_preview");
+    let no_preview_nodes: Vec<_> = harness.query_all_by_value(&no_preview_label).collect();
+    assert!(
+        no_preview_nodes.is_empty(),
+        "Preview pane must NOT show '{no_preview_label}' when a document is open. \
+         Likely cause: render_preview_header is consuming all available height, \
+         leaving ScrollArea with height=0."
+    );
+}
+
+#[test]
+fn test_regression_preview_content_visible_in_split_mode() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("split_regression.md");
+    std::fs::write(&md_path, "# SplitRegressionHeading\n\nSome body text.").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step();
+    harness.step();
+
+    let no_preview_label = katana_ui::i18n::t("no_preview");
+    let no_preview_nodes: Vec<_> = harness.query_all_by_value(&no_preview_label).collect();
+    assert!(
+        no_preview_nodes.is_empty(),
+        "Split mode preview pane must NOT show '{no_preview_label}' when a document is open."
+    );
+}
+
+/// Assert that the split direction setting is Horizontal by default in Split mode,
+/// and that changing the setting is reflected correctly.
+/// (Asserting via setting values since searching for Unicode buttons in egui_kittest
+///  is currently unstable)
+#[test]
+fn test_split_direction_setting_toggles_correctly() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("toggle_test.md");
+    std::fs::write(&md_path, "# Toggle Test").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step();
+
+    // Default setting is Horizontal
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Horizontal,
+        "Default split direction must be Horizontal"
+    );
+
+    // Temporarily switch direction in Split mode (not saved to settings)
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SetSplitDirection(
+            katana_platform::SplitDirection::Vertical,
+        ));
+    harness.step();
+
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Vertical,
+        "Split direction must switch to Vertical"
+    );
+
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_view_mode(),
+        ViewMode::Split,
+        "Split direction toggle must not leave split mode"
+    );
+}
+
+/// UI Layer Test: Simulate clicking on UI widgets by inserting pointer events into egui.
+#[test]
+fn test_ui_split_dir_toggle_horizontal_to_vertical() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("toggle_ui.md");
+    std::fs::write(&md_path, "# UI Toggle Test").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step(); // UI should render and the '⇕' button should appear
+
+    // Default setting is Horizontal
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Horizontal,
+    );
+
+    // Use node.click() (if provided by egui_kittest)
+    // If not provided, try .click() or use ui interaction helpers.
+    let node = harness.get_by_label("⇕");
+    node.click();
+    harness.step();
+
+    // Check if the Action was correctly dispatched and reflected from the UI
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Vertical,
+        "UI click on '⇕' should toggle split direction to Vertical",
+    );
+}
+
+// ── Split direction / pane order Action tests ──
+// Verify that SetSplitDirection / SetPaneOrder are correctly saved
+// to the per-tab temporary state via process_action, without persisting to settings.
+
+#[test]
+fn test_action_set_split_direction_horizontal_to_vertical() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("dir_test.md");
+    std::fs::write(&md_path, "# Dir Test").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step();
+
+    // Default is Horizontal (settings default)
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Horizontal,
+    );
+
+    // Switch to Vertical via Action
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SetSplitDirection(
+            katana_platform::SplitDirection::Vertical,
+        ));
+    harness.step();
+
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Vertical,
+        "SetSplitDirection(Vertical) must update per-tab state to Vertical"
+    );
+
+    // Verify that the state was not persisted to settings
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .settings
+            .settings()
+            .split_direction,
+        katana_platform::SplitDirection::Horizontal,
+        "settings.split_direction must remain unchanged (not persisted)"
+    );
+}
+
+#[test]
+fn test_action_set_split_direction_roundtrip() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("roundtrip_test.md");
+    std::fs::write(&md_path, "# Roundtrip Test").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step();
+
+    // Horizontal → Vertical → Horizontal
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SetSplitDirection(
+            katana_platform::SplitDirection::Vertical,
+        ));
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Vertical,
+    );
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SetSplitDirection(
+            katana_platform::SplitDirection::Horizontal,
+        ));
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_split_direction(),
+        katana_platform::SplitDirection::Horizontal,
+        "Must be able to switch back from Vertical to Horizontal"
+    );
+}
+
+#[test]
+fn test_action_set_pane_order_roundtrip() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let md_path = temp_dir.path().join("pane_order_test.md");
+    std::fs::write(&md_path, "# Pane Order Test").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(md_path));
+    harness.step();
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::Split);
+    harness.step();
+
+    // Default is EditorFirst
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_pane_order(),
+        katana_platform::PaneOrder::EditorFirst,
+    );
+
+    // EditorFirst → PreviewFirst
+    harness.state_mut().trigger_action(AppAction::SetPaneOrder(
+        katana_platform::PaneOrder::PreviewFirst,
+    ));
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_pane_order(),
+        katana_platform::PaneOrder::PreviewFirst,
+        "SetPaneOrder(PreviewFirst) must update per-tab pane order"
+    );
+
+    // PreviewFirst → EditorFirst
+    harness.state_mut().trigger_action(AppAction::SetPaneOrder(
+        katana_platform::PaneOrder::EditorFirst,
+    ));
+    harness.step();
+    assert_eq!(
+        harness.state_mut().app_state_mut().active_pane_order(),
+        katana_platform::PaneOrder::EditorFirst,
+        "Must be able to switch back from PreviewFirst to EditorFirst"
+    );
+}

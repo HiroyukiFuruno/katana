@@ -123,6 +123,8 @@ impl DiagramColorPreset {
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         ],
         emoji_font_candidates: &[
+            // macOS — Apple Color Emoji
+            "/System/Library/Fonts/Apple Color Emoji.ttc",
             // Windows — Segoe UI Emoji (standard since Windows 8.1)
             "C:/Windows/Fonts/seguiemj.ttf",
             // Linux — Noto Color Emoji (widely available via distro packages)
@@ -177,6 +179,8 @@ impl DiagramColorPreset {
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         ],
         emoji_font_candidates: &[
+            // macOS — Apple Color Emoji
+            "/System/Library/Fonts/Apple Color Emoji.ttc",
             // Windows
             "C:/Windows/Fonts/seguiemj.ttf",
             // Linux

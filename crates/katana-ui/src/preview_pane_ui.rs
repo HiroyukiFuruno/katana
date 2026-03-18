@@ -34,6 +34,11 @@ pub(crate) fn show_section(
 ) -> Option<DownloadRequest> {
     match section {
         RenderedSection::Markdown(md) => {
+            if id == 0 && starts_with_markdown_heading(md) {
+                // egui_commonmark inserts a forced leading newline before the first heading.
+                // Compensate that so preview padding stays consistent with non-heading content.
+                ui.add_space(-leading_heading_offset(ui));
+            }
             let preset = if ui.visuals().dark_mode {
                 &DiagramColorPreset::DARK
             } else {
@@ -99,6 +104,19 @@ pub(crate) fn show_section(
             None
         }
     }
+}
+
+fn starts_with_markdown_heading(markdown: &str) -> bool {
+    markdown
+        .trim_start_matches(char::is_whitespace)
+        .starts_with('#')
+}
+
+const HEADING_SPACING_MULTIPLIER: f32 = 1.0;
+
+fn leading_heading_offset(ui: &egui::Ui) -> f32 {
+    ui.text_style_height(&egui::TextStyle::Body)
+        + (ui.spacing().item_spacing.y * HEADING_SPACING_MULTIPLIER)
 }
 
 /// Download button UI for uninstalled tools.

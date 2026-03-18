@@ -232,6 +232,31 @@ fn assert_right_of_same_row(harness: &Harness, label_left: &str, label_right: &s
     );
 }
 
+/// Assert that widget B has a meaningful vertical gap below widget A.
+fn assert_gap_at_least(
+    harness: &Harness,
+    label_above: &str,
+    label_below: &str,
+    min_gap: f64,
+    context: &str,
+) {
+    let node_a = harness.get_by_label(label_above);
+    let node_b = harness.get_by_label(label_below);
+    let bounds_a = node_a
+        .accesskit_node()
+        .raw_bounds()
+        .unwrap_or_else(|| panic!("[{context}] '{label_above}' should have bounds"));
+    let bounds_b = node_b
+        .accesskit_node()
+        .raw_bounds()
+        .unwrap_or_else(|| panic!("[{context}] '{label_below}' should have bounds"));
+    let gap = bounds_b.y0 - bounds_a.y1;
+    assert!(
+        gap >= min_gap,
+        "[{context}] gap between '{label_above}' and '{label_below}' must be >= {min_gap:.1}, got {gap:.1}"
+    );
+}
+
 // ═════════════════════════════════════════════
 // Full fixture: Structural verification (load_fixture)
 // ═════════════════════════════════════════════
@@ -566,6 +591,22 @@ fn fixture_ja_s1_5_bidirectional_link() {
     assert_right_of_same_row(&harness, "English", "| 日本語", "§1.5 JA link same row");
 }
 
+/// §1.6 (JA): Top-level HTML blocks should keep browser-like vertical margins.
+#[test]
+fn fixture_ja_s1_6_readme_header_has_block_spacing() {
+    let (_, _, source) = load_fixture("sample.ja.md");
+    let section_md = extract_section(&source, "### 1.6", "## 2.");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections, PANEL_WIDTH, 500.0);
+    assert_gap_at_least(
+        &harness,
+        "KatanA Desktop",
+        "高速・軽量な macOS 向け Markdown ワークスペース",
+        16.0,
+        "§1.6 JA top-level block spacing",
+    );
+}
+
 /// DrawIo renders correctly in JA fixture.
 #[test]
 fn fixture_ja_drawio_renders() {
@@ -618,28 +659,113 @@ fn snapshot_fixture(fixture_filename: &str, snapshot_name: &str) {
     results.add(result);
 }
 
+fn load_fixture_harness(filename: &str) -> Harness<'static> {
+    let (pane, _, _) = load_fixture(filename);
+    build_harness(pane.sections, PANEL_WIDTH, PANEL_HEIGHT)
+}
+
 // ── HTML Centering ──
 
 #[test]
-fn snapshot_html_en() {
-    snapshot_fixture("sample_html.md", "sample_html_en");
+fn html_fixture_en_semantic_layout() {
+    let harness = load_fixture_harness("sample_html.md");
+    assert_centered(
+        &harness,
+        "Centered Heading",
+        "sample_html_en centered heading",
+    );
+    assert_centered(
+        &harness,
+        "Second centered paragraph — should NOT overlap with the first one.",
+        "sample_html_en centered paragraph",
+    );
+    assert_below(
+        &harness,
+        "Centered Heading",
+        "If all sections above render correctly, HTML centering is working.",
+        "sample_html_en full document order",
+    );
 }
 
 #[test]
-fn snapshot_html_ja() {
-    snapshot_fixture("sample_html.ja.md", "sample_html_ja");
+fn html_fixture_ja_semantic_layout() {
+    let harness = load_fixture_harness("sample_html.ja.md");
+    assert_centered(
+        &harness,
+        "中央寄せ見出し",
+        "sample_html_ja centered heading",
+    );
+    assert_centered(
+        &harness,
+        "2つ目の中央寄せ段落 — 1つ目と重ならないこと。",
+        "sample_html_ja centered paragraph",
+    );
+    assert_below(
+        &harness,
+        "中央寄せ見出し",
+        "すべてのセクションが正しく表示されていれば、HTMLセンタリングは正常です。",
+        "sample_html_ja full document order",
+    );
 }
 
 // ── Basic Markdown ──
 
 #[test]
-fn snapshot_basic_en() {
-    snapshot_fixture("sample_basic.md", "sample_basic_en");
+fn basic_fixture_en_semantic_smoke() {
+    let harness = load_fixture_harness("sample_basic.md");
+    let _h6 = harness.get_by_label("H6 Heading");
+    let _strike = harness.get_by_label("Strikethrough");
+    let _link = harness.get_by_label("Normal link");
+    let _task = harness.get_by_label("Completed task");
+    let _quote = harness.get_by_label("Outer quote");
+    let _arch = harness.get_by_label("Architecture Overview");
+    assert_below(
+        &harness,
+        "H6 Heading",
+        "Architecture Overview",
+        "sample_basic_en full document order",
+    );
 }
 
 #[test]
-fn snapshot_basic_ja() {
-    snapshot_fixture("sample_basic.ja.md", "sample_basic_ja");
+fn basic_fixture_ja_semantic_smoke() {
+    let harness = load_fixture_harness("sample_basic.ja.md");
+    let _h6 = harness.get_by_label("H6 見出し");
+    let _strike = harness.get_by_label("取り消し線");
+    let _link = harness.get_by_label("通常のリンク");
+    let _task = harness.get_by_label("完了タスク");
+    let _quote = harness.get_by_label("外側の引用");
+    let _arch = harness.get_by_label("アーキテクチャ概要");
+    assert_below(
+        &harness,
+        "H6 見出し",
+        "アーキテクチャ概要",
+        "sample_basic_ja full document order",
+    );
+}
+
+/// §11.2 (JA): Long inline code should wrap inside the preview instead of overflowing horizontally.
+#[test]
+fn basic_fixture_ja_s11_2_long_inline_code_wraps_within_panel() {
+    let (_, _, source) = load_fixture("sample_basic.ja.md");
+    let section_md = extract_section(&source, "### 11.2", "### 11.3");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections, 420.0, 220.0);
+    let node = harness.get_by_label_contains("このテキストは非常に長い行");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("long inline code should have bounds");
+    assert!(
+        bounds.x1 <= 412.0,
+        "long inline code must stay within the preview width, got right edge {:.1}",
+        bounds.x1
+    );
+    assert!(
+        bounds.y1 - bounds.y0 > 24.0,
+        "long inline code should wrap to multiple rows, got height {:.1}",
+        bounds.y1 - bounds.y0
+    );
 }
 
 // ── Diagrams (External Dependencies) ──

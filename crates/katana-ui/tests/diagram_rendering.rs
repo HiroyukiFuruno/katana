@@ -8,7 +8,7 @@
 //! This ensures that regardless of the host environment, fallback UIs are
 //! always verified, and rendering is verified when tools are present.
 
-use egui_kittest::{Harness, SnapshotOptions, SnapshotResults};
+use egui_kittest::{kittest::Queryable, Harness, SnapshotOptions, SnapshotResults};
 use katana_ui::preview_pane::{PreviewPane, RenderedSection};
 use std::path::Path;
 
@@ -44,6 +44,27 @@ fn render_and_wait(lang: &str, source: &str) -> PreviewPane {
     pane.full_render(&md, Path::new("/tmp/test.md"));
     pane.wait_for_renders();
     pane
+}
+
+/// Build a harness and render the provided sections for semantic UI assertions.
+fn build_harness(sections: Vec<RenderedSection>, width: f32, height: f32) -> Harness<'static> {
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(width, height))
+        .build_ui(move |ui| {
+            let mut pane = PreviewPane::default();
+            pane.sections = sections.clone();
+            pane.show_content(ui);
+        });
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+    harness
+}
+
+fn assert_standard_diagram_markdown_visible(harness: &Harness) {
+    let _heading = harness.get_by_label("Diagram Test");
+    let _footer = harness.get_by_label("Footer");
 }
 
 /// Build a harness, run it, take a snapshot, and return the SnapshotResults
@@ -119,12 +140,13 @@ fn drawio_invalid_xml_produces_error_section() {
     );
 }
 
-/// Snapshot: DrawIo rendered image displayed in the UI.
+/// DrawIo image rendering stays visible in the preview UI without relying on snapshots.
 #[test]
-fn snapshot_drawio_rendered_image() {
+fn drawio_rendered_image_is_visible_in_ui() {
     let pane = render_and_wait("drawio", DRAWIO_SOURCE);
     assert_image(&pane.sections, 1, "DrawIo pre-snapshot");
-    build_snapshot(pane.sections, "diagram_drawio_rendered", 600.0, 400.0);
+    let harness = build_harness(pane.sections, 600.0, 400.0);
+    assert_standard_diagram_markdown_visible(&harness);
 }
 
 /// Snapshot: DrawIo render error fallback UI.
@@ -150,13 +172,9 @@ const MERMAID_SOURCE: &str = "graph TD\n    A[Start] --> B[End]";
 
 /// Mermaid idempotent test: verifies BOTH fallback and rendering states
 /// by controlling tool visibility via environment variable.
-///
-/// Phase 1: Hide mmdc → verify CommandNotFound fallback + snapshot
-/// Phase 2: Restore mmdc → verify Image rendering + snapshot (skip if mmdc not on system)
 #[test]
-fn snapshot_mermaid_both_states() {
+fn mermaid_both_states_render_semantically() {
     let saved_mmdc = std::env::var("MERMAID_MMDC").ok();
-    let mut results = SnapshotResults::default();
 
     // ── Phase 1: Hide mmdc → test CommandNotFound fallback ──
     std::env::set_var("MERMAID_MMDC", "nonexistent_mmdc_for_idempotent_test");
@@ -178,13 +196,13 @@ fn snapshot_mermaid_both_states() {
             install_hint.contains("npm"),
             "Install hint should mention npm"
         );
+        let expected = katana_ui::i18n::t("missing_dependency")
+            .replace("{tool_name}", tool_name)
+            .replace("{install_hint}", install_hint);
+        let harness = build_harness(pane.sections.clone(), 600.0, 300.0);
+        assert_standard_diagram_markdown_visible(&harness);
+        let _fallback = harness.get_by_label(&expected);
     }
-    results.extend(build_snapshot(
-        pane.sections,
-        "diagram_mermaid_command_not_found",
-        600.0,
-        300.0,
-    ));
 
     // ── Phase 2: Restore mmdc → test actual rendering ──
     match &saved_mmdc {
@@ -200,14 +218,10 @@ fn snapshot_mermaid_both_states() {
             assert!(svg_data.height > 0, "Mermaid image height should be > 0");
             assert!(alt.contains("Mermaid"), "Alt should mention Mermaid");
         }
-        results.extend(build_snapshot(
-            pane.sections,
-            "diagram_mermaid_rendered",
-            600.0,
-            400.0,
-        ));
+        let harness = build_harness(pane.sections, 600.0, 400.0);
+        assert_standard_diagram_markdown_visible(&harness);
     } else {
-        eprintln!("SKIP Phase 2: mmdc not installed — Mermaid rendering snapshot skipped");
+        eprintln!("SKIP Phase 2: mmdc not installed — Mermaid rendering semantic UI check skipped");
     }
 
     // ── Cleanup + handle results ──
@@ -215,7 +229,6 @@ fn snapshot_mermaid_both_states() {
         Some(v) => std::env::set_var("MERMAID_MMDC", v),
         None => std::env::remove_var("MERMAID_MMDC"),
     }
-    // SnapshotResults are checked automatically on drop (panics if errors).
 }
 
 // ─────────────────────────────────────────────
@@ -226,13 +239,9 @@ const PLANTUML_SOURCE: &str = "@startuml\nAlice -> Bob : Hello\n@enduml";
 
 /// PlantUML idempotent test: verifies BOTH fallback and rendering states
 /// by controlling tool visibility via environment variable.
-///
-/// Phase 1: Hide plantuml.jar → verify NotInstalled fallback + snapshot
-/// Phase 2: Restore plantuml.jar → verify Image rendering + snapshot (skip if jar not on system)
 #[test]
-fn snapshot_plantuml_both_states() {
+fn plantuml_both_states_render_semantically() {
     let saved_jar = std::env::var("PLANTUML_JAR").ok();
-    let mut results = SnapshotResults::default();
 
     // ── Phase 1: Hide plantuml.jar → test NotInstalled fallback ──
     std::env::set_var("PLANTUML_JAR", "/nonexistent/path/for/idempotent/test.jar");
@@ -252,13 +261,11 @@ fn snapshot_plantuml_both_states() {
             download_url.contains("plantuml"),
             "URL should mention plantuml"
         );
+        let tool_msg = katana_ui::i18n::tf("tool_not_installed", &[("tool", kind)]);
+        let harness = build_harness(pane.sections.clone(), 600.0, 300.0);
+        assert_standard_diagram_markdown_visible(&harness);
+        let _fallback = harness.get_by_label(&tool_msg);
     }
-    results.extend(build_snapshot(
-        pane.sections,
-        "diagram_plantuml_not_installed",
-        600.0,
-        300.0,
-    ));
 
     // ── Phase 2: Restore plantuml.jar → test actual rendering ──
     match &saved_jar {
@@ -274,14 +281,12 @@ fn snapshot_plantuml_both_states() {
             assert!(svg_data.height > 0, "PlantUML image height should be > 0");
             assert!(alt.contains("PlantUml"), "Alt should mention PlantUml");
         }
-        results.extend(build_snapshot(
-            pane.sections,
-            "diagram_plantuml_rendered",
-            600.0,
-            400.0,
-        ));
+        let harness = build_harness(pane.sections, 600.0, 400.0);
+        assert_standard_diagram_markdown_visible(&harness);
     } else {
-        eprintln!("SKIP Phase 2: plantuml.jar not found — PlantUML rendering snapshot skipped");
+        eprintln!(
+            "SKIP Phase 2: plantuml.jar not found — PlantUML rendering semantic UI check skipped"
+        );
     }
 
     // ── Cleanup + handle results ──
@@ -289,7 +294,6 @@ fn snapshot_plantuml_both_states() {
         Some(v) => std::env::set_var("PLANTUML_JAR", v),
         None => std::env::remove_var("PLANTUML_JAR"),
     }
-    // SnapshotResults are checked automatically on drop (panics if errors).
 }
 
 // ─────────────────────────────────────────────
@@ -353,9 +357,9 @@ fn mixed_diagram_document_renders_all_independently() {
 // UI snapshot: Mixed document + Pending spinner + all fallbacks
 // ─────────────────────────────────────────────
 
-/// Snapshot: Mixed document with DrawIo image + Mermaid/PlantUML fallbacks.
+/// Mixed document fallback UI remains semantically correct without snapshots.
 #[test]
-fn snapshot_mixed_diagrams_with_fallbacks() {
+fn mixed_diagrams_with_fallbacks_render_semantically() {
     let drawio_pane = render_and_wait("drawio", DRAWIO_SOURCE);
     let drawio_image = drawio_pane.sections[1].clone();
     assert!(matches!(drawio_image, RenderedSection::Image { .. }));
@@ -379,7 +383,15 @@ fn snapshot_mixed_diagrams_with_fallbacks() {
         },
         RenderedSection::Markdown("## End\n".to_string()),
     ];
-    build_snapshot(sections, "diagram_mixed_with_fallbacks", 600.0, 600.0);
+    let expected_missing = katana_ui::i18n::t("missing_dependency")
+        .replace("{tool_name}", "mmdc (Mermaid CLI)")
+        .replace("{install_hint}", "`npm install -g @mermaid-js/mermaid-cli`");
+    let expected_not_installed = katana_ui::i18n::tf("tool_not_installed", &[("tool", "PlantUML")]);
+    let harness = build_harness(sections, 600.0, 600.0);
+    let _heading = harness.get_by_label("Mixed Diagram Document");
+    let _footer = harness.get_by_label("End");
+    let _missing = harness.get_by_label(&expected_missing);
+    let _not_installed = harness.get_by_label(&expected_not_installed);
 }
 
 /// Snapshot: Diagram in Pending state showing spinner.

@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use eframe::egui;
+use eframe::egui::text::LayoutJob;
 
 use katana_core::html::{HtmlNode, LinkAction, TextAlign};
 
@@ -24,6 +25,10 @@ const HEADING_H2_SIZE: f32 = 20.0;
 
 /// Font size (in points) for H3 headings.
 const HEADING_H3_SIZE: f32 = 16.0;
+/// Browser-like block spacing for top-level paragraphs.
+const PARAGRAPH_BLOCK_MARGIN_Y: f32 = 12.0;
+/// Browser-like block spacing for top-level headings.
+const HEADING_BLOCK_MARGIN_Y: f32 = 16.0;
 
 /// Heading level constants for match arms.
 const HEADING_LEVEL_1: u8 = 1;
@@ -113,7 +118,7 @@ impl<'a> HtmlRenderer<'a> {
 
     /// Renders a block-level node.
     fn render_block(&mut self, node: &HtmlNode) -> Option<LinkAction> {
-        match node {
+        let action = match node {
             HtmlNode::Paragraph { align, children } => match align {
                 Some(TextAlign::Center) => {
                     // Don't use vertical_centered here — it doesn't work for
@@ -128,7 +133,6 @@ impl<'a> HtmlRenderer<'a> {
                 align,
                 children,
             } => {
-                let action = None;
                 let text = collect_text(children);
                 let mut rt = if *level == HEADING_LEVEL_1 {
                     egui::RichText::new(&text).heading()
@@ -153,9 +157,51 @@ impl<'a> HtmlRenderer<'a> {
                         self.ui.label(rt);
                     }
                 }
-                action
+                None
             }
             _ => None, // Non-block nodes handled by inline path
+        };
+
+        self.ui.add_space(match node {
+            HtmlNode::Heading { .. } => HEADING_BLOCK_MARGIN_Y,
+            HtmlNode::Paragraph { .. } => PARAGRAPH_BLOCK_MARGIN_Y,
+            _ => 0.0,
+        });
+
+        action
+    }
+
+    fn batch_is_textual(batch: &[&HtmlNode]) -> bool {
+        batch.iter().all(|node| {
+            matches!(
+                node,
+                HtmlNode::Text(_)
+                    | HtmlNode::Emphasis(_)
+                    | HtmlNode::Strong(_)
+                    | HtmlNode::LineBreak
+            )
+        })
+    }
+
+    fn render_text_batch(&mut self, batch: &[&HtmlNode], centered: bool) {
+        let mut job = LayoutJob::default();
+        job.wrap.max_width = self.ui.available_width();
+        job.halign = if centered {
+            egui::Align::Center
+        } else {
+            egui::Align::LEFT
+        };
+
+        for node in batch {
+            self.append_text_node(&mut job, node, false, false);
+        }
+
+        let label = egui::Label::new(job).wrap();
+        if centered {
+            self.ui
+                .add_sized(egui::vec2(self.ui.available_width(), 0.0), label);
+        } else {
+            self.ui.add(label);
         }
     }
 
@@ -194,6 +240,11 @@ impl<'a> HtmlRenderer<'a> {
             return None;
         }
 
+        if Self::batch_is_textual(batch) {
+            self.render_text_batch(batch, false);
+            return None;
+        }
+
         if batch.len() == 1 {
             return self.render_inline(batch[0]);
         }
@@ -223,6 +274,11 @@ impl<'a> HtmlRenderer<'a> {
         batch_index: usize,
     ) -> Option<LinkAction> {
         if batch.is_empty() {
+            return None;
+        }
+
+        if Self::batch_is_textual(batch) {
+            self.render_text_batch(batch, true);
             return None;
         }
 
@@ -404,6 +460,52 @@ impl<'a> HtmlRenderer<'a> {
                 None
             }
             _ => None,
+        }
+    }
+
+    fn append_text_node(&self, job: &mut LayoutJob, node: &HtmlNode, strong: bool, italics: bool) {
+        match node {
+            HtmlNode::Text(text) => {
+                let mut rich = egui::RichText::new(text.as_str());
+                if strong {
+                    rich = rich.strong();
+                }
+                if italics {
+                    rich = rich.italics();
+                }
+                if let Some(color) = self.text_color {
+                    rich = rich.color(color);
+                }
+                rich.append_to(
+                    job,
+                    self.ui.style().as_ref(),
+                    egui::FontSelection::Default,
+                    egui::Align::Center,
+                );
+            }
+            HtmlNode::Emphasis(children) => {
+                for child in children {
+                    self.append_text_node(job, child, strong, true);
+                }
+            }
+            HtmlNode::Strong(children) => {
+                for child in children {
+                    self.append_text_node(job, child, true, italics);
+                }
+            }
+            HtmlNode::LineBreak => {
+                let mut rich = egui::RichText::new("\n");
+                if let Some(color) = self.text_color {
+                    rich = rich.color(color);
+                }
+                rich.append_to(
+                    job,
+                    self.ui.style().as_ref(),
+                    egui::FontSelection::Default,
+                    egui::Align::Center,
+                );
+            }
+            _ => {}
         }
     }
 

@@ -168,6 +168,7 @@ impl KatanaApp {
             .position(|d| d.path == path)
         {
             self.state.active_doc_idx = Some(existing_idx);
+            self.state.initialize_tab_split_state(path.clone());
             let src = self.state.open_documents[existing_idx].buffer.clone();
             let h = hash_str(&src);
             let last_h = self.tab_hashes.get(&path).copied().unwrap_or(0);
@@ -184,6 +185,7 @@ impl KatanaApp {
                 let src = doc.buffer.clone();
                 self.state.open_documents.push(doc);
                 self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
+                self.state.initialize_tab_split_state(path.clone());
                 self.full_refresh_preview(&path, &src);
             }
             Err(e) => {
@@ -255,6 +257,14 @@ impl KatanaApp {
             }
             AppAction::ToggleSettings => {
                 self.state.show_settings = !self.state.show_settings;
+            }
+            AppAction::SetSplitDirection(dir) => {
+                // Keep toolbar toggles temporary and scoped to the active tab.
+                self.state.set_active_split_direction(dir);
+            }
+            AppAction::SetPaneOrder(order) => {
+                // Keep toolbar toggles temporary and scoped to the active tab.
+                self.state.set_active_pane_order(order);
             }
             AppAction::None => {}
         }

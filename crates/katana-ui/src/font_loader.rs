@@ -1,6 +1,8 @@
-use egui::{Context, FontData, FontDefinitions, FontFamily};
+use egui::{Context, FontData, FontDefinitions, FontFamily, FontTweak};
 use katana_core::markdown::color_preset::DiagramColorPreset;
 use std::fs;
+
+const EMOJI_FONT_SCALE: f32 = 0.9;
 
 /// Responsible for dynamically loading and registering system fonts with egui.
 pub struct SystemFontLoader;
@@ -48,9 +50,14 @@ impl SystemFontLoader {
         );
         Self::load_system_candidates(&mut fonts, FontFamily::Monospace, monospace_candidates);
 
-        if let Some(name) = Self::load_first_valid(&mut fonts, emoji_candidates) {
-            Self::append_fallback(&mut fonts, FontFamily::Proportional, &name);
-            Self::append_fallback(&mut fonts, FontFamily::Monospace, &name);
+        if let Some(name) = Self::load_first_valid(&mut fonts, emoji_candidates, true) {
+            if Self::should_prioritize_system_emoji(&name) {
+                Self::insert_fallback_after_primary(&mut fonts, FontFamily::Proportional, &name);
+                Self::insert_fallback_after_primary(&mut fonts, FontFamily::Monospace, &name);
+            } else {
+                Self::append_fallback(&mut fonts, FontFamily::Proportional, &name);
+                Self::append_fallback(&mut fonts, FontFamily::Monospace, &name);
+            }
         }
 
         if let (Some(path), Some(name)) = (custom_font_path, custom_font_name) {
@@ -65,7 +72,7 @@ impl SystemFontLoader {
         primary_family: FontFamily,
         candidates: &[&str],
     ) {
-        let Some(name) = Self::load_first_valid(fonts, candidates) else {
+        let Some(name) = Self::load_first_valid(fonts, candidates, false) else {
             return;
         };
         Self::prepend_primary(fonts, primary_family.clone(), &name);
@@ -78,7 +85,11 @@ impl SystemFontLoader {
         Self::append_fallback(fonts, fallback_family, &name);
     }
 
-    fn load_first_valid(fonts: &mut FontDefinitions, candidates: &[&str]) -> Option<String> {
+    fn load_first_valid(
+        fonts: &mut FontDefinitions,
+        candidates: &[&str],
+        emoji_tweak: bool,
+    ) -> Option<String> {
         for &path in candidates {
             if let Ok(data) = fs::read(path) {
                 let name = std::path::Path::new(path)
@@ -86,10 +97,17 @@ impl SystemFontLoader {
                     .and_then(|s| s.to_str())
                     .unwrap_or("cjk_font")
                     .to_string();
-                fonts.font_data.insert(
-                    name.clone(),
-                    std::sync::Arc::new(FontData::from_owned(data)),
-                );
+                let font_data = if emoji_tweak {
+                    FontData::from_owned(data).tweak(FontTweak {
+                        scale: EMOJI_FONT_SCALE,
+                        ..Default::default()
+                    })
+                } else {
+                    FontData::from_owned(data)
+                };
+                fonts
+                    .font_data
+                    .insert(name.clone(), std::sync::Arc::new(font_data));
                 return Some(name);
             }
         }
@@ -108,6 +126,17 @@ impl SystemFontLoader {
         }
     }
 
+    fn should_prioritize_system_emoji(_name: &str) -> bool {
+        true
+    }
+
+    fn insert_fallback_after_primary(fonts: &mut FontDefinitions, family: FontFamily, name: &str) {
+        if let Some(list) = fonts.families.get_mut(&family) {
+            let insert_at = usize::from(!list.is_empty());
+            list.insert(insert_at, name.to_string());
+        }
+    }
+
     fn inject_custom_font(fonts: &mut FontDefinitions, path: &str, name: &str) {
         let Ok(data) = fs::read(path) else { return };
         fonts.font_data.insert(
@@ -121,8 +150,12 @@ impl SystemFontLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::{Color32, FontId};
     use std::fs;
+    use std::sync::Arc;
     use tempfile::TempDir;
+
+    const APPLE_COLOR_EMOJI_FONT_NAME: &str = "Apple Color Emoji";
 
     #[test]
     fn test_build_font_definitions_no_candidates() {
@@ -191,5 +224,208 @@ mod tests {
         let mut fonts = FontDefinitions::empty();
         SystemFontLoader::load_system_candidates(&mut fonts, FontFamily::Proportional, &[]);
         assert!(fonts.font_data.is_empty());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_apple_color_emoji_family_renders_directly() {
+        let data =
+            fs::read("/System/Library/Fonts/Apple Color Emoji.ttc").expect("apple emoji font");
+        let mut fonts = FontDefinitions::empty();
+        fonts.font_data.insert(
+            APPLE_COLOR_EMOJI_FONT_NAME.to_string(),
+            Arc::new(FontData::from_owned(data)),
+        );
+        fonts.families.insert(
+            FontFamily::Name(APPLE_COLOR_EMOJI_FONT_NAME.into()),
+            vec![APPLE_COLOR_EMOJI_FONT_NAME.to_string()],
+        );
+
+        let ctx = Context::default();
+        ctx.set_fonts(fonts);
+
+        let mut glyph = None;
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let galley = ui.painter().layout_no_wrap(
+                    "🌍".to_owned(),
+                    FontId::new(24.0, FontFamily::Name(APPLE_COLOR_EMOJI_FONT_NAME.into())),
+                    Color32::WHITE,
+                );
+                glyph = galley
+                    .rows
+                    .first()
+                    .and_then(|row| row.glyphs.first())
+                    .copied();
+            });
+        });
+
+        let glyph = glyph.expect("emoji glyph should be laid out");
+        assert!(
+            !glyph.uv_rect.is_nothing(),
+            "Apple Color Emoji should rasterize a visible glyph when used directly"
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_apple_color_emoji_has_extended_coverage_beyond_builtin_fallbacks() {
+        let mut fonts = FontDefinitions::default();
+        for name in [
+            APPLE_COLOR_EMOJI_FONT_NAME,
+            "NotoEmoji-Regular",
+            "emoji-icon-font",
+        ] {
+            if fonts.font_data.contains_key(name) {
+                fonts
+                    .families
+                    .insert(FontFamily::Name(name.into()), vec![name.to_string()]);
+            }
+        }
+        if !fonts.font_data.contains_key(APPLE_COLOR_EMOJI_FONT_NAME) {
+            let data =
+                fs::read("/System/Library/Fonts/Apple Color Emoji.ttc").expect("apple emoji font");
+            fonts.font_data.insert(
+                APPLE_COLOR_EMOJI_FONT_NAME.to_string(),
+                Arc::new(FontData::from_owned(data)),
+            );
+            fonts.families.insert(
+                FontFamily::Name(APPLE_COLOR_EMOJI_FONT_NAME.into()),
+                vec![APPLE_COLOR_EMOJI_FONT_NAME.to_string()],
+            );
+        }
+
+        let ctx = Context::default();
+        ctx.set_fonts(fonts);
+
+        let mut apple_results = Vec::new();
+        let mut noto_results = Vec::new();
+        let mut icon_results = Vec::new();
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.ctx().fonts_mut(|fonts| {
+                    for emoji in ["🌍", "🧪", "📖", "⚔️", "❤️"] {
+                        apple_results.push(fonts.has_glyphs(
+                            &FontId::new(
+                                24.0,
+                                FontFamily::Name(APPLE_COLOR_EMOJI_FONT_NAME.into()),
+                            ),
+                            emoji,
+                        ));
+                        noto_results.push(fonts.has_glyphs(
+                            &FontId::new(24.0, FontFamily::Name("NotoEmoji-Regular".into())),
+                            emoji,
+                        ));
+                        icon_results.push(fonts.has_glyphs(
+                            &FontId::new(24.0, FontFamily::Name("emoji-icon-font".into())),
+                            emoji,
+                        ));
+                    }
+                });
+            });
+        });
+
+        assert!(
+            apple_results.iter().all(|covered| *covered),
+            "Apple Color Emoji should cover the macOS emoji regression set"
+        );
+        assert!(
+            noto_results
+                .iter()
+                .zip(icon_results.iter())
+                .any(|(noto, icon)| !noto && !icon),
+            "built-in emoji fallbacks should miss at least one regression emoji, otherwise system priority is not justified"
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_macos_emoji_fallback_produces_rasterized_glyphs() {
+        let ctx = Context::default();
+        let preset = DiagramColorPreset::current();
+        SystemFontLoader::setup_fonts(&ctx, preset, None, None);
+
+        let mut glyph = None;
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let galley = ui.painter().layout_no_wrap(
+                    "🙂".to_owned(),
+                    FontId::proportional(24.0),
+                    Color32::WHITE,
+                );
+                glyph = galley
+                    .rows
+                    .first()
+                    .and_then(|row| row.glyphs.first())
+                    .copied();
+            });
+        });
+        let glyph = glyph.expect("emoji glyph should be laid out");
+
+        assert!(
+            !glyph.uv_rect.is_nothing(),
+            "emoji fallback was registered but produced no rasterized glyph"
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_macos_system_emoji_precedes_builtin_fallbacks() {
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            preset.proportional_font_candidates,
+            preset.monospace_font_candidates,
+            preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let proportional = fonts
+            .families
+            .get(&FontFamily::Proportional)
+            .expect("proportional family");
+        let emoji_idx = proportional
+            .iter()
+            .position(|name| name == APPLE_COLOR_EMOJI_FONT_NAME)
+            .expect("Apple Color Emoji should be registered on macOS");
+
+        for builtin in ["NotoEmoji-Regular", "emoji-icon-font"] {
+            if let Some(builtin_idx) = proportional.iter().position(|name| name == builtin) {
+                assert!(
+                    emoji_idx < builtin_idx,
+                    "Apple Color Emoji must precede built-in emoji fallbacks on macOS, family order was {proportional:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_common_emoji_sequences_produce_rasterized_glyphs() {
+        let ctx = Context::default();
+        let preset = DiagramColorPreset::current();
+        SystemFontLoader::setup_fonts(&ctx, preset, None, None);
+
+        for emoji in ["🌍", "🦀", "⚡", "📝", "🔧", "✅", "❌", "💡"] {
+            let mut glyph = None;
+            let _ = ctx.run(Default::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    let galley = ui.painter().layout_no_wrap(
+                        emoji.to_owned(),
+                        FontId::proportional(24.0),
+                        Color32::WHITE,
+                    );
+                    glyph = galley
+                        .rows
+                        .first()
+                        .and_then(|row| row.glyphs.first())
+                        .copied();
+                });
+            });
+            let glyph = glyph.unwrap_or_else(|| panic!("{emoji} should be laid out"));
+            assert!(
+                !glyph.uv_rect.is_nothing(),
+                "{emoji} produced no rasterized glyph"
+            );
+        }
     }
 }

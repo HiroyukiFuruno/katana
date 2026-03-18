@@ -148,20 +148,7 @@ pub fn setup_fonts_from_preset(
     ctx: &egui::Context,
     preset: &katana_core::markdown::color_preset::DiagramColorPreset,
 ) {
-    let fonts = build_font_definitions(
-        preset.proportional_font_candidates,
-        preset.monospace_font_candidates,
-        preset.emoji_font_candidates,
-    );
-    ctx.set_fonts(fonts);
-
-    #[cfg(debug_assertions)]
-    ctx.style_mut(|style| {
-        style.debug.debug_on_hover = false;
-        style.debug.show_expand_width = false;
-        style.debug.show_expand_height = false;
-        style.debug.show_widget_hits = false;
-    });
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(ctx, preset, None, None);
 }
 
 /// Receives a list of font candidates and sets the fonts. Testable.
@@ -194,64 +181,13 @@ pub fn build_font_definitions(
     monospace_candidates: &[&str],
     emoji_candidates: &[&str],
 ) -> egui::FontDefinitions {
-    let mut fonts = egui::FontDefinitions::default();
-
-    // Load proportional font (e.g. Hiragino Sans for Japanese UI text).
-    if let Some((name, data)) = load_first_font(proportional_candidates) {
-        fonts.font_data.insert(
-            name.clone(),
-            std::sync::Arc::new(egui::FontData::from_owned(data)),
-        );
-        // Primary in Proportional.
-        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
-            list.insert(0, name.clone());
-        }
-        // CJK fallback in Monospace.
-        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
-            list.push(name.clone());
-        }
-        tracing::info!("Loaded proportional font={name}");
-    } else {
-        tracing::warn!(
-            "Proportional system font not found. Text rendering quality may be degraded."
-        );
-    }
-
-    // Load monospace font (e.g. Menlo for code blocks).
-    if let Some((name, data)) = load_first_font(monospace_candidates) {
-        fonts.font_data.insert(
-            name.clone(),
-            std::sync::Arc::new(egui::FontData::from_owned(data)),
-        );
-        // Primary in Monospace (inserted BEFORE CJK fallback).
-        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
-            list.insert(0, name.clone());
-        }
-        tracing::info!("Loaded monospace font={name}");
-    } else {
-        tracing::warn!("Monospace system font not found. Code blocks may render poorly.");
-    }
-
-    // Load emoji font as fallback in both families.
-    if let Some((name, data)) = load_first_font(emoji_candidates) {
-        fonts.font_data.insert(
-            name.clone(),
-            std::sync::Arc::new(egui::FontData::from_owned(data)),
-        );
-        // Append as fallback in Proportional.
-        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
-            list.push(name.clone());
-        }
-        // Append as fallback in Monospace.
-        if let Some(list) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
-            list.push(name.clone());
-        }
-        tracing::info!("Loaded emoji font={name}");
-    } else {
-        tracing::warn!("Emoji font not found. Emoji characters may not render.");
-    }
-
-    fonts
+    katana_ui::font_loader::SystemFontLoader::build_font_definitions(
+        proportional_candidates,
+        monospace_candidates,
+        emoji_candidates,
+        None,
+        None,
+    )
 }
 
 /// Returns the first readable font from the list of candidate paths.

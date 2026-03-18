@@ -1,6 +1,7 @@
 use eframe::egui;
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::Harness;
+use katana_core::markdown::color_preset::DiagramColorPreset;
 use katana_core::markdown::svg_rasterize::RasterizedSvg;
 use katana_ui::preview_pane::{decode_png_rgba, extract_svg, PreviewPane, RenderedSection};
 use std::path::PathBuf;
@@ -14,6 +15,27 @@ fn markdown_texts(sections: &[RenderedSection]) -> Vec<&str> {
             _ => None,
         })
         .collect()
+}
+
+fn flatten_shapes<'a>(
+    shapes: impl IntoIterator<Item = &'a egui::epaint::ClippedShape>,
+) -> Vec<&'a egui::epaint::Shape> {
+    fn visit<'a>(shape: &'a egui::epaint::Shape, acc: &mut Vec<&'a egui::epaint::Shape>) {
+        match shape {
+            egui::epaint::Shape::Vec(children) => {
+                for child in children {
+                    visit(child, acc);
+                }
+            }
+            _ => acc.push(shape),
+        }
+    }
+
+    let mut flat = Vec::new();
+    for clipped in shapes {
+        visit(&clipped.shape, &mut flat);
+    }
+    flat
 }
 
 // ── 3.2 Preview Synchronization: Immediate preview update from unsaved buffer ──
@@ -619,6 +641,450 @@ fn centered_text_link_is_clickable() {
     harness.run();
     // Verify the link label exists in the accessibility tree
     let _link_node = harness.get_by_label("日本語");
+}
+
+/// Verifies that mixed inline text is emitted as a single wrapped text run.
+///
+/// Rendering each text fragment as an independent widget causes baseline drift
+/// for CJK text and makes long lines wrap inconsistently.
+#[test]
+fn inline_html_text_fragments_are_not_split_into_multiple_widgets() {
+    let html = "<p>前文<strong>強調</strong>後文</p>\n";
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(html.to_string())];
+
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(400.0, 160.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    let _combined = harness.get_by_label("前文強調後文");
+    assert!(
+        harness.query_by_label("前文").is_none(),
+        "inline text should not be emitted as separate widgets"
+    );
+    assert!(
+        harness.query_by_label("強調").is_none(),
+        "strong text should participate in the same text run"
+    );
+}
+
+#[test]
+fn blockquote_long_line_wraps_within_preview_width() {
+    let markdown = concat!(
+        "> Note: On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple. ",
+        "Alternatively, go to System Settings -> Privacy & Security -> \"Open Anyway\" after the first launch attempt.\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(markdown, std::path::Path::new("/tmp/blockquote.md"));
+
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(520.0, 240.0))
+        .build_ui(move |ui| {
+            pane.show_content(ui);
+        });
+    harness.step();
+    harness.step();
+    harness.step();
+    harness.run();
+
+    let quote = harness.get_by_label_contains("Note:");
+    let bounds = quote
+        .accesskit_node()
+        .raw_bounds()
+        .expect("blockquote text should have bounds");
+    assert!(
+        bounds.x1 <= 520.0,
+        "blockquote long line must stay within the preview viewport, got right edge {:.1}",
+        bounds.x1
+    );
+    assert!(
+        bounds.y1 - bounds.y0 > 30.0,
+        "blockquote long line should wrap to multiple rows, got height {:.1}",
+        bounds.y1 - bounds.y0
+    );
+}
+
+#[test]
+fn blockquote_with_strong_prefix_wraps_within_preview_width() {
+    let markdown = concat!(
+        "> **Note:** On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple. ",
+        "Alternatively, go to **System Settings -> Privacy & Security -> \"Open Anyway\"** after the first launch attempt.\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(markdown, std::path::Path::new("/tmp/blockquote-strong.md"));
+
+    let ctx = egui::Context::default();
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(520.0, 240.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(12)))
+                .show(ctx, |ui| {
+                    let inner_width = ui.available_width();
+                    ui.set_width(inner_width);
+                    pane.show(ui);
+                });
+        },
+    );
+
+    let text_shapes: Vec<(&egui::epaint::TextShape, egui::Rect)> = output
+        .shapes
+        .iter()
+        .filter_map(|clipped| match &clipped.shape {
+            egui::epaint::Shape::Text(text)
+                if text.galley.job.text.contains("Note:")
+                    || text.galley.job.text.contains("Gatekeeper requires")
+                    || text.galley.job.text.contains("Open Anyway") =>
+            {
+                Some((text, clipped.clip_rect))
+            }
+            _ => None,
+        })
+        .collect();
+
+    assert!(
+        !text_shapes.is_empty(),
+        "expected blockquote text shapes for strong-prefixed note"
+    );
+
+    let max_right = text_shapes
+        .iter()
+        .map(|(text, _)| text.visual_bounding_rect().right())
+        .fold(f32::NEG_INFINITY, f32::max);
+    let max_rows = text_shapes
+        .iter()
+        .map(|(text, _)| text.galley.rows.len())
+        .max()
+        .unwrap_or(0);
+    let clip_right = text_shapes
+        .iter()
+        .map(|(_, clip_rect)| clip_rect.right())
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    assert!(
+        max_rows > 1,
+        "strong-prefixed blockquote should wrap to multiple rows"
+    );
+    assert!(
+        max_right <= clip_right + 4.0,
+        "strong-prefixed blockquote must stay within clip rect, got right edge {max_right} with clip right {clip_right}"
+    );
+}
+
+#[test]
+fn blockquote_soft_break_continuation_stays_aligned_to_quote_content() {
+    let markdown = concat!(
+        "> Note: On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple.\n",
+        "> Alternatively, go to System Settings -> Privacy & Security -> \"Open Anyway\" after the first launch attempt.\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        markdown,
+        std::path::Path::new("/tmp/blockquote-softbreak.md"),
+    );
+
+    let ctx = egui::Context::default();
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(680.0, 240.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(12)))
+                .show(ctx, |ui| {
+                    pane.show(ui);
+                });
+        },
+    );
+
+    let text_shapes: Vec<&egui::epaint::TextShape> = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text.galley.job.text.contains("Note:")
+                    || text.galley.job.text.contains("Alternatively,") =>
+            {
+                Some(text)
+            }
+            _ => None,
+        })
+        .collect();
+
+    let combined = text_shapes
+        .iter()
+        .find(|text| {
+            text.galley.job.text.contains("Note:")
+                && text.galley.job.text.contains("Alternatively,")
+        })
+        .copied();
+
+    if let Some(text) = combined {
+        let row_lefts: Vec<f32> = text
+            .galley
+            .rows
+            .iter()
+            .map(|row| row.rect().left() + text.pos.x)
+            .collect();
+        let first_left = *row_lefts.first().expect("blockquote row");
+        let max_deviation = row_lefts
+            .iter()
+            .map(|left| (left - first_left).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_deviation <= 4.0,
+            "blockquote continuation rows should align with the first row, got row_lefts={row_lefts:?}"
+        );
+    } else {
+        assert!(
+            text_shapes.len() >= 2,
+            "expected blockquote text shapes for both lines"
+        );
+        let first_left = text_shapes
+            .iter()
+            .find(|text| text.galley.job.text.contains("Note:"))
+            .expect("note text shape")
+            .visual_bounding_rect()
+            .left();
+        let second_left = text_shapes
+            .iter()
+            .find(|text| text.galley.job.text.contains("Alternatively,"))
+            .expect("continuation text shape")
+            .visual_bounding_rect()
+            .left();
+
+        assert!(
+            (second_left - first_left).abs() <= 4.0,
+            "blockquote continuation should align with the first line, got first_left={first_left} second_left={second_left}"
+        );
+    }
+}
+
+#[test]
+fn preview_scroll_content_uses_viewport_width_instead_of_intrinsic_text_width() {
+    let markdown = concat!(
+        "# PaddingHeading\n\n",
+        "> **Note:** On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple. ",
+        "Alternatively, go to **System Settings → Privacy & Security → \"Open Anyway\"** after the first launch attempt.\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(markdown, std::path::Path::new("/tmp/preview-width.md"));
+
+    let ctx = egui::Context::default();
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(520.0, 280.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(12)))
+                .show(ctx, |ui| {
+                    pane.show(ui);
+                });
+        },
+    );
+
+    let shapes = flatten_shapes(output.shapes.iter());
+    let heading_rect = shapes
+        .iter()
+        .find_map(|shape| match shape {
+            egui::epaint::Shape::Text(text) if text.galley.job.text.contains("PaddingHeading") => {
+                Some(text.visual_bounding_rect())
+            }
+            _ => None,
+        })
+        .expect("heading text shape");
+    let note_shapes: Vec<(&egui::epaint::TextShape, egui::Rect)> = output
+        .shapes
+        .iter()
+        .filter_map(|clipped| match &clipped.shape {
+            egui::epaint::Shape::Text(text)
+                if text.galley.job.text.contains("Note:")
+                    || text.galley.job.text.contains("Gatekeeper requires")
+                    || text.galley.job.text.contains("Open Anyway") =>
+            {
+                Some((text, clipped.clip_rect))
+            }
+            _ => None,
+        })
+        .collect();
+    let max_right = note_shapes
+        .iter()
+        .map(|(text, _)| text.visual_bounding_rect().right())
+        .fold(f32::NEG_INFINITY, f32::max);
+    let max_rows = note_shapes
+        .iter()
+        .map(|(text, _)| text.galley.rows.len())
+        .max()
+        .unwrap_or(0);
+    let clip_right = note_shapes
+        .iter()
+        .map(|(_, clip_rect)| clip_rect.right())
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    assert!(
+        (heading_rect.left() - 12.0).abs() <= 2.0,
+        "preview heading should start at the viewport padding, got left edge {}",
+        heading_rect.left()
+    );
+    assert!(
+        max_rows > 1,
+        "long blockquote should wrap within the preview viewport"
+    );
+    assert!(
+        max_right <= clip_right + 4.0,
+        "wrapped blockquote must stay within the preview clip rect, got right edge {max_right} with clip right {clip_right}"
+    );
+}
+
+#[test]
+fn paragraph_with_inline_link_wraps_from_the_left_edge_after_link() {
+    let markdown = concat!(
+        "KatanA Desktop is under active development. See the ",
+        "[Releases page](https://example.com) ",
+        "for the latest version and changelog.\n"
+    );
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(markdown, std::path::Path::new("/tmp/inline-link-wrap.md"));
+
+    let ctx = egui::Context::default();
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(560.0, 220.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(12)))
+                .show(ctx, |ui| {
+                    pane.show(ui);
+                });
+        },
+    );
+
+    let shapes = flatten_shapes(output.shapes.iter());
+    let paragraph_left = shapes
+        .iter()
+        .find_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text
+                    .galley
+                    .job
+                    .text
+                    .contains("KatanA Desktop is under active development.") =>
+            {
+                Some(text.visual_bounding_rect().left())
+            }
+            _ => None,
+        })
+        .expect("leading paragraph text shape");
+    let tail_word_shapes: Vec<egui::Rect> = shapes
+        .iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if ["for ", "the ", "latest ", "version ", "and ", "changelog."]
+                    .iter()
+                    .any(|needle| text.galley.job.text.contains(needle)) =>
+            {
+                Some(text.visual_bounding_rect())
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !tail_word_shapes.is_empty(),
+        "expected trailing paragraph word shapes"
+    );
+
+    let first_row_top = tail_word_shapes
+        .iter()
+        .map(|rect| rect.top())
+        .fold(f32::INFINITY, f32::min);
+    let continuation_left = tail_word_shapes
+        .iter()
+        .filter(|rect| rect.top() > first_row_top + 2.0)
+        .map(|rect| rect.left())
+        .fold(f32::INFINITY, f32::min);
+
+    assert!(
+        continuation_left.is_finite(),
+        "expected the text after the inline link to wrap to a continuation row"
+    );
+    assert!(
+        (continuation_left - paragraph_left).abs() <= 24.0,
+        "text after an inline link must wrap from the paragraph left edge, got paragraph_left={paragraph_left} continuation_left={continuation_left}"
+    );
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn preview_markdown_renders_emoji_with_app_font_setup() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections("🌍", std::path::Path::new("/tmp/emoji.md"));
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(240.0, 120.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let emoji_text = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .find_map(|shape| match shape {
+            egui::epaint::Shape::Text(text) if text.galley.job.text.contains('🌍') => Some(text),
+            _ => None,
+        })
+        .expect("emoji text shape");
+
+    let has_visible_glyph = emoji_text
+        .galley
+        .rows
+        .iter()
+        .flat_map(|row| row.glyphs.iter())
+        .any(|glyph| !glyph.uv_rect.is_nothing());
+    assert!(
+        has_visible_glyph,
+        "preview markdown should render a visible emoji glyph with the app font setup"
+    );
 }
 
 /// Verifies that multiple centered <p> blocks each take their own vertical

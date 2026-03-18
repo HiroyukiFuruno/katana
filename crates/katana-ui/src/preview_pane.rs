@@ -166,10 +166,22 @@ impl PreviewPane {
         self.poll_renders(ui.ctx());
 
         let mut request: Option<DownloadRequest> = None;
+        let content_width = ui.available_width();
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                request = self.render_sections(ui);
+                let child_rect = egui::Rect::from_min_size(
+                    ui.next_widget_position(),
+                    egui::vec2(content_width, 0.0),
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(child_rect)
+                        .layout(egui::Layout::top_down(egui::Align::Min)),
+                    |ui| {
+                        request = self.render_sections(ui);
+                    },
+                );
             });
         request
     }

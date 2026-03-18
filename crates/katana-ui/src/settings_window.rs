@@ -28,12 +28,16 @@ const INNER_MARGIN: f32 = 12.0;
 const COLOUR_CHANNEL_MAX: f32 = 255.0;
 const FONT_SIZE_STEP: f64 = 1.0;
 const TAB_UNDERLINE_HEIGHT: f32 = 2.0;
+/// Spacing between layout selectors (split direction / pane order) within the Layout tab.
+const LAYOUT_SELECTOR_SPACING: f32 = 4.0;
 const TAB_BUTTON_PADDING_X: f32 = 16.0;
 const PRESET_SWATCH_SIZE: f32 = 14.0;
 const COLOR_GRID_LABEL_WIDTH: f32 = 130.0;
 const SECTION_HEADER_SIZE: f32 = 14.0;
 const SWATCH_CORNER_DIVISOR: f32 = 4.0;
 const FONT_FAMILY_COMBOBOX_WIDTH: f32 = 200.0;
+/// Maximum height of the scrollable font list inside the search popup.
+const FONT_DROPDOWN_MAX_HEIGHT: f32 = 200.0;
 
 // ── Sample markdown for settings preview ─────────────────────────────
 
@@ -69,12 +73,10 @@ Secondary text and [a link](https://example.com) for reference.
 /// Render the settings window.
 pub(crate) fn render_settings_window(
     ctx: &egui::Context,
-    show: &mut bool,
-    active_tab: &mut SettingsTab,
-    settings: &mut SettingsService,
+    state: &mut crate::app_state::AppState,
     preview_pane: &mut PreviewPane,
 ) {
-    if !*show {
+    if !state.show_settings {
         return;
     }
 
@@ -86,7 +88,7 @@ pub(crate) fn render_settings_window(
         );
     }
 
-    let mut open = *show;
+    let mut open = state.show_settings;
     egui::Window::new(i18n::t("settings_title"))
         .open(&mut open)
         .default_size(egui::vec2(
@@ -106,20 +108,20 @@ pub(crate) fn render_settings_window(
                     ui.set_width(left_width);
                     ui.set_min_height(available_height);
 
-                    render_tab_bar(ui, active_tab);
+                    render_tab_bar(ui, &mut state.active_settings_tab);
                     ui.add_space(SUBSECTION_SPACING);
 
                     egui::ScrollArea::vertical()
                         .id_salt("settings_left_scroll")
                         .auto_shrink(false)
                         .show(ui, |ui| {
-                            egui::Frame::NONE.inner_margin(INNER_MARGIN).show(ui, |ui| {
-                                match *active_tab {
-                                    SettingsTab::Theme => render_theme_tab(ui, settings),
-                                    SettingsTab::Font => render_font_tab(ui, settings),
-                                    SettingsTab::Layout => render_layout_tab(ui, settings),
-                                }
-                            });
+                            egui::Frame::NONE
+                                .inner_margin(INNER_MARGIN)
+                                .show(ui, |ui| match state.active_settings_tab {
+                                    SettingsTab::Theme => render_theme_tab(ui, &mut state.settings),
+                                    SettingsTab::Font => render_font_tab(ui, &mut state.settings),
+                                    SettingsTab::Layout => render_layout_tab(ui, state),
+                                });
                         });
                 });
 
@@ -136,7 +138,7 @@ pub(crate) fn render_settings_window(
                 });
             });
         });
-    *show = open;
+    state.show_settings = open;
 }
 
 // ── Tab bar (styled underline tabs) ──────────────────────────────────
@@ -363,6 +365,98 @@ fn apply_color_to_theme(colors: &mut ThemeColors, field_key: &str, rgb: Rgb) {
     }
 }
 
+// ── Font tab ──────────────────────────────────────────────
+fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
+    let current = settings.settings().font_family.clone();
+    let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
+
+    // Persistent state IDs
+    let open_id = egui::Id::new("font_selector_open");
+    let search_id = egui::Id::new("font_search_query");
+
+    let is_open: bool = ui.data(|d| d.get_temp(open_id)).unwrap_or(false);
+    let mut query: String = ui
+        .data(|d| d.get_temp::<String>(search_id))
+        .unwrap_or_default();
+
+    // ── Trigger button (shows current value, opens popup on click) ────────
+    let button_resp = ui.add(
+        egui::Button::new(format!("{current}  ▾"))
+            .min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)),
+    );
+    if button_resp.clicked() {
+        let new_state = !is_open;
+        ui.data_mut(|d| d.insert_temp(open_id, new_state));
+        if new_state {
+            // Clear search when opening.
+            ui.data_mut(|d| d.insert_temp(search_id, String::new()));
+            query = String::new();
+        }
+    }
+
+    // ── Popup with inline search field + filtered list ────────────────────
+    egui::Popup::from_response(&button_resp)
+        .open(is_open)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .show(|ui| {
+            ui.set_min_width(FONT_FAMILY_COMBOBOX_WIDTH);
+
+            // Search field at the top of the popup.
+            let search_resp = ui.text_edit_singleline(&mut query);
+            if search_resp.changed() {
+                ui.data_mut(|d: &mut egui::util::IdTypeMap| {
+                    d.insert_temp(search_id, query.clone())
+                });
+            }
+            // Auto-focus whenever popup is open.
+            search_resp.request_focus();
+
+            ui.separator();
+
+            let query_lower = query.to_lowercase();
+            let mut selected: Option<String> = None;
+            let mut close = false;
+
+            egui::ScrollArea::vertical()
+                .max_height(FONT_DROPDOWN_MAX_HEIGHT)
+                .show(ui, |ui| {
+                    let defaults = ["Proportional", "Monospace"];
+                    for family in defaults {
+                        if query_lower.is_empty() || family.to_lowercase().contains(&query_lower) {
+                            let is_current = current == family;
+                            if ui.selectable_label(is_current, family).clicked() {
+                                selected = Some(family.to_string());
+                                close = true;
+                            }
+                        }
+                    }
+                    ui.separator();
+                    for (name, _) in os_fonts.iter() {
+                        let name: &String = name;
+                        if query_lower.is_empty() || name.to_lowercase().contains(&query_lower) {
+                            let is_current = current == *name;
+                            if ui.selectable_label(is_current, name.as_str()).clicked() {
+                                selected = Some(name.clone());
+                                close = true;
+                            }
+                        }
+                    }
+                });
+
+            if let Some(new_font) = selected {
+                settings.settings_mut().font_family = new_font;
+                let _ = settings.save();
+            }
+            let should_close = close || ui.input(|i| i.key_pressed(egui::Key::Escape));
+            if should_close {
+                ui.data_mut(|d: &mut egui::util::IdTypeMap| {
+                    d.insert_temp(open_id, false);
+                    d.insert_temp(search_id, String::new());
+                });
+            }
+        });
+}
+
 // ── Font tab ─────────────────────────────────────────────────────────
 
 fn render_font_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
@@ -384,74 +478,15 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
     }
 }
 
-fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    let current = settings.settings().font_family.clone();
-    let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
-
-    // ── Search field ──────────────────────────────────────────────────
-    // Keep the search query in egui transient state, keyed per widget ID.
-    let search_id = egui::Id::new("font_search_query");
-    let mut query: String = ui
-        .data(|d| d.get_temp::<String>(search_id))
-        .unwrap_or_default();
-
-    ui.horizontal(|ui| {
-        let response = ui.text_edit_singleline(&mut query);
-        if response.changed() {
-            ui.data_mut(|d| d.insert_temp(search_id, query.clone()));
-        }
-        if ui.small_button("✕").clicked() {
-            query.clear();
-            ui.data_mut(|d| d.insert_temp(search_id, query.clone()));
-        }
-    });
-
-    let query_lower = query.to_lowercase();
-
-    // ── ComboBox with filtered list ───────────────────────────────────
-    let mut current_mut = current.clone();
-    egui::ComboBox::from_id_salt("font_family_selector")
-        .selected_text(&current_mut)
-        .width(FONT_FAMILY_COMBOBOX_WIDTH)
-        .show_ui(ui, |ui| {
-            let defaults = ["Proportional", "Monospace"];
-            for family in defaults {
-                if (query_lower.is_empty() || family.to_lowercase().contains(&query_lower))
-                    && ui
-                        .selectable_value(&mut current_mut, family.to_string(), family)
-                        .changed()
-                {
-                    settings.settings_mut().font_family = family.to_string();
-                    let _ = settings.save();
-                    // Clear search on selection.
-                    ui.data_mut(|d| d.insert_temp(search_id, String::new()));
-                }
-            }
-            ui.separator();
-            for (name, _) in os_fonts {
-                if (query_lower.is_empty() || name.to_lowercase().contains(&query_lower))
-                    && ui
-                        .selectable_value(&mut current_mut, name.to_string(), name)
-                        .changed()
-                {
-                    settings.settings_mut().font_family = name.to_string();
-                    let _ = settings.save();
-                    // Clear search on selection.
-                    ui.data_mut(|d| d.insert_temp(search_id, String::new()));
-                }
-            }
-        });
-}
-
 // ── Layout tab ───────────────────────────────────────────────────────
 
-fn render_layout_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
+fn render_layout_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     section_header(ui, "settings_tab_layout");
-    render_toc_toggle(ui, settings);
+    render_toc_toggle(ui, &mut state.settings);
     ui.add_space(SECTION_SPACING);
-    render_split_direction_selector(ui, settings);
-    ui.add_space(SECTION_SPACING);
-    render_pane_order_selector(ui, settings);
+    render_split_direction_selector(ui, state);
+    ui.add_space(LAYOUT_SELECTOR_SPACING);
+    render_pane_order_selector(ui, state);
 }
 
 fn render_toc_toggle(ui: &mut egui::Ui, settings: &mut SettingsService) {
@@ -465,10 +500,10 @@ fn render_toc_toggle(ui: &mut egui::Ui, settings: &mut SettingsService) {
     }
 }
 
-fn render_split_direction_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
+fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     ui.label(i18n::t("settings_layout_split_direction"));
     ui.horizontal(|ui| {
-        let current = settings.settings().split_direction;
+        let current = state.settings.settings().split_direction;
         if ui
             .selectable_label(
                 current == SplitDirection::Horizontal,
@@ -477,8 +512,8 @@ fn render_split_direction_selector(ui: &mut egui::Ui, settings: &mut SettingsSer
             .clicked()
             && current != SplitDirection::Horizontal
         {
-            settings.settings_mut().split_direction = SplitDirection::Horizontal;
-            let _ = settings.save();
+            state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
+            let _ = state.settings.save();
         }
         if ui
             .selectable_label(
@@ -488,16 +523,16 @@ fn render_split_direction_selector(ui: &mut egui::Ui, settings: &mut SettingsSer
             .clicked()
             && current != SplitDirection::Vertical
         {
-            settings.settings_mut().split_direction = SplitDirection::Vertical;
-            let _ = settings.save();
+            state.settings.settings_mut().split_direction = SplitDirection::Vertical;
+            let _ = state.settings.save();
         }
     });
 }
 
-fn render_pane_order_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
+fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     ui.label(i18n::t("settings_layout_pane_order"));
     ui.horizontal(|ui| {
-        let current = settings.settings().pane_order;
+        let current = state.settings.settings().pane_order;
         if ui
             .selectable_label(
                 current == PaneOrder::EditorFirst,
@@ -506,8 +541,8 @@ fn render_pane_order_selector(ui: &mut egui::Ui, settings: &mut SettingsService)
             .clicked()
             && current != PaneOrder::EditorFirst
         {
-            settings.settings_mut().pane_order = PaneOrder::EditorFirst;
-            let _ = settings.save();
+            state.settings.settings_mut().pane_order = PaneOrder::EditorFirst;
+            let _ = state.settings.save();
         }
         if ui
             .selectable_label(
@@ -517,8 +552,8 @@ fn render_pane_order_selector(ui: &mut egui::Ui, settings: &mut SettingsService)
             .clicked()
             && current != PaneOrder::PreviewFirst
         {
-            settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
-            let _ = settings.save();
+            state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+            let _ = state.settings.save();
         }
     });
 }

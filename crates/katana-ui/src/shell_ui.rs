@@ -195,19 +195,41 @@ pub(crate) fn render_preview_content(
     scroll_state: &mut (f32, ScrollSource, f32),
 ) -> Option<DownloadRequest> {
     let mut download_req = None;
-    render_preview_header(ui, state, action);
-    ui.separator();
+    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+    let padding = f32::from(PREVIEW_CONTENT_PADDING);
+    let outer_rect = ui.available_rect_before_wrap();
+    let content_rect = outer_rect.shrink2(egui::vec2(padding, padding));
+    ui.allocate_rect(outer_rect, egui::Sense::hover());
 
     let (fraction, source, prev_max_scroll) = scroll_state;
-    let mut scroll_area = egui::ScrollArea::both().id_salt("preview_scroll");
+    let mut scroll_area = egui::ScrollArea::vertical()
+        .id_salt("preview_scroll")
+        .auto_shrink([false, false]);
 
     let consuming_editor = scroll_sync && *source == ScrollSource::Editor;
     if consuming_editor {
         scroll_area = scroll_area.vertical_scroll_offset(*fraction * (*prev_max_scroll).max(1.0));
     }
 
-    let output = scroll_area.show(ui, |ui| {
-        download_req = preview.show_content(ui);
+    let mut content_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(content_rect)
+            .layout(egui::Layout::top_down(egui::Align::Min)),
+    );
+    content_ui.set_clip_rect(content_rect);
+
+    let output = scroll_area.show(&mut content_ui, |ui| {
+        let content_width = ui.available_width();
+        let child_rect =
+            egui::Rect::from_min_size(ui.next_widget_position(), egui::vec2(content_width, 0.0));
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .max_rect(child_rect)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+            |ui| {
+                download_req = preview.show_content(ui);
+            },
+        );
     });
 
     if scroll_sync {
@@ -231,22 +253,37 @@ pub(crate) fn render_preview_content(
         }
     }
 
+    render_preview_header(ui, state, action);
+
     download_req
 }
 
 pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
-    // タスク4.1: 「Preview」ラベルを削除し、リフレッシュボタンのみ残す。
-    // ヘッダーには操作ボタンだけを配置することで、プレビュー領域を最大限活用できる。
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let has_doc = state.active_document().is_some();
-        if ui
-            .add_enabled(has_doc, egui::Button::new("\u{1F504}"))
-            .on_hover_text(crate::i18n::t("refresh_diagrams"))
-            .clicked()
-        {
-            *action = AppAction::RefreshDiagrams;
-        }
-    });
+    let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
+    let margin = f32::from(PREVIEW_CONTENT_PADDING);
+    let button_rect = egui::Rect::from_min_size(
+        egui::pos2(
+            ui.max_rect().right() - margin - button_size.x,
+            ui.max_rect().top() + margin,
+        ),
+        button_size,
+    );
+    let mut overlay_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(button_rect)
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    let has_doc = state.active_document().is_some();
+    if overlay_ui
+        .add_enabled(
+            has_doc,
+            egui::Button::new("\u{1F504}").min_size(button_size),
+        )
+        .on_hover_text(crate::i18n::t("refresh_diagrams"))
+        .clicked()
+    {
+        *action = AppAction::RefreshDiagrams;
+    }
 }
 
 /// Tab bar: Displays tabs of open documents side-by-side.
@@ -350,16 +387,85 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
         egui::vec2(available_width, bar_height),
         egui::Layout::right_to_left(egui::Align::Center),
         |ui| {
-            ui.selectable_value(&mut mode, ViewMode::Split, i18n::t("view_mode_split"));
+            let is_split = mode == ViewMode::Split;
+            if ui
+                .selectable_label(is_split, i18n::t("view_mode_split"))
+                .clicked()
+                && !is_split
+            {
+                mode = ViewMode::Split;
+            }
+
             ui.selectable_value(&mut mode, ViewMode::CodeOnly, i18n::t("view_mode_code"));
             ui.selectable_value(
                 &mut mode,
                 ViewMode::PreviewOnly,
                 i18n::t("view_mode_preview"),
             );
+
+            // Show split controls only while split mode is active.
+            let prev_is_split = prev == ViewMode::Split;
+            if is_split && (is_split == prev_is_split) {
+                ui.separator();
+
+                // Toggle pane order.
+                let current_order = state.active_pane_order();
+                let (order_icon, order_tip) = match current_order {
+                    katana_platform::PaneOrder::EditorFirst => {
+                        ("📄|👁", i18n::t("split_toggle_preview_first"))
+                    }
+                    katana_platform::PaneOrder::PreviewFirst => {
+                        ("👁|📄", i18n::t("split_toggle_editor_first"))
+                    }
+                };
+                if ui
+                    .add(egui::Button::new(order_icon).sense(egui::Sense::click()))
+                    .on_hover_text(order_tip)
+                    .clicked()
+                {
+                    let new_order = match current_order {
+                        katana_platform::PaneOrder::EditorFirst => {
+                            katana_platform::PaneOrder::PreviewFirst
+                        }
+                        katana_platform::PaneOrder::PreviewFirst => {
+                            katana_platform::PaneOrder::EditorFirst
+                        }
+                    };
+                    state.set_active_pane_order(new_order);
+                }
+
+                // Toggle split direction.
+                let current_dir = state.active_split_direction();
+                let (dir_icon, dir_tip) = match current_dir {
+                    katana_platform::SplitDirection::Horizontal => {
+                        ("⇕", i18n::t("split_toggle_vertical"))
+                    }
+                    katana_platform::SplitDirection::Vertical => {
+                        ("⇔", i18n::t("split_toggle_horizontal"))
+                    }
+                };
+                if ui
+                    .add(egui::Button::new(dir_icon).sense(egui::Sense::click()))
+                    .on_hover_text(dir_tip)
+                    .clicked()
+                {
+                    let new_dir = match current_dir {
+                        katana_platform::SplitDirection::Horizontal => {
+                            katana_platform::SplitDirection::Vertical
+                        }
+                        katana_platform::SplitDirection::Vertical => {
+                            katana_platform::SplitDirection::Horizontal
+                        }
+                    };
+                    state.set_active_split_direction(new_dir);
+                }
+            }
         },
     );
     if mode != prev {
+        if mode == ViewMode::Split {
+            state.ensure_active_split_state();
+        }
         state.set_active_view_mode(mode);
     }
 }
@@ -495,35 +601,43 @@ pub(crate) fn render_file_entry(
     let is_active = active_path.is_some_and(|ap| ap == path);
 
     let text_color = if is_active {
-        egui::Color32::WHITE
+        ui.visuals().widgets.active.fg_stroke.color
     } else {
         ui.visuals().text_color()
     };
     let rich = egui::RichText::new(&label).color(text_color);
     let rich = if is_active { rich.strong() } else { rich };
 
-    let resp = ui.add(
-        egui::Label::new(rich)
-            .truncate()
-            .sense(egui::Sense::click()),
-    );
+    let row_height = ui.spacing().interact_size.y;
+    let desired_size = egui::vec2(ui.available_width(), row_height);
+    let (full_rect, row_resp) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
     if is_active {
-        let full_rect = egui::Rect::from_min_max(
-            egui::pos2(ui.min_rect().min.x, resp.rect.min.y),
-            egui::pos2(ui.min_rect().max.x, resp.rect.max.y),
-        );
         let highlight_color = ui.visuals().selection.bg_fill;
         ui.painter()
             .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
     }
+    let mut child_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(full_rect)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+    );
+    child_ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+    let label_resp = child_ui.add_sized(
+        full_rect.size(),
+        egui::Label::new(rich)
+            .truncate()
+            .sense(egui::Sense::click()),
+    );
+    let resp = row_resp.union(label_resp);
+
     if resp.clicked() && entry.is_markdown() {
         *selected = Some(path.to_path_buf());
     }
 }
 
 // ─────────────────────────────────────────────
-// Split Layout Helpers (Task 4.2 / 4.4)
+// Split layout helpers
 // ─────────────────────────────────────────────
 
 /// Renders the split view and returns a pending download request if any.
@@ -567,18 +681,22 @@ fn render_horizontal_split(
         app.state.preview_max_scroll,
     );
     let mut download_req = None;
+    let panel_id = match pane_order {
+        PaneOrder::EditorFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_right"),
+        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_left"),
+    };
 
     // EditorFirst: preview panel on the right; PreviewFirst: preview panel on the left.
     let panel_side = match pane_order {
-        PaneOrder::EditorFirst => egui::SidePanel::right("preview_panel_h"),
-        PaneOrder::PreviewFirst => egui::SidePanel::left("preview_panel_h"),
+        PaneOrder::EditorFirst => egui::SidePanel::right(panel_id),
+        PaneOrder::PreviewFirst => egui::SidePanel::left(panel_id),
     };
 
     panel_side
         .resizable(true)
         .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
         .default_width(half_width)
-        .frame(egui::Frame::side_top_panel(ctx.style().as_ref()).fill(preview_bg))
+        .frame(egui::Frame::NONE.fill(preview_bg))
         .show(ctx, |ui| {
             if let Some(path) = &active_path {
                 let pane = app.tab_panes.entry(path.clone()).or_default();
@@ -626,15 +744,21 @@ fn render_vertical_split(
         app.state.preview_max_scroll,
     );
     let mut download_req = None;
+    let panel_id = match pane_order {
+        PaneOrder::EditorFirst => {
+            preview_panel_id(active_path.as_deref(), "preview_panel_v_bottom")
+        }
+        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_v_top"),
+    };
 
     // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
     let show_preview_top = pane_order == PaneOrder::PreviewFirst;
 
     if show_preview_top {
-        egui::TopBottomPanel::top("preview_panel_v_top")
+        egui::TopBottomPanel::top(panel_id)
             .resizable(true)
             .default_height(half_height)
-            .frame(egui::Frame::side_top_panel(ctx.style().as_ref()).fill(preview_bg))
+            .frame(egui::Frame::NONE.fill(preview_bg))
             .show(ctx, |ui| {
                 if let Some(path) = &active_path {
                     let pane = app.tab_panes.entry(path.clone()).or_default();
@@ -652,10 +776,10 @@ fn render_vertical_split(
             render_editor_content(ui, &mut app.state, &mut app.pending_action, true);
         });
     } else {
-        egui::TopBottomPanel::bottom("preview_panel_v_bottom")
+        egui::TopBottomPanel::bottom(panel_id)
             .resizable(true)
             .default_height(half_height)
-            .frame(egui::Frame::side_top_panel(ctx.style().as_ref()).fill(preview_bg))
+            .frame(egui::Frame::NONE.fill(preview_bg))
             .show(ctx, |ui| {
                 if let Some(path) = &active_path {
                     let pane = app.tab_panes.entry(path.clone()).or_default();
@@ -714,7 +838,7 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
 }
 
 // ─────────────────────────────────────────────
-// eframe::App Implementation (egui Main Rendering Loop)
+// eframe::App implementation (egui main rendering loop)
 // ─────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]
@@ -772,8 +896,16 @@ pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
 
 use crate::shell::{KatanaApp, SIDEBAR_COLLAPSED_TOGGLE_WIDTH, SPLIT_PREVIEW_PANEL_MIN_WIDTH};
 
-// Half-panel ratio for responsive 50/50 split (task 4.2).
+// Half-panel ratio for responsive 50/50 split.
 const SPLIT_HALF_RATIO: f32 = 0.5;
+const PREVIEW_CONTENT_PADDING: i8 = 12;
+
+fn preview_panel_id(path: Option<&std::path::Path>, base: &'static str) -> egui::Id {
+    match path {
+        Some(path) => egui::Id::new((base, path)),
+        None => egui::Id::new(base),
+    }
+}
 
 impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -909,8 +1041,8 @@ impl eframe::App for KatanaApp {
         let is_split = current_mode == ViewMode::Split;
 
         if is_split {
-            let split_dir = self.state.settings.settings().split_direction;
-            let pane_order = self.state.settings.settings().pane_order;
+            let split_dir = self.state.active_split_direction();
+            let pane_order = self.state.active_pane_order();
             download_req = render_split_mode(ctx, self, split_dir, pane_order);
         }
 
@@ -933,9 +1065,7 @@ impl eframe::App for KatanaApp {
         // Settings window
         crate::settings_window::render_settings_window(
             ctx,
-            &mut self.state.show_settings,
-            &mut self.state.active_settings_tab,
-            &mut self.state.settings,
+            &mut self.state,
             &mut self.settings_preview,
         );
 
@@ -978,6 +1108,506 @@ impl eframe::App for KatanaApp {
         if !unprocessed_commands.is_empty() {
             ctx.output_mut(|o| o.commands.extend(unprocessed_commands));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::{self, pos2, Rect};
+    use katana_core::{document::Document, workspace::TreeEntry};
+    use std::path::{Path, PathBuf};
+
+    const PREVIEW_CONTENT_PADDING: f32 = 12.0;
+
+    fn test_input(size: egui::Vec2) -> egui::RawInput {
+        egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), size)),
+            ..Default::default()
+        }
+    }
+
+    fn flatten_shapes<'a>(
+        shapes: impl IntoIterator<Item = &'a egui::epaint::ClippedShape>,
+    ) -> Vec<&'a egui::epaint::Shape> {
+        fn visit<'a>(shape: &'a egui::epaint::Shape, acc: &mut Vec<&'a egui::epaint::Shape>) {
+            match shape {
+                egui::epaint::Shape::Vec(children) => {
+                    for child in children {
+                        visit(child, acc);
+                    }
+                }
+                _ => acc.push(shape),
+            }
+        }
+
+        let mut flat = Vec::new();
+        for clipped in shapes {
+            visit(&clipped.shape, &mut flat);
+        }
+        flat
+    }
+
+    fn state_with_active_doc(path: &std::path::Path) -> AppState {
+        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        state
+            .open_documents
+            .push(Document::new(path, "# Heading\n\nBody"));
+        state.active_doc_idx = Some(0);
+        state
+    }
+
+    fn app_with_preview_doc(path: &Path, markdown: &str) -> KatanaApp {
+        let mut app = KatanaApp::new(state_with_active_doc(path));
+        if let Some(doc) = app.state.active_document_mut() {
+            doc.buffer = markdown.to_string();
+        }
+        let mut pane = PreviewPane::default();
+        pane.full_render(markdown, path);
+        pane.wait_for_renders();
+        app.tab_panes.insert(path.to_path_buf(), pane);
+        app
+    }
+
+    #[test]
+    fn preview_header_leaves_height_for_preview_body() {
+        let ctx = egui::Context::default();
+        let state = state_with_active_doc(std::path::Path::new("/tmp/preview.md"));
+        let mut action = AppAction::None;
+        let mut before_height = 0.0;
+        let mut remaining_height = 0.0;
+
+        let _ = ctx.run(test_input(egui::vec2(800.0, 600.0)), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                before_height = ui.available_height();
+                render_preview_header(ui, &state, &mut action);
+                remaining_height = ui.available_height();
+            });
+        });
+
+        assert!(
+            (before_height - remaining_height).abs() <= 1.0,
+            "preview header must overlay without consuming layout height, before={before_height}, after={remaining_height}"
+        );
+    }
+
+    #[test]
+    fn active_file_highlight_is_painted_before_text() {
+        let ctx = egui::Context::default();
+        let path = std::path::PathBuf::from("/tmp/CHANGELOG.md");
+        let entry = TreeEntry::File { path: path.clone() };
+        let mut selected = None;
+
+        let output = ctx.run(test_input(egui::vec2(320.0, 200.0)), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                render_file_entry(ui, &entry, &path, &mut selected, 0, Some(path.as_path()));
+            });
+        });
+
+        let shapes = flatten_shapes(output.shapes.iter());
+        let highlight_idx = shapes.iter().position(|shape| {
+            matches!(
+                shape,
+                egui::epaint::Shape::Rect(rect)
+                    if rect.fill == ctx.style().visuals.selection.bg_fill
+            )
+        });
+        let text_idx = shapes.iter().position(|shape| {
+            matches!(
+                shape,
+                egui::epaint::Shape::Text(text)
+                    if text.galley.job.text.contains("CHANGELOG.md")
+            )
+        });
+
+        let highlight_idx = highlight_idx.expect("active row highlight was not painted");
+        let text_idx = text_idx.expect("active row label text was not painted");
+
+        assert!(
+            highlight_idx < text_idx,
+            "active row background must be behind its text, got rect index {highlight_idx} and text index {text_idx}"
+        );
+    }
+
+    #[test]
+    fn split_preview_left_padding_is_consistent() {
+        let ctx = egui::Context::default();
+        let path = PathBuf::from("/tmp/padding.md");
+        let mut app = app_with_preview_doc(&path, "# PaddingHeading\n\nBody");
+        let output = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        let shapes = flatten_shapes(output.shapes.iter());
+        let heading_rect = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                egui::epaint::Shape::Text(text)
+                    if text.galley.job.text.contains("PaddingHeading") =>
+                {
+                    let rect = text.visual_bounding_rect();
+                    if rect.left() >= preview_rect.left() - 1.0 {
+                        Some(rect)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .expect("heading text shape");
+
+        let left_padding = heading_rect.left() - preview_rect.left();
+        assert!(
+            (left_padding - PREVIEW_CONTENT_PADDING).abs() <= 2.0,
+            "preview left padding must be {}px, got {left_padding}",
+            PREVIEW_CONTENT_PADDING
+        );
+    }
+
+    #[test]
+    fn new_horizontal_split_starts_at_half_width_even_if_another_tab_has_panel_state() {
+        let ctx = egui::Context::default();
+        let active = PathBuf::from("/tmp/active.md");
+        let stale = PathBuf::from("/tmp/stale.md");
+        let mut app = app_with_preview_doc(&active, "Body");
+
+        ctx.data_mut(|data| {
+            data.insert_persisted(
+                preview_panel_id(Some(stale.as_path()), "preview_panel_h_right"),
+                egui::containers::panel::PanelState {
+                    rect: Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(240.0, 800.0)),
+                },
+            );
+        });
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        assert!(
+            (preview_rect.width() - 600.0).abs() <= 4.0,
+            "fresh horizontal split must start at 50%, got {}",
+            preview_rect.width()
+        );
+    }
+
+    #[test]
+    fn horizontal_split_width_stays_stable_across_initial_frames() {
+        let ctx = egui::Context::default();
+        let active = PathBuf::from("/tmp/active.md");
+        let mut app = app_with_preview_doc(&active, "# Title\n\nBody");
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let first_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after first frame")
+        .rect;
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let second_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after second frame")
+        .rect;
+
+        assert!(
+            (first_rect.width() - 600.0).abs() <= 4.0,
+            "first frame must start at 50%, got {}",
+            first_rect.width()
+        );
+        assert!(
+            (second_rect.width() - first_rect.width()).abs() <= 4.0,
+            "horizontal split width must remain stable across frames, first={} second={}",
+            first_rect.width(),
+            second_rect.width()
+        );
+    }
+
+    #[test]
+    fn horizontal_split_width_stays_stable_with_readme_like_preview_content() {
+        let ctx = egui::Context::default();
+        let active = PathBuf::from("/tmp/readme.md");
+        let markdown = concat!(
+            "# KatanA Desktop\n\n",
+            "> Note: On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple.\n",
+            "> Alternatively, go to System Settings -> Privacy & Security -> \"Open Anyway\" after the first launch attempt.\n\n",
+            "Current Status\n\n",
+            "KatanA Desktop is under active development. See the Releases page for the latest version and changelog.\n"
+        );
+        let mut app = app_with_preview_doc(&active, markdown);
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let first_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after first frame")
+        .rect;
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let second_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after second frame")
+        .rect;
+
+        assert!(
+            (first_rect.width() - 600.0).abs() <= 4.0,
+            "first frame must start at 50%, got {}",
+            first_rect.width()
+        );
+        assert!(
+            (second_rect.width() - first_rect.width()).abs() <= 4.0,
+            "horizontal split width must remain stable with README-like preview content, first={} second={}",
+            first_rect.width(),
+            second_rect.width()
+        );
+    }
+
+    #[test]
+    fn horizontal_split_width_stays_stable_with_changelog_like_list_content() {
+        let ctx = egui::Context::default();
+        let active = PathBuf::from("/tmp/changelog.md");
+        let markdown = concat!(
+            "## Fixes\n\n",
+            "- Dark theme DrawIO contrast fix using `drawio_label_color`\n",
+            "- Fixed `mmdc` lookup when launched from `.dmg/.app` without a standard PATH\n",
+            "- Stabilized i18n tests under parallel execution\n\n",
+            "## Improvements\n\n",
+            "- Expanded `mmdc` binary resolution across Homebrew, env vars, and shell fallback\n",
+            "- Extracted `CHANNEL_MAX`, `LUMA_R/G/B`, and `RENDER_POLL_INTERVAL_MS`\n"
+        );
+        let mut app = app_with_preview_doc(&active, markdown);
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let first_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after first frame")
+        .rect;
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+        let second_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect after second frame")
+        .rect;
+
+        assert!(
+            (first_rect.width() - 600.0).abs() <= 4.0,
+            "first frame must start at 50%, got {}",
+            first_rect.width()
+        );
+        assert!(
+            (second_rect.width() - first_rect.width()).abs() <= 4.0,
+            "horizontal split width must remain stable with changelog-like list content, first={} second={}",
+            first_rect.width(),
+            second_rect.width()
+        );
+    }
+
+    #[test]
+    fn new_vertical_split_starts_at_half_height_even_if_another_tab_has_panel_state() {
+        let ctx = egui::Context::default();
+        let active = PathBuf::from("/tmp/active.md");
+        let stale = PathBuf::from("/tmp/stale.md");
+        let mut app = app_with_preview_doc(&active, "Body");
+
+        ctx.data_mut(|data| {
+            data.insert_persisted(
+                preview_panel_id(Some(stale.as_path()), "preview_panel_v_bottom"),
+                egui::containers::panel::PanelState {
+                    rect: Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(1200.0, 180.0)),
+                },
+            );
+        });
+
+        let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
+            render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(active.as_path()), "preview_panel_v_bottom"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        assert!(
+            (preview_rect.height() - 400.0).abs() <= 4.0,
+            "fresh vertical split must start at 50%, got {}",
+            preview_rect.height()
+        );
+    }
+
+    #[test]
+    fn split_preview_wraps_long_lines_without_horizontal_overflow() {
+        let ctx = egui::Context::default();
+        let path = PathBuf::from("/tmp/long-line.md");
+        let long_line = "あ".repeat(240);
+        let mut app = app_with_preview_doc(&path, &long_line);
+
+        let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        let shapes = flatten_shapes(output.shapes.iter());
+        let text_shape = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                egui::epaint::Shape::Text(text)
+                    if text.galley.job.text.contains(&long_line[..60]) =>
+                {
+                    Some(text)
+                }
+                _ => None,
+            })
+            .expect("long preview text shape");
+
+        assert!(
+            text_shape.galley.rows.len() > 1,
+            "long preview line must wrap instead of staying on a single row"
+        );
+        assert!(
+            text_shape.visual_bounding_rect().right()
+                <= preview_rect.right() - PREVIEW_CONTENT_PADDING + 4.0,
+            "wrapped preview text must stay within the preview panel"
+        );
+    }
+
+    #[test]
+    fn split_preview_wraps_long_inline_code_without_horizontal_overflow() {
+        let ctx = egui::Context::default();
+        let path = PathBuf::from("/tmp/long-inline-code.md");
+        let inline_code = format!("`{}`", "あ".repeat(240));
+        let mut app = app_with_preview_doc(&path, &inline_code);
+
+        let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        let shapes = flatten_shapes(output.shapes.iter());
+        let text_shape = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                egui::epaint::Shape::Text(text)
+                    if text.galley.job.text.contains(&"あ".repeat(60)) =>
+                {
+                    Some(text)
+                }
+                _ => None,
+            })
+            .expect("long inline code text shape");
+
+        assert!(
+            text_shape.galley.rows.len() > 1,
+            "long inline code must wrap instead of staying on a single row"
+        );
+        assert!(
+            text_shape.visual_bounding_rect().right()
+                <= preview_rect.right() - PREVIEW_CONTENT_PADDING + 4.0,
+            "wrapped inline code must stay within the preview panel"
+        );
+    }
+
+    #[test]
+    fn split_preview_wraps_long_markdown_with_mixed_inline_styles() {
+        let ctx = egui::Context::default();
+        let path = PathBuf::from("/tmp/blockquote-strong.md");
+        let markdown = concat!(
+            "> **Note:** On macOS Sequoia (15.x), Gatekeeper requires this command for apps not notarized with Apple. ",
+            "Alternatively, go to System Settings -> Privacy & Security -> \"Open Anyway\" after the first launch attempt.\n"
+        );
+        let mut app = app_with_preview_doc(&path, markdown);
+
+        let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
+            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+        });
+
+        let preview_rect = egui::containers::panel::PanelState::load(
+            &ctx,
+            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+        )
+        .expect("preview panel rect")
+        .rect;
+        let shapes = flatten_shapes(output.shapes.iter());
+        let text_shapes: Vec<&egui::epaint::TextShape> = shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                egui::epaint::Shape::Text(text)
+                    if text.galley.job.text.contains("Note:")
+                        || text.galley.job.text.contains("Gatekeeper requires") =>
+                {
+                    Some(text)
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(
+            !text_shapes.is_empty(),
+            "expected mixed-style blockquote text shapes"
+        );
+
+        let max_right = text_shapes
+            .iter()
+            .map(|text| text.visual_bounding_rect().right())
+            .fold(f32::NEG_INFINITY, f32::max);
+        let max_rows = text_shapes
+            .iter()
+            .map(|text| text.galley.rows.len())
+            .max()
+            .unwrap_or(0);
+
+        assert!(
+            max_rows > 1,
+            "mixed-style blockquote must wrap to multiple rows"
+        );
+        assert!(
+            max_right <= preview_rect.right() - PREVIEW_CONTENT_PADDING + 4.0,
+            "mixed-style blockquote must stay within preview width, got right edge {max_right}"
+        );
     }
 }
 

@@ -21,6 +21,13 @@ pub enum ViewMode {
     Split,
 }
 
+/// Ephemeral split-layout state cached per tab for the lifetime of the app.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct SplitViewState {
+    pub direction: katana_platform::SplitDirection,
+    pub order: katana_platform::PaneOrder,
+}
+
 /// Tab within the settings window.
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum SettingsTab {
@@ -52,6 +59,10 @@ pub enum AppAction {
     ChangeLanguage(String),
     /// Toggle the settings window.
     ToggleSettings,
+    /// Change the split view direction (Horizontal / Vertical).
+    SetSplitDirection(katana_platform::SplitDirection),
+    /// Change the pane order within the split view (EditorFirst / PreviewFirst).
+    SetPaneOrder(katana_platform::PaneOrder),
     /// No-op (used internally).
     None,
 }
@@ -66,6 +77,8 @@ pub struct AppState {
     pub active_doc_idx: Option<usize>,
     /// View mode per tab. The key is the file path (to prevent index shifts after closing a tab).
     pub tab_view_modes: HashMap<std::path::PathBuf, ViewMode>,
+    /// Split-layout cache per tab. Initialized from persisted defaults when a tab is first opened.
+    pub tab_split_states: HashMap<std::path::PathBuf, SplitViewState>,
 
     /// Plugin registry (will be referenced during plugin widget integration in future Task 5.x).
     pub _plugin_registry: PluginRegistry,
@@ -116,6 +129,7 @@ impl AppState {
             open_documents: Vec::new(),
             active_doc_idx: None,
             tab_view_modes: HashMap::new(),
+            tab_split_states: HashMap::new(),
             _plugin_registry: plugin_registry,
             status_message: None,
             show_workspace: true,
@@ -166,5 +180,154 @@ impl AppState {
             let path = doc.path.clone();
             self.tab_view_modes.insert(path, mode);
         }
+    }
+
+    fn split_defaults(&self) -> SplitViewState {
+        SplitViewState {
+            direction: self.settings.settings().split_direction,
+            order: self.settings.settings().pane_order,
+        }
+    }
+
+    pub fn initialize_tab_split_state(&mut self, path: impl Into<std::path::PathBuf>) {
+        let defaults = self.split_defaults();
+        self.tab_split_states.entry(path.into()).or_insert(defaults);
+    }
+
+    pub fn ensure_active_split_state(&mut self) {
+        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+            return;
+        };
+        self.initialize_tab_split_state(path);
+    }
+
+    /// Returns the split direction for the active tab.
+    pub fn active_split_direction(&self) -> katana_platform::SplitDirection {
+        self.active_document()
+            .and_then(|doc| self.tab_split_states.get(&doc.path))
+            .map(|state| state.direction)
+            .unwrap_or_else(|| self.split_defaults().direction)
+    }
+
+    /// Returns the pane order for the active tab.
+    pub fn active_pane_order(&self) -> katana_platform::PaneOrder {
+        self.active_document()
+            .and_then(|doc| self.tab_split_states.get(&doc.path))
+            .map(|state| state.order)
+            .unwrap_or_else(|| self.split_defaults().order)
+    }
+
+    /// Sets the split direction for the active tab (temporary — not persisted to disk).
+    pub fn set_active_split_direction(&mut self, dir: katana_platform::SplitDirection) {
+        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+            return;
+        };
+        let defaults = self.split_defaults();
+        let state = self.tab_split_states.entry(path).or_insert(defaults);
+        state.direction = dir;
+    }
+
+    /// Sets the pane order for the active tab (temporary — not persisted to disk).
+    pub fn set_active_pane_order(&mut self, order: katana_platform::PaneOrder) {
+        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+            return;
+        };
+        let defaults = self.split_defaults();
+        let state = self.tab_split_states.entry(path).or_insert(defaults);
+        state.order = order;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use katana_platform::{PaneOrder, SplitDirection};
+    use std::path::PathBuf;
+
+    fn make_state_with_doc(path: &str) -> AppState {
+        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let doc = Document {
+            path: PathBuf::from(path),
+            buffer: String::new(),
+            is_dirty: false,
+        };
+        state.open_documents.push(doc);
+        state.active_doc_idx = Some(0);
+        state.initialize_tab_split_state(PathBuf::from(path));
+        state.set_active_view_mode(ViewMode::Split);
+        state
+    }
+
+    #[test]
+    fn test_split_state_is_cached_per_tab_after_settings_change() {
+        let mut state = make_state_with_doc("/tmp/a.md");
+        state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
+        state.initialize_tab_split_state("/tmp/a.md");
+        state.settings.settings_mut().split_direction = SplitDirection::Vertical;
+
+        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
+    }
+
+    #[test]
+    fn test_pane_order_is_cached_per_tab_after_settings_change() {
+        let mut state = make_state_with_doc("/tmp/b.md");
+        state.settings.settings_mut().pane_order = PaneOrder::EditorFirst;
+        state.initialize_tab_split_state("/tmp/b.md");
+        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+
+        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
+    }
+
+    #[test]
+    fn test_new_tab_uses_latest_persisted_split_defaults() {
+        let mut state = make_state_with_doc("/tmp/a.md");
+        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
+
+        state.settings.settings_mut().split_direction = SplitDirection::Vertical;
+        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+
+        let doc = Document {
+            path: PathBuf::from("/tmp/b.md"),
+            buffer: String::new(),
+            is_dirty: false,
+        };
+        state.open_documents.push(doc);
+        state.active_doc_idx = Some(1);
+        state.initialize_tab_split_state("/tmp/b.md");
+
+        assert_eq!(state.active_split_direction(), SplitDirection::Vertical);
+        assert_eq!(state.active_pane_order(), PaneOrder::PreviewFirst);
+
+        state.active_doc_idx = Some(0);
+        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
+        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
+    }
+
+    #[test]
+    fn test_split_state_is_initialized_once_then_prefers_tab_local_state() {
+        let mut state = make_state_with_doc("/tmp/a.md");
+        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
+        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
+
+        state.set_active_split_direction(SplitDirection::Vertical);
+        state.set_active_pane_order(PaneOrder::EditorFirst);
+
+        state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
+        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+
+        state.open_documents.push(Document {
+            path: PathBuf::from("/tmp/b.md"),
+            buffer: String::new(),
+            is_dirty: false,
+        });
+        state.active_doc_idx = Some(1);
+        state.initialize_tab_split_state("/tmp/b.md");
+
+        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
+        assert_eq!(state.active_pane_order(), PaneOrder::PreviewFirst);
+
+        state.active_doc_idx = Some(0);
+        assert_eq!(state.active_split_direction(), SplitDirection::Vertical);
+        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
     }
 }
