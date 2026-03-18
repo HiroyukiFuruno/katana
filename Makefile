@@ -171,7 +171,6 @@ coverage: ## Run tests and verify 100% test coverage (requires cargo-llvm-cov)
 	# ── Test Execution + Table Report ──
 	cargo llvm-cov --workspace --lib --tests \
 		--ignore-filename-regex '$(COVERAGE_IGNORE)' \
-		-- --test-threads=1
 	#
 	# ── Gate Check: Verify that all source code lines are executed at least once ──
 	#

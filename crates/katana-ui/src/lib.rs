@@ -12,3 +12,4 @@ pub mod preview_pane_ui;
 pub mod shell;
 pub mod shell_logic;
 pub mod shell_ui;
+pub mod theme_bridge;

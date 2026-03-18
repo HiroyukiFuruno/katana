@@ -3,6 +3,7 @@
 //! Settings are loaded from and saved to a JSON file via `JsonFileRepository`.
 //! For tests, `InMemoryRepository` provides a no-op backend.
 
+use crate::theme::{ThemeColors, ThemePreset};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,9 +13,16 @@ const DEFAULT_FONT_SIZE: f32 = 14.0;
 /// Application-level settings persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
-    /// Theme name ("dark" or "light").
+    /// Theme name ("dark" or "light") — kept for backward compatibility.
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Selected theme preset.
+    #[serde(default)]
+    pub selected_preset: ThemePreset,
+    /// User-customised colour overrides on top of the selected preset.
+    /// `None` means the preset colours are used as-is.
+    #[serde(default)]
+    pub custom_color_overrides: Option<ThemeColors>,
     /// Font size in pixels.
     #[serde(default = "default_font_size")]
     pub font_size: f32,
@@ -61,6 +69,8 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: default_theme(),
+            selected_preset: ThemePreset::default(),
+            custom_color_overrides: None,
             font_size: default_font_size(),
             font_family: default_font_family(),
             last_workspace: None,
@@ -70,6 +80,18 @@ impl Default for AppSettings {
             language: default_language(),
             extra: HashMap::new(),
         }
+    }
+}
+
+impl AppSettings {
+    /// Returns the effective theme colours.
+    ///
+    /// If the user has custom overrides, those are returned;
+    /// otherwise the selected preset's palette is used.
+    pub fn effective_theme_colors(&self) -> ThemeColors {
+        self.custom_color_overrides
+            .clone()
+            .unwrap_or_else(|| self.selected_preset.colors())
     }
 }
 
@@ -182,16 +204,39 @@ impl Default for SettingsService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme::Rgb;
     use tempfile::TempDir;
 
     #[test]
     fn test_app_settings_default_values() {
         let s = AppSettings::default();
         assert_eq!(s.theme, "dark");
+        assert_eq!(s.selected_preset, ThemePreset::KatanaDark);
+        assert!(s.custom_color_overrides.is_none());
         assert!((s.font_size - DEFAULT_FONT_SIZE).abs() < f32::EPSILON);
         assert_eq!(s.font_family, "monospace");
         assert_eq!(s.language, "en");
         assert!(s.last_workspace.is_none());
+    }
+
+    #[test]
+    fn test_effective_theme_colors_uses_preset_by_default() {
+        let s = AppSettings::default();
+        let colors = s.effective_theme_colors();
+        assert_eq!(colors, ThemePreset::KatanaDark.colors());
+    }
+
+    #[test]
+    fn test_effective_theme_colors_uses_custom_when_set() {
+        let mut s = AppSettings::default();
+        let mut custom = ThemePreset::Nord.colors();
+        custom.background = Rgb {
+            r: 10,
+            g: 20,
+            b: 30,
+        };
+        s.custom_color_overrides = Some(custom.clone());
+        assert_eq!(s.effective_theme_colors(), custom);
     }
 
     #[test]
@@ -345,6 +390,55 @@ mod tests {
         assert!(
             result.is_err(),
             "save should fail when create_dir_all fails"
+        );
+    }
+
+    #[test]
+    fn test_theme_preset_save_and_restore() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("settings.json");
+
+        // Save: change preset to Dracula
+        let mut settings = AppSettings::default();
+        settings.selected_preset = ThemePreset::Dracula;
+        let repo = JsonFileRepository::new(path.clone());
+        repo.save(&settings).unwrap();
+
+        // Restore: Dracula should be persisted
+        let loaded = repo.load();
+        assert_eq!(loaded.selected_preset, ThemePreset::Dracula);
+        assert!(loaded.custom_color_overrides.is_none());
+    }
+
+    #[test]
+    fn test_custom_color_overrides_save_and_restore() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("settings.json");
+
+        // Save custom colour overrides
+        let mut settings = AppSettings::default();
+        settings.selected_preset = ThemePreset::Nord;
+        let mut custom = ThemePreset::Nord.colors();
+        custom.background = Rgb {
+            r: 10,
+            g: 20,
+            b: 30,
+        };
+        settings.custom_color_overrides = Some(custom.clone());
+        let repo = JsonFileRepository::new(path.clone());
+        repo.save(&settings).unwrap();
+
+        // Restore: custom colours should be persisted correctly
+        let loaded = repo.load();
+        assert_eq!(loaded.selected_preset, ThemePreset::Nord);
+        assert_eq!(loaded.custom_color_overrides, Some(custom));
+        assert_eq!(
+            loaded.effective_theme_colors().background,
+            Rgb {
+                r: 10,
+                g: 20,
+                b: 30
+            }
         );
     }
 }

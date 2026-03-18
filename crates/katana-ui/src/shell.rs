@@ -56,16 +56,8 @@ pub(crate) const DOWNLOAD_STATUS_CHECK_INTERVAL_MS: u64 = 200;
 // ─────────────────────────────────────────────
 // Color Constants
 // ─────────────────────────────────────────────
-
-/// Text color of the file name displayed in the in-app title bar.
-pub(crate) const TITLE_BAR_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(180);
-
-/// Normal text color of the file tree (inactive files/directories).
-pub(crate) const FILE_TREE_TEXT_COLOR: egui::Color32 = egui::Color32::from_gray(220);
-
-/// Background highlight color indicating the active file in the file tree (VSCode-like semi-transparent blue).
-pub(crate) const ACTIVE_FILE_HIGHLIGHT_BG: egui::Color32 =
-    egui::Color32::from_rgba_premultiplied(40, 80, 160, 100);
+// Hardcoded colours have been migrated to ThemeColors (katana-platform::theme).
+// Individual constants are no longer needed as visuals_from_theme() sets them.
 
 /// Rounding radius of the active row background in the file tree.
 pub(crate) const ACTIVE_FILE_HIGHLIGHT_ROUNDING: f32 = 3.0;
