@@ -58,20 +58,66 @@ impl OsFontScanner {
             return;
         }
 
-        let Some(ext) = path.extension().and_then(|s| s.to_str()) else {
-            return;
-        };
-
-        let ext_lower = ext.to_lowercase();
-        if ext_lower != "ttf" && ext_lower != "ttc" && ext_lower != "otf" {
+        let ext = path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase();
+        if ext != "ttf" && ext != "ttc" && ext != "otf" {
             return; // 対象外の拡張子はスキップ
         }
 
-        let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
-            return;
-        };
-
+        let name = path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let path_str = path.to_string_lossy().to_string();
-        fonts.push((name.to_string(), path_str));
+        fonts.push((name, path_str));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_scan_directory_ignores_missing_dir() {
+        let mut fonts = vec![];
+        let path = Path::new("/path/that/does/not/exist");
+        OsFontScanner::scan_directory(path, &mut fonts);
+        assert!(fonts.is_empty());
+    }
+
+    #[test]
+    fn test_process_entry_skips_invalid_files() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mut fonts = vec![];
+
+        // 1. Directory is skipped
+        let dir_path = tmp.path().join("dir.ttf");
+        fs::create_dir(&dir_path).unwrap();
+        OsFontScanner::process_entry(&dir_path, &mut fonts);
+        assert!(fonts.is_empty());
+
+        // 2. File without extension is skipped
+        let no_ext_path = tmp.path().join("no_extension");
+        fs::write(&no_ext_path, "").unwrap();
+        OsFontScanner::process_entry(&no_ext_path, &mut fonts);
+        assert!(fonts.is_empty());
+
+        // 3. File with invalid extension is skipped
+        let invalid_ext_path = tmp.path().join("invalid.txt");
+        fs::write(&invalid_ext_path, "").unwrap();
+        OsFontScanner::process_entry(&invalid_ext_path, &mut fonts);
+        assert!(fonts.is_empty());
+
+        // 4. File with valid extension is added
+        let valid_path = tmp.path().join("MyFont.ttf");
+        fs::write(&valid_path, "").unwrap();
+        OsFontScanner::process_entry(&valid_path, &mut fonts);
+        assert_eq!(fonts.len(), 1);
+        assert_eq!(fonts[0].0, "MyFont");
     }
 }

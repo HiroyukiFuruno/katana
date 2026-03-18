@@ -117,3 +117,79 @@ impl SystemFontLoader {
         Self::prepend_primary(fonts, FontFamily::Proportional, name);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_build_font_definitions_no_candidates() {
+        let fonts = SystemFontLoader::build_font_definitions(&[], &[], &[], None, None);
+        // egui's FontDefinitions::default() is not empty. We just ensure no custom names were added.
+        assert!(!fonts.font_data.contains_key("cjk_font"));
+        assert!(!fonts.font_data.contains_key("MyCustomFont"));
+    }
+
+    #[test]
+    fn test_build_font_definitions_with_fallback() {
+        let tmp = TempDir::new().unwrap();
+        let font_path = tmp.path().join("emoji.ttf");
+        fs::write(&font_path, "").unwrap();
+        let path_str = font_path.to_str().unwrap();
+
+        let fonts = SystemFontLoader::build_font_definitions(&[], &[], &[path_str], None, None);
+
+        let emoji_name = "emoji"; // from file_stem
+        assert!(fonts.font_data.contains_key(emoji_name));
+
+        // Ensure the font was added to the fallback list for both families
+        let prop_list = fonts.families.get(&FontFamily::Proportional).unwrap();
+        assert!(prop_list.contains(&emoji_name.to_string()));
+
+        let mono_list = fonts.families.get(&FontFamily::Monospace).unwrap();
+        assert!(mono_list.contains(&emoji_name.to_string()));
+    }
+
+    #[test]
+    fn test_custom_font_injection() {
+        let tmp = TempDir::new().unwrap();
+        let custom_font_path = tmp.path().join("custom.ttf");
+        fs::write(&custom_font_path, "").unwrap();
+        let path_str = custom_font_path.to_str().unwrap();
+
+        let fonts = SystemFontLoader::build_font_definitions(
+            &[],
+            &[],
+            &[],
+            Some(path_str),
+            Some("MyCustomFont"),
+        );
+
+        assert!(fonts.font_data.contains_key("MyCustomFont"));
+        let prop_list = fonts.families.get(&FontFamily::Proportional).unwrap();
+        assert_eq!(prop_list.first().unwrap(), "MyCustomFont");
+    }
+
+    #[test]
+    fn test_custom_font_injection_invalid_path() {
+        let fonts = SystemFontLoader::build_font_definitions(
+            &[],
+            &[],
+            &[],
+            Some("/path/does/not/exist.ttf"),
+            Some("MyCustomFont"),
+        );
+
+        // Returns early without doing anything
+        assert!(!fonts.font_data.contains_key("MyCustomFont"));
+    }
+
+    #[test]
+    fn test_load_system_candidates_empty_returns_early() {
+        let mut fonts = FontDefinitions::empty();
+        SystemFontLoader::load_system_candidates(&mut fonts, FontFamily::Proportional, &[]);
+        assert!(fonts.font_data.is_empty());
+    }
+}

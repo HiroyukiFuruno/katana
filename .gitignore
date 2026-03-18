@@ -73,5 +73,6 @@ target/llvm-cov/
 # egui_kittest snapshots
 **/tests/snapshots/**/*.diff.png
 *.new.png
+*.old.png
 
 tmp

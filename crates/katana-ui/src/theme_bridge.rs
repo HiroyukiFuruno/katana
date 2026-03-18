@@ -158,3 +158,50 @@ pub fn apply_font_family(ctx: &egui::Context, family_name: &str) {
         }
     });
 }
+
+#[cfg(test)]
+mod apply_font_family_tests {
+    use super::*;
+
+    #[test]
+    fn test_apply_font_family_proportional() {
+        let ctx = egui::Context::default();
+        apply_font_family(&ctx, "Proportional");
+        let style = ctx.style();
+        assert_eq!(
+            style
+                .text_styles
+                .get(&egui::TextStyle::Body)
+                .unwrap()
+                .family,
+            egui::FontFamily::Proportional
+        );
+    }
+
+    #[test]
+    fn test_apply_font_family_monospace() {
+        let ctx = egui::Context::default();
+        apply_font_family(&ctx, "Monospace");
+        let style = ctx.style();
+        assert_eq!(
+            style
+                .text_styles
+                .get(&egui::TextStyle::Body)
+                .unwrap()
+                .family,
+            egui::FontFamily::Monospace
+        );
+    }
+
+    #[test]
+    fn test_apply_font_family_custom_os_font() {
+        let ctx = egui::Context::default();
+        apply_font_family(&ctx, "UnknownNonExistentFont123");
+
+        // Also try to hit the branch matching an actual OS font if any exist
+        let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
+        if let Some((name, _)) = os_fonts.first() {
+            apply_font_family(&ctx, name);
+        }
+    }
+}

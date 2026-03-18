@@ -298,6 +298,16 @@ mod tests {
     }
 
     #[test]
+    fn current_returns_light_preset_when_not_dark() {
+        DiagramColorPreset::set_dark_mode(false);
+        assert_eq!(
+            DiagramColorPreset::current().text,
+            DiagramColorPreset::LIGHT.text
+        );
+        DiagramColorPreset::set_dark_mode(true);
+    }
+
+    #[test]
     fn dark_preset_syntax_theme_is_ocean() {
         assert_eq!(
             DiagramColorPreset::DARK.syntax_theme_dark,
