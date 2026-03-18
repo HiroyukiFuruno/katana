@@ -4,24 +4,12 @@ All notable changes to KatanA Desktop will be documented in this file.
 
 ## [0.0.4] - 2026-03-18
 
-Fixed DMG code signing so that "Right-click → Open" works on macOS without Apple Developer ID or notarization.
-
-### 🐛 Bug Fixes
-
-- Fixed DMG not opening via "Right-click → Open" on macOS by replacing `--deep` with proper `--options runtime --timestamp=none` ad-hoc signing
-- Fixed quarantine attributes not being removed before code signing, which caused Gatekeeper rejection
-- Fixed app bundle signature being overwritten during DMG creation by decoupling the build steps
+CI improvements and workflow optimizations.
 
 ### ✨ Improvements
 
-- Added ad-hoc signing for the DMG file itself (in addition to the .app bundle)
-- Added Gatekeeper assessment (`spctl --assess`) as an informational CI step
 - CI now mirrors the local `make coverage` gate with full exclusion rules, replacing the simple `--fail-under-lines 100` flag
 - CI workflow now skips on documentation-only changes (`paths-ignore` for `**.md`, `docs/**`, etc.)
-
-### 📚 Documentation
-
-- Updated installation instructions: "Right-click → Open" is now the recommended method; `xattr` command demoted to troubleshooting fallback
 
 ## [0.0.3] - 2026-03-18
 

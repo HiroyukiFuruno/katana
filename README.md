@@ -76,21 +76,19 @@ The goal of KatanA is to provide a **simple, fast, and workspace-oriented Markdo
 
 KatanA Desktop is ad-hoc signed but not notarized with Apple, so macOS will show an **"unidentified developer"** warning on first launch.
 
-**Right-click to open (Recommended)**
+**Option A: Right-click to open (depends on macOS settings)**
 
 1. Right-click (or Control-click) on **KatanA Desktop.app** in your Applications folder
 2. Select **"Open"** from the context menu
 3. Click **"Open"** in the confirmation dialog
 
-After the first successful launch, macOS will remember your choice and the app will open normally.
-
-**Troubleshooting: If "Open" does not appear**
-
-If right-click does not show the "Open" option (very rare), run the following command:
+**Option B: Command line (Recommended / Guaranteed to work)**
 
 ```sh
 xattr -cr /Applications/KatanA\ Desktop.app
 ```
+
+After the first successful launch, macOS will remember your choice and the app will open normally.
 
 ---
 
