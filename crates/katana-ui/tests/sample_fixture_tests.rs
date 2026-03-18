@@ -649,13 +649,13 @@ fn snapshot_basic_ja() {
 //   cargo test -- --ignored snapshot_diagrams
 
 #[test]
-#[ignore = "requires external diagram tools (mmdc, plantuml, drawio) not available in CI"]
+#[ignore = "limited_local: requires external diagram tools (mmdc, plantuml, drawio)"]
 fn snapshot_diagrams_en() {
     snapshot_fixture("sample_diagrams.md", "sample_diagrams_en");
 }
 
 #[test]
-#[ignore = "requires external diagram tools (mmdc, plantuml, drawio) not available in CI"]
+#[ignore = "limited_local: requires external diagram tools (mmdc, plantuml, drawio)"]
 fn snapshot_diagrams_ja() {
     snapshot_fixture("sample_diagrams.ja.md", "sample_diagrams_ja");
 }
