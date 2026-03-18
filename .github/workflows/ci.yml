@@ -10,6 +10,7 @@ on:
       - '.gitignore'
       - 'openspec/**'
       - 'docs/**'
+      - 'Makefile'
   pull_request:
     branches: [master]
     paths-ignore:
@@ -19,6 +20,7 @@ on:
       - '.gitignore'
       - 'openspec/**'
       - 'docs/**'
+      - 'Makefile'
 
 # Restrict default GITHUB_TOKEN permissions (Task 7.3 hardening).
 permissions:
