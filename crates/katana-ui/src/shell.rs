@@ -85,6 +85,8 @@ pub struct KatanaApp {
     pub about_icon: Option<egui::TextureHandle>,
     /// Cached theme palette used to avoid redundant `set_visuals()` calls every frame.
     pub(crate) cached_theme: Option<ThemeColors>,
+    /// Cached font size to avoid redundant `style_mut()` calls every frame.
+    pub(crate) cached_font_size: Option<f32>,
 }
 
 impl KatanaApp {
@@ -99,6 +101,7 @@ impl KatanaApp {
             show_about: false,
             about_icon: None,
             cached_theme: None,
+            cached_font_size: None,
         }
     }
 

@@ -592,6 +592,13 @@ impl eframe::App for KatanaApp {
             self.cached_theme = Some(theme_colors.clone());
         }
 
+        // Apply font size to egui text styles (only when the size changed)
+        let font_size = self.state.settings.settings().clamped_font_size();
+        if self.cached_font_size != Some(font_size) {
+            theme_bridge::apply_font_size(ctx, font_size);
+            self.cached_font_size = Some(font_size);
+        }
+
         self.poll_download(ctx);
 
         // macOS: Poll actions from the native menu.

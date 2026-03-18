@@ -71,3 +71,27 @@ pub fn rgb_to_color32(c: Rgb) -> egui::Color32 {
 pub fn rgba_to_color32(c: Rgba) -> egui::Color32 {
     egui::Color32::from_rgba_premultiplied(c.r, c.g, c.b, c.a)
 }
+
+/// Heading / Small font-size ratio constants.
+const HEADING_SIZE_RATIO: f32 = 1.5;
+const SMALL_SIZE_RATIO: f32 = 0.75;
+
+/// Applies `font_size` to all standard egui text styles.
+///
+/// - **Body** / **Button**: `font_size`
+/// - **Monospace**: `font_size`
+/// - **Heading**: `font_size × 1.5`
+/// - **Small**: `font_size × 0.75`
+pub fn apply_font_size(ctx: &egui::Context, font_size: f32) {
+    ctx.style_mut(|style| {
+        let heading = font_size * HEADING_SIZE_RATIO;
+        let small = font_size * SMALL_SIZE_RATIO;
+        for (text_style, font_id) in style.text_styles.iter_mut() {
+            match text_style {
+                egui::TextStyle::Heading => font_id.size = heading,
+                egui::TextStyle::Small => font_id.size = small,
+                _ => font_id.size = font_size,
+            }
+        }
+    });
+}

@@ -9,6 +9,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 const DEFAULT_FONT_SIZE: f32 = 14.0;
+/// Minimum allowed font size in pixels.
+pub const MIN_FONT_SIZE: f32 = 8.0;
+/// Maximum allowed font size in pixels.
+pub const MAX_FONT_SIZE: f32 = 32.0;
 
 /// Application-level settings persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,6 +96,18 @@ impl AppSettings {
         self.custom_color_overrides
             .clone()
             .unwrap_or_else(|| self.selected_preset.colors())
+    }
+
+    /// Sets font size, clamping to the allowed range [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].
+    pub fn set_font_size(&mut self, size: f32) {
+        self.font_size = size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
+    }
+
+    /// Returns the font size clamped to [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].
+    ///
+    /// Useful after deserialization where the raw value may be out of range.
+    pub fn clamped_font_size(&self) -> f32 {
+        self.font_size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE)
     }
 }
 
