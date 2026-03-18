@@ -92,20 +92,18 @@ After the first successful launch, macOS will remember your choice and the app w
 
 ---
 
-## First Release: v0.0.1
+## Current Status
 
-This release is the **first public version** of KatanA Desktop.
+KatanA Desktop is under **active development**. See the [Releases page](https://github.com/HiroyukiFuruno/katana/releases/latest) for the latest version and changelog.
 
-Version **v0.0.1** is intentionally minimal and focuses primarily on **Markdown viewing and workspace navigation**.
-
-Key features currently include:
+Core features available today:
 
 - Workspace-based Markdown browsing
 - Diagram support (Mermaid / PlantUML / draw.io)
 - Split preview with synchronized scrolling
 - Fast native desktop performance (Rust-based)
 
-This version should be considered an **MVP (Minimum Viable Product)** and the foundation for future development.
+The project is evolving rapidly — new features and improvements are released frequently.
 
 ---
 

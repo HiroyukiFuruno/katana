@@ -92,20 +92,18 @@ xattr -cr /Applications/KatanA\ Desktop.app
 
 ---
 
-## ファーストリリース: v0.0.1
+## 現在のステータス
 
-本リリースは KatanA Desktop の **最初のパブリックバージョン** です。
+KatanA Desktop は **活発に開発中** です。最新バージョンと変更履歴は [Releasesページ](https://github.com/HiroyukiFuruno/katana/releases/latest) をご覧ください。
 
-バージョン **v0.0.1** は意図的にミニマルであり、主に **Markdownの閲覧とワークスペースナビゲーション** に焦点を当てています。
-
-現在含まれている主な機能：
+現在利用可能な主な機能：
 
 - ワークスペースベースのMarkdown閲覧
 - ダイアグラムサポート（Mermaid / PlantUML / draw.io）
 - スクロール同期付きスプリットプレビュー
 - 高速なネイティブデスクトップパフォーマンス（Rustベース）
 
-このバージョンは **MVP（Minimum Viable Product）** であり、今後の開発の基盤と位置づけています。
+プロジェクトは急速に進化しており、新機能や改善が頻繁にリリースされています。
 
 ---
 
