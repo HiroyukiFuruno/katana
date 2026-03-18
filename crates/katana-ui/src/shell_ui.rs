@@ -604,6 +604,13 @@ impl eframe::App for KatanaApp {
             self.cached_font_size = Some(font_size);
         }
 
+        // Apply font family by rebuilding FontDefinitions (only when family changed)
+        let font_family = self.state.settings.settings().font_family.clone();
+        if self.cached_font_family.as_deref() != Some(&font_family) {
+            theme_bridge::apply_font_family(ctx, &font_family);
+            self.cached_font_family = Some(font_family);
+        }
+
         self.poll_download(ctx);
 
         // macOS: Poll actions from the native menu.

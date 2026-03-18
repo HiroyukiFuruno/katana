@@ -32,6 +32,7 @@ const PRESET_SWATCH_SIZE: f32 = 14.0;
 const COLOR_GRID_LABEL_WIDTH: f32 = 130.0;
 const SECTION_HEADER_SIZE: f32 = 14.0;
 const SWATCH_CORNER_DIVISOR: f32 = 4.0;
+const FONT_FAMILY_COMBOBOX_WIDTH: f32 = 200.0;
 
 // ── Sample markdown for settings preview ─────────────────────────────
 
@@ -383,23 +384,34 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
 }
 
 fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    let families = [
-        "Proportional",
-        "Monospace",
-        "Menlo",
-        "Monaco",
-        "SF Mono",
-        "Consolas",
-        "Courier New",
-    ];
-    let current = settings.settings().font_family.clone();
-    for family in &families {
-        let is_selected = current == *family;
-        if ui.selectable_label(is_selected, *family).clicked() && !is_selected {
-            settings.settings_mut().font_family = (*family).to_string();
-            let _ = settings.save();
-        }
-    }
+    let mut current = settings.settings().font_family.clone();
+    let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
+
+    egui::ComboBox::from_id_salt("font_family_selector")
+        .selected_text(&current)
+        .width(FONT_FAMILY_COMBOBOX_WIDTH) // Provide enough width for long font names
+        .show_ui(ui, |ui| {
+            let defaults = ["Proportional", "Monospace"];
+            for family in defaults {
+                if ui
+                    .selectable_value(&mut current, family.to_string(), family)
+                    .changed()
+                {
+                    settings.settings_mut().font_family = family.to_string();
+                    let _ = settings.save();
+                }
+            }
+            ui.separator();
+            for (name, _) in os_fonts {
+                if ui
+                    .selectable_value(&mut current, name.to_string(), name)
+                    .changed()
+                {
+                    settings.settings_mut().font_family = name.to_string();
+                    let _ = settings.save();
+                }
+            }
+        });
 }
 
 // ── Layout tab ───────────────────────────────────────────────────────

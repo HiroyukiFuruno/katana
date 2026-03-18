@@ -4,6 +4,7 @@
 //! entire application can be themed cohesively.
 
 use eframe::egui;
+use katana_core::markdown::color_preset::DiagramColorPreset;
 use katana_platform::theme::{Rgb, Rgba, ThemeColors, ThemeMode};
 
 // ── Stroke width constants ──
@@ -119,6 +120,40 @@ pub fn apply_font_size(ctx: &egui::Context, font_size: f32) {
                 egui::TextStyle::Heading => font_id.size = heading,
                 egui::TextStyle::Small => font_id.size = small,
                 _ => font_id.size = font_size,
+            }
+        }
+    });
+}
+
+/// Dynamically applies a font family from settings to the egui context.
+///
+/// Refetches OS fonts, overrides the primary definitions if a specific OS font is chosen,
+/// and resets the text styles to map to the correct default family.
+pub fn apply_font_family(ctx: &egui::Context, family_name: &str) {
+    let preset = DiagramColorPreset::current();
+    let mut custom_path = None;
+    let mut custom_name = None;
+
+    let mut default_family = egui::FontFamily::Proportional;
+    if family_name == "Proportional" {
+        default_family = egui::FontFamily::Proportional;
+    } else if family_name == "Monospace" {
+        default_family = egui::FontFamily::Monospace;
+    } else {
+        let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
+        if let Some((name, path)) = os_fonts.iter().find(|(name, _)| name == family_name) {
+            custom_path = Some(path.as_str());
+            custom_name = Some(name.as_str());
+            default_family = egui::FontFamily::Proportional;
+        }
+    }
+
+    crate::font_loader::SystemFontLoader::setup_fonts(ctx, preset, custom_path, custom_name);
+
+    ctx.style_mut(|style| {
+        for (text_style, font_id) in style.text_styles.iter_mut() {
+            if *text_style != egui::TextStyle::Monospace {
+                font_id.family = default_family.clone();
             }
         }
     });

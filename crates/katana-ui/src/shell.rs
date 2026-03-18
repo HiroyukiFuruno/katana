@@ -87,6 +87,8 @@ pub struct KatanaApp {
     pub(crate) cached_theme: Option<ThemeColors>,
     /// Cached font size to avoid redundant `style_mut()` calls every frame.
     pub(crate) cached_font_size: Option<f32>,
+    /// Cached font family to avoid rebuilding `FontDefinitions` every frame.
+    pub(crate) cached_font_family: Option<String>,
     /// Dedicated PreviewPane for the settings window live preview.
     pub(crate) settings_preview: PreviewPane,
 }
@@ -104,6 +106,7 @@ impl KatanaApp {
             about_icon: None,
             cached_theme: None,
             cached_font_size: None,
+            cached_font_family: None,
             settings_preview: PreviewPane::default(),
         }
     }

@@ -1,6 +1,7 @@
 #![deny(warnings)]
 
 pub mod filesystem;
+pub mod os_fonts;
 pub mod settings;
 pub mod theme;
 
