@@ -76,8 +76,6 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Install git-cliff
-        run: command -v git-cliff || cargo install git-cliff
 
       - name: Build .app bundle
         run: make package-mac
@@ -92,9 +90,13 @@ jobs:
       - name: Build .dmg installer
         run: make dmg
 
-      - name: Generate changelog for this release
+      - name: Extract release notes from CHANGELOG.md
         run: |
-          git-cliff --tag "${{ steps.tag.outputs.version }}" --latest --output RELEASE_NOTES.md
+          VERSION="${{ steps.tag.outputs.version }}"
+          VERSION_NUM="${VERSION#v}"
+          awk "/^## \[${VERSION_NUM}\]/{found=1; next} /^## \[/{if(found) exit} found" CHANGELOG.md > RELEASE_NOTES.md
+          echo "--- Release notes for ${VERSION} ---"
+          cat RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
