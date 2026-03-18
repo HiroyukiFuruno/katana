@@ -585,9 +585,12 @@ use crate::shell::{
 
 impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply theme colours to egui Visuals
+        // Apply theme colours to egui Visuals (only when the palette changed)
         let theme_colors = self.state.settings.settings().effective_theme_colors();
-        ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+        if self.cached_theme.as_ref() != Some(&theme_colors) {
+            ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+            self.cached_theme = Some(theme_colors.clone());
+        }
 
         self.poll_download(ctx);
 

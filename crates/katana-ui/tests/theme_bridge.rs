@@ -71,3 +71,37 @@ fn rgba_to_color32_converts_correctly() {
         eframe::egui::Color32::from_rgba_premultiplied(40, 80, 160, 100)
     );
 }
+
+#[test]
+fn warn_fg_color_matches_warning_text() {
+    let colors = ThemePreset::Monokai.colors();
+    let visuals = visuals_from_theme(&colors);
+    assert_eq!(visuals.warn_fg_color, rgb_to_color32(colors.warning_text));
+}
+
+#[test]
+fn selection_bg_uses_selection_color() {
+    let colors = ThemePreset::Dracula.colors();
+    let visuals = visuals_from_theme(&colors);
+    assert_eq!(visuals.selection.bg_fill, rgb_to_color32(colors.selection));
+}
+
+#[test]
+fn hovered_bg_uses_active_file_highlight() {
+    let colors = ThemePreset::Dracula.colors();
+    let visuals = visuals_from_theme(&colors);
+    assert_eq!(
+        visuals.widgets.hovered.bg_fill,
+        rgba_to_color32(colors.active_file_highlight)
+    );
+}
+
+#[test]
+fn noninteractive_fg_uses_text_secondary() {
+    let colors = ThemePreset::Nord.colors();
+    let visuals = visuals_from_theme(&colors);
+    assert_eq!(
+        visuals.widgets.noninteractive.fg_stroke.color,
+        rgb_to_color32(colors.text_secondary)
+    );
+}

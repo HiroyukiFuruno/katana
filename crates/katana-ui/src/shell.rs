@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 use eframe::egui;
+use katana_platform::theme::ThemeColors;
 use katana_platform::FilesystemService;
 
 use crate::{
@@ -82,6 +83,8 @@ pub struct KatanaApp {
     /// App icon texture for the About dialog.
     /// Public because it is set from the binary crate (main.rs) during initialization.
     pub about_icon: Option<egui::TextureHandle>,
+    /// Cached theme palette used to avoid redundant `set_visuals()` calls every frame.
+    pub(crate) cached_theme: Option<ThemeColors>,
 }
 
 impl KatanaApp {
@@ -95,6 +98,7 @@ impl KatanaApp {
             download_rx: None,
             show_about: false,
             about_icon: None,
+            cached_theme: None,
         }
     }
 

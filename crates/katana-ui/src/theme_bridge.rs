@@ -19,10 +19,13 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     let bg = rgb_to_color32(colors.background);
     let panel_bg = rgb_to_color32(colors.panel_background);
     let text = rgb_to_color32(colors.text);
+    let text_secondary = rgb_to_color32(colors.text_secondary);
     let accent = rgb_to_color32(colors.accent);
     let border = rgb_to_color32(colors.border);
     let selection_bg = rgb_to_color32(colors.selection);
+    let highlight_bg = rgba_to_color32(colors.active_file_highlight);
     let code_bg = rgb_to_color32(colors.code_background);
+    let warning = rgb_to_color32(colors.warning_text);
 
     let mut visuals = if dark {
         egui::Visuals::dark()
@@ -35,19 +38,20 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     visuals.window_fill = bg;
     visuals.extreme_bg_color = code_bg;
     visuals.faint_bg_color = panel_bg;
+    visuals.warn_fg_color = warning;
 
     visuals.selection.bg_fill = selection_bg;
     visuals.selection.stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
     visuals.widgets.noninteractive.bg_fill = panel_bg;
-    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
     visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals.widgets.inactive.bg_fill = panel_bg;
-    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
     visuals.widgets.inactive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
-    visuals.widgets.hovered.bg_fill = selection_bg;
+    visuals.widgets.hovered.bg_fill = highlight_bg;
     visuals.widgets.hovered.fg_stroke = egui::Stroke::new(STROKE_MEDIUM, accent);
     visuals.widgets.hovered.bg_stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
