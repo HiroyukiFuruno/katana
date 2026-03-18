@@ -4,10 +4,12 @@ All notable changes to KatanA Desktop will be documented in this file.
 
 ## [0.0.4] - 2026-03-18
 
-CI improvements and workflow optimizations.
+CI improvements and release workflow optimizations.
 
 ### ✨ Improvements
 
+- Improved .app ad-hoc signing: replaced `--deep` with `--options runtime --timestamp=none`, added quarantine attribute removal before signing
+- Fixed DMG build to call `create-dmg` directly, preventing `make dmg` from re-running `package-mac` and overwriting the signed .app
 - CI now mirrors the local `make coverage` gate with full exclusion rules, replacing the simple `--fail-under-lines 100` flag
 - CI workflow now skips on documentation-only changes (`paths-ignore` for `**.md`, `docs/**`, etc.)
 

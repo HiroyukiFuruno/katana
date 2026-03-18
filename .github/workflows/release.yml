@@ -80,15 +80,45 @@ jobs:
       - name: Build .app bundle
         run: make package-mac
 
-      - name: Ad-hoc code sign
+      - name: Ad-hoc code sign .app
         run: |
           APP_PATH=$(find target/release/bundle/osx -name "*.app" -maxdepth 1 | head -1)
           echo "Signing: $APP_PATH"
-          codesign --force --deep --sign - "$APP_PATH"
+
+          # Remove quarantine attributes before signing
+          xattr -cr "$APP_PATH"
+
+          # Ad-hoc codesign with hardened runtime (no --deep, no Apple Developer ID)
+          codesign --force --sign - \
+            --options runtime \
+            --timestamp=none \
+            "$APP_PATH"
+
+          # Verify
           codesign --verify --verbose "$APP_PATH"
+          spctl --assess --verbose "$APP_PATH" || true
 
       - name: Build .dmg installer
-        run: make dmg
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          APP_PATH=$(find target/release/bundle/osx -name "*.app" -maxdepth 1 | head -1)
+          DMG_OUT="target/release/KatanA-Desktop-${VERSION_NUM}.dmg"
+          rm -f "$DMG_OUT"
+          # Build DMG directly from signed app (skip make dmg to avoid re-running package-mac)
+          create-dmg \
+            --volname "KatanA Desktop ${VERSION_NUM}" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "KatanA Desktop.app" 150 190 \
+            --app-drop-link 450 190 \
+            --no-internet-enable \
+            "$DMG_OUT" \
+            "$APP_PATH"
+          # NOTE: DMG is intentionally NOT signed — ad-hoc signing the DMG causes
+          # Gatekeeper to block it entirely, which is worse than leaving it unsigned.
 
       - name: Extract release notes from CHANGELOG.md
         run: |
