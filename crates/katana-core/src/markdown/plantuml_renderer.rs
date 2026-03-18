@@ -123,15 +123,18 @@ skinparam sequenceArrowColor {arrow}
 pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let preset = DiagramColorPreset::current();
     let themed_source = inject_theme(source, preset);
+    let mut args = vec![
+        "-Djava.awt.headless=true".to_string(),
+        "-jar".to_string(),
+        jar.to_str().unwrap_or("plantuml.jar").to_string(),
+        "-pipe".to_string(),
+        "-tsvg".to_string(),
+    ];
+    if DiagramColorPreset::is_dark_mode() {
+        args.push("-darkmode".to_string());
+    }
     let mut child = Command::new("java")
-        .args([
-            "-Djava.awt.headless=true",
-            "-jar",
-            jar.to_str().unwrap_or("plantuml.jar"),
-            "-pipe",
-            "-tsvg",
-            "-darkmode",
-        ])
+        .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

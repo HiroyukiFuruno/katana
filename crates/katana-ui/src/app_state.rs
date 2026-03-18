@@ -21,6 +21,18 @@ pub enum ViewMode {
     Split,
 }
 
+/// Tab within the settings window.
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
+pub enum SettingsTab {
+    /// Theme preset and custom colour editing.
+    #[default]
+    Theme,
+    /// Font size and family.
+    Font,
+    /// Editor / preview layout options.
+    Layout,
+}
+
 /// User-visible actions dispatched from UI components to the core update loop.
 #[derive(Debug)]
 pub enum AppAction {
@@ -38,6 +50,8 @@ pub enum AppAction {
     RefreshDiagrams,
     /// Change language.
     ChangeLanguage(String),
+    /// Toggle the settings window.
+    ToggleSettings,
     /// No-op (used internally).
     None,
 }
@@ -59,6 +73,10 @@ pub struct AppState {
     pub status_message: Option<String>,
     /// Show/hide the workspace panel.
     pub show_workspace: bool,
+    /// Show/hide the settings window.
+    pub show_settings: bool,
+    /// Currently active tab in the settings window.
+    pub active_settings_tab: SettingsTab,
     /// Trigger to expand/collapse the entire workspace tree. Some(true)=expand all, Some(false)=collapse all.
     pub force_tree_open: Option<bool>,
     /// Split mode scroll sync: Normalized scroll position (0.0–1.0).
@@ -101,6 +119,8 @@ impl AppState {
             _plugin_registry: plugin_registry,
             status_message: None,
             show_workspace: true,
+            show_settings: false,
+            active_settings_tab: SettingsTab::default(),
             force_tree_open: None,
             scroll_fraction: 0.0,
             scroll_source: ScrollSource::Neither,

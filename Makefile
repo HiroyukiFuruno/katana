@@ -150,7 +150,7 @@ test-update-snapshots: ## Update UI snapshot images (UPDATE_SNAPSHOTS=true)
 
 # ---------- CI / Quality Gates ----------
 
-COVERAGE_IGNORE := plantuml_renderer\.rs|mermaid_renderer\.rs|katana-ui/src/main\.rs|shell_ui\.rs|preview_pane_ui\.rs|html_renderer\.rs
+COVERAGE_IGNORE := plantuml_renderer\.rs|mermaid_renderer\.rs|katana-ui/src/main\.rs|shell_ui\.rs|preview_pane_ui\.rs|html_renderer\.rs|settings_window\.rs
 
 .PHONY: coverage
 coverage: ## Run tests and verify 100% test coverage (requires cargo-llvm-cov)

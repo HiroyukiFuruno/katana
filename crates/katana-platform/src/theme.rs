@@ -69,6 +69,8 @@ pub struct ThemeColors {
     pub selection: Rgb,
     /// Code block background colour.
     pub code_background: Rgb,
+    /// Preview pane background colour.
+    pub preview_background: Rgb,
 }
 
 impl ThemeColors {
@@ -165,6 +167,7 @@ struct PresetColorData {
     border: Rgb,
     selection: Rgb,
     code_background: Rgb,
+    preview_background: Rgb,
 }
 
 impl PresetColorData {
@@ -184,6 +187,7 @@ impl PresetColorData {
             border: self.border,
             selection: self.selection,
             code_background: self.code_background,
+            preview_background: self.preview_background,
         }
     }
 }
@@ -253,6 +257,11 @@ const KATANA_DARK: PresetColorData = PresetColorData {
         g: 40,
         b: 40,
     },
+    preview_background: Rgb {
+        r: 30,
+        g: 30,
+        b: 30,
+    },
 };
 
 const DRACULA: PresetColorData = PresetColorData {
@@ -317,6 +326,11 @@ const DRACULA: PresetColorData = PresetColorData {
         r: 50,
         g: 52,
         b: 66,
+    },
+    preview_background: Rgb {
+        r: 40,
+        g: 42,
+        b: 54,
     },
 };
 
@@ -383,6 +397,11 @@ const GITHUB_DARK: PresetColorData = PresetColorData {
         g: 27,
         b: 34,
     },
+    preview_background: Rgb {
+        r: 13,
+        g: 17,
+        b: 23,
+    },
 };
 
 const NORD: PresetColorData = PresetColorData {
@@ -448,6 +467,11 @@ const NORD: PresetColorData = PresetColorData {
         g: 66,
         b: 82,
     },
+    preview_background: Rgb {
+        r: 46,
+        g: 52,
+        b: 64,
+    },
 };
 
 const MONOKAI: PresetColorData = PresetColorData {
@@ -512,6 +536,11 @@ const MONOKAI: PresetColorData = PresetColorData {
         r: 49,
         g: 50,
         b: 44,
+    },
+    preview_background: Rgb {
+        r: 39,
+        g: 40,
+        b: 34,
     },
 };
 
@@ -580,6 +609,11 @@ const KATANA_LIGHT: PresetColorData = PresetColorData {
         g: 243,
         b: 243,
     },
+    preview_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
 };
 
 const GITHUB_LIGHT: PresetColorData = PresetColorData {
@@ -644,6 +678,11 @@ const GITHUB_LIGHT: PresetColorData = PresetColorData {
         r: 246,
         g: 248,
         b: 250,
+    },
+    preview_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
     },
 };
 
@@ -710,6 +749,11 @@ const SOLARIZED_LIGHT: PresetColorData = PresetColorData {
         g: 232,
         b: 213,
     },
+    preview_background: Rgb {
+        r: 253,
+        g: 246,
+        b: 227,
+    },
 };
 
 const AYU_LIGHT: PresetColorData = PresetColorData {
@@ -775,6 +819,11 @@ const AYU_LIGHT: PresetColorData = PresetColorData {
         g: 242,
         b: 242,
     },
+    preview_background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
 };
 
 const GRUVBOX_LIGHT: PresetColorData = PresetColorData {
@@ -839,6 +888,11 @@ const GRUVBOX_LIGHT: PresetColorData = PresetColorData {
         r: 235,
         g: 219,
         b: 178,
+    },
+    preview_background: Rgb {
+        r: 251,
+        g: 241,
+        b: 199,
     },
 };
 

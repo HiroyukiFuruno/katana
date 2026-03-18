@@ -87,6 +87,8 @@ pub struct KatanaApp {
     pub(crate) cached_theme: Option<ThemeColors>,
     /// Cached font size to avoid redundant `style_mut()` calls every frame.
     pub(crate) cached_font_size: Option<f32>,
+    /// Dedicated PreviewPane for the settings window live preview.
+    pub(crate) settings_preview: PreviewPane,
 }
 
 impl KatanaApp {
@@ -102,6 +104,7 @@ impl KatanaApp {
             about_icon: None,
             cached_theme: None,
             cached_font_size: None,
+            settings_preview: PreviewPane::default(),
         }
     }
 
@@ -234,6 +237,9 @@ impl KatanaApp {
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
+                // Invalidate hashes so non-active tabs re-render on next switch
+                self.tab_hashes.clear();
+                // Re-render only the active tab immediately
                 if let Some(doc) = self.state.active_document() {
                     let src = doc.buffer.clone();
                     let path = doc.path.clone();
@@ -246,6 +252,9 @@ impl KatanaApp {
                 if let Err(e) = self.state.settings.save() {
                     tracing::warn!("Failed to save settings: {e}");
                 }
+            }
+            AppAction::ToggleSettings => {
+                self.state.show_settings = !self.state.show_settings;
             }
             AppAction::None => {}
         }
@@ -492,6 +501,19 @@ mod tests {
         let mut app = make_app();
         app.process_action(AppAction::ChangeLanguage("ja".to_string()));
         // Verify i18n language was changed (since direct access is hard, ensure no panic)
+    }
+
+    // process_action: ToggleSettings
+    #[test]
+    fn process_action_toggle_settings_toggles_flag() {
+        let mut app = make_app();
+        assert!(!app.state.show_settings);
+
+        app.process_action(AppAction::ToggleSettings);
+        assert!(app.state.show_settings);
+
+        app.process_action(AppAction::ToggleSettings);
+        assert!(!app.state.show_settings);
     }
 
     // process_action: None (L258)

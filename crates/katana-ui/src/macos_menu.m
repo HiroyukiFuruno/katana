@@ -8,6 +8,7 @@ enum {
     TAG_LANG_EN        = 3,
     TAG_LANG_JA        = 4,
     TAG_ABOUT          = 5,
+    TAG_SETTINGS       = 6,
 };
 
 // Global: Tag of the last selected menu action.
@@ -129,6 +130,16 @@ void katana_setup_native_menu(void) {
     [langMenuItem setSubmenu:langMenu];
 
     NSMenu *settingsMenu = [[NSMenu alloc] initWithTitle:@"Settings"];
+
+    NSMenuItem *prefsItem = [[NSMenuItem alloc]
+        initWithTitle:@"Preferences…"
+        action:action
+        keyEquivalent:@","];
+    [prefsItem setTarget:g_target];
+    [prefsItem setTag:TAG_SETTINGS];
+    [settingsMenu addItem:prefsItem];
+
+    [settingsMenu addItem:[NSMenuItem separatorItem]];
     [settingsMenu addItem:langMenuItem];
 
     NSMenuItem *settingsMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];

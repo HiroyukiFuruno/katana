@@ -9,6 +9,8 @@
 //! - A base preset can be partially overridden via the `with_*` builder methods.
 //! - Future theme system can swap presets without touching renderer internals.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 /// A complete theme preset for preview rendering and editor configuration.
 ///
 /// All color fields are `&'static str` CSS hex color values (e.g. `"#E0E0E0"`).
@@ -183,13 +185,28 @@ impl DiagramColorPreset {
         ],
         editor_font_size: Self::DEFAULT_EDITOR_FONT_SIZE,
     };
+}
 
-    /// Returns the currently active preset.
-    ///
-    /// For now, always returns `DARK`. When the theme system is implemented (Task 2),
-    /// this will be dynamically resolved from `AppSettings`.
-    pub const fn current() -> &'static Self {
-        &Self::DARK
+pub static DARK_MODE: AtomicBool = AtomicBool::new(true);
+
+impl DiagramColorPreset {
+    /// Checks if the current UI mode in Katana is dark.
+    pub fn is_dark_mode() -> bool {
+        DARK_MODE.load(Ordering::Relaxed)
+    }
+
+    /// Sets the current UI mode globally.
+    pub fn set_dark_mode(is_dark: bool) {
+        DARK_MODE.store(is_dark, Ordering::Relaxed);
+    }
+
+    /// Returns the currently active preset based on the current UI theme.
+    pub fn current() -> &'static Self {
+        if Self::is_dark_mode() {
+            &Self::DARK
+        } else {
+            &Self::LIGHT
+        }
     }
 
     /// Parses a `#RRGGBB` hex string into `(r, g, b)` components.

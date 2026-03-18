@@ -34,13 +34,12 @@ pub(crate) fn show_section(
 ) -> Option<DownloadRequest> {
     match section {
         RenderedSection::Markdown(md) => {
-            let preset = DiagramColorPreset::current();
-            let prev_override = ui.visuals().override_text_color;
-            if let Some((r, g, b)) = DiagramColorPreset::parse_hex_rgb(preset.preview_text) {
-                ui.visuals_mut().override_text_color = Some(egui::Color32::from_rgb(r, g, b));
-            }
-            let text_color = DiagramColorPreset::parse_hex_rgb(preset.preview_text)
-                .map(|(r, g, b)| egui::Color32::from_rgb(r, g, b));
+            let preset = if ui.visuals().dark_mode {
+                &DiagramColorPreset::DARK
+            } else {
+                &DiagramColorPreset::LIGHT
+            };
+            let text_color = ui.visuals().override_text_color;
             let md_path_owned = md_file_path.to_path_buf();
             CommonMarkViewer::new()
                 .syntax_theme_dark(preset.syntax_theme_dark)
@@ -49,7 +48,6 @@ pub(crate) fn show_section(
                     render_html_block(ui, html, text_color, &md_path_owned);
                 }))
                 .show(ui, cache, md);
-            ui.visuals_mut().override_text_color = prev_override;
             None
         }
         RenderedSection::Image { svg_data, alt } => {

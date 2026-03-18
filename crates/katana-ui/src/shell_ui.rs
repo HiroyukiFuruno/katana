@@ -534,6 +534,7 @@ mod native_menu {
     pub const TAG_LANG_EN: i32 = 3;
     pub const TAG_LANG_JA: i32 = 4;
     pub const TAG_ABOUT: i32 = 5;
+    pub const TAG_SETTINGS: i32 = 6;
 
     #[allow(dead_code)]
     extern "C" {
@@ -588,8 +589,12 @@ impl eframe::App for KatanaApp {
         // Apply theme colours to egui Visuals (only when the palette changed)
         let theme_colors = self.state.settings.settings().effective_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
+            let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+            katana_core::markdown::color_preset::DiagramColorPreset::set_dark_mode(dark);
             self.cached_theme = Some(theme_colors.clone());
+            // Re-render diagrams with the new theme colours
+            self.pending_action = AppAction::RefreshDiagrams;
         }
 
         // Apply font size to egui text styles (only when the size changed)
@@ -622,6 +627,9 @@ impl eframe::App for KatanaApp {
                 }
                 native_menu::TAG_ABOUT => {
                     self.show_about = !self.show_about;
+                }
+                native_menu::TAG_SETTINGS => {
+                    self.pending_action = AppAction::ToggleSettings;
                 }
                 _ => {}
             }
@@ -707,10 +715,18 @@ impl eframe::App for KatanaApp {
                 self.state.scroll_source,
                 self.state.preview_max_scroll,
             );
+            let preview_bg = theme_bridge::rgb_to_color32(
+                self.state
+                    .settings
+                    .settings()
+                    .effective_theme_colors()
+                    .preview_background,
+            );
             egui::SidePanel::right("preview_panel")
                 .resizable(true)
                 .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
                 .default_width(SPLIT_PREVIEW_PANEL_DEFAULT_WIDTH)
+                .frame(egui::Frame::side_top_panel(ctx.style().as_ref()).fill(preview_bg))
                 .show(ctx, |ui| {
                     if let Some(path) = &active_path {
                         let pane = self.tab_panes.entry(path.clone()).or_default();
@@ -734,6 +750,17 @@ impl eframe::App for KatanaApp {
                 render_editor_content(ui, &mut self.state, &mut self.pending_action, is_split);
             }
             ViewMode::PreviewOnly => {
+                ui.painter().rect_filled(
+                    ui.max_rect(),
+                    0.0,
+                    theme_bridge::rgb_to_color32(
+                        self.state
+                            .settings
+                            .settings()
+                            .effective_theme_colors()
+                            .preview_background,
+                    ),
+                );
                 let active_path = self.state.active_document().map(|d| d.path.clone());
                 let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
                 if let Some(path) = active_path {
@@ -760,6 +787,15 @@ impl eframe::App for KatanaApp {
         if let Some(req) = download_req {
             self.start_download(req);
         }
+
+        // Settings window
+        crate::settings_window::render_settings_window(
+            ctx,
+            &mut self.state.show_settings,
+            &mut self.state.active_settings_tab,
+            &mut self.state.settings,
+            &mut self.settings_preview,
+        );
 
         // About dialog
         if self.show_about {

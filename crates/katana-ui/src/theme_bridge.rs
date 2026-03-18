@@ -55,11 +55,39 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     visuals.widgets.hovered.fg_stroke = egui::Stroke::new(STROKE_MEDIUM, accent);
     visuals.widgets.hovered.bg_stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
+    let strong = strengthen_color(text, dark);
     visuals.widgets.active.bg_fill = accent;
-    visuals.widgets.active.fg_stroke = egui::Stroke::new(STROKE_BOLD, bg);
+    visuals.widgets.active.fg_stroke = egui::Stroke::new(STROKE_BOLD, strong);
     visuals.widgets.active.bg_stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
     visuals
+}
+
+/// Blend ratio for strong text emphasis (30% toward the target extreme).
+const STRONG_BLEND_RATIO: f32 = 0.3;
+
+/// Produces a stronger (higher contrast) variant of `base` for emphasis.
+///
+/// - **Dark mode**: lightens toward white (like SCSS `lighten`).
+/// - **Light mode**: darkens toward black (like SCSS `darken`).
+fn strengthen_color(base: egui::Color32, dark: bool) -> egui::Color32 {
+    let target: egui::Color32 = if dark {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::BLACK
+    };
+    let lerp = |a: u8, b: u8| -> u8 {
+        let a = f32::from(a);
+        let b = f32::from(b);
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let result = (a + (b - a) * STRONG_BLEND_RATIO) as u8;
+        result
+    };
+    egui::Color32::from_rgb(
+        lerp(base.r(), target.r()),
+        lerp(base.g(), target.g()),
+        lerp(base.b(), target.b()),
+    )
 }
 
 /// Convert `Rgb` to `egui::Color32`.
