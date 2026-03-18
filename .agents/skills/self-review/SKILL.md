@@ -56,8 +56,13 @@ Verify compliance with the rules defined in `docs/coding-rules.ja.md`.
 - [ ] No magic numbers (extracted to `const`)
 - [ ] No banned types (`Box<dyn Any>`, `HashMap<String, Value>`, etc.)
 - [ ] Appropriate derives on new structs (`Debug`, `Clone`, `PartialEq`, `Serialize`, etc.)
-- [ ] Tests are in `tests/` directory only — no inline `#[cfg(test)] mod tests` in `src/`
+- [ ] Unit tests follow Rust conventions: inline `#[cfg(test)]` in `src/`; integration tests live in `tests/`
 - [ ] No private function testing hacks (redesign instead)
+
+### AI Quality is Speed Check (No Sloppy Shortcuts)
+- [ ] Are there ANY lazy shortcuts? (e.g., `todo!()`, `unimplemented!()`, `dbg!()`, `unwrap()` used as a temporary bypass). **Fix them now.**
+- [ ] Does this design gracefully support future extension, avoiding hardcoded boolean flags or spaghetti state?
+- [ ] Is it built with the absolute principle of "丁寧＝早い (Careful = Fast)" preventing bugs later?
 
 ---
 

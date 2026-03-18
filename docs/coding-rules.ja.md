@@ -1,5 +1,10 @@
 # Katana Rust コーディングルール
 
+> [!IMPORTANT]
+> **Bi-directional Update Required / 双方向アップデート必須**
+> 本ファイル（`coding-rules.ja.md`）を更新する際は、必ず英語版（`coding-rules.md`）も同時に同期更新してください。
+> When updating this file (`coding-rules.ja.md`), you MUST also update the English version (`coding-rules.md`) simultaneously to keep them in sync.
+
 本ドキュメントはプロジェクト全体で遵守すべき Rust コーディング規約を定義する。
 linter で自動検査できるルールは `.clippy.toml` と各クレートの `#![deny(...)]` で強制する。
 
@@ -35,6 +40,22 @@ fn html_escape(s: &str) -> String { ... }
 | L (リスコフ) | `trait` 実装は契約（ドキュメントの事前/事後条件）を破らない |
 | I (インターフェース分離) | `trait` は小さく保ち、不要なメソッドをまとめない |
 | D (依存関係逆転) | 上位レイヤーは具体型ではなく `trait` に依存する |
+
+### 1.3 ステート分離アーキテクチャ (Global, Session, Tab)
+
+状態（State）は影響範囲とそのライフサイクルに基づいて明確に分離設計を行わなければなりません。
+単一の巨大な構造体への融合や、場当たり的な `HashMap` の乱立は技術的負債となります。
+
+| State Layer | 説明 (Description) | 例 (Example) |
+|-------------|--------------------|--------------|
+| **Global**  | 永続化が必要な全体設定。常に最新として扱われる。 | `SettingsService` (分割方向の基本設定など) |
+| **Session** | 一時的なアプリ実行状態。揮発する。 | `pending_action`, ウィンドウのリサイズ状態 |
+| **Tab (固有管理)** | ドキュメントタブごとに独立した固有のキャッシュ。 | `SplitViewState` (タブ固有の分割状態のオーバーライド) |
+
+**実装の原則:**
+- タブが開かれた瞬間に Global 設定から Initial Value をコピー・キャッシュして Tab 固有の状態（`SplitViewState`等）を生成・分離します。
+- UIの個別要素（トグルボタン等）は **固有管理 (Tab)** の状態のみをミューテートします。
+- Global 設定が変更された際は、既存の Tab 状態を再初期化（最新のGlobal値で上書き同期）して状態の不一致を防ぎます。
 
 ---
 
@@ -222,7 +243,7 @@ crates/katana-core/
 |------|------|--------------|
 | Unit Test (UT) | `src/` 内インライン `#[cfg(test)]` | **100%（例外なし）** |
 | Integration Test (IT) | `tests/` ディレクトリ | 主要公開 API フロー網羅 |
-| UI Integration Test | `tests/integration/` (egui_kittest予定) | MVP の全シナリオ、スナップショット回帰監視 |
+| UI Integration Test | `tests/integration/` (egui_kittest) | 全MVPシナリオ、および実レスポンス（Node, Rect等）のアサーション。**Snapshot非推奨** |
 
 カバレッジ測定: `cargo llvm-cov --workspace --fail-under-lines 100`（CI 強制）
 
@@ -254,19 +275,35 @@ crates/katana-core/
 ❌ 実装を通すためにテストを削除または弱体化する
 ```
 
-#### egui_kittest による UI テスト
+#### egui_kittest による UI テスト (Snapshotの廃止と実レスポンス検証)
 
-UI の挙動（レンダリング位置、ウィジェットの存在、クリッカブル性）は `egui_kittest::Harness` で検証する：
+**ベストプラクティス：UIの検証は「実レスポンス（出力）」を検証すること。**
+UIにおける「差分しか検出できないSnapshotテスト (`.png` 比較)」への依存は技術的負債として現在廃止（非推奨）します。
+Snapshotテストは実行が遅く、失敗しても開発者が「ただ画像がズレただけ」と脳死で `UPDATE_SNAPSHOTS=1` を叩いてしまうため、デグレードの担保として全く機能しません。
+
+**不具合・デグレード発生時の鉄則：**
+不具合やデグレードが発生した際は、**コードを修正する前に、まずTDD（RED）でその失敗（バグの挙動）を再現・制限すること**を絶対の義務とします。
+その際の検証には、必ず **「実際のUIエンジンのレスポンス（出力としての `Rect` の幅・高さ、`Z-index` の描画順レイヤー など）」をプログラム的に直接アサート** し、Snapshotに逃げないでください。
 
 ```rust
-// ✅ Good — テストファースト: 実装前に中央寄せの挙動を検証
+// ✅ Good — アサーション・ベースのUI実レスポンス検証 (TDD/REDでバグを再現・証明)
 #[test]
-fn centered_paragraph_renders_badge_images_on_same_row() {
-    let mut harness = Harness::new_ui(|ui| {
-        // バッジ付き HTML ブロックをレンダリング
-    });
+fn new_horizontal_split_starts_at_half_width() {
+    let mut harness = Harness::new_ui(|ui| { /* ... */ });
     harness.run();
-    // すべてのバッジが同じ Y 座標にいることをアサート
+    
+    // パネルのRectを直接取得し、画面幅全体の50%（期待値）と一致するかをピクセル単位でアサートする
+    let panel_rect = egui::containers::panel::PanelState::load(&ctx, id).unwrap().rect;
+    assert!((panel_rect.width() - 600.0).abs() <= 4.0, "must start at 50%");
+}
+
+// ❌ Bad — 思考停止を招くSnapshot画像比較 (技術的負債)
+#[test]
+fn split_looks_correct() {
+    let mut harness = Harness::new_ui(|ui| { /* ... */ });
+    harness.step();
+    // 意味がなく、CI遅延の要因。技術的負債となる。
+    harness.snapshot_options("split_looks_correct", ...);
 }
 ```
 
@@ -337,7 +374,7 @@ PR をマージ可能とするための必須条件:
 2. **Clippy**: `cargo clippy --workspace -- -D warnings` パス（warning ゼロ）
 3. **テスト (ロジック)**: `cargo test --workspace` 全パス
 4. **テスト (統合)**: `make test-integration` パス（UI スナップショット回帰なし）
-5. **テスト配置**: 新規ロジックには `tests/` ディレクトリにテストが付随している
+5. **テスト配置**: 新規ロジックには `src/` 内インライン UT、または境界横断シナリオ向けの `tests/` 配下 IT が付随している
 6. **カバレッジ**: `cargo llvm-cov --workspace --fail-under-lines 100` パス
 
 一括チェック: `make check`（pre-push フックと同等）

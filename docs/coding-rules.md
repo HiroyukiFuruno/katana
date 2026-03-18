@@ -1,5 +1,10 @@
 # Katana Rust Coding Rules
 
+> [!IMPORTANT]
+> **Bi-directional Update Required / 双方向アップデート必須**
+> When updating this file (`coding-rules.md`), you MUST also update the Japanese version (`coding-rules.ja.md`) simultaneously to keep them in sync.
+> 本ファイル（`coding-rules.md`）を更新する際は、必ず日本語版（`coding-rules.ja.md`）も同時に同期更新してください。
+
 This document defines the Rust coding conventions to be followed throughout the project.
 Rules that can be checked automatically by linters are enforced via `.clippy.toml` and `#![deny(...)]` in each crate.
 
@@ -35,6 +40,22 @@ fn html_escape(s: &str) -> String { ... }
 | L (Liskov Substitution) | `trait` implementations do not break the contract (pre/post-conditions of the documentation). |
 | I (Interface Segregation) | Keep `trait`s small and avoid clumping unnecessary methods together. |
 | D (Dependency Inversion) | Upper layers depend on `trait` rather than concrete types. |
+
+### 1.3 State Separation Architecture (Global, Session, Tab)
+
+State must be explicitly separated and designed based on its scope and lifecycle.
+Fusing states into a single massive struct or using ad-hoc `HashMap`s is considered technical debt.
+
+| State Layer | Description | Example |
+|-------------|-------------|---------|
+| **Global**  | Overall settings requiring persistence. Always treated as the source of truth. | `SettingsService` (e.g., default split direction) |
+| **Session** | Temporary app execution state. Volatile. | `pending_action`, window resize state |
+| **Tab (Tab-Specific)** | Independent, isolated cache per document tab. | `SplitViewState` (per-tab split state overrides) |
+
+**Implementation Principles:**
+- The moment a tab is opened, copy/cache the Initial Value from the Global settings to generate and isolate the Tab-specific state (e.g., `SplitViewState`).
+- Individual UI elements (like toggle buttons) mutate **ONLY the Tab-Specific** state.
+- When Global settings change, re-initialize existing Tab states (overwrite and sync with the latest Global value) to prevent state mismatch.
 
 ---
 
@@ -218,7 +239,7 @@ crates/katana-core/
 |------|-----------|----------------|
 | Unit Test (UT) | Inline `#[cfg(test)]` inside `src/` | **100% (No Exceptions)** |
 | Integration Test (IT) | `tests/` directory | Core public API flow coverage |
-| UI Integration Test | `tests/integration/` (Planned egui_kittest) | All MVP scenarios, Snapshot regression monitoring |
+| UI Integration Test | `tests/integration/` (egui_kittest) | All MVP scenarios, and assertion of actual responses (Node, Rect, etc.). **Snapshots are deprecated** |
 
 Coverage measurement: `cargo llvm-cov --workspace --fail-under-lines 100` (Forced in CI)
 
@@ -243,26 +264,42 @@ The convention "a defined rule without enforcement is meaningless" applies here 
 
 #### Anti-patterns (Strictly Prohibited)
 
-```
+```text
 ❌ Implement first, write tests later (or never)
 ❌ Modify implementation code and ask the user to "verify visually"
 ❌ Make multiple implementation attempts without automated verification
 ❌ Remove or weaken a test to make the implementation pass
 ```
 
-#### UI Testing with egui_kittest
+#### UI Testing with egui_kittest (Abolishing Snapshots and Validating Actual Responses)
 
-For UI behavior (rendering positions, widget availability, clickability), use `egui_kittest::Harness`:
+**Best Practice: UI verification must validate the "actual response (output)".**
+Reliance on "Snapshot testing (comparing `.png` files) which can only detect visual differences" is now formally deprecated as technical debt.
+Snapshot tests are slow to execute, and when they fail, developers blindly run `UPDATE_SNAPSHOTS=1` assuming "the image just shifted slightly", which renders them completely ineffective as a safeguard against regressions.
+
+**Ironclad Rule for Bugs/Regressions:**
+When a bug or regression occurs, **before modifying any code, you have an absolute obligation to first reproduce and bound that failure (the bug's behavior) using TDD (RED)**.
+For this verification, you MUST **programmatically and directly assert the "actual response of the UI engine (output such as `Rect` width/height, `Z-index` rendering layer order, etc.)"**, and do not escape to Snapshots.
 
 ```rust
-// ✅ Good — Test-first: verify centering behavior before implementation
+// ✅ Good — Assertion-based UI actual response validation (Reproduce/prove the bug with TDD/RED)
 #[test]
-fn centered_paragraph_renders_badge_images_on_same_row() {
-    let mut harness = Harness::new_ui(|ui| {
-        // render HTML block with badges
-    });
+fn new_horizontal_split_starts_at_half_width() {
+    let mut harness = Harness::new_ui(|ui| { /* ... */ });
     harness.run();
-    // Assert all badges share the same Y coordinate
+    
+    // Get the Panel's Rect directly and assert it exactly matches 50% of the screen width in pixels
+    let panel_rect = egui::containers::panel::PanelState::load(&ctx, id).unwrap().rect;
+    assert!((panel_rect.width() - 600.0).abs() <= 4.0, "must start at 50%");
+}
+
+// ❌ Bad — Thoughtless Snapshot image comparison (Technical Debt)
+#[test]
+fn split_looks_correct() {
+    let mut harness = Harness::new_ui(|ui| { /* ... */ });
+    harness.step();
+    // Meaningless and causes CI delays. Becomes technical debt.
+    harness.snapshot_options("split_looks_correct", ...);
 }
 ```
 
