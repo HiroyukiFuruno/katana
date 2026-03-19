@@ -2,26 +2,31 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
-## [0.1.7] - 2026-03-19
+## [0.1.6] - 2026-03-19
 
 ### 🐛 Bug Fixes
 
 - DMGビルド時にInfo.plistへ自動でバージョンを注入するよう改善
+- Make release実行時にCargo.lockが自動同期されるよう改善
+
+### 📚 Documentation
+
+- プロジェクト固有スキル「release_workflow」を追加
+
+### 🔧 Miscellaneous
+
+- V0.1.7 リリース準備
+- Cargo.lock の更新 (v0.1.7版への追従)
 
 ### 🚀 Features
 
+- ワークスペースの検索とフィルター機能の実装
 - 検索モーダルのInclude/Excludeオプション向け国際化テキストを追加
 - 検索モーダルに包含/除外フィルター機能を追加し検索ボタンをUIに配置
 
 ### 🧪 Testing
 
 - 検索フィルターのInclude/Excludeオプション機能に関する結合テストを追加
-
-## [0.1.6] - 2026-03-19
-
-### 🚀 Features
-
-- ワークスペースの検索とフィルター機能の実装
 
 ## [0.1.5] - 2026-03-19
 
