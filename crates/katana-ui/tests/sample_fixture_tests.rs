@@ -23,7 +23,7 @@
 
 use eframe::egui;
 use egui_kittest::kittest::{NodeT, Queryable};
-use egui_kittest::{Harness, SnapshotOptions};
+use egui_kittest::Harness;
 use katana_ui::preview_pane::{PreviewPane, RenderedSection};
 use std::path::Path;
 
@@ -33,7 +33,6 @@ const PANEL_WIDTH: f32 = 800.0;
 /// so that each group fits within this limit and is captured in full — no clipping.
 const PANEL_HEIGHT: f32 = 8000.0;
 const CENTERING_TOLERANCE: f64 = 50.0;
-const SNAPSHOT_PIXEL_TOLERANCE: usize = 10000;
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -161,10 +160,6 @@ fn build_harness(sections: Vec<RenderedSection>, width: f32, height: f32) -> Har
     }
     harness.run();
     harness
-}
-
-fn snapshot_opts() -> SnapshotOptions {
-    SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE)
 }
 
 /// Assert a widget's center X is near the panel center (horizontally centered).

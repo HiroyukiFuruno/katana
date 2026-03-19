@@ -7,6 +7,9 @@
 
 .DEFAULT_GOAL := help
 
+# Force all warnings to be treated as errors for every cargo command run via make
+export RUSTFLAGS=-D warnings
+
 # ---------- Build / Run ----------
 
 .PHONY: build
