@@ -636,7 +636,23 @@ impl CommonMarkViewerInternal {
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 let Table { header, rows } = parse_table(events);
 
-                egui::Grid::new(id).striped(true).show(ui, |ui| {
+                // Force table to fill available preview width (CSS: width: 100%).
+                // Without this, egui::Grid shrinks to fit cell content.
+                let frame_padding = ui.spacing().indent;
+                let table_width = (max_width - frame_padding).max(0.0);
+                ui.set_min_width(table_width);
+
+                // Distribute width equally across columns (CSS: table-layout with auto columns).
+                let num_cols = header.len().max(1);
+                let col_spacing = ui.spacing().item_spacing.x;
+                let min_col = ((table_width - col_spacing * (num_cols as f32 - 1.0))
+                    / num_cols as f32)
+                    .max(0.0);
+
+                egui::Grid::new(id)
+                    .striped(true)
+                    .min_col_width(min_col)
+                    .show(ui, |ui| {
                     for col in header {
                         ui.horizontal(|ui| {
                             for (e, src_span) in col {

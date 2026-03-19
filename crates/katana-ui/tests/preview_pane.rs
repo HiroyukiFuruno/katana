@@ -1891,3 +1891,86 @@ fn badges_then_language_selector_both_centered() {
         (group_center_x - panel_center_x).abs()
     );
 }
+
+// ── TDD(RED): Markdown table must fill available preview width ──
+
+/// Table must use the available preview width so columns don't shrink to
+/// content-minimum. Without explicit width constraints, egui::Grid compacts
+/// cells to fit text, leaving most of the preview area unused and causing
+/// text overflow when content is even slightly longer.
+///
+/// This test verifies that the rightmost header cell extends to at least 80%
+/// of the preview content width.
+#[test]
+fn markdown_table_fills_available_width() {
+    let table_md = concat!(
+        "# Table Test\n\n",
+        "| Header A | Header B | Header C |\n",
+        "|----------|----------|----------|\n",
+        "| Cell 1   | Cell 2   | Cell 3   |\n",
+        "| Cell 4   | Cell 5   | Cell 6   |\n",
+    );
+
+    let preview_width = 600.0_f32;
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(table_md, std::path::Path::new("/tmp/table_test.md"));
+
+    let ctx = egui::Context::default();
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(preview_width, 400.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(8)))
+                .show(ctx, |ui| {
+                    pane.show(ui);
+                });
+        },
+    );
+
+    // Inspect Rect shapes to find the table group frame.
+    // The table group frame is distinguished by having a non-zero stroke width
+    // (egui::Frame::group always draws a border).
+    let flat = flatten_shapes(&output.shapes);
+    let group_frame_widths: Vec<f32> = flat
+        .iter()
+        .filter_map(|s| {
+            if let egui::epaint::Shape::Rect(rect_shape) = s {
+                // Group frames have a visible stroke (width > 0)
+                if rect_shape.stroke.width > 0.0 && rect_shape.rect.width() > 50.0 {
+                    Some(rect_shape.rect.width())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(
+        !group_frame_widths.is_empty(),
+        "Expected at least one group frame rect shape for the table"
+    );
+
+    let table_frame_width = group_frame_widths
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    // Table should fill at least 80% of available width (accounting for margins).
+    // Available width after 8px margin on each side = preview_width - 16.
+    let content_width = preview_width - 16.0;
+    let fill_ratio = table_frame_width / content_width;
+
+    assert!(
+        fill_ratio >= 0.80,
+        "Table frame should fill >= 80% of available width, got {fill_ratio:.2} \
+         (table_frame_width={table_frame_width:.1}, content_width={content_width:.1})"
+    );
+}
