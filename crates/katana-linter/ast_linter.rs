@@ -261,6 +261,14 @@ fn extract_type_from_call(func: &syn::Expr) -> Option<String> {
 }
 
 impl<'ast> Visit<'ast> for I18nHardcodeVisitor {
+    /// Skip `#[cfg(test)]` modules — test code is exempt from i18n rules.
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        if has_cfg_test_attr(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_item_mod(self, node);
+    }
+
     /// Inspect method call: `receiver.method(args)`.
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
         let method_name = node.method.to_string();
@@ -1232,5 +1240,42 @@ mod internal_tests {
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_magic_numbers(&PathBuf::from("fake.rs"), &syntax);
         assert!(!violations.is_empty());
+    }
+
+    // ── lint_lazy_code: LazyCodeVisitor coverage ──
+
+    #[test]
+    fn lint_lazy_code_detects_todo_macro() {
+        let code = r#"fn foo() { todo!(); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("todo!()"));
+    }
+
+    #[test]
+    fn lint_lazy_code_detects_unimplemented_macro() {
+        let code = r#"fn foo() { unimplemented!(); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("unimplemented!()"));
+    }
+
+    #[test]
+    fn lint_lazy_code_detects_dbg_macro() {
+        let code = r#"fn foo() { dbg!(42); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("dbg!()"));
+    }
+
+    #[test]
+    fn lint_lazy_code_allows_normal_macros() {
+        let code = r#"fn foo() { println!("ok"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
     }
 }
