@@ -75,6 +75,13 @@ brew install --cask katana-desktop
 
 No additional steps required — the app is ready to use immediately.
 
+### Updating via Homebrew
+
+```sh
+brew update
+brew upgrade --cask katana-desktop
+```
+
 ### Manual Download
 
 1. Go to the [Releases page](https://github.com/HiroyukiFuruno/katana/releases/latest)
@@ -103,6 +110,36 @@ Core features available today:
 - Fast native desktop performance (Rust-based)
 
 The project is evolving rapidly — new features and improvements are released frequently.
+
+---
+
+## Diagram Rendering Setup
+
+KatanA supports Mermaid, PlantUML, and Draw.io diagrams in Markdown fenced code blocks. External tools are required only for Mermaid and PlantUML rendering.
+
+### Mermaid
+
+Install the Mermaid CLI globally:
+
+```sh
+npm i -g @mermaid-js/mermaid-cli
+```
+
+Once installed, `mmdc` will be detected automatically. No additional configuration is needed.
+
+### PlantUML
+
+1. Install a Java runtime:
+
+```sh
+brew install openjdk@25
+```
+
+2. Open a Markdown file containing a PlantUML block in KatanA and click the **⬇ Download** button that appears in the preview pane. The `plantuml.jar` will be downloaded automatically.
+
+### Draw.io
+
+Draw.io diagrams are rendered natively — no external tools required.
 
 ---
 
