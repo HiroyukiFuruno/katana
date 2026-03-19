@@ -34,6 +34,7 @@
   "curl_launch_failed": "curl 起動失敗",
   "download_failed": "ダウンロードに失敗しました",
   "collapse_sidebar": "サイドバーを隐す",
+  "refresh_workspace": "ワークスペースを更新",
   "render_error": "⚠ [{kind}] {message}",
   "tool_not_installed": "⚠ {tool} がインストールされていません",
   "tool_install_path": "インストール先: {path}",

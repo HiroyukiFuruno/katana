@@ -63,6 +63,8 @@ pub enum AppAction {
     SetSplitDirection(katana_platform::SplitDirection),
     /// Change the pane order within the split view (EditorFirst / PreviewFirst).
     SetPaneOrder(katana_platform::PaneOrder),
+    /// Reload the workspace directory tree from disk.
+    RefreshWorkspace,
     /// No-op (used internally).
     None,
 }

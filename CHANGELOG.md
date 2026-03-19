@@ -2,6 +2,13 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.1.1] - 2026-03-19
+
+### ✨ Features
+
+- **Hidden Directory Support**: workspace file tree now includes hidden directories (`.`-prefixed, e.g. `.github`, `.vscode`) if they contain `.md` files.
+- **Refresh Workspace Button**: Added a 🔄 button to the workspace panel toolbar to reload the directory tree from disk.
+
 ## [0.1.0] - 2026-03-19
 
 Major update introducing a dedicated Settings window, allowing flexible customization of themes, fonts, and layouts to significantly improve UI/UX.

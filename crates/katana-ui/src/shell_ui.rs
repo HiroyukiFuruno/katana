@@ -146,6 +146,15 @@ pub(crate) fn render_workspace_panel(
                     {
                         state.force_tree_open = Some(false);
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .small_button("🔄")
+                            .on_hover_text(crate::i18n::t("refresh_workspace"))
+                            .clicked()
+                        {
+                            *action = AppAction::RefreshWorkspace;
+                        }
+                    });
                 });
             }
             ui.separator();

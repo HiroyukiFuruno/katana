@@ -61,11 +61,8 @@ impl FilesystemService {
                 let path = entry.path();
                 let file_name = path.file_name().and_then(|n| n.to_str())?;
 
-                // Skip hidden files, build artifacts, and Node.js modules.
-                if file_name.starts_with('.')
-                    || file_name == "target"
-                    || file_name == "node_modules"
-                {
+                // Skip build artifacts and Node.js modules.
+                if file_name == "target" || file_name == "node_modules" {
                     return None;
                 }
 

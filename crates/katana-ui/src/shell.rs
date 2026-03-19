@@ -159,6 +159,25 @@ impl KatanaApp {
         }
     }
 
+    fn handle_refresh_workspace(&mut self) {
+        let Some(workspace) = &self.state.workspace else {
+            return;
+        };
+        let root = workspace.root.clone();
+        match self.fs.open_workspace(&root) {
+            Ok(ws) => {
+                self.state.workspace = Some(ws);
+            }
+            Err(e) => {
+                let error = e.to_string();
+                self.state.status_message = Some(crate::i18n::tf(
+                    "status_cannot_open_workspace",
+                    &[("error", &error)],
+                ));
+            }
+        }
+    }
+
     fn handle_select_document(&mut self, path: std::path::PathBuf) {
         // If the tab is already open, move focus to it. Reuse cache if the content hasn't changed.
         if let Some(existing_idx) = self
@@ -266,6 +285,7 @@ impl KatanaApp {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_pane_order(order);
             }
+            AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::None => {}
         }
     }
@@ -926,5 +946,60 @@ mod tests_extra {
             matches!(app.pending_action, AppAction::RefreshDiagrams),
             "RefreshDiagrams should be set when no action is pending"
         );
+    }
+
+    // handle_refresh_workspace: Success case — re-scans the workspace tree
+    #[test]
+    fn handle_refresh_workspace_rescans_tree() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        app.handle_open_workspace(dir.path().to_path_buf());
+        assert!(app.state.workspace.is_some());
+
+        // Add a new file to the workspace
+        std::fs::write(dir.path().join("new.md"), "# New").unwrap();
+
+        app.handle_refresh_workspace();
+        let ws = app.state.workspace.as_ref().unwrap();
+        let paths: Vec<_> = ws
+            .tree
+            .iter()
+            .map(|it| it.path().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.iter().any(|it| it.contains("new.md")));
+    }
+
+    // handle_refresh_workspace: No workspace open — early return
+    #[test]
+    fn handle_refresh_workspace_no_workspace_does_nothing() {
+        let mut app = make_app();
+        app.handle_refresh_workspace();
+        assert!(app.state.workspace.is_none());
+    }
+
+    // handle_refresh_workspace: Error case — workspace root is no longer valid
+    #[test]
+    fn handle_refresh_workspace_error_sets_status_message() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        app.handle_open_workspace(dir.path().to_path_buf());
+        assert!(app.state.workspace.is_some());
+
+        // Overwrite the workspace root to a non-existent path
+        app.state.workspace.as_mut().unwrap().root =
+            std::path::PathBuf::from("/nonexistent/deleted/workspace");
+
+        app.handle_refresh_workspace();
+        assert!(app.state.status_message.is_some());
+    }
+
+    // process_action: RefreshWorkspace
+    #[test]
+    fn process_action_refresh_workspace_calls_handler() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        app.handle_open_workspace(dir.path().to_path_buf());
+        app.process_action(AppAction::RefreshWorkspace);
+        assert!(app.state.workspace.is_some());
     }
 }

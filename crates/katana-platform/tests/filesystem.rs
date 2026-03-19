@@ -71,29 +71,44 @@ fn load_nonexistent_document_returns_error() {
     assert!(result.is_err());
 }
 
-// L64-70: hidden files/dirs are excluded from workspace tree
+// Hidden directories containing .md files are included in workspace tree
 #[test]
-fn hidden_files_are_excluded_from_workspace() {
+fn hidden_directories_with_markdown_are_included() {
     let tmp = TempDir::new().unwrap();
     // Regular md file
     fs::write(tmp.path().join("visible.md"), "# Visible").unwrap();
-    // Hidden file (starts with '.')
+    // Hidden .md file at root level
     fs::write(tmp.path().join(".hidden.md"), "# Hidden").unwrap();
-    // Hidden directory
-    fs::create_dir(tmp.path().join(".git")).unwrap();
-    fs::write(tmp.path().join(".git").join("README.md"), "# Not shown").unwrap();
+    // Hidden directory with a .md file
+    fs::create_dir(tmp.path().join(".config")).unwrap();
+    fs::write(tmp.path().join(".config").join("notes.md"), "# Notes").unwrap();
+    // Hidden directory without .md files (still excluded by has_any_markdown check)
+    fs::create_dir(tmp.path().join(".cache")).unwrap();
+    fs::write(tmp.path().join(".cache").join("data.bin"), b"binary").unwrap();
 
     let svc = FilesystemService::new();
     let ws = svc.open_workspace(tmp.path()).unwrap();
 
-    let paths: Vec<_> = ws
-        .tree
-        .iter()
-        .map(|e| e.path().to_string_lossy().to_string())
-        .collect();
-    assert!(paths.iter().any(|p| p.contains("visible.md")));
-    assert!(!paths.iter().any(|p| p.contains(".hidden.md")));
-    assert!(!paths.iter().any(|p| p.contains(".git")));
+    let all_paths = collect_all_paths(&ws.tree);
+    assert!(all_paths.iter().any(|p| p.contains("visible.md")));
+    // Hidden .md file is now included
+    assert!(all_paths.iter().any(|p| p.contains(".hidden.md")));
+    // Hidden directory with .md file is included
+    assert!(all_paths.iter().any(|p| p.contains(".config")));
+    // Hidden directory without .md files is still excluded
+    assert!(!all_paths.iter().any(|p| p.contains(".cache")));
+}
+
+/// Recursively collects all paths from a tree (for test assertions).
+fn collect_all_paths(tree: &[katana_core::workspace::TreeEntry]) -> Vec<String> {
+    let mut paths = Vec::new();
+    for entry in tree {
+        paths.push(entry.path().to_string_lossy().to_string());
+        if let katana_core::workspace::TreeEntry::Directory { children, .. } = entry {
+            paths.extend(collect_all_paths(children));
+        }
+    }
+    paths
 }
 
 // L66: "target" directory is excluded

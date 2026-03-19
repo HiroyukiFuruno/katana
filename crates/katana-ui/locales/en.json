@@ -34,6 +34,7 @@
   "curl_launch_failed": "curl launch failed",
   "download_failed": "Download failed",
   "collapse_sidebar": "Hide Sidebar",
+  "refresh_workspace": "Refresh workspace",
   "render_error": "⚠ [{kind}] {message}",
   "tool_not_installed": "⚠ {tool} is not installed",
   "tool_install_path": "Install path: {path}",
