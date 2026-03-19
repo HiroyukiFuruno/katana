@@ -351,6 +351,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         let nav_enabled = doc_count > 1;
         if ui
             .add_enabled(nav_enabled, egui::Button::new("◀").small())
+            .on_hover_text(crate::i18n::t("tab_nav_prev"))
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
@@ -362,6 +363,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         }
         if ui
             .add_enabled(nav_enabled, egui::Button::new("▶").small())
+            .on_hover_text(crate::i18n::t("tab_nav_next"))
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
@@ -632,8 +634,7 @@ pub(crate) fn render_file_entry(
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     child_ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-    let label_resp = child_ui.add_sized(
-        full_rect.size(),
+    let label_resp = child_ui.add(
         egui::Label::new(rich)
             .truncate()
             .sense(egui::Sense::click()),

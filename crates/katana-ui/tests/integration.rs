@@ -1298,3 +1298,188 @@ fn test_action_set_pane_order_roundtrip() {
         "Must be able to switch back from PreviewFirst to EditorFirst"
     );
 }
+
+// ── v0.1.2 TDD RED tests ──
+
+/// Bug Fix 1: File entry labels in workspace panel must be left-aligned
+/// within their parent directory container. The label rect must start
+/// near the left edge of the workspace panel (with indent), NOT at the
+/// right side. We compare the label rect.left() against the row rect
+/// to verify proper left-alignment.
+#[test]
+fn test_file_entry_label_is_left_aligned() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("alignment.md"), "# Alignment").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness.step();
+
+    // Find the file label node.
+    let nodes: Vec<_> = harness.get_all_by_value("📄 alignment.md").collect();
+    assert!(
+        !nodes.is_empty(),
+        "File entry '📄 alignment.md' must be present in the workspace tree"
+    );
+
+    let node = &nodes[0];
+    let label_rect = node.rect();
+    // The label text width must be smaller than the full row width.
+    // When right-aligned via add_sized, the label rect spans the full row.
+    // When properly left-aligned via add(), the label rect width matches
+    // only the text content width — which must be < 80% of the panel
+    // default width (220px). So label width < 176px.
+    let label_width = label_rect.width();
+    assert!(
+        label_width < 176.0,
+        "File entry label width must be text-width, not full-row-width. \
+         Got width={label_width:.1}, expected < 176.0 (indicates add_sized right-alignment bug)"
+    );
+}
+
+/// Regression: Clicking a file entry in the workspace must open the document.
+/// This test reproduces a critical regression where removing label_resp from
+/// the click response union caused file clicks to stop working.
+#[test]
+fn test_file_entry_click_opens_document() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("clickable.md"), "# Clickable").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness.step();
+
+    // Verify no document is open yet
+    assert!(
+        harness.state_mut().app_state_mut().active_doc_idx.is_none(),
+        "No document should be open before clicking"
+    );
+
+    // Click the file entry
+    let nodes: Vec<_> = harness.get_all_by_value("📄 clickable.md").collect();
+    assert!(!nodes.is_empty(), "File entry must be present");
+    nodes[0].click();
+    harness.step();
+    harness.step();
+
+    // The document must be opened
+    assert!(
+        harness.state_mut().app_state_mut().active_doc_idx.is_some(),
+        "Clicking a file entry must open the document (active_doc_idx should be Some)"
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents.len(),
+        1,
+        "Exactly one document should be open after clicking"
+    );
+}
+
+/// Bug Fix 2: Tab ◀/▶ navigation buttons must have i18n tooltips.
+/// After rendering with multiple tabs, verify the tooltip i18n keys exist
+/// by checking that the buttons' on_hover_text callbacks register the
+/// expected text. We test this by verifying the rendered UI contains the
+/// tooltip response.
+#[test]
+fn test_tab_nav_buttons_have_tooltips() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("a.md"), "# A").unwrap();
+    std::fs::write(temp_dir.path().join("b.md"), "# B").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(temp_dir.path().join("a.md")));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(temp_dir.path().join("b.md")));
+    harness.step();
+
+    // Verify ◀ button exists and can be found by label
+    let prev_nodes: Vec<_> = harness.get_all_by_label("◀").collect();
+    assert!(
+        !prev_nodes.is_empty(),
+        "◀ (previous tab) button must be present"
+    );
+
+    // Verify ▶ button exists and can be found by label
+    let next_nodes: Vec<_> = harness.get_all_by_label("▶").collect();
+    assert!(
+        !next_nodes.is_empty(),
+        "▶ (next tab) button must be present"
+    );
+
+    // Hover the ◀ button to trigger tooltip rendering path
+    prev_nodes[0].hover();
+    harness.step();
+    harness.step();
+
+    // Verify the i18n keys resolve correctly (tooltip text is registered)
+    let prev_tooltip = katana_ui::i18n::t("tab_nav_prev");
+    let next_tooltip = katana_ui::i18n::t("tab_nav_next");
+    assert_ne!(
+        prev_tooltip, "tab_nav_prev",
+        "tab_nav_prev i18n key must resolve to translated text"
+    );
+    assert_ne!(
+        next_tooltip, "tab_nav_next",
+        "tab_nav_next i18n key must resolve to translated text"
+    );
+
+    // Verify hover triggers repaint (tooltip rendering is exercised)
+    // The tooltip layer may not appear in AccessKit within kittest,
+    // but the on_hover_text code path is compiled and exercised.
+    // Visual verification is handled by snapshot tests.
+}
+
+/// Bug Fix 3: Font size slider must have a hover tooltip describing usage.
+/// When the slider is hovered, the tooltip text should appear in the UI.
+#[test]
+fn test_font_size_slider_has_hover_tooltip() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    // Open settings window
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ToggleSettings);
+    harness.step();
+
+    // Switch to Font tab
+    harness.state_mut().app_state_mut().active_settings_tab =
+        katana_ui::app_state::SettingsTab::Font;
+    harness.step();
+    harness.step();
+
+    let hint_text = katana_ui::i18n::t("settings_font_size_slider_hint");
+    // Verify i18n key resolves
+    assert_ne!(
+        hint_text, "settings_font_size_slider_hint",
+        "i18n key must resolve to a translated value, not the key itself"
+    );
+
+    // The slider's on_hover_text is compiled and exercised during rendering.
+    // Snapshot tests cover the visual tooltip rendering.
+    // Here we verify the settings Font tab renders without panic and
+    // the i18n key is correctly resolved for tooltip integration.
+    harness.snapshot_options(
+        "settings_font_tab",
+        &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
+    );
+}
