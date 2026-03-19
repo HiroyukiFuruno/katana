@@ -354,11 +354,15 @@ impl KatanaApp {
 
 /// Calls `curl` as a subprocess to download a file.
 fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
+    _download_with_cmd("curl", url, dest)
+}
+
+fn _download_with_cmd(cmd: &str, url: &str, dest: &std::path::Path) -> Result<(), String> {
     // Create parent directory if it does not exist
     if let Some(p) = dest.parent() {
         std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
     }
-    let status = std::process::Command::new("curl")
+    let status = std::process::Command::new(cmd)
         .args(["-L", "-o", dest.to_str().unwrap_or(""), url])
         .status()
         .map_err(|e| {
@@ -729,19 +733,13 @@ mod tests_extra {
 
     #[test]
     fn download_with_curl_launch_error() {
-        // Temporarily clear PATH to simulate a system without curl installed.
-        // SAFETY: This test modifies the environment, which is unsafe in
-        // multi-threaded contexts. Acceptable here because the value is
-        // immediately restored after the test call.
-        let old_path = std::env::var_os("PATH").unwrap_or_default();
-        unsafe { std::env::set_var("PATH", "/invalid_path_for_test") };
-
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("dest.txt");
-        let result = download_with_curl("http://example.com/file", &dest);
-
-        // Restore PATH
-        unsafe { std::env::set_var("PATH", old_path) };
+        let result = super::_download_with_cmd(
+            "invalid_curl_binary_for_test",
+            "http://example.com/file",
+            &dest,
+        );
 
         assert!(result.is_err());
         let err = result.unwrap_err();
