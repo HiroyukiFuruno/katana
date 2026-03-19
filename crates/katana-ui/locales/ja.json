@@ -125,7 +125,9 @@
   },
   "search": {
     "modal_title": "ファイル検索",
-    "query_hint": "検索ファイル名の一部を入力…",
-    "no_results": "見つかりませんでした"
+    "query_hint": "ファイル名で検索...",
+    "include_pattern_hint": "含める（正規表現, カンマ区切り）",
+    "exclude_pattern_hint": "除外する（正規表現, カンマ区切り）",
+    "no_results": "ファイルが見つかりません"
   }
 }

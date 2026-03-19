@@ -125,7 +125,9 @@
   },
   "search": {
     "modal_title": "Search Files",
-    "query_hint": "Type to search...",
+    "query_hint": "Type to search by file name...",
+    "include_pattern_hint": "Include (regex, comma-separated)",
+    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
     "no_results": "No files found."
   }
 }

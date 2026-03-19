@@ -124,8 +124,10 @@
     "nav_next": "다음 탭으로 이동"
   },
   "search": {
-    "modal_title": "Search Files",
-    "query_hint": "Type to search...",
-    "no_results": "No files found."
+    "modal_title": "파일 찾기",
+    "query_hint": "파일 이름으로 검색...",
+    "include_pattern_hint": "Include (regex, comma-separated)",
+    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+    "no_results": "파일을 찾을 수 없습니다."
   }
 }

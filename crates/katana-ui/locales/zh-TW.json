@@ -124,8 +124,10 @@
     "nav_next": "移至下一個標籤頁"
   },
   "search": {
-    "modal_title": "Search Files",
-    "query_hint": "Type to search...",
-    "no_results": "No files found."
+    "modal_title": "搜尋檔案",
+    "query_hint": "輸入檔名進行搜尋...",
+    "include_pattern_hint": "Include (regex, comma-separated)",
+    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+    "no_results": "沒有找到檔案。"
   }
 }
