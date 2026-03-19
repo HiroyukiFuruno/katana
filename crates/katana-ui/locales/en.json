@@ -1,78 +1,125 @@
 {
-  "menu_file": "File",
-  "menu_settings": "Settings",
-  "menu_language": "Language",
-  "menu_open_workspace": "Open Workspace…",
-  "menu_save": "Save",
-  "no_workspace_open": "No workspace open.",
-  "no_document_selected": "No document open.",
-  "preview_title": "Preview",
-  "refresh_diagrams": "Refresh diagrams",
-  "rendering": "{kind} Rendering...",
-  "no_preview": "(No preview)",
-  "downloading_plantuml": "⬇ Downloading PlantUML JAR...",
-  "plantuml_installed": "✅ PlantUML installed. Refreshing preview...",
-  "download_error": "❌ Download error: ",
-  "workspace_title": "Workspace",
-  "view_mode_preview": "Preview",
-  "view_mode_code": "Code",
-  "view_mode_split": "Split",
-  "split_toggle_horizontal": "Switch to horizontal split (left/right)",
-  "split_toggle_vertical": "Switch to vertical split (top/bottom)",
-  "split_toggle_editor_first": "Place editor left/top",
-  "split_toggle_preview_first": "Place preview left/top",
-  "missing_dependency": "⚠️ {tool_name} is not found. Please install it using {install_hint}.",
-  "status_ready": "Ready",
-  "status_saved": "Saved.",
-  "status_save_failed": "Save failed: {error}",
-  "status_opened_workspace": "Opened workspace: {name}",
-  "status_cannot_open_workspace": "Cannot open workspace: {error}",
-  "status_cannot_open_file": "Cannot open file: {error}",
-  "expand_all": "Expand all",
-  "collapse_all": "Collapse all",
-  "ai_unconfigured": "[AI: unconfigured]",
-  "curl_launch_failed": "curl launch failed",
-  "download_failed": "Download failed",
-  "collapse_sidebar": "Hide Sidebar",
-  "refresh_workspace": "Refresh workspace",
-  "render_error": "⚠ [{kind}] {message}",
-  "tool_not_installed": "⚠ {tool} is not installed",
-  "tool_install_path": "Install path: {path}",
-  "tool_download": "⬇ Download {tool}",
-  "settings_title": "Settings",
-  "settings_tab_theme": "Theme",
-  "settings_tab_font": "Font",
-  "settings_tab_layout": "Layout",
-  "settings_theme_preset": "Theme Preset",
-  "settings_theme_dark_section": "Dark",
-  "settings_theme_light_section": "Light",
-  "settings_theme_custom_colors": "Custom Colours",
-  "settings_theme_reset_custom": "Reset to Preset",
-  "settings_font_size": "Font Size",
-  "settings_font_family": "Font Family",
-  "settings_toc_visible": "Show Table of Contents",
-  "settings_layout_split_direction": "Split Direction",
-  "settings_layout_horizontal": "Horizontal (Left / Right)",
-  "settings_layout_vertical": "Vertical (Top / Bottom)",
-  "settings_layout_pane_order": "Pane Order",
-  "settings_layout_editor_first": "Editor First",
-  "settings_layout_preview_first": "Preview First",
-  "settings_preview_title": "Preview",
-  "settings_color_background": "Background",
-  "settings_color_panel_background": "Panel Background",
-  "settings_color_text": "Text",
-  "settings_color_text_secondary": "Secondary Text",
-  "settings_color_accent": "Accent",
-  "settings_color_border": "Border",
-  "settings_color_selection": "Selection",
-  "settings_color_code_background": "Code Background",
-  "settings_color_preview_background": "Preview Background",
-  "settings_preview_heading": "# Sample Heading",
-  "settings_preview_normal_text": "Normal text with ",
-  "settings_preview_accent_link": "accent link",
-  "settings_preview_secondary_text": "Secondary text sample",
-  "settings_preview_code_sample": "fn main() { println!(\"Hello!\"); }",
-  "tab_nav_prev": "Move to previous tab",
-  "tab_nav_next": "Move to next tab",
-  "settings_font_size_slider_hint": "Drag left or right to adjust size"
+  "menu": {
+    "file": "File",
+    "settings": "Settings",
+    "language": "Language",
+    "open_workspace": "Open Workspace…",
+    "save": "Save"
+  },
+  "workspace": {
+    "no_workspace_open": "No workspace open.",
+    "no_document_selected": "No document open.",
+    "workspace_title": "Workspace"
+  },
+  "preview": {
+    "preview_title": "Preview",
+    "refresh_diagrams": "Refresh diagrams",
+    "rendering": "{kind} Rendering...",
+    "no_preview": "(No preview)"
+  },
+  "plantuml": {
+    "downloading_plantuml": "⬇ Downloading PlantUML JAR...",
+    "plantuml_installed": "✅ PlantUML installed. Refreshing preview...",
+    "download_error": "❌ Download error: "
+  },
+  "view_mode": {
+    "preview": "Preview",
+    "code": "Code",
+    "split": "Split"
+  },
+  "split_toggle": {
+    "horizontal": "Switch to horizontal split (left/right)",
+    "vertical": "Switch to vertical split (top/bottom)",
+    "editor_first": "Place editor left/top",
+    "preview_first": "Place preview left/top"
+  },
+  "error": {
+    "missing_dependency": "⚠️ {tool_name} is not found. Please install it using {install_hint}.",
+    "curl_launch_failed": "curl launch failed",
+    "download_failed": "Download failed",
+    "render_error": "⚠ [{kind}] {message}"
+  },
+  "status": {
+    "ready": "Ready",
+    "saved": "Saved.",
+    "save_failed": "Save failed: {error}",
+    "opened_workspace": "Opened workspace: {name}",
+    "cannot_open_workspace": "Cannot open workspace: {error}",
+    "cannot_open_file": "Cannot open file: {error}"
+  },
+  "action": {
+    "expand_all": "Expand all",
+    "collapse_all": "Collapse all",
+    "collapse_sidebar": "Hide Sidebar",
+    "refresh_workspace": "Refresh workspace"
+  },
+  "ai": {
+    "ai_unconfigured": "[AI: unconfigured]"
+  },
+  "tool": {
+    "not_installed": "⚠ {tool} is not installed",
+    "install_path": "Install path: {path}",
+    "download": "⬇ Download {tool}"
+  },
+  "settings": {
+    "title": "Settings",
+    "toc_visible": "Show Table of Contents",
+    "theme": {
+      "preset": "Theme Preset",
+      "dark_section": "Dark",
+      "light_section": "Light",
+      "custom_colors": "Custom Colours",
+      "reset_custom": "Reset to Preset"
+    },
+    "font": {
+      "size": "Font Size",
+      "family": "Font Family",
+      "size_slider_hint": "Drag left or right to adjust size"
+    },
+    "layout": {
+      "split_direction": "Split Direction",
+      "horizontal": "Horizontal (Left / Right)",
+      "vertical": "Vertical (Top / Bottom)",
+      "pane_order": "Pane Order",
+      "editor_first": "Editor First",
+      "preview_first": "Preview First"
+    },
+    "preview": {
+      "title": "Preview",
+      "heading": "# Sample Heading",
+      "normal_text": "Normal text with ",
+      "accent_link": "accent link",
+      "secondary_text": "Secondary text sample",
+      "code_sample": "fn main() { println!(\"Hello!\"); }"
+    },
+    "color": {
+      "background": "Background",
+      "panel_background": "Panel Background",
+      "text": "Text",
+      "text_secondary": "Secondary Text",
+      "accent": "Accent",
+      "border": "Border",
+      "selection": "Selection",
+      "code_background": "Code Background",
+      "preview_background": "Preview Background"
+    },
+    "tabs": [
+      {
+        "key": "theme",
+        "name": "Theme"
+      },
+      {
+        "key": "font",
+        "name": "Font"
+      },
+      {
+        "key": "layout",
+        "name": "Layout"
+      }
+    ]
+  },
+  "tab": {
+    "nav_prev": "Move to previous tab",
+    "nav_next": "Move to next tab"
+  }
 }

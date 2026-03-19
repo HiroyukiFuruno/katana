@@ -1,78 +1,125 @@
 {
-  "menu_file": "ファイル",
-  "menu_settings": "設定",
-  "menu_language": "言語 (Language)",
-  "menu_open_workspace": "ワークスペースを開く…",
-  "menu_save": "保存",
-  "no_workspace_open": "ワークスペースが開かれていません。",
-  "no_document_selected": "ドキュメントが開かれていません。",
-  "preview_title": "プレビュー",
-  "refresh_diagrams": "ダイアグラムを更新",
-  "rendering": "{kind} レンダリング中…",
-  "no_preview": "（プレビューなし）",
-  "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",
-  "plantuml_installed": "✅ PlantUML のインストールが完了しました。プレビューを更新中…",
-  "download_error": "❌ ダウンロードエラー: ",
-  "workspace_title": "ワークスペース",
-  "view_mode_preview": "プレビュー",
-  "view_mode_code": "コード",
-  "view_mode_split": "分割",
-  "split_toggle_horizontal": "水平分割（左右）に切り替え",
-  "split_toggle_vertical": "垂直分割（上下）に切り替え",
-  "split_toggle_editor_first": "エディタを左/上に配置",
-  "split_toggle_preview_first": "プレビューを左/上に配置",
-  "missing_dependency": "⚠️ {tool_name} が見つかりません。{install_hint} を使用してインストールしてください。",
-  "status_ready": "準備完了",
-  "status_saved": "保存しました。",
-  "status_save_failed": "保存に失敗しました: {error}",
-  "status_opened_workspace": "{name} を開きました",
-  "status_cannot_open_workspace": "ワークスペースを開けませんでした: {error}",
-  "status_cannot_open_file": "ファイルを開けませんでした: {error}",
-  "expand_all": "すべて展開",
-  "collapse_all": "すべて折りたたむ",
-  "ai_unconfigured": "[AI: 未設定]",
-  "curl_launch_failed": "curl 起動失敗",
-  "download_failed": "ダウンロードに失敗しました",
-  "collapse_sidebar": "サイドバーを隠す",
-  "refresh_workspace": "ワークスペースを更新",
-  "render_error": "⚠ [{kind}] {message}",
-  "tool_not_installed": "⚠ {tool} がインストールされていません",
-  "tool_install_path": "インストール先: {path}",
-  "tool_download": "⬇ {tool} をダウンロード",
-  "settings_title": "設定",
-  "settings_tab_theme": "テーマ",
-  "settings_tab_font": "フォント",
-  "settings_tab_layout": "レイアウト",
-  "settings_theme_preset": "テーマプリセット",
-  "settings_theme_dark_section": "ダーク",
-  "settings_theme_light_section": "ライト",
-  "settings_theme_custom_colors": "カスタムカラー",
-  "settings_theme_reset_custom": "プリセットに戻す",
-  "settings_font_size": "フォントサイズ",
-  "settings_font_family": "フォントファミリー",
-  "settings_toc_visible": "目次を表示",
-  "settings_layout_split_direction": "分割方向",
-  "settings_layout_horizontal": "水平（左右）",
-  "settings_layout_vertical": "垂直（上下）",
-  "settings_layout_pane_order": "配置順",
-  "settings_layout_editor_first": "エディタ優先",
-  "settings_layout_preview_first": "プレビュー優先",
-  "settings_preview_title": "プレビュー",
-  "settings_color_background": "背景",
-  "settings_color_panel_background": "パネル背景",
-  "settings_color_text": "テキスト",
-  "settings_color_text_secondary": "セカンダリテキスト",
-  "settings_color_accent": "アクセント",
-  "settings_color_border": "ボーダー",
-  "settings_color_selection": "選択",
-  "settings_color_code_background": "コード背景",
-  "settings_color_preview_background": "プレビュー背景",
-  "settings_preview_heading": "# サンプル見出し",
-  "settings_preview_normal_text": "通常テキストと",
-  "settings_preview_accent_link": "アクセントリンク",
-  "settings_preview_secondary_text": "セカンダリテキストのサンプル",
-  "settings_preview_code_sample": "fn main() { println!(\"こんにちは!\"); }",
-  "tab_nav_prev": "前のタブへ移動",
-  "tab_nav_next": "次のタブへ移動",
-  "settings_font_size_slider_hint": "左右にドラッグしてサイズを増減"
+  "menu": {
+    "file": "ファイル",
+    "settings": "設定",
+    "language": "言語 (Language)",
+    "open_workspace": "ワークスペースを開く…",
+    "save": "保存"
+  },
+  "workspace": {
+    "no_workspace_open": "ワークスペースが開かれていません。",
+    "no_document_selected": "ドキュメントが開かれていません。",
+    "workspace_title": "ワークスペース"
+  },
+  "preview": {
+    "preview_title": "プレビュー",
+    "refresh_diagrams": "ダイアグラムを更新",
+    "rendering": "{kind} レンダリング中…",
+    "no_preview": "（プレビューなし）"
+  },
+  "plantuml": {
+    "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",
+    "plantuml_installed": "✅ PlantUML のインストールが完了しました。プレビューを更新中…",
+    "download_error": "❌ ダウンロードエラー: "
+  },
+  "view_mode": {
+    "preview": "プレビュー",
+    "code": "コード",
+    "split": "分割"
+  },
+  "split_toggle": {
+    "horizontal": "水平分割（左右）に切り替え",
+    "vertical": "垂直分割（上下）に切り替え",
+    "editor_first": "エディタを左/上に配置",
+    "preview_first": "プレビューを左/上に配置"
+  },
+  "error": {
+    "missing_dependency": "⚠️ {tool_name} が見つかりません。{install_hint} を使用してインストールしてください。",
+    "curl_launch_failed": "curl 起動失敗",
+    "download_failed": "ダウンロードに失敗しました",
+    "render_error": "⚠ [{kind}] {message}"
+  },
+  "status": {
+    "ready": "準備完了",
+    "saved": "保存しました。",
+    "save_failed": "保存に失敗しました: {error}",
+    "opened_workspace": "{name} を開きました",
+    "cannot_open_workspace": "ワークスペースを開けませんでした: {error}",
+    "cannot_open_file": "ファイルを開けませんでした: {error}"
+  },
+  "action": {
+    "expand_all": "すべて展開",
+    "collapse_all": "すべて折りたたむ",
+    "collapse_sidebar": "サイドバーを隠す",
+    "refresh_workspace": "ワークスペースを更新"
+  },
+  "ai": {
+    "ai_unconfigured": "[AI: 未設定]"
+  },
+  "tool": {
+    "not_installed": "⚠ {tool} がインストールされていません",
+    "install_path": "インストール先: {path}",
+    "download": "⬇ {tool} をダウンロード"
+  },
+  "settings": {
+    "title": "設定",
+    "toc_visible": "目次を表示",
+    "theme": {
+      "preset": "テーマプリセット",
+      "dark_section": "ダーク",
+      "light_section": "ライト",
+      "custom_colors": "カスタムカラー",
+      "reset_custom": "プリセットに戻す"
+    },
+    "font": {
+      "size": "フォントサイズ",
+      "family": "フォントファミリー",
+      "size_slider_hint": "左右にドラッグしてサイズを増減"
+    },
+    "layout": {
+      "split_direction": "分割方向",
+      "horizontal": "水平（左右）",
+      "vertical": "垂直（上下）",
+      "pane_order": "配置順",
+      "editor_first": "エディタ優先",
+      "preview_first": "プレビュー優先"
+    },
+    "preview": {
+      "title": "プレビュー",
+      "heading": "# サンプル見出し",
+      "normal_text": "通常テキストと",
+      "accent_link": "アクセントリンク",
+      "secondary_text": "セカンダリテキストのサンプル",
+      "code_sample": "fn main() { println!(\"こんにちは!\"); }"
+    },
+    "color": {
+      "background": "背景",
+      "panel_background": "パネル背景",
+      "text": "テキスト",
+      "text_secondary": "セカンダリテキスト",
+      "accent": "アクセント",
+      "border": "ボーダー",
+      "selection": "選択",
+      "code_background": "コード背景",
+      "preview_background": "プレビュー背景"
+    },
+    "tabs": [
+      {
+        "key": "theme",
+        "name": "テーマ"
+      },
+      {
+        "key": "font",
+        "name": "フォント"
+      },
+      {
+        "key": "layout",
+        "name": "レイアウト"
+      }
+    ]
+  },
+  "tab": {
+    "nav_prev": "前のタブへ移動",
+    "nav_next": "次のタブへ移動"
+  }
 }

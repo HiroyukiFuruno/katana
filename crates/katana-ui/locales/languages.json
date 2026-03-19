@@ -1,4 +1,42 @@
 [
-  { "code": "en", "name": "English" },
-  { "code": "ja", "name": "日本語" }
+  {
+    "code": "en",
+    "name": "English"
+  },
+  {
+    "code": "ja",
+    "name": "日本語 (Japanese)"
+  },
+  {
+    "code": "zh-CN",
+    "name": "简体中文 (Simplified Chinese)"
+  },
+  {
+    "code": "zh-TW",
+    "name": "繁體中文 (Traditional Chinese)"
+  },
+  {
+    "code": "ko",
+    "name": "한국어 (Korean)"
+  },
+  {
+    "code": "pt",
+    "name": "Português (Portuguese)"
+  },
+  {
+    "code": "fr",
+    "name": "Français (French)"
+  },
+  {
+    "code": "de",
+    "name": "Deutsch (German)"
+  },
+  {
+    "code": "es",
+    "name": "Español (Spanish)"
+  },
+  {
+    "code": "it",
+    "name": "Italiano (Italian)"
+  }
 ]
