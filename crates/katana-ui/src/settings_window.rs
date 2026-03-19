@@ -40,6 +40,8 @@ const FONT_FAMILY_COMBOBOX_WIDTH: f32 = 200.0;
 const FONT_DROPDOWN_MAX_HEIGHT: f32 = 200.0;
 /// Opacity for the inactive slider rail (0–255). Provides visible contrast on both light and dark themes.
 const SLIDER_RAIL_OPACITY: u8 = 80;
+/// Border width for the slider handle and rail for visibility on all themes.
+const SLIDER_BORDER_WIDTH: f32 = 1.0;
 
 // ── Sample markdown for settings preview ─────────────────────────────
 
@@ -494,6 +496,15 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
         SLIDER_RAIL_OPACITY,
     );
 
+    // Add visible border to the slider handle/rail on all themes.
+    let border_stroke = egui::Stroke::new(SLIDER_BORDER_WIDTH, selection_color);
+    let saved_active_stroke = ui.visuals().widgets.active.bg_stroke;
+    let saved_hovered_stroke = ui.visuals().widgets.hovered.bg_stroke;
+    let saved_inactive_stroke = ui.visuals().widgets.inactive.bg_stroke;
+    ui.visuals_mut().widgets.active.bg_stroke = border_stroke;
+    ui.visuals_mut().widgets.hovered.bg_stroke = border_stroke;
+    ui.visuals_mut().widgets.inactive.bg_stroke = border_stroke;
+
     if ui
         .add(slider)
         .on_hover_text(crate::i18n::t("settings_font_size_slider_hint"))
@@ -507,6 +518,9 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
     ui.visuals_mut().widgets.active.bg_fill = saved_active_bg;
     ui.visuals_mut().widgets.hovered.bg_fill = saved_hovered_bg;
     ui.visuals_mut().widgets.inactive.bg_fill = saved_inactive_bg;
+    ui.visuals_mut().widgets.active.bg_stroke = saved_active_stroke;
+    ui.visuals_mut().widgets.hovered.bg_stroke = saved_hovered_stroke;
+    ui.visuals_mut().widgets.inactive.bg_stroke = saved_inactive_stroke;
 }
 
 // ── Layout tab ───────────────────────────────────────────────────────

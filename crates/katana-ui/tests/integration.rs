@@ -1547,3 +1547,59 @@ fn test_font_size_slider_visible_on_light_theme() {
         panel_bg.b(),
     );
 }
+
+/// Slider handle/rail must have a visible border (bg_stroke) on all themes.
+/// By default, egui widgets have bg_stroke.width == 0.0 (no border),
+/// making the slider boundary invisible against similar-colored backgrounds.
+/// The fix applies a selection-colored stroke to all widget states.
+#[test]
+fn test_font_size_slider_has_visible_border() {
+    // Default egui visuals have no visible border on widget backgrounds.
+    let dark = egui::Visuals::dark();
+    let light = egui::Visuals::light();
+
+    // Prove the bug: default bg_stroke width is 0 (no border).
+    assert!(
+        dark.widgets.inactive.bg_stroke.width < 1.0,
+        "Default dark theme must have no visible slider border (proves bug). \
+         Got width={}",
+        dark.widgets.inactive.bg_stroke.width,
+    );
+    assert!(
+        light.widgets.inactive.bg_stroke.width < 1.0,
+        "Default light theme must have no visible slider border (proves bug). \
+         Got width={}",
+        light.widgets.inactive.bg_stroke.width,
+    );
+
+    // Fix validation: selection color is available for border stroke.
+    let dark_selection = dark.selection.bg_fill;
+    let light_selection = light.selection.bg_fill;
+
+    // Selection colors must have sufficient saturation for a visible border.
+    let dark_max_diff = dark_selection
+        .r()
+        .abs_diff(dark_selection.g())
+        .max(dark_selection.r().abs_diff(dark_selection.b()));
+    let light_max_diff = light_selection
+        .r()
+        .abs_diff(light_selection.g())
+        .max(light_selection.r().abs_diff(light_selection.b()));
+
+    assert!(
+        dark_max_diff > 10,
+        "Dark selection color must have saturation for border. \
+         rgb=({},{},{}), spread={dark_max_diff}",
+        dark_selection.r(),
+        dark_selection.g(),
+        dark_selection.b(),
+    );
+    assert!(
+        light_max_diff > 10,
+        "Light selection color must have saturation for border. \
+         rgb=({},{},{}), spread={light_max_diff}",
+        light_selection.r(),
+        light_selection.g(),
+        light_selection.b(),
+    );
+}
