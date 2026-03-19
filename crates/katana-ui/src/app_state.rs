@@ -330,4 +330,28 @@ mod tests {
         assert_eq!(state.active_split_direction(), SplitDirection::Vertical);
         assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
     }
+
+    #[test]
+    fn test_ensure_active_split_state_no_active_doc() {
+        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        // No documents open, active_doc_idx is None — should return early without panic
+        state.ensure_active_split_state();
+        assert!(state.tab_split_states.is_empty());
+    }
+
+    #[test]
+    fn test_set_active_split_direction_no_active_doc() {
+        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        // No documents open — should return early without panic
+        state.set_active_split_direction(SplitDirection::Vertical);
+        assert!(state.tab_split_states.is_empty());
+    }
+
+    #[test]
+    fn test_set_active_pane_order_no_active_doc() {
+        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        // No documents open — should return early without panic
+        state.set_active_pane_order(PaneOrder::PreviewFirst);
+        assert!(state.tab_split_states.is_empty());
+    }
 }

@@ -602,8 +602,34 @@ fn fixture_ja_s1_6_readme_header_has_block_spacing() {
         &harness,
         "KatanA Desktop",
         "高速・軽量な macOS 向け Markdown ワークスペース",
-        16.0,
+        7.0,
         "§1.6 JA top-level block spacing",
+    );
+}
+
+/// Top-level HTML blocks should keep browser-like spacing between paragraphs.
+#[test]
+fn top_level_html_paragraphs_keep_browser_like_vertical_spacing() {
+    let pane = render_snippet(concat!(
+        "<p align=\"center\">First paragraph</p>\n\n",
+        "<p align=\"center\">Second paragraph</p>\n\n",
+        "<p align=\"center\">Third paragraph</p>\n",
+    ));
+    let harness = build_harness(pane.sections, PANEL_WIDTH, 280.0);
+
+    assert_gap_at_least(
+        &harness,
+        "First paragraph",
+        "Second paragraph",
+        6.0,
+        "top-level html paragraph spacing 1->2",
+    );
+    assert_gap_at_least(
+        &harness,
+        "Second paragraph",
+        "Third paragraph",
+        6.0,
+        "top-level html paragraph spacing 2->3",
     );
 }
 

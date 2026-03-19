@@ -1040,9 +1040,9 @@ fn paragraph_with_inline_link_wraps_from_the_left_edge_after_link() {
 
 #[test]
 #[cfg(target_os = "macos")]
-fn preview_markdown_renders_emoji_with_app_font_setup() {
+fn preview_markdown_renders_emoji_as_inline_image_on_macos() {
     let mut pane = PreviewPane::default();
-    pane.update_markdown_sections("🌍", std::path::Path::new("/tmp/emoji.md"));
+    pane.update_markdown_sections("Hello 🌍", std::path::Path::new("/tmp/emoji.md"));
 
     let ctx = egui::Context::default();
     katana_ui::font_loader::SystemFontLoader::setup_fonts(
@@ -1069,21 +1069,371 @@ fn preview_markdown_renders_emoji_with_app_font_setup() {
 
     let emoji_text = flatten_shapes(output.shapes.iter())
         .into_iter()
-        .find_map(|shape| match shape {
+        .filter_map(|shape| match shape {
             egui::epaint::Shape::Text(text) if text.galley.job.text.contains('🌍') => Some(text),
             _ => None,
         })
-        .expect("emoji text shape");
-
-    let has_visible_glyph = emoji_text
-        .galley
-        .rows
-        .iter()
-        .flat_map(|row| row.glyphs.iter())
-        .any(|glyph| !glyph.uv_rect.is_nothing());
+        .collect::<Vec<_>>();
     assert!(
-        has_visible_glyph,
-        "preview markdown should render a visible emoji glyph with the app font setup"
+        emoji_text.is_empty(),
+        "emoji should no longer be rendered through egui text glyphs"
+    );
+
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections("Hello 🌍", std::path::Path::new("/tmp/emoji.md"));
+    let mut harness = Harness::new_ui(move |ui| {
+        katana_ui::font_loader::SystemFontLoader::setup_fonts(
+            ui.ctx(),
+            DiagramColorPreset::current(),
+            None,
+            None,
+        );
+        pane.show_content(ui);
+    });
+    harness.run();
+
+    harness.get_by_role(egui::accesskit::Role::Image);
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn inline_emoji_stays_within_text_line_height_budget() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        "👉 Become a Sponsor",
+        std::path::Path::new("/tmp/emoji-line.md"),
+    );
+    let mut harness = Harness::new_ui(move |ui| {
+        katana_ui::font_loader::SystemFontLoader::setup_fonts(
+            ui.ctx(),
+            DiagramColorPreset::current(),
+            None,
+            None,
+        );
+        pane.show_content(ui);
+    });
+    harness.run();
+
+    let image = harness.get_by_role(egui::accesskit::Role::Image);
+    let image_bounds = image
+        .accesskit_node()
+        .raw_bounds()
+        .expect("emoji image should have bounds");
+    let text = harness.get_by_label("Sponsor");
+    let text_bounds = text
+        .accesskit_node()
+        .raw_bounds()
+        .expect("text should have bounds");
+
+    let image_height = image_bounds.y1 - image_bounds.y0;
+    let text_height = text_bounds.y1 - text_bounds.y0;
+    let bottom_diff = (image_bounds.y1 - text_bounds.y1).abs();
+
+    assert!(
+        image_height <= text_height * 1.15,
+        "inline emoji should stay near text line height, got image={image_height:.1} text={text_height:.1}"
+    );
+    assert!(
+        bottom_diff <= 8.0,
+        "inline emoji should stay aligned near the text baseline, bottom diff={bottom_diff:.1}, image=({:.1},{:.1}) text=({:.1},{:.1})",
+        image_bounds.y0,
+        image_bounds.y1,
+        text_bounds.y0,
+        text_bounds.y1,
+    );
+}
+
+#[test]
+fn markdown_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        "KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。\n",
+        std::path::Path::new("/tmp/cjk-baseline.md"),
+    );
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+    katana_ui::theme_bridge::apply_font_family(&ctx, "Monospace");
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(900.0, 200.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let text_shape = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text
+                    .galley
+                    .job
+                    .text
+                    .contains("AIエージェントと共に仕様駆動開発") =>
+            {
+                Some(text)
+            }
+            _ => None,
+        })
+        .next()
+        .expect("expected rendered mixed CJK paragraph");
+
+    assert!(
+        text_shape
+            .galley
+            .job
+            .sections
+            .iter()
+            .all(|section| section.format.valign == egui::Align::BOTTOM),
+        "mixed CJK markdown text should use bottom baseline alignment"
+    );
+}
+
+#[test]
+fn html_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(
+        "<p>KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。</p>\n"
+            .to_string(),
+    )];
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+    katana_ui::theme_bridge::apply_font_family(&ctx, "Monospace");
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(900.0, 200.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let text_shape = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text
+                    .galley
+                    .job
+                    .text
+                    .contains("AIエージェントと共に仕様駆動開発") =>
+            {
+                Some(text)
+            }
+            _ => None,
+        })
+        .next()
+        .expect("expected rendered mixed CJK html paragraph");
+
+    assert!(
+        text_shape
+            .galley
+            .job
+            .sections
+            .iter()
+            .all(|section| section.format.valign == egui::Align::BOTTOM),
+        "mixed CJK html text should use bottom baseline alignment"
+    );
+}
+
+#[test]
+fn preview_markdown_uses_proportional_body_font_even_when_ui_font_family_is_monospace() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        "KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。\n",
+        std::path::Path::new("/tmp/preview-font-markdown.md"),
+    );
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+    katana_ui::theme_bridge::apply_font_family(&ctx, "Monospace");
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(900.0, 200.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let text_shape = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text
+                    .galley
+                    .job
+                    .text
+                    .contains("AIエージェントと共に仕様駆動開発") =>
+            {
+                Some(text)
+            }
+            _ => None,
+        })
+        .next()
+        .expect("expected rendered markdown paragraph");
+
+    assert!(
+        text_shape
+            .galley
+            .job
+            .sections
+            .iter()
+            .all(|section| section.format.font_id.family == egui::FontFamily::Proportional),
+        "preview markdown body text should use the proportional family even when the UI uses monospace"
+    );
+}
+
+#[test]
+fn preview_html_uses_proportional_body_font_even_when_ui_font_family_is_monospace() {
+    let mut pane = PreviewPane::default();
+    pane.sections = vec![RenderedSection::Markdown(
+        "<p>KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。</p>\n"
+            .to_string(),
+    )];
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+    katana_ui::theme_bridge::apply_font_family(&ctx, "Monospace");
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(900.0, 200.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let text_shape = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text)
+                if text
+                    .galley
+                    .job
+                    .text
+                    .contains("AIエージェントと共に仕様駆動開発") =>
+            {
+                Some(text)
+            }
+            _ => None,
+        })
+        .next()
+        .expect("expected rendered html paragraph");
+
+    assert!(
+        text_shape
+            .galley
+            .job
+            .sections
+            .iter()
+            .all(|section| section.format.font_id.family == egui::FontFamily::Proportional),
+        "preview html body text should use the proportional family even when the UI uses monospace"
+    );
+}
+
+#[test]
+fn preview_code_blocks_keep_monospace_font_when_body_text_is_proportional() {
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(
+        "本文です。\n\n```rust\nfn main() {}\n```\n",
+        std::path::Path::new("/tmp/preview-font-code.md"),
+    );
+
+    let ctx = egui::Context::default();
+    katana_ui::font_loader::SystemFontLoader::setup_fonts(
+        &ctx,
+        DiagramColorPreset::current(),
+        None,
+        None,
+    );
+    katana_ui::theme_bridge::apply_font_family(&ctx, "Monospace");
+
+    let output = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(900.0, 260.0),
+            )),
+            ..Default::default()
+        },
+        |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                pane.show_content(ui);
+            });
+        },
+    );
+
+    let code_shape = flatten_shapes(output.shapes.iter())
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::epaint::Shape::Text(text) if text.galley.job.text.contains("fn main() {}") => {
+                Some(text)
+            }
+            _ => None,
+        })
+        .next()
+        .expect("expected rendered code block");
+
+    assert!(
+        code_shape
+            .galley
+            .job
+            .sections
+            .iter()
+            .all(|section| section.format.font_id.family == egui::FontFamily::Monospace),
+        "preview code blocks must keep the monospace family"
     );
 }
 
@@ -1423,6 +1773,11 @@ fn readme_header_all_elements_horizontally_centered() {
         (desc_center_x - panel_center_x).abs() < tolerance,
         "Description center X ({desc_center_x:.1}) should be near panel center ({panel_center_x:.1}), diff={:.1}",
         (desc_center_x - panel_center_x).abs()
+    );
+    let heading_to_desc_gap = desc_bounds.y0 - heading_bounds.y1;
+    assert!(
+        heading_to_desc_gap <= 56.0,
+        "Heading-to-description gap should stay compact, got {heading_to_desc_gap:.1}"
     );
 
     // Verify language selector link is centered (the "English" link within the group)

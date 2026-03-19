@@ -51,3 +51,60 @@ pub fn next_tab_index(current: usize, count: usize) -> usize {
     }
     (current + 1) % count
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn hash_str_deterministic() {
+        assert_eq!(hash_str("hello"), hash_str("hello"));
+        assert_ne!(hash_str("hello"), hash_str("world"));
+    }
+
+    #[test]
+    fn relative_full_path_with_workspace_root() {
+        let path = Path::new("/workspace/specs/auth/spec.md");
+        let root = Path::new("/workspace");
+        let result = relative_full_path(path, Some(root));
+        assert_eq!(result, "specs/auth/spec.md");
+    }
+
+    #[test]
+    fn relative_full_path_without_workspace_root() {
+        let path = Path::new("/workspace/specs/auth/spec.md");
+        let result = relative_full_path(path, None);
+        assert_eq!(result, "/workspace/specs/auth/spec.md");
+    }
+
+    #[test]
+    fn prev_tab_index_zero_count_returns_zero() {
+        assert_eq!(prev_tab_index(0, 0), 0);
+    }
+
+    #[test]
+    fn prev_tab_index_wraps_from_first_to_last() {
+        assert_eq!(prev_tab_index(0, 3), 2);
+    }
+
+    #[test]
+    fn prev_tab_index_normal_decrement() {
+        assert_eq!(prev_tab_index(2, 3), 1);
+    }
+
+    #[test]
+    fn next_tab_index_zero_count_returns_zero() {
+        assert_eq!(next_tab_index(0, 0), 0);
+    }
+
+    #[test]
+    fn next_tab_index_wraps_from_last_to_first() {
+        assert_eq!(next_tab_index(2, 3), 0);
+    }
+
+    #[test]
+    fn next_tab_index_normal_increment() {
+        assert_eq!(next_tab_index(0, 3), 1);
+    }
+}
