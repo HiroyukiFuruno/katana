@@ -215,7 +215,7 @@ Rust コミュニティのベストプラクティスに合わせ、テストを
 | **Unit Test (UT)** | `src/` 内 `#[cfg(test)] mod tests { ... }` | 同一クレート内の private API を直接テストできる。Rust 標準スタイル。 |
 | **Integration Test (IT)** | `tests/` ディレクトリ | クレートの公開 API のみアクセス可能。外部利用者視点の検証。 |
 
-```
+```text
 crates/katana-core/
   src/
     document.rs           # 実装 + #[cfg(test)] mod tests { ... }  (UT)
@@ -445,6 +445,6 @@ fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) { ... }
 
 開発者がコードを変更してコミットする際、以下のハードゲートを通る。規約違反があった場合、コミット自体が `lefthook` に拒否される。
 
-```
+```text
 [コード変更] → [lefthook 検査] → [cargo test (ast_linter.rs)] → [AST 解析・合否]
 ```

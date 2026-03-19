@@ -441,6 +441,6 @@ To automatically enforce these coding conventions (including i18n rules and proh
 
 When a developer changes code and commits, it goes through the following hard gate. If there is a convention violation, the commit itself will be rejected by `lefthook`.
 
-```
+```text
 [Code Change] → [lefthook Inspection] → [cargo test (ast_linter.rs)] → [AST Analysis / Pass or Fail]
 ```
