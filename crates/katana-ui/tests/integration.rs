@@ -1642,3 +1642,100 @@ fn test_ui_all_languages_load_successfully() {
         );
     }
 }
+
+#[test]
+fn test_search_modal_include_exclude_options() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("apple.md"), "# Apple").unwrap();
+    std::fs::write(temp_dir.path().join("banana.md"), "# Banana").unwrap();
+    std::fs::write(temp_dir.path().join("cherry.md"), "# Cherry").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness.step();
+
+    // Wait until workspace is loaded
+    for _ in 0..50 {
+        let count = harness
+            .state_mut()
+            .app_state_mut()
+            .workspace
+            .as_ref()
+            .map_or(0, |w| w.tree.len());
+        if count > 0 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        harness.step();
+    }
+
+    // Open search modal
+    harness.state_mut().app_state_mut().show_search_modal = true;
+    harness.step();
+    harness.step();
+
+    // 1. Default (no filter) -> clears results
+    harness.state_mut().app_state_mut().search_query = "".to_string();
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 0);
+
+    // 2. Query filter
+    harness.state_mut().app_state_mut().search_query = "apple".to_string();
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("apple.md"));
+
+    // 3. Include pattern
+    harness.state_mut().app_state_mut().search_query = "".to_string();
+    harness.state_mut().app_state_mut().search_include_pattern = "banana".to_string();
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("banana.md"));
+
+    // 4. Exclude pattern
+    harness.state_mut().app_state_mut().search_include_pattern = "".to_string();
+    harness.state_mut().app_state_mut().search_exclude_pattern = "banana".to_string();
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 2);
+
+    // 5. Query + Include + Exclude
+    harness.state_mut().app_state_mut().search_query = "a".to_string(); // 'apple.md' and 'banana.md' have 'a'
+    harness.state_mut().app_state_mut().search_include_pattern = ".md".to_string();
+    harness.state_mut().app_state_mut().search_exclude_pattern = "banana".to_string(); // excludes 'banana.md'
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("apple.md"));
+}
+
+#[test]
+fn test_search_sidebar_buttons() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.path().to_path_buf()));
+    harness.step();
+    harness.step();
+
+    // Check that we have a Search button (🔍) in the sidebar
+    let search_nodes: Vec<_> = harness.get_all_by_label("🔍").collect();
+    assert!(
+        !search_nodes.is_empty(),
+        "Search button (🔍) must be present in the workspace sidebar"
+    );
+
+    // Check that we have a Y-shaped Filter button (▼ or funnel) in the sidebar
+    // Since we will use ▼
+    let filter_nodes: Vec<_> = harness.get_all_by_label("\u{25BC}").collect(); // ▼
+    assert!(
+        !filter_nodes.is_empty(),
+        "Filter button (\u{25BC}) must be present in the workspace sidebar"
+    );
+}
