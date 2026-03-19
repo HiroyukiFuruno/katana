@@ -186,8 +186,8 @@ impl AppState {
 
     fn split_defaults(&self) -> SplitViewState {
         SplitViewState {
-            direction: self.settings.settings().split_direction,
-            order: self.settings.settings().pane_order,
+            direction: self.settings.settings().layout.split_direction,
+            order: self.settings.settings().layout.pane_order,
         }
     }
 
@@ -263,9 +263,9 @@ mod tests {
     #[test]
     fn test_split_state_is_cached_per_tab_after_settings_change() {
         let mut state = make_state_with_doc("/tmp/a.md");
-        state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
+        state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
         state.initialize_tab_split_state("/tmp/a.md");
-        state.settings.settings_mut().split_direction = SplitDirection::Vertical;
+        state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
 
         assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
     }
@@ -273,9 +273,9 @@ mod tests {
     #[test]
     fn test_pane_order_is_cached_per_tab_after_settings_change() {
         let mut state = make_state_with_doc("/tmp/b.md");
-        state.settings.settings_mut().pane_order = PaneOrder::EditorFirst;
+        state.settings.settings_mut().layout.pane_order = PaneOrder::EditorFirst;
         state.initialize_tab_split_state("/tmp/b.md");
-        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
 
         assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
     }
@@ -285,8 +285,8 @@ mod tests {
         let mut state = make_state_with_doc("/tmp/a.md");
         assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
 
-        state.settings.settings_mut().split_direction = SplitDirection::Vertical;
-        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+        state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
+        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
 
         let doc = Document {
             path: PathBuf::from("/tmp/b.md"),
@@ -314,8 +314,8 @@ mod tests {
         state.set_active_split_direction(SplitDirection::Vertical);
         state.set_active_pane_order(PaneOrder::EditorFirst);
 
-        state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
-        state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+        state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
+        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
 
         state.open_documents.push(Document {
             path: PathBuf::from("/tmp/b.md"),

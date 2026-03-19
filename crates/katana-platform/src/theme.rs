@@ -102,11 +102,31 @@ pub enum ThemePreset {
     GitHubDark,
     Nord,
     Monokai,
+    OneDark,
+    TokyoNight,
+    CatppuccinMocha,
+    MaterialDark,
+    NightOwl,
+    RosePine,
+    Palenight,
+    SynthWave84,
+    Andromeda,
+    OceanicNext,
     KatanaLight,
     GitHubLight,
     SolarizedLight,
     AyuLight,
     GruvboxLight,
+    OneLight,
+    RosePineDawn,
+    CatppuccinLatte,
+    MaterialLight,
+    QuietLight,
+    PaperColorLight,
+    MinimalLight,
+    Alabaster,
+    FlatUILight,
+    EverforestLight,
 }
 
 impl ThemePreset {
@@ -118,11 +138,31 @@ impl ThemePreset {
             Self::GitHubDark,
             Self::Nord,
             Self::Monokai,
+            Self::OneDark,
+            Self::TokyoNight,
+            Self::CatppuccinMocha,
+            Self::MaterialDark,
+            Self::NightOwl,
+            Self::RosePine,
+            Self::Palenight,
+            Self::SynthWave84,
+            Self::Andromeda,
+            Self::OceanicNext,
             Self::KatanaLight,
             Self::GitHubLight,
             Self::SolarizedLight,
             Self::AyuLight,
             Self::GruvboxLight,
+            Self::OneLight,
+            Self::RosePineDawn,
+            Self::CatppuccinLatte,
+            Self::MaterialLight,
+            Self::QuietLight,
+            Self::PaperColorLight,
+            Self::MinimalLight,
+            Self::Alabaster,
+            Self::FlatUILight,
+            Self::EverforestLight,
         ]
     }
 
@@ -134,11 +174,31 @@ impl ThemePreset {
             Self::GitHubDark => "GitHub Dark",
             Self::Nord => "Nord",
             Self::Monokai => "Monokai",
+            Self::OneDark => "One Dark",
+            Self::TokyoNight => "Tokyo Night",
+            Self::CatppuccinMocha => "Catppuccin Mocha",
+            Self::MaterialDark => "Material Dark",
+            Self::NightOwl => "Night Owl",
+            Self::RosePine => "Rosé Pine",
+            Self::Palenight => "Palenight",
+            Self::SynthWave84 => "SynthWave '84",
+            Self::Andromeda => "Andromeda",
+            Self::OceanicNext => "Oceanic Next",
             Self::KatanaLight => "KatanA Light",
             Self::GitHubLight => "GitHub Light",
             Self::SolarizedLight => "Solarized Light",
             Self::AyuLight => "Ayu Light",
             Self::GruvboxLight => "Gruvbox Light",
+            Self::OneLight => "One Light",
+            Self::RosePineDawn => "Rosé Pine Dawn",
+            Self::CatppuccinLatte => "Catppuccin Latte",
+            Self::MaterialLight => "Material Light",
+            Self::QuietLight => "Quiet Light",
+            Self::PaperColorLight => "PaperColor Light",
+            Self::MinimalLight => "Minimal Light",
+            Self::Alabaster => "Alabaster",
+            Self::FlatUILight => "Flat UI Light",
+            Self::EverforestLight => "Everforest Light",
         }
     }
 
@@ -150,11 +210,31 @@ impl ThemePreset {
             Self::GitHubDark => &GITHUB_DARK,
             Self::Nord => &NORD,
             Self::Monokai => &MONOKAI,
+            Self::OneDark => &ONE_DARK,
+            Self::TokyoNight => &TOKYO_NIGHT,
+            Self::CatppuccinMocha => &CATPPUCCIN_MOCHA,
+            Self::MaterialDark => &MATERIAL_DARK,
+            Self::NightOwl => &NIGHT_OWL,
+            Self::RosePine => &ROSE_PINE,
+            Self::Palenight => &PALENIGHT,
+            Self::SynthWave84 => &SYNTHWAVE_84,
+            Self::Andromeda => &ANDROMEDA,
+            Self::OceanicNext => &OCEANIC_NEXT,
             Self::KatanaLight => &KATANA_LIGHT,
             Self::GitHubLight => &GITHUB_LIGHT,
             Self::SolarizedLight => &SOLARIZED_LIGHT,
             Self::AyuLight => &AYU_LIGHT,
             Self::GruvboxLight => &GRUVBOX_LIGHT,
+            Self::OneLight => &ONE_LIGHT,
+            Self::RosePineDawn => &ROSE_PINE_DAWN,
+            Self::CatppuccinLatte => &CATPPUCCIN_LATTE,
+            Self::MaterialLight => &MATERIAL_LIGHT,
+            Self::QuietLight => &QUIET_LIGHT,
+            Self::PaperColorLight => &PAPERCOLOR_LIGHT,
+            Self::MinimalLight => &MINIMAL_LIGHT,
+            Self::Alabaster => &ALABASTER,
+            Self::FlatUILight => &FLAT_UI_LIGHT,
+            Self::EverforestLight => &EVERFOREST_LIGHT,
         };
         data.to_theme_colors(self.display_name())
     }
@@ -911,8 +991,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_presets_returns_ten_items() {
-        assert_eq!(ThemePreset::all().len(), 10);
+    fn all_presets_returns_thirty_items() {
+        assert_eq!(ThemePreset::all().len(), 30);
     }
 
     #[test]
@@ -1003,3 +1083,1391 @@ mod tests {
         assert_eq!(ThemeMode::Light.to_theme_string(), "light");
     }
 }
+
+const ONE_DARK: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 40,
+        g: 44,
+        b: 52,
+    },
+    panel_background: Rgb {
+        r: 35,
+        g: 39,
+        b: 47,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 50,
+        g: 54,
+        b: 62,
+    },
+    preview_background: Rgb {
+        r: 40,
+        g: 44,
+        b: 52,
+    },
+};
+
+const TOKYO_NIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 26,
+        g: 27,
+        b: 38,
+    },
+    panel_background: Rgb {
+        r: 21,
+        g: 22,
+        b: 33,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 36,
+        g: 37,
+        b: 48,
+    },
+    preview_background: Rgb {
+        r: 26,
+        g: 27,
+        b: 38,
+    },
+};
+
+const CATPPUCCIN_MOCHA: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 30,
+        g: 30,
+        b: 46,
+    },
+    panel_background: Rgb {
+        r: 25,
+        g: 25,
+        b: 41,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 40,
+        g: 40,
+        b: 56,
+    },
+    preview_background: Rgb {
+        r: 30,
+        g: 30,
+        b: 46,
+    },
+};
+
+const MATERIAL_DARK: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 38,
+        g: 50,
+        b: 56,
+    },
+    panel_background: Rgb {
+        r: 33,
+        g: 45,
+        b: 51,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 48,
+        g: 60,
+        b: 66,
+    },
+    preview_background: Rgb {
+        r: 38,
+        g: 50,
+        b: 56,
+    },
+};
+
+const NIGHT_OWL: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb { r: 1, g: 22, b: 39 },
+    panel_background: Rgb { r: 0, g: 17, b: 34 },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 11,
+        g: 32,
+        b: 49,
+    },
+    preview_background: Rgb { r: 1, g: 22, b: 39 },
+};
+
+const ROSE_PINE: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 25,
+        g: 23,
+        b: 36,
+    },
+    panel_background: Rgb {
+        r: 20,
+        g: 18,
+        b: 31,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 35,
+        g: 33,
+        b: 46,
+    },
+    preview_background: Rgb {
+        r: 25,
+        g: 23,
+        b: 36,
+    },
+};
+
+const PALENIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 41,
+        g: 45,
+        b: 62,
+    },
+    panel_background: Rgb {
+        r: 36,
+        g: 40,
+        b: 57,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 51,
+        g: 55,
+        b: 72,
+    },
+    preview_background: Rgb {
+        r: 41,
+        g: 45,
+        b: 62,
+    },
+};
+
+const SYNTHWAVE_84: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 38,
+        g: 35,
+        b: 53,
+    },
+    panel_background: Rgb {
+        r: 33,
+        g: 30,
+        b: 48,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 48,
+        g: 45,
+        b: 63,
+    },
+    preview_background: Rgb {
+        r: 38,
+        g: 35,
+        b: 53,
+    },
+};
+
+const ANDROMEDA: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 35,
+        g: 38,
+        b: 46,
+    },
+    panel_background: Rgb {
+        r: 30,
+        g: 33,
+        b: 41,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 45,
+        g: 48,
+        b: 56,
+    },
+    preview_background: Rgb {
+        r: 35,
+        g: 38,
+        b: 46,
+    },
+};
+
+const OCEANIC_NEXT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Dark,
+    background: Rgb {
+        r: 27,
+        g: 43,
+        b: 52,
+    },
+    panel_background: Rgb {
+        r: 22,
+        g: 38,
+        b: 47,
+    },
+    text: Rgb {
+        r: 212,
+        g: 212,
+        b: 212,
+    },
+    text_secondary: Rgb {
+        r: 160,
+        g: 160,
+        b: 160,
+    },
+    accent: Rgb {
+        r: 100,
+        g: 150,
+        b: 255,
+    },
+    title_bar_text: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    file_tree_text: Rgb {
+        r: 180,
+        g: 180,
+        b: 180,
+    },
+    active_file_highlight: Rgba {
+        r: 60,
+        g: 100,
+        b: 200,
+        a: 100,
+    },
+    warning_text: Rgb {
+        r: 255,
+        g: 100,
+        b: 100,
+    },
+    border: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    selection: Rgb {
+        r: 80,
+        g: 80,
+        b: 100,
+    },
+    code_background: Rgb {
+        r: 37,
+        g: 53,
+        b: 62,
+    },
+    preview_background: Rgb {
+        r: 27,
+        g: 43,
+        b: 52,
+    },
+};
+
+const ONE_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
+    panel_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 240,
+        g: 240,
+        b: 240,
+    },
+    preview_background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
+};
+
+const ROSE_PINE_DAWN: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 250,
+        g: 244,
+        b: 237,
+    },
+    panel_background: Rgb {
+        r: 255,
+        g: 249,
+        b: 242,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 240,
+        g: 234,
+        b: 227,
+    },
+    preview_background: Rgb {
+        r: 250,
+        g: 244,
+        b: 237,
+    },
+};
+
+const CATPPUCCIN_LATTE: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 239,
+        g: 241,
+        b: 245,
+    },
+    panel_background: Rgb {
+        r: 244,
+        g: 246,
+        b: 250,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 229,
+        g: 231,
+        b: 235,
+    },
+    preview_background: Rgb {
+        r: 239,
+        g: 241,
+        b: 245,
+    },
+};
+
+const MATERIAL_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
+    panel_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 240,
+        g: 240,
+        b: 240,
+    },
+    preview_background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
+};
+
+const QUIET_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 245,
+        g: 245,
+        b: 245,
+    },
+    panel_background: Rgb {
+        r: 250,
+        g: 250,
+        b: 250,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 235,
+        g: 235,
+        b: 235,
+    },
+    preview_background: Rgb {
+        r: 245,
+        g: 245,
+        b: 245,
+    },
+};
+
+const PAPERCOLOR_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 238,
+        g: 238,
+        b: 238,
+    },
+    panel_background: Rgb {
+        r: 243,
+        g: 243,
+        b: 243,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 228,
+        g: 228,
+        b: 228,
+    },
+    preview_background: Rgb {
+        r: 238,
+        g: 238,
+        b: 238,
+    },
+};
+
+const MINIMAL_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+    panel_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 245,
+        g: 245,
+        b: 245,
+    },
+    preview_background: Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+};
+
+const ALABASTER: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 247,
+        g: 247,
+        b: 247,
+    },
+    panel_background: Rgb {
+        r: 252,
+        g: 252,
+        b: 252,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 237,
+        g: 237,
+        b: 237,
+    },
+    preview_background: Rgb {
+        r: 247,
+        g: 247,
+        b: 247,
+    },
+};
+
+const FLAT_UI_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 236,
+        g: 240,
+        b: 241,
+    },
+    panel_background: Rgb {
+        r: 241,
+        g: 245,
+        b: 246,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 226,
+        g: 230,
+        b: 231,
+    },
+    preview_background: Rgb {
+        r: 236,
+        g: 240,
+        b: 241,
+    },
+};
+
+const EVERFOREST_LIGHT: PresetColorData = PresetColorData {
+    mode: ThemeMode::Light,
+    background: Rgb {
+        r: 253,
+        g: 246,
+        b: 227,
+    },
+    panel_background: Rgb {
+        r: 255,
+        g: 251,
+        b: 232,
+    },
+    text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    text_secondary: Rgb {
+        r: 100,
+        g: 100,
+        b: 100,
+    },
+    accent: Rgb {
+        r: 0,
+        g: 100,
+        b: 200,
+    },
+    title_bar_text: Rgb {
+        r: 40,
+        g: 40,
+        b: 40,
+    },
+    file_tree_text: Rgb {
+        r: 60,
+        g: 60,
+        b: 60,
+    },
+    active_file_highlight: Rgba {
+        r: 180,
+        g: 210,
+        b: 255,
+        a: 150,
+    },
+    warning_text: Rgb {
+        r: 200,
+        g: 50,
+        b: 50,
+    },
+    border: Rgb {
+        r: 200,
+        g: 200,
+        b: 200,
+    },
+    selection: Rgb {
+        r: 200,
+        g: 220,
+        b: 255,
+    },
+    code_background: Rgb {
+        r: 243,
+        g: 236,
+        b: 217,
+    },
+    preview_background: Rgb {
+        r: 253,
+        g: 246,
+        b: 227,
+    },
+};

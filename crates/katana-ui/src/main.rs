@@ -34,6 +34,58 @@ fn load_icon() -> std::sync::Arc<egui::IconData> {
     })
 }
 
+/// Resolves a macOS locale string (e.g. "ja-JP", "zh-Hans") to a supported language code.
+#[cfg(all(target_os = "macos", not(test)))]
+fn resolve_locale_to_lang(locale: &str) -> String {
+    let lower = locale.to_lowercase();
+
+    // Chinese variants require special handling due to script subtags.
+    if lower.starts_with("zh-hans") || lower.contains("hans") {
+        return "zh-CN".to_string();
+    }
+    if lower.starts_with("zh-hant")
+        || lower.contains("hant")
+        || lower.starts_with("zh-tw")
+        || lower.starts_with("zh-hk")
+    {
+        return "zh-TW".to_string();
+    }
+
+    // Simple prefix-based lookup for all other languages.
+    const PREFIX_MAP: &[(&str, &str)] = &[
+        ("ja", "ja"),
+        ("ko", "ko"),
+        ("pt", "pt"),
+        ("fr", "fr"),
+        ("de", "de"),
+        ("es", "es"),
+        ("it", "it"),
+    ];
+    for &(prefix, lang) in PREFIX_MAP {
+        if lower.starts_with(prefix) {
+            return lang.to_string();
+        }
+    }
+    "en".to_string()
+}
+
+#[cfg(not(test))]
+fn detect_initial_language() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        extern "C" {
+            fn katana_get_mac_locale(buf: *mut std::ffi::c_char, max_len: usize);
+        }
+        let mut buf = [0u8; 32];
+        unsafe { katana_get_mac_locale(buf.as_mut_ptr() as _, buf.len()) };
+        let c_str = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as _) };
+        let locale = c_str.to_string_lossy().to_string();
+        return Some(resolve_locale_to_lang(&locale));
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
 #[cfg(not(test))]
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
@@ -67,6 +119,7 @@ fn main() -> eframe::Result<()> {
     // On first launch (no settings.json), automatically select the OS-matching theme.
     // Existing users keep their saved preset unchanged.
     settings.apply_os_default_theme();
+    settings.apply_os_default_language(detect_initial_language());
 
     // Read saved values before moving settings into AppState.
     let saved_language = settings.settings().language.clone();
@@ -101,6 +154,7 @@ fn main() -> eframe::Result<()> {
 
             // Restore saved language.
             katana_ui::i18n::set_language(&saved_language);
+            katana_ui::shell_ui::update_native_menu_strings_from_i18n();
 
             let mut app = KatanaApp::new(state);
 

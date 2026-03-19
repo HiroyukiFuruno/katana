@@ -9,6 +9,14 @@ enum {
     TAG_LANG_JA        = 4,
     TAG_ABOUT          = 5,
     TAG_SETTINGS       = 6,
+    TAG_LANG_ZH_CN     = 7,
+    TAG_LANG_ZH_TW     = 8,
+    TAG_LANG_KO        = 9,
+    TAG_LANG_PT        = 10,
+    TAG_LANG_FR        = 11,
+    TAG_LANG_DE        = 12,
+    TAG_LANG_ES        = 13,
+    TAG_LANG_IT        = 14,
 };
 
 // Global: Tag of the last selected menu action.
@@ -27,6 +35,13 @@ static volatile int g_last_action = 0;
 @end
 
 static KatanaMenuTarget *g_target = nil;
+
+static NSMenu *g_file_menu = nil;
+static NSMenuItem *g_open_workspace_item = nil;
+static NSMenuItem *g_save_item = nil;
+static NSMenu *g_settings_menu = nil;
+static NSMenuItem *g_preferences_item = nil;
+static NSMenu *g_language_menu = nil;
 
 /// Called from Rust at the very start of main(), before eframe creates the window.
 /// Must be called before the window server registers the process to ensure
@@ -85,6 +100,7 @@ void katana_setup_native_menu(void) {
 
     // --- File Menu ---
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
+    g_file_menu = fileMenu;
 
     NSMenuItem *openItem = [[NSMenuItem alloc]
         initWithTitle:@"Open Workspace…"
@@ -93,6 +109,7 @@ void katana_setup_native_menu(void) {
     [openItem setTarget:g_target];
     [openItem setTag:TAG_OPEN_WORKSPACE];
     [fileMenu addItem:openItem];
+    g_open_workspace_item = openItem;
 
     [fileMenu addItem:[NSMenuItem separatorItem]];
 
@@ -103,12 +120,14 @@ void katana_setup_native_menu(void) {
     [saveItem setTarget:g_target];
     [saveItem setTag:TAG_SAVE];
     [fileMenu addItem:saveItem];
+    g_save_item = saveItem;
 
     NSMenuItem *fileMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [fileMenuItem setSubmenu:fileMenu];
 
     // --- Settings > Language ---
     NSMenu *langMenu = [[NSMenu alloc] initWithTitle:@"Language"];
+    g_language_menu = langMenu;
 
     NSMenuItem *enItem = [[NSMenuItem alloc]
         initWithTitle:@"English"
@@ -126,10 +145,51 @@ void katana_setup_native_menu(void) {
     [jaItem setTag:TAG_LANG_JA];
     [langMenu addItem:jaItem];
 
+    NSMenuItem *zhCNItem = [[NSMenuItem alloc] initWithTitle:@"简体中文" action:action keyEquivalent:@""];
+    [zhCNItem setTarget:g_target];
+    [zhCNItem setTag:TAG_LANG_ZH_CN];
+    [langMenu addItem:zhCNItem];
+
+    NSMenuItem *zhTWItem = [[NSMenuItem alloc] initWithTitle:@"繁體中文" action:action keyEquivalent:@""];
+    [zhTWItem setTarget:g_target];
+    [zhTWItem setTag:TAG_LANG_ZH_TW];
+    [langMenu addItem:zhTWItem];
+
+    NSMenuItem *koItem = [[NSMenuItem alloc] initWithTitle:@"한국어" action:action keyEquivalent:@""];
+    [koItem setTarget:g_target];
+    [koItem setTag:TAG_LANG_KO];
+    [langMenu addItem:koItem];
+
+    NSMenuItem *ptItem = [[NSMenuItem alloc] initWithTitle:@"Português" action:action keyEquivalent:@""];
+    [ptItem setTarget:g_target];
+    [ptItem setTag:TAG_LANG_PT];
+    [langMenu addItem:ptItem];
+
+    NSMenuItem *frItem = [[NSMenuItem alloc] initWithTitle:@"Français" action:action keyEquivalent:@""];
+    [frItem setTarget:g_target];
+    [frItem setTag:TAG_LANG_FR];
+    [langMenu addItem:frItem];
+
+    NSMenuItem *deItem = [[NSMenuItem alloc] initWithTitle:@"Deutsch" action:action keyEquivalent:@""];
+    [deItem setTarget:g_target];
+    [deItem setTag:TAG_LANG_DE];
+    [langMenu addItem:deItem];
+
+    NSMenuItem *esItem = [[NSMenuItem alloc] initWithTitle:@"Español" action:action keyEquivalent:@""];
+    [esItem setTarget:g_target];
+    [esItem setTag:TAG_LANG_ES];
+    [langMenu addItem:esItem];
+
+    NSMenuItem *itItem = [[NSMenuItem alloc] initWithTitle:@"Italiano" action:action keyEquivalent:@""];
+    [itItem setTarget:g_target];
+    [itItem setTag:TAG_LANG_IT];
+    [langMenu addItem:itItem];
+
     NSMenuItem *langMenuItem = [[NSMenuItem alloc] initWithTitle:@"Language" action:nil keyEquivalent:@""];
     [langMenuItem setSubmenu:langMenu];
 
     NSMenu *settingsMenu = [[NSMenu alloc] initWithTitle:@"Settings"];
+    g_settings_menu = settingsMenu;
 
     NSMenuItem *prefsItem = [[NSMenuItem alloc]
         initWithTitle:@"Preferences…"
@@ -138,6 +198,7 @@ void katana_setup_native_menu(void) {
     [prefsItem setTarget:g_target];
     [prefsItem setTag:TAG_SETTINGS];
     [settingsMenu addItem:prefsItem];
+    g_preferences_item = prefsItem;
 
     [settingsMenu addItem:[NSMenuItem separatorItem]];
     [settingsMenu addItem:langMenuItem];
@@ -161,6 +222,37 @@ int katana_poll_menu_action(void) {
     return action;
 }
 
+/// Called from Rust to dynamically update menu strings for i18n
+void katana_update_menu_strings(
+    const char* file, 
+    const char* open_workspace, 
+    const char* save, 
+    const char* settings, 
+    const char* preferences, 
+    const char* language
+) {
+    @autoreleasepool {
+        if (g_file_menu && file) {
+            [g_file_menu setTitle:[NSString stringWithUTF8String:file]];
+        }
+        if (g_open_workspace_item && open_workspace) {
+            [g_open_workspace_item setTitle:[NSString stringWithUTF8String:open_workspace]];
+        }
+        if (g_save_item && save) {
+            [g_save_item setTitle:[NSString stringWithUTF8String:save]];
+        }
+        if (g_settings_menu && settings) {
+            [g_settings_menu setTitle:[NSString stringWithUTF8String:settings]];
+        }
+        if (g_preferences_item && preferences) {
+            [g_preferences_item setTitle:[NSString stringWithUTF8String:preferences]];
+        }
+        if (g_language_menu && language) {
+            [g_language_menu setTitle:[NSString stringWithUTF8String:language]];
+        }
+    }
+}
+
 static NSImage *g_app_icon = nil;
 
 /// Called from Rust: Sets the application and dock icon from PNG bytes.
@@ -171,6 +263,23 @@ void katana_set_app_icon_png(const unsigned char *png_data, unsigned long png_le
         if (image) {
             g_app_icon = image;
             [NSApp setApplicationIconImage:image];
+        }
+    }
+}
+
+/// Called from Rust: Gets the current user locale from macOS.
+void katana_get_mac_locale(char *buf, size_t max_len) {
+    if (buf == NULL || max_len == 0) return;
+    buf[0] = '\0';
+    @autoreleasepool {
+        NSArray *languages = [NSLocale preferredLanguages];
+        if (languages != nil && languages.count > 0) {
+            NSString *preferred = languages[0];
+            const char *utf8 = [preferred UTF8String];
+            if (utf8) {
+                strncpy(buf, utf8, max_len - 1);
+                buf[max_len - 1] = '\0';
+            }
         }
     }
 }

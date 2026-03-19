@@ -5,7 +5,6 @@
 //!   - **Right pane**: Live markdown preview using `PreviewPane` (scrollable independently)
 
 use crate::app_state::SettingsTab;
-use crate::i18n;
 use crate::preview_pane::PreviewPane;
 use crate::theme_bridge;
 use katana_platform::settings::{SettingsService, MAX_FONT_SIZE, MIN_FONT_SIZE};
@@ -93,7 +92,7 @@ pub(crate) fn render_settings_window(
     }
 
     let mut open = state.show_settings;
-    egui::Window::new(i18n::t("settings_title"))
+    egui::Window::new(crate::i18n::get().settings.title.clone())
         .open(&mut open)
         .default_size(egui::vec2(
             SETTINGS_WINDOW_DEFAULT_WIDTH,
@@ -137,7 +136,7 @@ pub(crate) fn render_settings_window(
                     ui.set_width(ui.available_width());
                     ui.set_min_height(available_height);
 
-                    section_header(ui, "settings_preview_title");
+                    section_header(ui, &crate::i18n::get().settings.preview.title);
                     preview_pane.show(ui);
                 });
             });
@@ -149,23 +148,31 @@ pub(crate) fn render_settings_window(
 
 fn render_tab_bar(ui: &mut egui::Ui, active_tab: &mut SettingsTab) {
     let tabs = [
-        (SettingsTab::Theme, "settings_tab_theme"),
-        (SettingsTab::Font, "settings_tab_font"),
-        (SettingsTab::Layout, "settings_tab_layout"),
+        (
+            SettingsTab::Theme,
+            crate::i18n::get().settings.tab_name("theme"),
+        ),
+        (
+            SettingsTab::Font,
+            crate::i18n::get().settings.tab_name("font"),
+        ),
+        (
+            SettingsTab::Layout,
+            crate::i18n::get().settings.tab_name("layout"),
+        ),
     ];
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         let tab_width = ui.available_width() / tabs.len() as f32;
 
-        for (tab, key) in &tabs {
-            let label = i18n::t(key);
+        for (tab, label) in &tabs {
             let is_active = *active_tab == *tab;
 
             let text = if is_active {
-                egui::RichText::new(label).strong()
+                egui::RichText::new(label.as_str()).strong()
             } else {
-                egui::RichText::new(label)
+                egui::RichText::new(label.as_str())
             };
 
             let button = egui::Button::new(text).frame(false);
@@ -201,12 +208,8 @@ fn render_tab_bar(ui: &mut egui::Ui, active_tab: &mut SettingsTab) {
 
 // ── Section header helper ────────────────────────────────────────────
 
-fn section_header(ui: &mut egui::Ui, key: &str) {
-    ui.label(
-        egui::RichText::new(i18n::t(key))
-            .strong()
-            .size(SECTION_HEADER_SIZE),
-    );
+fn section_header(ui: &mut egui::Ui, text: &String) {
+    ui.label(egui::RichText::new(text).strong().size(SECTION_HEADER_SIZE));
     ui.add_space(SUBSECTION_SPACING);
 }
 
@@ -217,34 +220,57 @@ fn render_theme_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
     ui.add_space(SECTION_SPACING);
 
     egui::CollapsingHeader::new(
-        egui::RichText::new(i18n::t("settings_theme_custom_colors"))
+        egui::RichText::new(crate::i18n::get().settings.theme.custom_colors.clone())
             .strong()
             .size(SECTION_HEADER_SIZE),
     )
-    .default_open(settings.settings().custom_color_overrides.is_some())
+    .default_open(settings.settings().theme.custom_color_overrides.is_some())
     .show(ui, |ui| {
         render_custom_color_editor(ui, settings);
     });
 }
 
 fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    section_header(ui, "settings_theme_preset");
+    section_header(ui, &crate::i18n::get().settings.theme.preset);
 
-    ui.label(egui::RichText::new(i18n::t("settings_theme_dark_section")).weak());
-    let dark_presets: Vec<&ThemePreset> = ThemePreset::all()
+    let show_more_id = ui.id().with("show_more_themes");
+    let mut show_more = ui.data_mut(|d| d.get_temp::<bool>(show_more_id).unwrap_or(false));
+
+    const VISIBLE_PRESET_COUNT: usize = 5;
+
+    ui.label(egui::RichText::new(crate::i18n::get().settings.theme.dark_section.clone()).weak());
+    let mut dark_presets: Vec<&ThemePreset> = ThemePreset::all()
         .iter()
         .filter(|it| it.colors().mode == ThemeMode::Dark)
         .collect();
+    if !show_more {
+        dark_presets.truncate(VISIBLE_PRESET_COUNT);
+    }
     render_preset_group(ui, settings, &dark_presets);
 
     ui.add_space(SECTION_SPACING);
 
-    ui.label(egui::RichText::new(i18n::t("settings_theme_light_section")).weak());
-    let light_presets: Vec<&ThemePreset> = ThemePreset::all()
+    ui.label(egui::RichText::new(crate::i18n::get().settings.theme.light_section.clone()).weak());
+    let mut light_presets: Vec<&ThemePreset> = ThemePreset::all()
         .iter()
         .filter(|it| it.colors().mode == ThemeMode::Light)
         .collect();
+    if !show_more {
+        light_presets.truncate(VISIBLE_PRESET_COUNT);
+    }
     render_preset_group(ui, settings, &light_presets);
+
+    ui.add_space(SUBSECTION_SPACING);
+
+    let toggle_text = if show_more {
+        "Show less..."
+    } else {
+        "Show more..."
+    };
+    if ui.link(toggle_text).clicked() {
+        show_more = !show_more;
+        ui.data_mut(|d| d.insert_temp(show_more_id, show_more));
+    }
 }
 
 fn render_preset_group(
@@ -253,7 +279,7 @@ fn render_preset_group(
     presets: &[&ThemePreset],
 ) {
     for preset in presets {
-        let is_selected = settings.settings().selected_preset == **preset;
+        let is_selected = settings.settings().theme.preset == **preset;
         let colors = preset.colors();
         let bg_color = theme_bridge::rgb_to_color32(colors.background);
         let accent_color = theme_bridge::rgb_to_color32(colors.accent);
@@ -274,8 +300,8 @@ fn render_preset_group(
                 .clicked()
                 && !is_selected
             {
-                settings.settings_mut().selected_preset = (*preset).clone();
-                settings.settings_mut().custom_color_overrides = None;
+                settings.settings_mut().theme.preset = (*preset).clone();
+                settings.settings_mut().theme.custom_color_overrides = None;
                 let _ = settings.save();
             }
         });
@@ -285,26 +311,50 @@ fn render_preset_group(
 fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService) {
     let current_colors = settings.settings().effective_theme_colors();
 
-    let color_fields: Vec<(&str, Rgb)> = vec![
-        ("settings_color_background", current_colors.background),
+    let color_fields: Vec<(&str, &String, Rgb)> = vec![
+        (
+            "settings_color_background",
+            &crate::i18n::get().settings.color.background,
+            current_colors.background,
+        ),
         (
             "settings_color_panel_background",
+            &crate::i18n::get().settings.color.panel_background,
             current_colors.panel_background,
         ),
-        ("settings_color_text", current_colors.text),
+        (
+            "settings_color_text",
+            &crate::i18n::get().settings.color.text,
+            current_colors.text,
+        ),
         (
             "settings_color_text_secondary",
+            &crate::i18n::get().settings.color.text_secondary,
             current_colors.text_secondary,
         ),
-        ("settings_color_accent", current_colors.accent),
-        ("settings_color_border", current_colors.border),
-        ("settings_color_selection", current_colors.selection),
+        (
+            "settings_color_accent",
+            &crate::i18n::get().settings.color.accent,
+            current_colors.accent,
+        ),
+        (
+            "settings_color_border",
+            &crate::i18n::get().settings.color.border,
+            current_colors.border,
+        ),
+        (
+            "settings_color_selection",
+            &crate::i18n::get().settings.color.selection,
+            current_colors.selection,
+        ),
         (
             "settings_color_code_background",
+            &crate::i18n::get().settings.color.code_background,
             current_colors.code_background,
         ),
         (
             "settings_color_preview_background",
+            &crate::i18n::get().settings.color.preview_background,
             current_colors.preview_background,
         ),
     ];
@@ -316,10 +366,10 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
         .num_columns(2)
         .spacing([SECTION_SPACING, SUBSECTION_SPACING])
         .show(ui, |ui| {
-            for (key, original_rgb) in &color_fields {
+            for (key, label, original_rgb) in &color_fields {
                 ui.add_sized(
                     egui::vec2(COLOR_GRID_LABEL_WIDTH, 0.0),
-                    egui::Label::new(i18n::t(key)),
+                    egui::Label::new(*label),
                 );
                 let mut color_arr = [
                     f32::from(original_rgb.r) / COLOUR_CHANNEL_MAX,
@@ -343,15 +393,17 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
         });
 
     if changed {
-        settings.settings_mut().custom_color_overrides = Some(new_colors);
+        settings.settings_mut().theme.custom_color_overrides = Some(new_colors);
         let _ = settings.save();
     }
 
     ui.add_space(SUBSECTION_SPACING);
-    if settings.settings().custom_color_overrides.is_some()
-        && ui.button(i18n::t("settings_theme_reset_custom")).clicked()
+    if settings.settings().theme.custom_color_overrides.is_some()
+        && ui
+            .button(crate::i18n::get().settings.theme.reset_custom.clone())
+            .clicked()
     {
-        settings.settings_mut().custom_color_overrides = None;
+        settings.settings_mut().theme.custom_color_overrides = None;
         let _ = settings.save();
     }
 }
@@ -373,7 +425,7 @@ fn apply_color_to_theme(colors: &mut ThemeColors, field_key: &str, rgb: Rgb) {
 
 // ── Font tab ──────────────────────────────────────────────
 fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    let current = settings.settings().font_family.clone();
+    let current = settings.settings().font.family.clone();
     let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
 
     // Persistent state IDs
@@ -450,7 +502,7 @@ fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService
                 });
 
             if let Some(new_font) = selected {
-                settings.settings_mut().font_family = new_font;
+                settings.settings_mut().font.family = new_font;
                 let _ = settings.save();
             }
             let should_close = close || ui.input(|i| i.key_pressed(egui::Key::Escape));
@@ -466,10 +518,10 @@ fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService
 // ── Font tab ─────────────────────────────────────────────────────────
 
 fn render_font_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    section_header(ui, "settings_font_size");
+    section_header(ui, &crate::i18n::get().settings.font.size);
     render_font_size_slider(ui, settings);
     ui.add_space(SECTION_SPACING);
-    section_header(ui, "settings_font_family");
+    section_header(ui, &crate::i18n::get().settings.font.family);
     render_font_family_selector(ui, settings);
 }
 
@@ -507,7 +559,7 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
 
     if ui
         .add(slider)
-        .on_hover_text(crate::i18n::t("settings_font_size_slider_hint"))
+        .on_hover_text(crate::i18n::get().settings.font.size_slider_hint.clone())
         .changed()
     {
         settings.settings_mut().set_font_size(size);
@@ -526,7 +578,8 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
 // ── Layout tab ───────────────────────────────────────────────────────
 
 fn render_layout_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
-    section_header(ui, "settings_tab_layout");
+    let title = crate::i18n::get().settings.tab_name("layout");
+    section_header(ui, &title);
     render_toc_toggle(ui, &mut state.settings);
     ui.add_space(SECTION_SPACING);
     render_split_direction_selector(ui, state);
@@ -535,69 +588,72 @@ fn render_layout_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) 
 }
 
 fn render_toc_toggle(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    let mut toc_visible = settings.settings().toc_visible;
+    let mut toc_visible = settings.settings().layout.toc_visible;
     if ui
-        .checkbox(&mut toc_visible, i18n::t("settings_toc_visible"))
+        .checkbox(
+            &mut toc_visible,
+            crate::i18n::get().settings.toc_visible.clone(),
+        )
         .changed()
     {
-        settings.settings_mut().toc_visible = toc_visible;
+        settings.settings_mut().layout.toc_visible = toc_visible;
         let _ = settings.save();
     }
 }
 
 fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
-    ui.label(i18n::t("settings_layout_split_direction"));
+    ui.label(crate::i18n::get().settings.layout.split_direction.clone());
     ui.horizontal(|ui| {
-        let current = state.settings.settings().split_direction;
+        let current = state.settings.settings().layout.split_direction;
         if ui
             .selectable_label(
                 current == SplitDirection::Horizontal,
-                i18n::t("settings_layout_horizontal"),
+                crate::i18n::get().settings.layout.horizontal.clone(),
             )
             .clicked()
             && current != SplitDirection::Horizontal
         {
-            state.settings.settings_mut().split_direction = SplitDirection::Horizontal;
+            state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
             let _ = state.settings.save();
         }
         if ui
             .selectable_label(
                 current == SplitDirection::Vertical,
-                i18n::t("settings_layout_vertical"),
+                crate::i18n::get().settings.layout.vertical.clone(),
             )
             .clicked()
             && current != SplitDirection::Vertical
         {
-            state.settings.settings_mut().split_direction = SplitDirection::Vertical;
+            state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
             let _ = state.settings.save();
         }
     });
 }
 
 fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
-    ui.label(i18n::t("settings_layout_pane_order"));
+    ui.label(crate::i18n::get().settings.layout.pane_order.clone());
     ui.horizontal(|ui| {
-        let current = state.settings.settings().pane_order;
+        let current = state.settings.settings().layout.pane_order;
         if ui
             .selectable_label(
                 current == PaneOrder::EditorFirst,
-                i18n::t("settings_layout_editor_first"),
+                crate::i18n::get().settings.layout.editor_first.clone(),
             )
             .clicked()
             && current != PaneOrder::EditorFirst
         {
-            state.settings.settings_mut().pane_order = PaneOrder::EditorFirst;
+            state.settings.settings_mut().layout.pane_order = PaneOrder::EditorFirst;
             let _ = state.settings.save();
         }
         if ui
             .selectable_label(
                 current == PaneOrder::PreviewFirst,
-                i18n::t("settings_layout_preview_first"),
+                crate::i18n::get().settings.layout.preview_first.clone(),
             )
             .clicked()
             && current != PaneOrder::PreviewFirst
         {
-            state.settings.settings_mut().pane_order = PaneOrder::PreviewFirst;
+            state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
             let _ = state.settings.save();
         }
     });

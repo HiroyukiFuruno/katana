@@ -144,12 +144,8 @@ test-specific: ## Run a specific test (e.g., make test-specific T=test_name)
 	cargo test --workspace -- $(T)
 
 .PHONY: test-integration
-test-integration: ## Run integration tests (UI tests) (requires: egui_kittest)
+test-integration: ## Run integration tests (UI tests, semantic assertions only) (requires: egui_kittest)
 	cargo test --workspace --test integration
-
-.PHONY: test-update-snapshots
-test-update-snapshots: ## Update UI snapshot images (UPDATE_SNAPSHOTS=true)
-	UPDATE_SNAPSHOTS=true cargo test --workspace --test integration
 
 # ---------- CI / Quality Gates ----------
 
@@ -178,7 +174,7 @@ coverage: ## Run tests and verify 100% test coverage (requires cargo-llvm-cov)
 	# ── Test Execution + Table Report ──
 	cargo llvm-cov --workspace --lib --tests \
 		--ignore-filename-regex '$(COVERAGE_IGNORE)' \
-		-- --test-threads=1
+		-- --test-threads=1 --skip fixture
 	#
 	# ── Gate Check: Verify that all source code lines are executed at least once ──
 	#

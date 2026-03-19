@@ -14,13 +14,26 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
     // Force missing mmdc to ensure deterministic fallback UI across Local/CI
     std::env::set_var("MERMAID_MMDC", "dummy_missing_executable_for_kittest");
 
-    Harness::builder().build_eframe(|_cc| {
+    // Generate a unique path for settings so tests don't clobber each other or production settings
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let settings_path = std::env::temp_dir().join(format!(
+        "katana_test_settings_harness_{}_{}.json",
+        std::process::id(),
+        id
+    ));
+    let _ = std::fs::remove_file(&settings_path);
+
+    Harness::builder().build_eframe(move |_cc| {
         let ai_registry = AiProviderRegistry::new();
         let plugin_registry = PluginRegistry::new();
         let state = AppState::new(
             ai_registry,
             plugin_registry,
-            katana_platform::SettingsService::default(),
+            katana_platform::SettingsService::new(Box::new(
+                katana_platform::JsonFileRepository::new(settings_path.clone()),
+            )),
         );
         katana_ui::i18n::set_language("en");
         KatanaApp::new(state)
@@ -671,7 +684,7 @@ fn test_integration_view_mode_selection_via_button() {
     harness.step(); // Extra frame for UI layout stabilization
 
     // Click "Code" mode button
-    let code_label = katana_ui::i18n::t("view_mode_code");
+    let code_label = katana_ui::i18n::get().view_mode.code.clone();
     if let Some(btn) = harness.get_all_by_label(&code_label).next() {
         btn.click();
     }
@@ -683,7 +696,7 @@ fn test_integration_view_mode_selection_via_button() {
     );
 
     // Click "Preview" mode button
-    let preview_label = katana_ui::i18n::t("view_mode_preview");
+    let preview_label = katana_ui::i18n::get().view_mode.preview.clone();
     if let Some(btn) = harness.get_all_by_label(&preview_label).next() {
         btn.click();
     }
@@ -695,7 +708,7 @@ fn test_integration_view_mode_selection_via_button() {
     );
 
     // Click "Split" mode button
-    let split_label = katana_ui::i18n::t("view_mode_split");
+    let split_label = katana_ui::i18n::get().view_mode.split.clone();
     if let Some(btn) = harness.get_all_by_label(&split_label).next() {
         btn.click();
     }
@@ -942,7 +955,7 @@ fn test_persistence_corrupt_file_falls_back_to_defaults() {
 
     let s = harness.state_mut().app_state_mut();
     assert_eq!(
-        s.settings.settings().theme,
+        s.settings.settings().theme.theme,
         "dark",
         "Should fall back to default theme"
     );
@@ -967,7 +980,7 @@ fn test_persistence_missing_file_uses_defaults() {
     harness.step();
 
     let s = harness.state_mut().app_state_mut();
-    assert_eq!(s.settings.settings().theme, "dark");
+    assert_eq!(s.settings.settings().theme.theme, "dark");
     assert_eq!(s.settings.settings().language, "en");
 }
 
@@ -1002,7 +1015,7 @@ fn test_regression_preview_content_visible_in_preview_only_mode() {
     harness.step();
 
     // Regression if "(No preview)" is displayed
-    let no_preview_label = katana_ui::i18n::t("no_preview");
+    let no_preview_label = katana_ui::i18n::get().preview.no_preview.clone();
     let no_preview_nodes: Vec<_> = harness.query_all_by_value(&no_preview_label).collect();
     assert!(
         no_preview_nodes.is_empty(),
@@ -1037,7 +1050,7 @@ fn test_regression_preview_content_visible_in_split_mode() {
     harness.step();
     harness.step();
 
-    let no_preview_label = katana_ui::i18n::t("no_preview");
+    let no_preview_label = katana_ui::i18n::get().preview.no_preview.clone();
     let no_preview_nodes: Vec<_> = harness.query_all_by_value(&no_preview_label).collect();
     assert!(
         no_preview_nodes.is_empty(),
@@ -1197,6 +1210,7 @@ fn test_action_set_split_direction_horizontal_to_vertical() {
             .app_state_mut()
             .settings
             .settings()
+            .layout
             .split_direction,
         katana_platform::SplitDirection::Horizontal,
         "settings.split_direction must remain unchanged (not persisted)"
@@ -1433,8 +1447,8 @@ fn test_tab_nav_buttons_have_tooltips() {
     harness.step();
 
     // Verify the i18n keys resolve correctly (tooltip text is registered)
-    let prev_tooltip = katana_ui::i18n::t("tab_nav_prev");
-    let next_tooltip = katana_ui::i18n::t("tab_nav_next");
+    let prev_tooltip = katana_ui::i18n::get().tab.nav_prev.clone();
+    let next_tooltip = katana_ui::i18n::get().tab.nav_next.clone();
     assert_ne!(
         prev_tooltip, "tab_nav_prev",
         "tab_nav_prev i18n key must resolve to translated text"
@@ -1469,7 +1483,11 @@ fn test_font_size_slider_has_hover_tooltip() {
     harness.step();
     harness.step();
 
-    let hint_text = katana_ui::i18n::t("settings_font_size_slider_hint");
+    let hint_text = katana_ui::i18n::get()
+        .settings
+        .font
+        .size_slider_hint
+        .clone();
     // Verify i18n key resolves
     assert_ne!(
         hint_text, "settings_font_size_slider_hint",
@@ -1479,7 +1497,7 @@ fn test_font_size_slider_has_hover_tooltip() {
     // Verify the slider exists.
     // In accesskit/kittest, simply retrieving the node validates its presence.
     // The tooltip interaction itself is implicitly tested by egui core.
-    let font_size_label = katana_ui::i18n::t("settings_font_size");
+    let font_size_label = katana_ui::i18n::get().settings.font.size.clone();
     let _slider = harness.get_by_label(&font_size_label);
     harness.step();
 }
@@ -1602,4 +1620,52 @@ fn test_font_size_slider_has_visible_border() {
         light_selection.g(),
         light_selection.b(),
     );
+}
+
+#[test]
+fn test_ui_all_languages_load_successfully() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let supported_langs = [
+        ("en", "English"),
+        ("ja", "日本語"),
+        ("zh-CN", "简体中文"),
+        ("zh-TW", "繁體中文"),
+        ("ko", "한국어"),
+        ("pt", "Português"),
+        ("fr", "Français"),
+        ("de", "Deutsch"),
+        ("es", "Español"),
+        ("it", "Italiano"),
+    ];
+
+    for (code, _name) in supported_langs {
+        // Trigger language change
+        harness
+            .state_mut()
+            .trigger_action(katana_ui::app_state::AppAction::ChangeLanguage(
+                code.to_string(),
+            ));
+        harness.step();
+        harness.step();
+
+        let settings = katana_ui::i18n::get();
+        assert!(
+            !settings.settings.tabs.is_empty(),
+            "Tabs shouldn't be empty for {}",
+            code
+        );
+        assert_eq!(
+            harness
+                .state_mut()
+                .app_state_mut()
+                .settings
+                .settings()
+                .language,
+            code,
+            "Language setting should be updated to {}",
+            code
+        );
+    }
 }

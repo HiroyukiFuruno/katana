@@ -92,7 +92,7 @@ fn drawio_render_error_ui() {
     let harness = build_harness(sections, 600.0, 300.0);
     // Verify fallback UI text using i18n
     let expected_error = katana_ui::i18n::tf(
-        "render_error",
+        &katana_ui::i18n::get().error.render_error,
         &[
             ("kind", "DrawIo"),
             ("message", "Failed to extract SVG from rendered HTML"),
@@ -134,7 +134,9 @@ fn mermaid_both_states_render_semantically() {
             install_hint.contains("npm"),
             "Install hint should mention npm"
         );
-        let expected = katana_ui::i18n::t("missing_dependency")
+        let expected = katana_ui::i18n::get()
+            .error
+            .missing_dependency
             .replace("{tool_name}", tool_name)
             .replace("{install_hint}", install_hint);
         let harness = build_harness(pane.sections.clone(), 600.0, 300.0);
@@ -199,7 +201,10 @@ fn plantuml_both_states_render_semantically() {
             download_url.contains("plantuml"),
             "URL should mention plantuml"
         );
-        let tool_msg = katana_ui::i18n::tf("tool_not_installed", &[("tool", kind)]);
+        let tool_msg = katana_ui::i18n::tf(
+            &katana_ui::i18n::get().tool.not_installed,
+            &[("tool", kind)],
+        );
         let harness = build_harness(pane.sections.clone(), 600.0, 300.0);
         assert_standard_diagram_markdown_visible(&harness);
         let _fallback = harness.get_by_label(&tool_msg);
@@ -321,10 +326,15 @@ fn mixed_diagrams_with_fallbacks_render_semantically() {
         },
         RenderedSection::Markdown("## End\n".to_string()),
     ];
-    let expected_missing = katana_ui::i18n::t("missing_dependency")
+    let expected_missing = katana_ui::i18n::get()
+        .error
+        .missing_dependency
         .replace("{tool_name}", "mmdc (Mermaid CLI)")
         .replace("{install_hint}", "`npm install -g @mermaid-js/mermaid-cli`");
-    let expected_not_installed = katana_ui::i18n::tf("tool_not_installed", &[("tool", "PlantUML")]);
+    let expected_not_installed = katana_ui::i18n::tf(
+        &katana_ui::i18n::get().tool.not_installed,
+        &[("tool", "PlantUML")],
+    );
     let harness = build_harness(sections, 600.0, 600.0);
     let _heading = harness.get_by_label("Mixed Diagram Document");
     let _footer = harness.get_by_label("End");
