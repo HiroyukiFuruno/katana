@@ -676,6 +676,7 @@ fn test_integration_view_mode_selection_via_button() {
         btn.click();
     }
     harness.step();
+    harness.step(); // UI layout stabilization
     assert_eq!(
         harness.state_mut().app_state_mut().active_view_mode(),
         ViewMode::CodeOnly
@@ -687,6 +688,7 @@ fn test_integration_view_mode_selection_via_button() {
         btn.click();
     }
     harness.step();
+    harness.step(); // UI layout stabilization
     assert_eq!(
         harness.state_mut().app_state_mut().active_view_mode(),
         ViewMode::PreviewOnly
