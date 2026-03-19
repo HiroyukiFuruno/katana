@@ -17,14 +17,14 @@ fn switching_preset_changes_effective_colors() {
     assert_eq!(default_colors.mode, ThemeMode::Dark);
 
     // Switch to Dracula
-    svc.settings_mut().selected_preset = ThemePreset::Dracula;
+    svc.settings_mut().theme.preset = ThemePreset::Dracula;
     let dracula_colors = svc.settings().effective_theme_colors();
     assert_eq!(dracula_colors.name, "Dracula");
     assert_eq!(dracula_colors.mode, ThemeMode::Dark);
     assert_ne!(dracula_colors.background, default_colors.background);
 
     // Switch to KatanaLight
-    svc.settings_mut().selected_preset = ThemePreset::KatanaLight;
+    svc.settings_mut().theme.preset = ThemePreset::KatanaLight;
     let light_colors = svc.settings().effective_theme_colors();
     assert_eq!(light_colors.mode, ThemeMode::Light);
 }
@@ -39,7 +39,7 @@ fn switching_preset_changes_visuals() {
     assert!(dark_visuals.dark_mode);
 
     // Switch to Light → visuals.dark_mode == false
-    svc.settings_mut().selected_preset = ThemePreset::GitHubLight;
+    svc.settings_mut().theme.preset = ThemePreset::GitHubLight;
     let light_visuals = visuals_from_theme(&svc.settings().effective_theme_colors());
     assert!(!light_visuals.dark_mode);
 
@@ -57,10 +57,10 @@ fn custom_overrides_take_precedence_over_preset() {
     let mut svc = SettingsService::new(Box::new(InMemoryRepository));
 
     // Apply customisation on top of a preset
-    svc.settings_mut().selected_preset = ThemePreset::Nord;
+    svc.settings_mut().theme.preset = ThemePreset::Nord;
     let mut custom = ThemePreset::Nord.colors();
     custom.background = Rgb { r: 1, g: 2, b: 3 };
-    svc.settings_mut().custom_color_overrides = Some(custom.clone());
+    svc.settings_mut().theme.custom_color_overrides = Some(custom.clone());
 
     let effective = svc.settings().effective_theme_colors();
     assert_eq!(effective.background, Rgb { r: 1, g: 2, b: 3 });
@@ -74,8 +74,8 @@ fn all_presets_switch_correctly() {
     let mut svc = SettingsService::new(Box::new(InMemoryRepository));
 
     for preset in ThemePreset::all() {
-        svc.settings_mut().selected_preset = preset.clone();
-        svc.settings_mut().custom_color_overrides = None;
+        svc.settings_mut().theme.preset = preset.clone();
+        svc.settings_mut().theme.custom_color_overrides = None;
 
         let colors = svc.settings().effective_theme_colors();
         assert_eq!(
