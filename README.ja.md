@@ -166,9 +166,8 @@ KatanA Desktopはオープンソースプロジェクトです。
 
 ソースからビルドしたい方、コントリビュートしたい方、アーキテクチャを理解したい方へ：
 
-- 📖 **[Development Guide](docs/development-guide.md)** — セットアップ、ビルド、テスト、プロジェクト構造
-- 📖 **[開発ガイド（日本語）](docs/development-guide.ja.md)** — 日本語版の開発ガイド
-- 📐 **[Coding Rules](docs/coding-rules.md)** — コードスタイル、規約、品質ゲート
+- 📖 **[開発ガイド](docs/development-guide.ja.md)** — セットアップ、ビルド、テスト、プロジェクト構造
+- 📐 **[コーディング規約](docs/coding-rules.ja.md)** — コードスタイル、規約、品質ゲート
 - 🏗️ **[Architecture Decisions](docs/adr/)** — 設計の根拠とADR
 
 ---

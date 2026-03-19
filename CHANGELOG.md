@@ -2,6 +2,31 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.1.0] - 2026-03-19
+
+Major update introducing a dedicated Settings window, allowing flexible customization of themes, fonts, and layouts to significantly improve UI/UX.
+
+### ✨ Features
+
+- **10 Theme Presets & Color Customization**: Now includes 10 popular dark/light theme presets (e.g., Katana-Dark, Dracula, Nord) with support for custom color overrides.
+- **OS Theme Sync**: Automatically selects the optimal theme based on your macOS system appearance (Dark/Light mode) on the first launch.
+- **Extended Font Settings**: Configurable font family and size (8px-32px) for both editor and preview panes.
+- **Incremental Search**: Added a real-time filtering UI to quickly search and select from the font list.
+- **Apple Color Emoji Support**: Emojis are now rendered correctly in the preview pane on macOS environments.
+- **Dedicated Settings UI**: Introduced an overlay Settings window with real-time preview and instant auto-save.
+- **Flexible Layouts**: Improved responsive 50:50 window splitting. You can now toggle split directions (Horizontal/Vertical) and swap the order of the editor and preview panes.
+
+### 🐛 Bug Fixes
+
+- Fixed a regression where the previous workspace state was not correctly restored upon app restart.
+- Fixed `mmdc` (Mermaid CLI) execution failures from GUI app launch by auto-completing Node's PATH environment variable.
+- Fixed cramped layout issues by adjusting margins for headings and HTML blocks.
+
+### 🔧 Miscellaneous
+
+- Added Homebrew Cask support (`brew install --cask`) for seamless installation and updates.
+- Enforced stricter quality checks in the custom linter (e.g., prohibiting `todo!` macros) and updated coding guidelines.
+
 ## [0.0.3] - 2026-03-18
 
 Bug fixes for diagram rendering readability and .app bundle compatibility, plus testing improvements.
