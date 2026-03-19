@@ -12,7 +12,6 @@ use eframe::egui;
 
 use crate::{
     app_state::{AppAction, AppState, ScrollSource, ViewMode},
-    i18n,
     preview_pane::{DownloadRequest, PreviewPane},
 };
 
@@ -32,10 +31,10 @@ pub(crate) fn open_folder_dialog() -> Option<std::path::PathBuf> {
 pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
     egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button(crate::i18n::t("menu_file"), |ui| {
+            ui.menu_button(crate::i18n::get().menu.file.clone(), |ui| {
                 render_file_menu(ui, state, action);
             });
-            ui.menu_button(crate::i18n::t("menu_settings"), |ui| {
+            ui.menu_button(crate::i18n::get().menu.settings.clone(), |ui| {
                 render_settings_menu(ui, state, action);
             });
             render_header_right(ui, state);
@@ -45,7 +44,10 @@ pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action:
 
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
-    if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
+    if ui
+        .button(crate::i18n::get().menu.open_workspace.clone())
+        .clicked()
+    {
         if let Some(path) = open_folder_dialog() {
             *action = AppAction::OpenWorkspace(path);
         }
@@ -55,7 +57,7 @@ pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut
     if ui
         .add_enabled(
             state.is_dirty(),
-            egui::Button::new(crate::i18n::t("menu_save")),
+            egui::Button::new(crate::i18n::get().menu.save.clone()),
         )
         .clicked()
     {
@@ -66,7 +68,7 @@ pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut
 
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn render_settings_menu(ui: &mut egui::Ui, _state: &AppState, action: &mut AppAction) {
-    ui.menu_button(crate::i18n::t("menu_language"), |ui| {
+    ui.menu_button(crate::i18n::get().menu.language.clone(), |ui| {
         let mut reset_layout = false;
         for (code, display_name) in crate::i18n::supported_languages() {
             if ui.button(display_name.as_str()).clicked() {
@@ -92,7 +94,7 @@ pub(crate) fn render_header_right(ui: &mut egui::Ui, state: &AppState) {
 pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            let ready = crate::i18n::t("status_ready");
+            let ready = crate::i18n::get().status.ready.clone();
             let msg = state.status_message.as_deref().unwrap_or(&ready);
             ui.label(msg);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -119,11 +121,11 @@ pub(crate) fn render_workspace_panel(
             ui.set_min_width(panel_width);
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
             ui.horizontal(|ui| {
-                ui.heading(crate::i18n::t("workspace_title"));
+                ui.heading(crate::i18n::get().workspace.workspace_title.clone());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
                         .small_button("‹")
-                        .on_hover_text(crate::i18n::t("collapse_sidebar"))
+                        .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                         .clicked()
                     {
                         state.show_workspace = false;
@@ -134,14 +136,14 @@ pub(crate) fn render_workspace_panel(
                 ui.horizontal(|ui| {
                     if ui
                         .small_button("+")
-                        .on_hover_text(crate::i18n::t("expand_all"))
+                        .on_hover_text(crate::i18n::get().action.expand_all.clone())
                         .clicked()
                     {
                         state.force_tree_open = Some(true);
                     }
                     if ui
                         .small_button("-")
-                        .on_hover_text(crate::i18n::t("collapse_all"))
+                        .on_hover_text(crate::i18n::get().action.collapse_all.clone())
                         .clicked()
                     {
                         state.force_tree_open = Some(false);
@@ -149,7 +151,7 @@ pub(crate) fn render_workspace_panel(
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .small_button("🔄")
-                            .on_hover_text(crate::i18n::t("refresh_workspace"))
+                            .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
                             .clicked()
                         {
                             *action = AppAction::RefreshWorkspace;
@@ -185,9 +187,12 @@ pub(crate) fn render_workspace_content(
             *action = AppAction::SelectDocument(path);
         }
     } else {
-        ui.label(crate::i18n::t("no_workspace_open"));
+        ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
         ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
-        if ui.button(crate::i18n::t("menu_open_workspace")).clicked() {
+        if ui
+            .button(crate::i18n::get().menu.open_workspace.clone())
+            .clicked()
+        {
             if let Some(path) = open_folder_dialog() {
                 *action = AppAction::OpenWorkspace(path);
             }
@@ -288,7 +293,7 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
             has_doc,
             egui::Button::new("\u{1F504}").min_size(button_size),
         )
-        .on_hover_text(crate::i18n::t("refresh_diagrams"))
+        .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
         .clicked()
     {
         *action = AppAction::RefreshDiagrams;
@@ -351,7 +356,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         let nav_enabled = doc_count > 1;
         if ui
             .add_enabled(nav_enabled, egui::Button::new("◀").small())
-            .on_hover_text(crate::i18n::t("tab_nav_prev"))
+            .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
@@ -363,7 +368,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         }
         if ui
             .add_enabled(nav_enabled, egui::Button::new("▶").small())
-            .on_hover_text(crate::i18n::t("tab_nav_next"))
+            .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
         {
             if let Some(idx) = state.active_doc_idx {
@@ -400,18 +405,22 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
         |ui| {
             let is_split = mode == ViewMode::Split;
             if ui
-                .selectable_label(is_split, i18n::t("view_mode_split"))
+                .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
                 .clicked()
                 && !is_split
             {
                 mode = ViewMode::Split;
             }
 
-            ui.selectable_value(&mut mode, ViewMode::CodeOnly, i18n::t("view_mode_code"));
+            ui.selectable_value(
+                &mut mode,
+                ViewMode::CodeOnly,
+                crate::i18n::get().view_mode.code.clone(),
+            );
             ui.selectable_value(
                 &mut mode,
                 ViewMode::PreviewOnly,
-                i18n::t("view_mode_preview"),
+                crate::i18n::get().view_mode.preview.clone(),
             );
 
             // Show split controls only while split mode is active.
@@ -422,11 +431,12 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
                 // Toggle pane order.
                 let current_order = state.active_pane_order();
                 let (order_icon, order_tip) = match current_order {
-                    katana_platform::PaneOrder::EditorFirst => {
-                        ("📄|👁", i18n::t("split_toggle_preview_first"))
-                    }
+                    katana_platform::PaneOrder::EditorFirst => (
+                        "📄|👁",
+                        crate::i18n::get().split_toggle.preview_first.clone(),
+                    ),
                     katana_platform::PaneOrder::PreviewFirst => {
-                        ("👁|📄", i18n::t("split_toggle_editor_first"))
+                        ("👁|📄", crate::i18n::get().split_toggle.editor_first.clone())
                     }
                 };
                 if ui
@@ -449,10 +459,10 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
                 let current_dir = state.active_split_direction();
                 let (dir_icon, dir_tip) = match current_dir {
                     katana_platform::SplitDirection::Horizontal => {
-                        ("⇕", i18n::t("split_toggle_vertical"))
+                        ("⇕", crate::i18n::get().split_toggle.vertical.clone())
                     }
                     katana_platform::SplitDirection::Vertical => {
-                        ("⇔", i18n::t("split_toggle_horizontal"))
+                        ("⇔", crate::i18n::get().split_toggle.horizontal.clone())
                     }
                 };
                 if ui
@@ -857,7 +867,7 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
         );
     } else {
         ui.centered_and_justified(|ui| {
-            ui.label(i18n::t("no_document_selected"));
+            ui.label(crate::i18n::get().workspace.no_document_selected.clone());
         });
     }
 }
@@ -875,6 +885,14 @@ mod native_menu {
     pub const TAG_LANG_JA: i32 = 4;
     pub const TAG_ABOUT: i32 = 5;
     pub const TAG_SETTINGS: i32 = 6;
+    pub const TAG_LANG_ZH_CN: i32 = 7;
+    pub const TAG_LANG_ZH_TW: i32 = 8;
+    pub const TAG_LANG_KO: i32 = 9;
+    pub const TAG_LANG_PT: i32 = 10;
+    pub const TAG_LANG_FR: i32 = 11;
+    pub const TAG_LANG_DE: i32 = 12;
+    pub const TAG_LANG_ES: i32 = 13;
+    pub const TAG_LANG_IT: i32 = 14;
 
     // These FFI symbols are linked from Objective-C (macos_menu.m) and called
     // only at runtime; the Rust compiler cannot see the call sites.
@@ -884,6 +902,14 @@ mod native_menu {
         pub fn katana_poll_menu_action() -> i32;
         pub fn katana_set_app_icon_png(png_data: *const u8, png_len: std::ffi::c_ulong);
         pub fn katana_set_process_name();
+        pub fn katana_update_menu_strings(
+            file: *const std::ffi::c_char,
+            open_workspace: *const std::ffi::c_char,
+            save: *const std::ffi::c_char,
+            settings: *const std::ffi::c_char,
+            preferences: *const std::ffi::c_char,
+            language: *const std::ffi::c_char,
+        );
     }
 }
 
@@ -916,6 +942,50 @@ pub unsafe fn native_set_process_name() {
 pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
     native_menu::katana_set_app_icon_png(png_data, png_len as std::ffi::c_ulong);
 }
+
+#[cfg(all(target_os = "macos", not(test)))]
+unsafe fn native_update_menu_strings(
+    file: &str,
+    open_workspace: &str,
+    save: &str,
+    settings: &str,
+    preferences: &str,
+    language: &str,
+) {
+    let f = std::ffi::CString::new(file).unwrap_or_default();
+    let ow = std::ffi::CString::new(open_workspace).unwrap_or_default();
+    let s = std::ffi::CString::new(save).unwrap_or_default();
+    let st = std::ffi::CString::new(settings).unwrap_or_default();
+    let p = std::ffi::CString::new(preferences).unwrap_or_default();
+    let l = std::ffi::CString::new(language).unwrap_or_default();
+    native_menu::katana_update_menu_strings(
+        f.as_ptr(),
+        ow.as_ptr(),
+        s.as_ptr(),
+        st.as_ptr(),
+        p.as_ptr(),
+        l.as_ptr(),
+    );
+}
+
+#[cfg(all(target_os = "macos", not(test)))]
+pub fn update_native_menu_strings_from_i18n() {
+    let msgs = crate::i18n::get();
+    let preferences = format!("{}…", msgs.menu.settings);
+    unsafe {
+        native_update_menu_strings(
+            &msgs.menu.file,
+            &msgs.menu.open_workspace,
+            &msgs.menu.save,
+            &msgs.menu.settings,
+            &preferences,
+            &msgs.menu.language,
+        );
+    }
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+pub fn update_native_menu_strings_from_i18n() {}
 
 // ─────────────────────────────────────────────
 // eframe::App Implementation (egui Main Rendering Loop)
@@ -962,7 +1032,7 @@ impl eframe::App for KatanaApp {
         }
 
         // Apply font family by rebuilding FontDefinitions (only when family changed)
-        let font_family = self.state.settings.settings().font_family.clone();
+        let font_family = self.state.settings.settings().font.family.clone();
         if self.cached_font_family.as_deref() != Some(&font_family) {
             theme_bridge::apply_font_family(ctx, &font_family);
             self.cached_font_family = Some(font_family);
@@ -988,6 +1058,30 @@ impl eframe::App for KatanaApp {
                 }
                 native_menu::TAG_LANG_JA => {
                     self.pending_action = AppAction::ChangeLanguage("ja".to_string());
+                }
+                native_menu::TAG_LANG_ZH_CN => {
+                    self.pending_action = AppAction::ChangeLanguage("zh-CN".to_string());
+                }
+                native_menu::TAG_LANG_ZH_TW => {
+                    self.pending_action = AppAction::ChangeLanguage("zh-TW".to_string());
+                }
+                native_menu::TAG_LANG_KO => {
+                    self.pending_action = AppAction::ChangeLanguage("ko".to_string());
+                }
+                native_menu::TAG_LANG_PT => {
+                    self.pending_action = AppAction::ChangeLanguage("pt".to_string());
+                }
+                native_menu::TAG_LANG_FR => {
+                    self.pending_action = AppAction::ChangeLanguage("fr".to_string());
+                }
+                native_menu::TAG_LANG_DE => {
+                    self.pending_action = AppAction::ChangeLanguage("de".to_string());
+                }
+                native_menu::TAG_LANG_ES => {
+                    self.pending_action = AppAction::ChangeLanguage("es".to_string());
+                }
+                native_menu::TAG_LANG_IT => {
+                    self.pending_action = AppAction::ChangeLanguage("it".to_string());
                 }
                 native_menu::TAG_ABOUT => {
                     self.show_about = !self.show_about;
@@ -1037,7 +1131,7 @@ impl eframe::App for KatanaApp {
                     ui.vertical_centered(|ui| {
                         if ui
                             .button("›")
-                            .on_hover_text(crate::i18n::t("workspace_title"))
+                            .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                             .clicked()
                         {
                             self.state.show_workspace = true;

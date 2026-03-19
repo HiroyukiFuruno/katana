@@ -68,7 +68,7 @@ pub(crate) fn show_section(
         } => {
             ui.label(
                 egui::RichText::new(crate::i18n::tf(
-                    "render_error",
+                    &crate::i18n::get().error.render_error,
                     &[("kind", kind), ("message", message)],
                 ))
                 .color(egui::Color32::YELLOW)
@@ -81,7 +81,10 @@ pub(crate) fn show_section(
             install_hint,
             _source: _,
         } => {
-            let msg = crate::i18n::t("missing_dependency")
+            let msg = crate::i18n::get()
+                .error
+                .missing_dependency
+                .clone()
                 .replace("{tool_name}", tool_name)
                 .replace("{install_hint}", install_hint);
             ui.label(
@@ -100,7 +103,11 @@ pub(crate) fn show_section(
             ui.horizontal(|ui| {
                 ui.spinner();
                 ui.label(
-                    egui::RichText::new(crate::i18n::tf("rendering", &[("kind", kind)])).weak(),
+                    egui::RichText::new(crate::i18n::tf(
+                        &crate::i18n::get().preview.rendering,
+                        &[("kind", kind)],
+                    ))
+                    .weak(),
                 );
             });
             None
@@ -167,19 +174,25 @@ pub(crate) fn show_not_installed(
     let mut request = None;
     ui.group(|ui| {
         ui.label(
-            egui::RichText::new(crate::i18n::tf("tool_not_installed", &[("tool", kind)]))
-                .color(WARNING_TEXT_COLOR),
+            egui::RichText::new(crate::i18n::tf(
+                &crate::i18n::get().tool.not_installed,
+                &[("tool", kind)],
+            ))
+            .color(WARNING_TEXT_COLOR),
         );
         ui.label(
             egui::RichText::new(crate::i18n::tf(
-                "tool_install_path",
+                &crate::i18n::get().tool.install_path,
                 &[("path", &install_path.display().to_string())],
             ))
             .small()
             .weak(),
         );
         if ui
-            .button(crate::i18n::tf("tool_download", &[("tool", kind)]))
+            .button(crate::i18n::tf(
+                &crate::i18n::get().tool.download,
+                &[("tool", kind)],
+            ))
             .clicked()
         {
             request = Some(DownloadRequest {
@@ -227,7 +240,7 @@ pub(crate) fn render_sections(
         });
     }
     if sections.is_empty() {
-        ui.label(egui::RichText::new(crate::i18n::t("no_preview")).weak());
+        ui.label(egui::RichText::new(crate::i18n::get().preview.no_preview.clone()).weak());
     }
     request
 }

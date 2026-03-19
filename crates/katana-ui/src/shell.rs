@@ -232,11 +232,13 @@ impl KatanaApp {
             return;
         };
         match self.fs.save_document(doc) {
-            Ok(()) => self.state.status_message = Some(crate::i18n::t("status_saved")),
+            Ok(()) => self.state.status_message = Some(crate::i18n::get().status.saved.clone()),
             Err(e) => {
                 let error = e.to_string();
-                self.state.status_message =
-                    Some(crate::i18n::tf("status_save_failed", &[("error", &error)]));
+                self.state.status_message = Some(crate::i18n::tf(
+                    &crate::i18n::get().status.save_failed,
+                    &[("error", &error)],
+                ));
             }
         }
     }
@@ -269,6 +271,7 @@ impl KatanaApp {
             }
             AppAction::ChangeLanguage(lang) => {
                 crate::i18n::set_language(&lang);
+                crate::shell_ui::update_native_menu_strings_from_i18n();
                 self.state.settings.settings_mut().language = lang;
                 if let Err(e) = self.state.settings.save() {
                     tracing::warn!("Failed to save settings: {e}");
@@ -294,7 +297,7 @@ impl KatanaApp {
     pub(crate) fn start_download(&mut self, req: DownloadRequest) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.download_rx = Some(rx);
-        self.state.status_message = Some(crate::i18n::t("downloading_plantuml"));
+        self.state.status_message = Some(crate::i18n::get().plantuml.downloading_plantuml.clone());
         let url = req.url;
         let dest = req.dest;
         std::thread::spawn(move || {
@@ -308,13 +311,17 @@ impl KatanaApp {
         let done = if let Some(rx) = &self.download_rx {
             match rx.try_recv() {
                 Ok(Ok(())) => {
-                    self.state.status_message = Some(crate::i18n::t("plantuml_installed"));
+                    self.state.status_message =
+                        Some(crate::i18n::get().plantuml.plantuml_installed.clone());
                     self.pending_action = AppAction::RefreshDiagrams;
                     true
                 }
                 Ok(Err(e)) => {
-                    self.state.status_message =
-                        Some(format!("{}{}", crate::i18n::t("download_error"), e));
+                    self.state.status_message = Some(format!(
+                        "{}{}",
+                        crate::i18n::get().plantuml.download_error.clone(),
+                        e
+                    ));
                     true
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
@@ -354,11 +361,16 @@ fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
     let status = std::process::Command::new("curl")
         .args(["-L", "-o", dest.to_str().unwrap_or(""), url])
         .status()
-        .map_err(|e| format!("{}: {e}", crate::i18n::t("curl_launch_failed")))?;
+        .map_err(|e| {
+            format!(
+                "{}: {e}",
+                crate::i18n::get().error.curl_launch_failed.clone()
+            )
+        })?;
     if status.success() {
         Ok(())
     } else {
-        Err(crate::i18n::t("download_failed"))
+        Err(crate::i18n::get().error.download_failed.clone())
     }
 }
 
@@ -713,6 +725,25 @@ mod tests_extra {
         // curl is available on macOS
         assert!(result.is_ok());
         assert!(dest.exists());
+    }
+
+    #[test]
+    fn download_with_curl_launch_error() {
+        // Temporarily clear PATH to simulate a system without curl installed
+        let old_path = std::env::var_os("PATH").unwrap_or_default();
+        std::env::set_var("PATH", "/invalid_path_for_test");
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("dest.txt");
+        let result = download_with_curl("http://example.com/file", &dest);
+
+        // Restore PATH
+        std::env::set_var("PATH", old_path);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        // Just verify it uses the mapped error message from the locale
+        assert!(err.contains(&crate::i18n::get().error.curl_launch_failed));
     }
 
     // process_action: OpenWorkspace (L234)

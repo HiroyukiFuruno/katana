@@ -35,6 +35,56 @@ fn load_icon() -> std::sync::Arc<egui::IconData> {
 }
 
 #[cfg(not(test))]
+fn detect_initial_language() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        extern "C" {
+            fn katana_get_mac_locale(buf: *mut std::ffi::c_char, max_len: usize);
+        }
+        let mut buf = [0u8; 32];
+        unsafe { katana_get_mac_locale(buf.as_mut_ptr() as _, buf.len()) };
+        let c_str = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as _) };
+        let locale = c_str.to_string_lossy().to_string();
+
+        let lower = locale.to_lowercase();
+        if lower.starts_with("ja") {
+            return Some("ja".to_string());
+        }
+        if lower.starts_with("zh-hans") || lower.contains("hans") {
+            return Some("zh-CN".to_string());
+        }
+        if lower.starts_with("zh-hant")
+            || lower.contains("hant")
+            || lower.starts_with("zh-tw")
+            || lower.starts_with("zh-hk")
+        {
+            return Some("zh-TW".to_string());
+        }
+        if lower.starts_with("ko") {
+            return Some("ko".to_string());
+        }
+        if lower.starts_with("pt") {
+            return Some("pt".to_string());
+        }
+        if lower.starts_with("fr") {
+            return Some("fr".to_string());
+        }
+        if lower.starts_with("de") {
+            return Some("de".to_string());
+        }
+        if lower.starts_with("es") {
+            return Some("es".to_string());
+        }
+        if lower.starts_with("it") {
+            return Some("it".to_string());
+        }
+        return Some("en".to_string());
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
+#[cfg(not(test))]
 fn main() -> eframe::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
@@ -67,6 +117,7 @@ fn main() -> eframe::Result<()> {
     // On first launch (no settings.json), automatically select the OS-matching theme.
     // Existing users keep their saved preset unchanged.
     settings.apply_os_default_theme();
+    settings.apply_os_default_language(detect_initial_language());
 
     // Read saved values before moving settings into AppState.
     let saved_language = settings.settings().language.clone();
@@ -101,6 +152,7 @@ fn main() -> eframe::Result<()> {
 
             // Restore saved language.
             katana_ui::i18n::set_language(&saved_language);
+            katana_ui::shell_ui::update_native_menu_strings_from_i18n();
 
             let mut app = KatanaApp::new(state);
 
