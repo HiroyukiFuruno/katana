@@ -51,7 +51,8 @@
     "expand_all": "Alle erweitern",
     "collapse_all": "Alle minimieren",
     "collapse_sidebar": "Seitenleiste ausblenden",
-    "refresh_workspace": "Arbeitsbereich aktualisieren"
+    "refresh_workspace": "Arbeitsbereich aktualisieren",
+    "toggle_filter": "フィルター切り替え"
   },
   "ai": {
     "ai_unconfigured": "[AI: nicht konfiguriert]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "Zum vorherigen Tab wechseln",
     "nav_next": "Zum nächsten Tab wechseln"
+  },
+  "search": {
+    "modal_title": "Search Files",
+    "query_hint": "Type to search...",
+    "no_results": "No files found."
   }
 }

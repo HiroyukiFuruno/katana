@@ -51,7 +51,8 @@
     "expand_all": "Expand all",
     "collapse_all": "Collapse all",
     "collapse_sidebar": "Hide Sidebar",
-    "refresh_workspace": "Refresh workspace"
+    "refresh_workspace": "Refresh workspace",
+    "toggle_filter": "Toggle filter"
   },
   "ai": {
     "ai_unconfigured": "[AI: unconfigured]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "Move to previous tab",
     "nav_next": "Move to next tab"
+  },
+  "search": {
+    "modal_title": "Search Files",
+    "query_hint": "Type to search...",
+    "no_results": "No files found."
   }
 }

@@ -17,6 +17,15 @@ pub struct I18nMessages {
     pub tool: ToolMessages,
     pub settings: SettingsMessages,
     pub tab: TabMessages,
+    pub search: SearchMessages,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct SearchMessages {
+    pub modal_title: String,
+    pub query_hint: String,
+    pub no_results: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -98,6 +107,7 @@ pub struct ActionMessages {
     pub collapse_all: String,
     pub collapse_sidebar: String,
     pub refresh_workspace: String,
+    pub toggle_filter: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -51,7 +51,8 @@
     "expand_all": "全部展开",
     "collapse_all": "全部折叠",
     "collapse_sidebar": "隐藏侧边栏",
-    "refresh_workspace": "刷新工作区"
+    "refresh_workspace": "刷新工作区",
+    "toggle_filter": "フィルター切り替え"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未配置]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "移至上一个标签页",
     "nav_next": "移至下一个标签页"
+  },
+  "search": {
+    "modal_title": "Search Files",
+    "query_hint": "Type to search...",
+    "no_results": "No files found."
   }
 }

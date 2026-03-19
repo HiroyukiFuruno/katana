@@ -51,7 +51,8 @@
     "expand_all": "Espandi tutto",
     "collapse_all": "Comprimi tutto",
     "collapse_sidebar": "Nascondi la barra laterale",
-    "refresh_workspace": "Aggiorna lo spazio di lavoro"
+    "refresh_workspace": "Aggiorna lo spazio di lavoro",
+    "toggle_filter": "フィルター切り替え"
   },
   "ai": {
     "ai_unconfigured": "[AI: non configurato]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "Passa alla scheda precedente",
     "nav_next": "Passa alla scheda successiva"
+  },
+  "search": {
+    "modal_title": "Search Files",
+    "query_hint": "Type to search...",
+    "no_results": "No files found."
   }
 }

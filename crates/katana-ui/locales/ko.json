@@ -51,7 +51,8 @@
     "expand_all": "모두 펼치기",
     "collapse_all": "모두 접기",
     "collapse_sidebar": "사이드바 숨기기",
-    "refresh_workspace": "워크스페이스 새로고침"
+    "refresh_workspace": "워크스페이스 새로고침",
+    "toggle_filter": "フィルター切り替え"
   },
   "ai": {
     "ai_unconfigured": "[AI: 설정되지 않음]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "이전 탭으로 이동",
     "nav_next": "다음 탭으로 이동"
+  },
+  "search": {
+    "modal_title": "Search Files",
+    "query_hint": "Type to search...",
+    "no_results": "No files found."
   }
 }

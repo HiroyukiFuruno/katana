@@ -156,8 +156,40 @@ pub(crate) fn render_workspace_panel(
                         {
                             *action = AppAction::RefreshWorkspace;
                         }
+                        let filter_btn_color = if state.filter_enabled {
+                            ui.visuals().selection.bg_fill
+                        } else {
+                            egui::Color32::TRANSPARENT
+                        };
+                        if ui
+                            .add(egui::Button::new("🔍").small().fill(filter_btn_color))
+                            .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
+                            .clicked()
+                        {
+                            state.filter_enabled = !state.filter_enabled;
+                        }
                     });
                 });
+
+                if state.filter_enabled {
+                    let mut is_valid_regex = true;
+                    if !state.filter_query.is_empty() {
+                        is_valid_regex = regex::Regex::new(&state.filter_query).is_ok();
+                    }
+                    ui.horizontal(|ui| {
+                        let text_color = if is_valid_regex {
+                            ui.visuals().text_color()
+                        } else {
+                            egui::Color32::RED
+                        };
+                        ui.add(
+                            egui::TextEdit::singleline(&mut state.filter_query)
+                                .text_color(text_color)
+                                .hint_text("Filter (Regex)...")
+                                .desired_width(f32::INFINITY),
+                        );
+                    });
+                }
             }
             ui.separator();
             render_workspace_content(ui, state, action);
@@ -174,12 +206,36 @@ pub(crate) fn render_workspace_content(
         let mut selected: Option<std::path::PathBuf> = None;
         let force = state.force_tree_open;
         let active_path = state.active_path().map(|p| p.to_path_buf());
+
+        let ws_root = ws.root.clone();
+        if state.filter_enabled && !state.filter_query.is_empty() {
+            if let Ok(regex) = regex::Regex::new(&state.filter_query) {
+                if state.filter_cache.as_ref().map(|(q, _)| q) != Some(&state.filter_query) {
+                    let mut visible = std::collections::HashSet::new();
+                    gather_visible_paths(&entries, &regex, &ws_root, &mut visible);
+                    state.filter_cache = Some((state.filter_query.clone(), visible));
+                }
+            } else {
+                state.filter_cache = None;
+            }
+        } else {
+            state.filter_cache = None;
+        }
+        let filter_set = state.filter_cache.as_ref().map(|(_, v)| v);
+
         egui::ScrollArea::vertical()
             .id_salt("workspace_tree_scroll")
             .show(ui, |ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                let mut ctx = TreeRenderContext {
+                    selected: &mut selected,
+                    force,
+                    depth: 0,
+                    active_path: active_path.as_deref(),
+                    filter_set,
+                };
                 for entry in &entries {
-                    render_tree_entry(ui, entry, &mut selected, force, 0, active_path.as_deref());
+                    render_tree_entry(ui, entry, &mut ctx);
                 }
             });
         state.force_tree_open = None;
@@ -543,21 +599,35 @@ pub(crate) fn render_editor_content(
     }
 }
 
+pub(crate) struct TreeRenderContext<'a, 'b> {
+    pub selected: &'a mut Option<std::path::PathBuf>,
+    pub force: Option<bool>,
+    pub depth: usize,
+    pub active_path: Option<&'b std::path::Path>,
+    pub filter_set: Option<&'b std::collections::HashSet<std::path::PathBuf>>,
+}
+
 pub(crate) fn render_tree_entry(
     ui: &mut egui::Ui,
     entry: &katana_core::workspace::TreeEntry,
-    selected: &mut Option<std::path::PathBuf>,
-    force: Option<bool>,
-    depth: usize,
-    active_path: Option<&std::path::Path>,
+    ctx: &mut TreeRenderContext<'_, '_>,
 ) {
     use katana_core::workspace::TreeEntry;
+    let entry_path = match entry {
+        TreeEntry::Directory { path, .. } => path,
+        TreeEntry::File { path } => path,
+    };
+    if let Some(fs) = ctx.filter_set {
+        if !fs.contains(entry_path) {
+            return;
+        }
+    }
     match entry {
         TreeEntry::Directory { path, children } => {
-            render_directory_entry(ui, path, children, selected, force, depth, active_path);
+            render_directory_entry(ui, path, children, ctx);
         }
         TreeEntry::File { path } => {
-            render_file_entry(ui, entry, path, selected, depth, active_path);
+            render_file_entry(ui, entry, path, ctx);
         }
     }
 }
@@ -570,23 +640,20 @@ pub(crate) fn render_directory_entry(
     ui: &mut egui::Ui,
     path: &std::path::Path,
     children: &[katana_core::workspace::TreeEntry],
-    selected: &mut Option<std::path::PathBuf>,
-    force: Option<bool>,
-    depth: usize,
-    active_path: Option<&std::path::Path>,
+    ctx: &mut TreeRenderContext<'_, '_>,
 ) {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
     let id = ui.make_persistent_id(format!("dir:{}", path.display()));
     let mut state =
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
-    if let Some(open) = force {
+    if let Some(open) = ctx.force {
         state.set_open(open);
     }
     let is_open = state.is_open();
 
     let arrow = if is_open { "▼" } else { "▶" };
     let dir_icon = if is_open { "📂" } else { "📁" };
-    let prefix = indent_prefix(depth);
+    let prefix = indent_prefix(ctx.depth);
     let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
     let file_tree_color = ui.visuals().text_color();
     let resp = ui.add(
@@ -600,26 +667,54 @@ pub(crate) fn render_directory_entry(
     state.store(ui.ctx());
 
     if state.is_open() {
+        let prev_depth = ctx.depth;
+        ctx.depth += 1;
         for child in children {
-            render_tree_entry(ui, child, selected, force, depth + 1, active_path);
+            render_tree_entry(ui, child, ctx);
+        }
+        ctx.depth = prev_depth;
+    }
+}
+
+fn gather_visible_paths(
+    entries: &[katana_core::workspace::TreeEntry],
+    regex: &regex::Regex,
+    ws_root: &std::path::Path,
+    visible: &mut std::collections::HashSet<std::path::PathBuf>,
+) -> bool {
+    let mut any_visible = false;
+    for entry in entries {
+        match entry {
+            katana_core::workspace::TreeEntry::File { path } => {
+                let rel = crate::shell_logic::relative_full_path(path, Some(ws_root));
+                if regex.is_match(&rel) {
+                    visible.insert(path.clone());
+                    any_visible = true;
+                }
+            }
+            katana_core::workspace::TreeEntry::Directory { path, children } => {
+                if gather_visible_paths(children, regex, ws_root, visible) {
+                    visible.insert(path.clone());
+                    any_visible = true;
+                }
+            }
         }
     }
+    any_visible
 }
 
 pub(crate) fn render_file_entry(
     ui: &mut egui::Ui,
     entry: &katana_core::workspace::TreeEntry,
     path: &std::path::Path,
-    selected: &mut Option<std::path::PathBuf>,
-    depth: usize,
-    active_path: Option<&std::path::Path>,
+    ctx: &mut TreeRenderContext<'_, '_>,
 ) {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-    let prefix = indent_prefix(depth);
+    let prefix = indent_prefix(ctx.depth);
     let icon = if entry.is_markdown() { "📄" } else { "  " };
     let label = format!("{prefix}{icon} {name}");
 
-    let is_active = active_path.is_some_and(|ap| ap == path);
+    let is_active = ctx.active_path.is_some_and(|ap| ap == path);
 
     let text_color = if is_active {
         ui.visuals().widgets.active.fg_stroke.color
@@ -652,7 +747,7 @@ pub(crate) fn render_file_entry(
     let resp = row_resp.union(label_resp);
 
     if resp.clicked() && entry.is_markdown() {
-        *selected = Some(path.to_path_buf());
+        *ctx.selected = Some(path.to_path_buf());
     }
 }
 
@@ -1045,6 +1140,16 @@ impl eframe::App for KatanaApp {
             self.cached_font_family = Some(font_family);
         }
 
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::P,
+            ))
+        }) {
+            self.state.show_search_modal = true;
+            // The query will persist across invocations as per standard fuzzy finders
+        }
+
         self.poll_download(ctx);
 
         // macOS: Poll actions from the native menu.
@@ -1201,6 +1306,10 @@ impl eframe::App for KatanaApp {
             &mut self.settings_preview,
         );
 
+        if self.state.show_search_modal {
+            render_search_modal(ctx, &mut self.state, &mut self.pending_action);
+        }
+
         // About dialog
         if self.show_about {
             render_about_window(ctx, &mut self.show_about, self.about_icon.as_ref());
@@ -1336,7 +1445,14 @@ mod tests {
 
         let output = ctx.run(test_input(egui::vec2(320.0, 200.0)), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
-                render_file_entry(ui, &entry, &path, &mut selected, 0, Some(path.as_path()));
+                let mut render_ctx = TreeRenderContext {
+                    selected: &mut selected,
+                    force: None,
+                    depth: 0,
+                    active_path: Some(path.as_path()),
+                    filter_set: None,
+                };
+                render_file_entry(ui, &entry, &path, &mut render_ctx);
             });
         });
 
@@ -2048,4 +2164,97 @@ fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
             ui.hyperlink_to("↗", url);
         });
     });
+}
+
+const SEARCH_MODAL_WIDTH: f32 = 500.0;
+const SEARCH_MODAL_HEIGHT: f32 = 400.0;
+
+pub(crate) fn render_search_modal(
+    ctx: &egui::Context,
+    state: &mut AppState,
+    action: &mut AppAction,
+) {
+    let mut is_open = state.show_search_modal;
+    egui::Window::new(crate::i18n::get().search.modal_title.clone())
+        .open(&mut is_open)
+        .collapsible(false)
+        .resizable(true)
+        .default_size(egui::vec2(SEARCH_MODAL_WIDTH, SEARCH_MODAL_HEIGHT))
+        .show(ctx, |ui| {
+            // Focus on the text edit automatically
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut state.search_query)
+                    .hint_text(crate::i18n::get().search.query_hint.clone())
+                    .desired_width(f32::INFINITY),
+            );
+            response.request_focus();
+
+            if response.changed() {
+                let query = state.search_query.to_lowercase();
+                if query.is_empty() {
+                    state.search_results.clear();
+                } else if let Some(ws) = &state.workspace {
+                    let mut results = Vec::new();
+                    let ws_root = ws.root.clone();
+
+                    fn collect_matches(
+                        entries: &[katana_core::workspace::TreeEntry],
+                        query: &str,
+                        ws_root: &std::path::Path,
+                        results: &mut Vec<std::path::PathBuf>,
+                    ) {
+                        if results.len() >= 100 {
+                            return;
+                        }
+                        for entry in entries {
+                            match entry {
+                                katana_core::workspace::TreeEntry::File { path } => {
+                                    let rel =
+                                        crate::shell_logic::relative_full_path(path, Some(ws_root));
+                                    if rel.to_lowercase().contains(query) {
+                                        results.push(path.clone());
+                                        if results.len() >= 100 {
+                                            return;
+                                        }
+                                    }
+                                }
+                                katana_core::workspace::TreeEntry::Directory {
+                                    children, ..
+                                } => {
+                                    collect_matches(children, query, ws_root, results);
+                                }
+                            }
+                        }
+                    }
+
+                    collect_matches(&ws.tree, &query, &ws_root, &mut results);
+                    state.search_results = results;
+                }
+            }
+
+            ui.separator();
+
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    if state.search_results.is_empty() && !state.search_query.is_empty() {
+                        ui.label(crate::i18n::get().search.no_results.clone());
+                    } else {
+                        let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
+                        for path in &state.search_results {
+                            let rel =
+                                crate::shell_logic::relative_full_path(path, ws_root.as_deref());
+                            if ui.selectable_label(false, rel).clicked() && path.exists() {
+                                *action = AppAction::SelectDocument(path.clone());
+                                // Close the modal by updating state directly
+                                state.show_search_modal = false;
+                            }
+                        }
+                    }
+                });
+        });
+
+    if !is_open {
+        state.show_search_modal = false;
+    }
 }

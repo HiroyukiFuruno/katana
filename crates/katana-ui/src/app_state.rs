@@ -99,8 +99,20 @@ pub struct AppState {
     pub status_message: Option<String>,
     /// Show/hide the workspace panel.
     pub show_workspace: bool,
+    /// Whether the workspace file filter is enabled.
+    pub filter_enabled: bool,
+    /// The current regular expression query for the workspace folder filter.
+    pub filter_query: String,
+    /// Cache of visible paths for the current filter query. Tuple of (query, visible_paths_set)
+    pub filter_cache: Option<(String, std::collections::HashSet<std::path::PathBuf>)>,
     /// Show/hide the settings window.
     pub show_settings: bool,
+    /// Show/hide the search modal.
+    pub show_search_modal: bool,
+    /// The search query for the file search modal.
+    pub search_query: String,
+    /// The cached search results.
+    pub search_results: Vec<std::path::PathBuf>,
     /// Currently active tab in the settings window.
     pub active_settings_tab: SettingsTab,
     /// Trigger to expand/collapse the entire workspace tree. Some(true)=expand all, Some(false)=collapse all.
@@ -146,7 +158,13 @@ impl AppState {
             _plugin_registry: plugin_registry,
             status_message: None,
             show_workspace: true,
+            filter_enabled: false,
+            filter_query: String::new(),
+            filter_cache: None,
             show_settings: false,
+            show_search_modal: false,
+            search_query: String::new(),
+            search_results: Vec::new(),
             active_settings_tab: SettingsTab::default(),
             force_tree_open: None,
             scroll_fraction: 0.0,

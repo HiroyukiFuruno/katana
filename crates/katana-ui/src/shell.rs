@@ -164,6 +164,7 @@ impl KatanaApp {
                 self.state.workspace = Some(ws);
                 self.state.open_documents.clear();
                 self.state.active_doc_idx = None;
+                self.state.filter_cache = None;
 
                 // Persist the last opened workspace path.
                 self.state.settings.settings_mut().last_workspace =
@@ -190,6 +191,7 @@ impl KatanaApp {
         match self.fs.open_workspace(&root) {
             Ok(ws) => {
                 self.state.workspace = Some(ws);
+                self.state.filter_cache = None;
             }
             Err(e) => {
                 let error = e.to_string();

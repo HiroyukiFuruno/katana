@@ -51,7 +51,8 @@
     "expand_all": "すべて展開",
     "collapse_all": "すべて折りたたむ",
     "collapse_sidebar": "サイドバーを隠す",
-    "refresh_workspace": "ワークスペースを更新"
+    "refresh_workspace": "ワークスペースを更新",
+    "toggle_filter": "フィルター切り替え"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未設定]"
@@ -121,5 +122,10 @@
   "tab": {
     "nav_prev": "前のタブへ移動",
     "nav_next": "次のタブへ移動"
+  },
+  "search": {
+    "modal_title": "ファイル検索",
+    "query_hint": "検索ファイル名の一部を入力…",
+    "no_results": "見つかりませんでした"
   }
 }

@@ -2269,6 +2269,7 @@ dependencies = [
  "katana-core",
  "katana-platform",
  "open",
+ "regex",
  "resvg 0.45.1",
  "rfd",
  "serde",
