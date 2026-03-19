@@ -162,11 +162,18 @@ pub(crate) fn render_workspace_panel(
                             egui::Color32::TRANSPARENT
                         };
                         if ui
-                            .add(egui::Button::new("🔍").small().fill(filter_btn_color))
+                            .add(egui::Button::new("\u{25BC}").small().fill(filter_btn_color))
                             .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                             .clicked()
                         {
                             state.filter_enabled = !state.filter_enabled;
+                        }
+                        if ui
+                            .add(egui::Button::new("🔍").small())
+                            .on_hover_text(crate::i18n::get().search.modal_title.clone())
+                            .clicked()
+                        {
+                            state.show_search_modal = true;
                         }
                     });
                 });
@@ -2189,9 +2196,71 @@ pub(crate) fn render_search_modal(
             );
             response.request_focus();
 
-            if response.changed() {
+            let mut include_regexes = Vec::new();
+            let mut include_valid = true;
+            if !state.search_include_pattern.is_empty() {
+                for pat in state.search_include_pattern.split(',') {
+                    let pat = pat.trim();
+                    if !pat.is_empty() {
+                        match regex::Regex::new(pat) {
+                            Ok(re) => include_regexes.push(re),
+                            Err(_) => include_valid = false,
+                        }
+                    }
+                }
+            }
+
+            let mut exclude_regexes = Vec::new();
+            let mut exclude_valid = true;
+            if !state.search_exclude_pattern.is_empty() {
+                for pat in state.search_exclude_pattern.split(',') {
+                    let pat = pat.trim();
+                    if !pat.is_empty() {
+                        match regex::Regex::new(pat) {
+                            Ok(re) => exclude_regexes.push(re),
+                            Err(_) => exclude_valid = false,
+                        }
+                    }
+                }
+            }
+
+            let include_color = if include_valid {
+                ui.visuals().text_color()
+            } else {
+                egui::Color32::RED
+            };
+
+            let exclude_color = if exclude_valid {
+                ui.visuals().text_color()
+            } else {
+                egui::Color32::RED
+            };
+
+            ui.add(
+                egui::TextEdit::singleline(&mut state.search_include_pattern)
+                    .hint_text(crate::i18n::get().search.include_pattern_hint.clone())
+                    .text_color(include_color)
+                    .desired_width(f32::INFINITY),
+            );
+
+            ui.add(
+                egui::TextEdit::singleline(&mut state.search_exclude_pattern)
+                    .hint_text(crate::i18n::get().search.exclude_pattern_hint.clone())
+                    .text_color(exclude_color)
+                    .desired_width(f32::INFINITY),
+            );
+
+            let current_params = (
+                state.search_query.clone(),
+                state.search_include_pattern.clone(),
+                state.search_exclude_pattern.clone(),
+            );
+
+            if state.last_search_params.as_ref() != Some(&current_params) {
+                state.last_search_params = Some(current_params);
+
                 let query = state.search_query.to_lowercase();
-                if query.is_empty() {
+                if query.is_empty() && include_regexes.is_empty() && exclude_regexes.is_empty() {
                     state.search_results.clear();
                 } else if let Some(ws) = &state.workspace {
                     let mut results = Vec::new();
@@ -2200,6 +2269,8 @@ pub(crate) fn render_search_modal(
                     fn collect_matches(
                         entries: &[katana_core::workspace::TreeEntry],
                         query: &str,
+                        include_regexes: &[regex::Regex],
+                        exclude_regexes: &[regex::Regex],
                         ws_root: &std::path::Path,
                         results: &mut Vec<std::path::PathBuf>,
                     ) {
@@ -2211,7 +2282,38 @@ pub(crate) fn render_search_modal(
                                 katana_core::workspace::TreeEntry::File { path } => {
                                     let rel =
                                         crate::shell_logic::relative_full_path(path, Some(ws_root));
-                                    if rel.to_lowercase().contains(query) {
+
+                                    // 1. Exclude check (priority)
+                                    let mut is_excluded = false;
+                                    for re in exclude_regexes {
+                                        if re.is_match(&rel) {
+                                            is_excluded = true;
+                                            break;
+                                        }
+                                    }
+                                    if is_excluded {
+                                        continue;
+                                    }
+
+                                    // 2. Query check
+                                    let mut matches_query = true;
+                                    if !query.is_empty() {
+                                        matches_query = rel.to_lowercase().contains(query);
+                                    }
+
+                                    // 3. Include check
+                                    let mut matches_include = true;
+                                    if !include_regexes.is_empty() {
+                                        matches_include = false;
+                                        for re in include_regexes {
+                                            if re.is_match(&rel) {
+                                                matches_include = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if matches_query && matches_include {
                                         results.push(path.clone());
                                         if results.len() >= 100 {
                                             return;
@@ -2221,13 +2323,27 @@ pub(crate) fn render_search_modal(
                                 katana_core::workspace::TreeEntry::Directory {
                                     children, ..
                                 } => {
-                                    collect_matches(children, query, ws_root, results);
+                                    collect_matches(
+                                        children,
+                                        query,
+                                        include_regexes,
+                                        exclude_regexes,
+                                        ws_root,
+                                        results,
+                                    );
                                 }
                             }
                         }
                     }
 
-                    collect_matches(&ws.tree, &query, &ws_root, &mut results);
+                    collect_matches(
+                        &ws.tree,
+                        &query,
+                        &include_regexes,
+                        &exclude_regexes,
+                        &ws_root,
+                        &mut results,
+                    );
                     state.search_results = results;
                 }
             }

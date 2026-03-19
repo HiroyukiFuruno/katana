@@ -124,8 +124,10 @@
     "nav_next": "移至下一个标签页"
   },
   "search": {
-    "modal_title": "Search Files",
-    "query_hint": "Type to search...",
-    "no_results": "No files found."
+    "modal_title": "搜索文件",
+    "query_hint": "输入文件名进行搜索...",
+    "include_pattern_hint": "Include (regex, comma-separated)",
+    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+    "no_results": "没有找到文件。"
   }
 }

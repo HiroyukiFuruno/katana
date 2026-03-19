@@ -111,6 +111,12 @@ pub struct AppState {
     pub show_search_modal: bool,
     /// The search query for the file search modal.
     pub search_query: String,
+    /// Regular expression for including files/dirs in search results.
+    pub search_include_pattern: String,
+    /// Regular expression for excluding files/dirs in search results.
+    pub search_exclude_pattern: String,
+    /// Cached parameters used for the last search to detect programmatic changes.
+    pub last_search_params: Option<(String, String, String)>,
     /// The cached search results.
     pub search_results: Vec<std::path::PathBuf>,
     /// Currently active tab in the settings window.
@@ -164,6 +170,9 @@ impl AppState {
             show_settings: false,
             show_search_modal: false,
             search_query: String::new(),
+            search_include_pattern: String::new(),
+            search_exclude_pattern: String::new(),
+            last_search_params: None,
             search_results: Vec::new(),
             active_settings_tab: SettingsTab::default(),
             force_tree_open: None,

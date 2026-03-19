@@ -124,8 +124,10 @@
     "nav_next": "Ir para a próxima aba"
   },
   "search": {
-    "modal_title": "Search Files",
-    "query_hint": "Type to search...",
-    "no_results": "No files found."
+    "modal_title": "Buscar arquivos",
+    "query_hint": "Digite para buscar pelo nome do arquivo...",
+    "include_pattern_hint": "Include (regex, comma-separated)",
+    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+    "no_results": "Nenhum arquivo encontrado."
   }
 }

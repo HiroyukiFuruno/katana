@@ -25,6 +25,8 @@ pub struct I18nMessages {
 pub struct SearchMessages {
     pub modal_title: String,
     pub query_hint: String,
+    pub include_pattern_hint: String,
+    pub exclude_pattern_hint: String,
     pub no_results: String,
 }
 
