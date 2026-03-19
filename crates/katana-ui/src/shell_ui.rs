@@ -851,6 +851,8 @@ mod native_menu {
     pub const TAG_ABOUT: i32 = 5;
     pub const TAG_SETTINGS: i32 = 6;
 
+    // These FFI symbols are linked from Objective-C (macos_menu.m) and called
+    // only at runtime; the Rust compiler cannot see the call sites.
     #[allow(dead_code)]
     extern "C" {
         pub fn katana_setup_native_menu();

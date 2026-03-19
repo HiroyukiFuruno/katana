@@ -80,6 +80,7 @@ fn strengthen_color(base: egui::Color32, dark: bool) -> egui::Color32 {
     let lerp = |a: u8, b: u8| -> u8 {
         let a = f32::from(a);
         let b = f32::from(b);
+        // Linear interpolation between 0–255 colour channels; result is always in [0, 255].
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let result = (a + (b - a) * STRONG_BLEND_RATIO) as u8;
         result
@@ -203,5 +204,48 @@ mod apply_font_family_tests {
         if let Some((name, _)) = os_fonts.first() {
             apply_font_family(&ctx, name);
         }
+    }
+}
+
+#[cfg(test)]
+mod visuals_tests {
+    use super::*;
+    use katana_platform::theme::{ThemeMode, ThemePreset};
+
+    #[test]
+    fn visuals_from_theme_light_mode_uses_light_base() {
+        let colors = ThemePreset::KatanaLight.colors();
+        assert_eq!(colors.mode, ThemeMode::Light);
+        let visuals = visuals_from_theme(&colors);
+        // Light mode base has dark_mode = false
+        assert!(!visuals.dark_mode);
+    }
+
+    #[test]
+    fn visuals_from_theme_dark_mode_uses_dark_base() {
+        let colors = ThemePreset::KatanaDark.colors();
+        assert_eq!(colors.mode, ThemeMode::Dark);
+        let visuals = visuals_from_theme(&colors);
+        assert!(visuals.dark_mode);
+    }
+
+    #[test]
+    fn strengthen_color_darkens_in_light_mode() {
+        let base = egui::Color32::from_rgb(200, 200, 200);
+        let result = strengthen_color(base, false);
+        // In light mode, strengthens toward BLACK, so values should decrease
+        assert!(result.r() < base.r());
+        assert!(result.g() < base.g());
+        assert!(result.b() < base.b());
+    }
+
+    #[test]
+    fn strengthen_color_lightens_in_dark_mode() {
+        let base = egui::Color32::from_rgb(100, 100, 100);
+        let result = strengthen_color(base, true);
+        // In dark mode, strengthens toward WHITE, so values should increase
+        assert!(result.r() > base.r());
+        assert!(result.g() > base.g());
+        assert!(result.b() > base.b());
     }
 }

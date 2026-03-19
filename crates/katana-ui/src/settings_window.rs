@@ -323,6 +323,8 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
                     f32::from(original_rgb.b) / COLOUR_CHANNEL_MAX,
                 ];
                 if ui.color_edit_button_rgb(&mut color_arr).changed() {
+                    // Colour channel values are clamped to [0.0, 1.0] by the colour picker;
+                    // multiplying by 255 always yields a valid u8.
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let new_rgb = Rgb {
                         r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
