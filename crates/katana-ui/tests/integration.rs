@@ -1483,3 +1483,67 @@ fn test_font_size_slider_has_hover_tooltip() {
         &SnapshotOptions::default().failed_pixel_count_threshold(SNAPSHOT_PIXEL_TOLERANCE),
     );
 }
+
+/// Regression: Font size slider must be visible on light themes.
+/// The brightness-boost approach (`saturating_add(40)`) on light-theme
+/// inactive bg produces near-white, invisible against the panel background.
+/// Fix: Use `selection.bg_fill` (theme-aware accent) instead.
+///
+/// This test validates the color contrast logic directly without snapshots.
+/// Uses max per-channel difference to detect visibility (accounts for hue).
+#[test]
+fn test_font_size_slider_visible_on_light_theme() {
+    // Get egui light theme default colors
+    let light = egui::Visuals::light();
+    let inactive_bg = light.widgets.inactive.bg_fill;
+    let panel_bg = light.panel_fill;
+
+    // Current bug: brightness-boost on light theme inactive bg
+    let boosted = egui::Color32::from_rgba_premultiplied(
+        inactive_bg.r().saturating_add(40),
+        inactive_bg.g().saturating_add(40),
+        inactive_bg.b().saturating_add(40),
+        inactive_bg.a(),
+    );
+
+    // Max per-channel difference: detects both brightness AND color difference.
+    let boosted_max_diff = boosted
+        .r()
+        .abs_diff(panel_bg.r())
+        .max(boosted.g().abs_diff(panel_bg.g()))
+        .max(boosted.b().abs_diff(panel_bg.b()));
+
+    // Boosted color is TOO CLOSE to panel background — proving the bug.
+    assert!(
+        boosted_max_diff < 30,
+        "Brightness-boost must produce low contrast on light theme (proves bug). \
+         max_diff={boosted_max_diff}, boosted=({},{},{}), panel=({},{},{})",
+        boosted.r(),
+        boosted.g(),
+        boosted.b(),
+        panel_bg.r(),
+        panel_bg.g(),
+        panel_bg.b(),
+    );
+
+    // Fix validation: selection.bg_fill is theme-aware with good contrast.
+    let selection_bg = light.selection.bg_fill;
+    let selection_max_diff = selection_bg
+        .r()
+        .abs_diff(panel_bg.r())
+        .max(selection_bg.g().abs_diff(panel_bg.g()))
+        .max(selection_bg.b().abs_diff(panel_bg.b()));
+
+    // Selection color MUST have sufficient contrast (>= 30) with panel bg.
+    assert!(
+        selection_max_diff >= 30,
+        "Selection color must provide sufficient contrast on light theme. \
+         max_diff={selection_max_diff}, selection=({},{},{}), panel=({},{},{})",
+        selection_bg.r(),
+        selection_bg.g(),
+        selection_bg.b(),
+        panel_bg.r(),
+        panel_bg.g(),
+        panel_bg.b(),
+    );
+}
