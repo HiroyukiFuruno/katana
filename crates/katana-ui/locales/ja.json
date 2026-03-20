@@ -11,7 +11,8 @@
         "no_workspace_open": "ワークスペースが開かれていません。",
         "no_document_selected": "ドキュメントが開かれていません。",
         "workspace_title": "ワークスペース",
-        "recent_workspaces": "最近のワークスペース"
+        "recent_workspaces": "最近のワークスペース",
+        "metadata_tooltip": "サイズ: {size} B\n更新日時: {mod_time}"
     },
     "preview": {
         "preview_title": "プレビュー",
@@ -55,7 +56,9 @@
         "collapse_sidebar": "サイドバーを隠す",
         "refresh_workspace": "ワークスペースを更新",
         "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "履歴から削除"
+        "remove_workspace": "履歴から削除",
+        "recursive_expand": "再帰的にディレクトリを展開",
+        "recursive_open_all": "再帰的に全ファイルを開く"
     },
     "ai": {
         "ai_unconfigured": "[AI: 未設定]"

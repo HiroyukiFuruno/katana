@@ -5,13 +5,14 @@
         "language": "Idioma (Language)",
         "open_workspace": "Abrir Espaço de Trabalho…",
         "save": "Salvar",
-        "open_all": "Open All"
+        "open_all": "Abrir tudo"
     },
     "workspace": {
         "no_workspace_open": "Nenhum espaço de trabalho aberto.",
         "no_document_selected": "Nenhum documento aberto.",
         "workspace_title": "Espaço de Trabalho",
-        "recent_workspaces": "Recent Workspaces"
+        "recent_workspaces": "Espaços de trabalho recentes",
+        "metadata_tooltip": "Tamanho: {size} B\nModificado: {mod_time}"
     },
     "preview": {
         "preview_title": "Visualização",
@@ -54,8 +55,10 @@
         "collapse_all": "Recolher tudo",
         "collapse_sidebar": "Ocultar a Barra Lateral",
         "refresh_workspace": "Atualizar espaço de trabalho",
-        "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "Remove from history"
+        "toggle_filter": "Alternar filtro",
+        "remove_workspace": "Remover do histórico",
+        "recursive_expand": "Expandir subdiretórios recursivamente",
+        "recursive_open_all": "Abrir todos os arquivos recursivamente"
     },
     "ai": {
         "ai_unconfigured": "[AI: não configurado]"
@@ -129,8 +132,8 @@
     "search": {
         "modal_title": "Buscar arquivos",
         "query_hint": "Digite para buscar pelo nome do arquivo...",
-        "include_pattern_hint": "Include (regex, comma-separated)",
-        "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+        "include_pattern_hint": "Incluir (regex, separado por vírgulas)",
+        "exclude_pattern_hint": "Excluir (regex, separado por vírgulas)",
         "no_results": "Nenhum arquivo encontrado."
     }
 }

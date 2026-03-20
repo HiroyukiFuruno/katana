@@ -52,6 +52,29 @@ pub fn next_tab_index(current: usize, count: usize) -> usize {
     (current + 1) % count
 }
 
+/// Formats the metadata tooltip string (Size and Modified time).
+pub fn format_metadata_tooltip(
+    size: u64,
+    sys_time: Option<std::time::SystemTime>,
+    template: &str,
+) -> String {
+    let mod_time_str = sys_time
+        .map(|st| {
+            let dt: chrono::DateTime<chrono::Local> = st.into();
+            dt.format("%Y-%m-%d %H:%M:%S").to_string()
+        })
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    #[allow(clippy::useless_vec)]
+    crate::i18n::tf(
+        template,
+        &vec![
+            ("size", size.to_string().as_str()),
+            ("mod_time", mod_time_str.as_str()),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +129,22 @@ mod tests {
     #[test]
     fn next_tab_index_normal_increment() {
         assert_eq!(next_tab_index(0, 3), 1);
+    }
+
+    #[test]
+    fn format_metadata_tooltip_populates_template() {
+        // TDD RED phase test
+        let size = 1024;
+        let sys_time = Some(std::time::UNIX_EPOCH);
+        let template = "Size: {size}\nMod: {mod_time}";
+
+        let result = format_metadata_tooltip(size, sys_time, template);
+
+        // It should replace \{size\} with 1024
+        assert!(result.contains("1024"));
+        // It should contain 'Size: 1024\nMod: '
+        assert!(result.starts_with("Size: 1024"));
+        // Since we are formatting UNIX_EPOCH in local time, exact string match of the year (1970 or 1969 depending on timezone) is enough to check replacement without being flaky.
+        assert!(result.contains("1970") || result.contains("1969"));
     }
 }

@@ -5,13 +5,14 @@
         "language": "语言 (Language)",
         "open_workspace": "打开工作区…",
         "save": "保存",
-        "open_all": "Open All"
+        "open_all": "全部打开"
     },
     "workspace": {
         "no_workspace_open": "未打开工作区。",
-        "no_document_selected": "未选择文档。",
+        "no_document_selected": "未打开文档。",
         "workspace_title": "工作区",
-        "recent_workspaces": "Recent Workspaces"
+        "recent_workspaces": "最近的工作区",
+        "metadata_tooltip": "大小: {size} B\n修改时间: {mod_time}"
     },
     "preview": {
         "preview_title": "预览",
@@ -54,8 +55,10 @@
         "collapse_all": "全部折叠",
         "collapse_sidebar": "隐藏侧边栏",
         "refresh_workspace": "刷新工作区",
-        "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "Remove from history"
+        "toggle_filter": "切换过滤器",
+        "remove_workspace": "从历史记录中移除",
+        "recursive_expand": "递归展开子目录",
+        "recursive_open_all": "递归打开所有文件"
     },
     "ai": {
         "ai_unconfigured": "[AI: 未配置]"
@@ -129,8 +132,8 @@
     "search": {
         "modal_title": "搜索文件",
         "query_hint": "输入文件名进行搜索...",
-        "include_pattern_hint": "Include (regex, comma-separated)",
-        "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+        "include_pattern_hint": "包含（正则表达式，逗号分隔）",
+        "exclude_pattern_hint": "排除（正则表达式，逗号分隔）",
         "no_results": "没有找到文件。"
     }
 }

@@ -331,6 +331,7 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use katana_core::workspace::TreeEntry;
     use katana_platform::{PaneOrder, SplitDirection};
     use std::path::PathBuf;
 
@@ -345,6 +346,7 @@ mod tests {
             path: PathBuf::from(path),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(0);
@@ -385,6 +387,7 @@ mod tests {
             path: PathBuf::from("/tmp/b.md"),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(1);
@@ -414,6 +417,7 @@ mod tests {
             path: PathBuf::from("/tmp/b.md"),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         });
         state.active_doc_idx = Some(1);
         state.initialize_tab_split_state("/tmp/b.md");
@@ -503,5 +507,43 @@ mod tests {
         );
         empty_state.ensure_active_split_state(); // Should safely return early
         assert_eq!(empty_state.tab_split_states.len(), 0);
+    }
+    #[test]
+    fn test_tree_entry_collection() {
+        let root = PathBuf::from("/root");
+        let file1 = root.join("a.md");
+        let file2 = root.join("b.txt");
+        let sub = root.join("sub");
+        let file3 = sub.join("c.md");
+
+        let entry = TreeEntry::Directory {
+            path: root.clone(),
+            children: vec![
+                TreeEntry::File {
+                    path: file1.clone(),
+                },
+                TreeEntry::File {
+                    path: file2.clone(),
+                },
+                TreeEntry::Directory {
+                    path: sub.clone(),
+                    children: vec![TreeEntry::File {
+                        path: file3.clone(),
+                    }],
+                },
+            ],
+        };
+
+        let mut md_files = Vec::new();
+        entry.collect_all_markdown_file_paths(&mut md_files);
+        assert_eq!(md_files.len(), 2);
+        assert!(md_files.contains(&file1));
+        assert!(md_files.contains(&file3));
+
+        let mut dirs = Vec::new();
+        entry.collect_all_directory_paths(&mut dirs);
+        assert_eq!(dirs.len(), 2);
+        assert!(dirs.contains(&root));
+        assert!(dirs.contains(&sub));
     }
 }

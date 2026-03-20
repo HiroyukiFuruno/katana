@@ -19,7 +19,7 @@ use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
     FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
     RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
-    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
+    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
 };
 use crate::theme_bridge;
 use katana_platform::{PaneOrder, SplitDirection};
@@ -737,18 +737,28 @@ pub(crate) fn render_directory_entry(
     let prefix = indent_prefix(ctx.depth);
     let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
     let file_tree_color = ui.visuals().text_color();
-
-    // Full-width clickable label for better clickability and testability
-    let resp = ui.add_sized(
-        egui::vec2(ui.available_width(), 22.0),
-        egui::Label::new(egui::RichText::new(label_text).color(file_tree_color))
-            .sense(egui::Sense::click())
-            .truncate(),
+    let (rect, mut resp) = ui.allocate_at_least(
+        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
+        egui::Sense::click(),
     );
+
+    if ui.is_rect_visible(rect) {
+        let mut child_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        child_ui.add_space(TREE_LABEL_HOFFSET);
+        let label_resp = child_ui.add(
+            egui::Label::new(egui::RichText::new(label_text).color(file_tree_color))
+                .sense(egui::Sense::click()),
+        );
+        resp = resp.union(label_resp);
+    }
 
     if resp.hovered() {
         ui.painter()
-            .rect_filled(resp.rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+            .rect_filled(rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
     }
 
     // Directory level Meta Info on Hover
@@ -757,13 +767,11 @@ pub(crate) fn render_directory_entry(
         "{}\n{}",
         crate::i18n::tf("Path", &[("path", path_str.as_str())]),
         if let Ok(metadata) = std::fs::metadata(path) {
-            let mod_time = metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            format!("Size: {} B\nModified (Unix): {}", metadata.len(), mod_time)
+            crate::shell_logic::format_metadata_tooltip(
+                metadata.len(),
+                metadata.modified().ok(),
+                &crate::i18n::get().workspace.metadata_tooltip,
+            )
         } else {
             "Metadata unavailable".to_string()
         }
@@ -775,20 +783,25 @@ pub(crate) fn render_directory_entry(
     // "Open All" Context Menu for directories
     resp.context_menu(|ui| {
         if ui
-            .button(crate::i18n::get().menu.open_all.clone())
+            .button(crate::i18n::get().action.recursive_expand.clone())
+            .clicked()
+        {
+            let mut to_expand = Vec::new();
+            for child in children {
+                child.collect_all_directory_paths(&mut to_expand);
+            }
+            ctx.expanded_directories.insert(path.to_path_buf()); // Expand self too
+            ctx.expanded_directories.extend(to_expand);
+            ui.close();
+        }
+        if ui
+            .button(crate::i18n::get().action.recursive_open_all.clone())
             .clicked()
         {
             let mut to_open = Vec::new();
-            let mut to_expand = Vec::new();
             for child in children {
                 child.collect_all_markdown_file_paths(&mut to_open);
-                child.collect_all_directory_paths(&mut to_expand);
             }
-            // Also expand the current directory
-            ctx.expanded_directories.insert(path.to_path_buf());
-            // And all subdirectories
-            ctx.expanded_directories.extend(to_expand);
-
             if !to_open.is_empty() {
                 *ctx.action = crate::app_state::AppAction::OpenMultipleDocuments(to_open);
             }
@@ -862,32 +875,67 @@ pub(crate) fn render_file_entry(
     } else {
         ui.visuals().text_color()
     };
-    let rich = egui::RichText::new(&label).color(text_color);
-    let rich = if is_active { rich.strong() } else { rich };
+    let label_text = label;
+    let (full_rect, mut resp) = ui.allocate_at_least(
+        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
+        egui::Sense::click(),
+    );
 
-    let row_height = ui.spacing().interact_size.y;
-    let desired_size = egui::vec2(ui.available_width(), row_height);
-    let (full_rect, row_resp) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if ui.is_rect_visible(full_rect) {
+        if is_active {
+            let highlight_color = ui.visuals().selection.bg_fill;
+            ui.painter()
+                .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
+        } else if resp.hovered() {
+            ui.painter()
+                .rect_filled(full_rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+        }
 
-    if is_active {
-        let highlight_color = ui.visuals().selection.bg_fill;
-        ui.painter()
-            .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
+        let mut child_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(full_rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        child_ui.add_space(TREE_LABEL_HOFFSET);
+        let rich = egui::RichText::new(label_text).color(text_color);
+        let label_resp = child_ui.add(
+            egui::Label::new(if is_active { rich.strong() } else { rich })
+                .sense(egui::Sense::click()),
+        );
+        resp = resp.union(label_resp);
     }
-    let mut child_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(full_rect)
-            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+
+    // File level Meta Info on Hover
+    let path_str = path.display().to_string();
+    let meta_text = format!(
+        "{}\n{}",
+        crate::i18n::tf("Path", &[("path", path_str.as_str())]),
+        if let Ok(metadata) = std::fs::metadata(path) {
+            crate::shell_logic::format_metadata_tooltip(
+                metadata.len(),
+                metadata.modified().ok(),
+                &crate::i18n::get().workspace.metadata_tooltip,
+            )
+        } else {
+            "Metadata unavailable".to_string()
+        }
     );
-    child_ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-    let label_resp = child_ui.add(
-        egui::Label::new(rich)
-            .truncate()
-            .sense(egui::Sense::click()),
-    );
-    let resp = row_resp.union(label_resp);
+    let resp = resp.on_hover_ui(|ui| {
+        ui.label(meta_text);
+    });
 
     if resp.clicked() && entry.is_markdown() {
+        // Auto-expand parents when clicking a file
+        let mut parent = path.parent();
+        while let Some(p) = parent {
+            if p == std::path::Path::new("") {
+                break;
+            }
+            if ctx.expanded_directories.insert(p.to_path_buf()) {
+                // If we added a new parent, it might be newly visible
+            }
+            parent = p.parent();
+        }
         *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
     }
 }
@@ -1603,7 +1651,6 @@ mod tests {
             egui::CentralPanel::default().show(ctx, |ui| {
                 let mut render_ctx = TreeRenderContext {
                     action: &mut action,
-                    force: None,
                     depth: 0,
                     active_path: Some(path.as_path()),
                     filter_set: None,

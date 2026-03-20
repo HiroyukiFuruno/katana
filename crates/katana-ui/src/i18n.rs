@@ -48,6 +48,12 @@ pub struct WorkspaceMessages {
     pub no_document_selected: String,
     pub workspace_title: String,
     pub recent_workspaces: String,
+    #[serde(default = "default_metadata_tooltip")]
+    pub metadata_tooltip: String,
+}
+
+fn default_metadata_tooltip() -> String {
+    "Size: {size} B\nModified: {mod_time}".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -104,7 +110,7 @@ pub struct StatusMessages {
     pub cannot_open_file: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[allow(dead_code)]
 pub struct ActionMessages {
     pub expand_all: String,
@@ -113,6 +119,10 @@ pub struct ActionMessages {
     pub refresh_workspace: String,
     pub toggle_filter: String,
     pub remove_workspace: String,
+    #[serde(default)]
+    pub recursive_expand: String,
+    #[serde(default)]
+    pub recursive_open_all: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -349,5 +359,13 @@ mod tests {
         assert!(!msgs.menu.file.is_empty());
         // Restore to avoid polluting global state for other tests running in parallel.
         set_language("en");
+    }
+
+    #[test]
+    fn test_default_metadata_tooltip() {
+        assert_eq!(
+            super::default_metadata_tooltip(),
+            "Size: {size} B\nModified: {mod_time}"
+        );
     }
 }

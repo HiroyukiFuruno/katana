@@ -5,13 +5,14 @@
         "language": "언어 (Language)",
         "open_workspace": "워크스페이스 열기…",
         "save": "저장",
-        "open_all": "Open All"
+        "open_all": "모두 열기"
     },
     "workspace": {
         "no_workspace_open": "열린 워크스페이스가 없습니다.",
         "no_document_selected": "열린 문서가 없습니다.",
         "workspace_title": "워크스페이스",
-        "recent_workspaces": "Recent Workspaces"
+        "recent_workspaces": "최근 워크스페이스",
+        "metadata_tooltip": "크기: {size} B\n수정: {mod_time}"
     },
     "preview": {
         "preview_title": "미리보기",
@@ -54,8 +55,10 @@
         "collapse_all": "모두 접기",
         "collapse_sidebar": "사이드바 숨기기",
         "refresh_workspace": "워크스페이스 새로고침",
-        "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "Remove from history"
+        "toggle_filter": "필터 전환",
+        "remove_workspace": "기록에서 제거",
+        "recursive_expand": "하위 디렉토리 재귀적 확장",
+        "recursive_open_all": "모든 파일 재귀적으로 열기"
     },
     "ai": {
         "ai_unconfigured": "[AI: 설정되지 않음]"
@@ -129,8 +132,8 @@
     "search": {
         "modal_title": "파일 찾기",
         "query_hint": "파일 이름으로 검색...",
-        "include_pattern_hint": "Include (regex, comma-separated)",
-        "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+        "include_pattern_hint": "포함 (정규식, 쉼표로 구분)",
+        "exclude_pattern_hint": "제외 (정규식, 쉼표로 구분)",
         "no_results": "파일을 찾을 수 없습니다."
     }
 }

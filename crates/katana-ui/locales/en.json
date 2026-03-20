@@ -11,7 +11,8 @@
         "no_workspace_open": "No workspace open.",
         "no_document_selected": "No document open.",
         "workspace_title": "Workspace",
-        "recent_workspaces": "Recent Workspaces"
+        "recent_workspaces": "Recent Workspaces",
+        "metadata_tooltip": "Size: {size} B\nModified: {mod_time}"
     },
     "preview": {
         "preview_title": "Preview",
@@ -55,7 +56,9 @@
         "collapse_sidebar": "Hide Sidebar",
         "refresh_workspace": "Refresh workspace",
         "toggle_filter": "Toggle filter",
-        "remove_workspace": "Remove from history"
+        "remove_workspace": "Remove from history",
+        "recursive_expand": "Recursive Expand Subdirectories",
+        "recursive_open_all": "Recursive Open All Files"
     },
     "ai": {
         "ai_unconfigured": "[AI: unconfigured]"

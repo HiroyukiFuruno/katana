@@ -5,13 +5,14 @@
         "language": "語言 (Language)",
         "open_workspace": "開啟工作區…",
         "save": "儲存",
-        "open_all": "Open All"
+        "open_all": "全部開啟"
     },
     "workspace": {
         "no_workspace_open": "未開啟工作區。",
-        "no_document_selected": "未選擇文件。",
-        "workspace_title": "工作区",
-        "recent_workspaces": "Recent Workspaces"
+        "no_document_selected": "未開啟文件。",
+        "workspace_title": "工作區",
+        "recent_workspaces": "最近的工作區",
+        "metadata_tooltip": "大小: {size} B\n修改時間: {mod_time}"
     },
     "preview": {
         "preview_title": "預覽",
@@ -21,7 +22,7 @@
     },
     "plantuml": {
         "downloading_plantuml": "⬇ 正在下載 PlantUML JAR...",
-        "plantuml_installed": "✅ PlantUML 已安裝。正在刷新預覽...",
+        "plantuml_installed": "✅ PlantUML 已安裝。正在重新整理預覽...",
         "download_error": "❌ 下載錯誤: "
     },
     "view_mode": {
@@ -53,12 +54,14 @@
         "expand_all": "全部展開",
         "collapse_all": "全部摺疊",
         "collapse_sidebar": "隱藏側邊欄",
-        "refresh_workspace": "刷新工作區",
-        "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "Remove from history"
+        "refresh_workspace": "重新整理工作區",
+        "toggle_filter": "切換篩選器",
+        "remove_workspace": "從歷史紀錄中移除",
+        "recursive_expand": "遞迴展開子目錄",
+        "recursive_open_all": "遞迴開啟所有檔案"
     },
     "ai": {
-        "ai_unconfigured": "[AI: 未配置]"
+        "ai_unconfigured": "[AI: 未設定]"
     },
     "tool": {
         "not_installed": "⚠ {tool} 未安裝",
@@ -129,8 +132,8 @@
     "search": {
         "modal_title": "搜尋檔案",
         "query_hint": "輸入檔名進行搜尋...",
-        "include_pattern_hint": "Include (regex, comma-separated)",
-        "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+        "include_pattern_hint": "包含（正則表示式，以逗號分隔）",
+        "exclude_pattern_hint": "排除（正則表示式，以逗號分隔）",
         "no_results": "沒有找到檔案。"
     }
 }
