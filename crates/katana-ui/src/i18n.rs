@@ -38,6 +38,7 @@ pub struct MenuMessages {
     pub language: String,
     pub open_workspace: String,
     pub save: String,
+    pub open_all: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

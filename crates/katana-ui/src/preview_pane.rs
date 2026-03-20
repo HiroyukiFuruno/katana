@@ -72,9 +72,25 @@ pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
     pub sections: Vec<RenderedSection>,
     /// Channel for background rendering completion notifications.
-    render_rx: Option<std::sync::mpsc::Receiver<(usize, RenderedSection)>>,
+    pub render_rx: Option<std::sync::mpsc::Receiver<RenderMessage>>,
     /// Path to the currently previewed Markdown file (for resolving relative paths in render_html_fn).
     md_file_path: std::path::PathBuf,
+    /// Signals shell to reduce diagram concurrency settings if a worker fails.
+    pub concurrency_reduction_requested: bool,
+}
+
+struct RenderJob {
+    index: usize,
+    kind: DiagramKind,
+    src: String,
+    path: std::path::PathBuf,
+    cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
+    force: bool,
+}
+
+pub enum RenderMessage {
+    Section(usize, RenderedSection),
+    ReduceConcurrency,
 }
 
 impl PreviewPane {
@@ -116,7 +132,14 @@ impl PreviewPane {
     ///
     /// Returns Markdown sections immediately. Diagrams are set to `Pending`
     /// and rendered in a background thread.
-    pub fn full_render(&mut self, source: &str, md_file_path: &std::path::Path) {
+    pub fn full_render(
+        &mut self,
+        source: &str,
+        md_file_path: &std::path::Path,
+        cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
+        force: bool,
+        diagram_concurrency: usize,
+    ) {
         self.md_file_path = md_file_path.to_path_buf();
         let resolved = resolve_image_paths(source, md_file_path);
         let flattened = flatten_list_code_blocks(&resolved);
@@ -125,7 +148,7 @@ impl PreviewPane {
         self.render_rx = None;
 
         let mut sections = Vec::with_capacity(raw.len());
-        let mut jobs: Vec<(usize, DiagramKind, String)> = Vec::new();
+        let mut jobs: Vec<RenderJob> = Vec::new();
 
         for (i, section) in raw.iter().enumerate() {
             match section {
@@ -134,9 +157,16 @@ impl PreviewPane {
                 }
                 PreviewSection::Diagram { kind, source: src } => {
                     sections.push(RenderedSection::Pending {
-                        kind: format!("{kind:?}"),
+                        kind: format!("{kind:?}", kind = kind),
                     });
-                    jobs.push((i, kind.clone(), src.clone()));
+                    jobs.push(RenderJob {
+                        index: i,
+                        kind: kind.clone(),
+                        src: src.clone(),
+                        path: self.md_file_path.clone(),
+                        cache: cache.clone(),
+                        force,
+                    });
                 }
             }
         }
@@ -147,14 +177,74 @@ impl PreviewPane {
         }
         let (tx, rx) = std::sync::mpsc::channel();
         self.render_rx = Some(rx);
-        std::thread::spawn(move || {
-            for (index, kind, src) in jobs {
-                let section = render_diagram(&kind, &src);
-                if tx.send((index, section)).is_err() {
+
+        let concurrency = diagram_concurrency.max(1);
+        let jobs_len = jobs.len();
+        let jobs_rx = std::sync::Arc::new(std::sync::Mutex::new(jobs.into_iter()));
+
+        for _ in 0..concurrency.min(jobs_len) {
+            let tx = tx.clone();
+            let jobs_rx = jobs_rx.clone();
+            std::thread::spawn(move || loop {
+                let job = {
+                    let mut lock = jobs_rx.lock().unwrap();
+                    lock.next()
+                };
+                let Some(job) = job else {
+                    break;
+                };
+
+                let cache_key = get_cache_key(&job.path, &job.kind, &job.src);
+                let is_http = job.src.contains("http://") || job.src.contains("https://");
+
+                let cached_result = if !job.force {
+                    if is_http {
+                        job.cache.get_memory(&cache_key)
+                    } else {
+                        job.cache.get_persistent(&cache_key)
+                    }
+                } else {
+                    None
+                };
+
+                let result = if let Some(json) = cached_result {
+                    if let Ok(res) = serde_json::from_str::<DiagramResult>(&json) {
+                        res
+                    } else {
+                        let res = dispatch_renderer(&DiagramBlock {
+                            kind: job.kind.clone(),
+                            source: job.src.clone(),
+                        });
+                        if matches!(res, DiagramResult::Err { .. }) {
+                            let _ = tx.send(RenderMessage::ReduceConcurrency);
+                        }
+                        res
+                    }
+                } else {
+                    let res = dispatch_renderer(&DiagramBlock {
+                        kind: job.kind.clone(),
+                        source: job.src.clone(),
+                    });
+
+                    if let Ok(json) = serde_json::to_string(&res) {
+                        if is_http {
+                            job.cache.set_memory(&cache_key, json);
+                        } else {
+                            let _ = job.cache.set_persistent(&cache_key, json);
+                        }
+                    }
+                    if matches!(res, DiagramResult::Err { .. }) {
+                        let _ = tx.send(RenderMessage::ReduceConcurrency);
+                    }
+                    res
+                };
+
+                let section = map_diagram_result(&job.kind, &job.src, result);
+                if tx.send(RenderMessage::Section(job.index, section)).is_err() {
                     break; // Receiver was dropped.
                 }
-            }
-        });
+            });
+        }
     }
 
     /// Renders the preview pane content (including ScrollArea).
@@ -208,10 +298,17 @@ impl PreviewPane {
     fn poll_renders(&mut self, ctx: &egui::Context) {
         let still_pending = if let Some(rx) = &self.render_rx {
             let mut updated = false;
-            while let Ok((idx, section)) = rx.try_recv() {
-                if let Some(slot) = self.sections.get_mut(idx) {
-                    *slot = section;
-                    updated = true;
+            while let Ok(msg) = rx.try_recv() {
+                match msg {
+                    RenderMessage::Section(idx, section) => {
+                        if let Some(slot) = self.sections.get_mut(idx) {
+                            *slot = section;
+                            updated = true;
+                        }
+                    }
+                    RenderMessage::ReduceConcurrency => {
+                        self.concurrency_reduction_requested = true;
+                    }
                 }
             }
             if updated {
@@ -234,9 +331,16 @@ impl PreviewPane {
     /// Available in release builds too (harmless no-op when no background render is running).
     pub fn wait_for_renders(&mut self) {
         while let Some(rx) = &self.render_rx {
-            while let Ok((idx, section)) = rx.try_recv() {
-                if let Some(slot) = self.sections.get_mut(idx) {
-                    *slot = section;
+            while let Ok(msg) = rx.try_recv() {
+                match msg {
+                    RenderMessage::Section(idx, section) => {
+                        if let Some(slot) = self.sections.get_mut(idx) {
+                            *slot = section;
+                        }
+                    }
+                    RenderMessage::ReduceConcurrency => {
+                        self.concurrency_reduction_requested = true;
+                    }
                 }
             }
             if self
@@ -255,6 +359,7 @@ impl PreviewPane {
 
 /// Renders a `PreviewSection` into a `RenderedSection`.
 /// Converts diagram blocks via the renderer and attempts SVG rasterization.
+#[cfg(test)]
 fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     let block = DiagramBlock {
         kind: kind.clone(),
@@ -262,6 +367,18 @@ fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
     };
     let result = dispatch_renderer(&block);
     map_diagram_result(kind, source, result)
+}
+
+/// Generates a cache key based on the file path, diagram kind, and source text.
+pub fn get_cache_key(md_file_path: &std::path::Path, kind: &DiagramKind, source: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    md_file_path.hash(&mut hasher);
+    kind.display_name().hash(&mut hasher);
+    source.hash(&mut hasher);
+    format!("diagram_{:x}", hasher.finish())
 }
 
 /// Pure function converting a `DiagramResult` into a `RenderedSection`. Exposed for testing.
@@ -371,6 +488,7 @@ pub fn decode_png_rgba(bytes: &[u8]) -> Result<RasterizedSvg, String> {
 #[allow(clippy::unwrap_used, clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
+    use katana_platform::CacheFacade;
 
     // ── Markdown image parsing (test-only utilities) ──
 
@@ -626,8 +744,11 @@ mod tests {
         pane.render_rx = Some(rx);
 
         // Send a result from the background thread
-        tx.send((0, RenderedSection::Markdown("# Result".to_string())))
-            .unwrap();
+        tx.send(RenderMessage::Section(
+            0,
+            RenderedSection::Markdown("# Result".to_string()),
+        ))
+        .unwrap();
         // Drop tx so the receiver becomes Disconnected
         drop(tx);
 
@@ -657,7 +778,10 @@ mod tests {
         // Send in another thread
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(10));
-            let _ = tx.send((0, RenderedSection::Markdown("# Done".to_string())));
+            let _ = tx.send(RenderMessage::Section(
+                0,
+                RenderedSection::Markdown("# Done".to_string()),
+            ));
         });
 
         pane.wait_for_renders();
@@ -684,7 +808,14 @@ mod tests {
         let mut pane = PreviewPane::default();
         // Content containing a DrawIo diagram -> evaluates to Pending
         let source = "# Title\n```drawio\n<mxGraphModel><root></root></mxGraphModel>\n```";
-        pane.full_render(source, std::path::Path::new("/tmp/test.md"));
+        let cache = std::sync::Arc::new(katana_platform::InMemoryCacheService::default());
+        pane.full_render(
+            source,
+            std::path::Path::new("/tmp/test.md"),
+            cache,
+            false,
+            4,
+        );
 
         // render_rx is set (because there is a diagram)
         assert!(pane.render_rx.is_some());
@@ -791,5 +922,92 @@ mod tests {
             find_next_image("text before [![badge](url)](link)"),
             Some(12)
         );
+    }
+
+    // ── Coverage Gap Fillers (Task 4) ──
+
+    #[test]
+    fn test_coverage_gap_fillers_rendering_logic() {
+        let mut pane = PreviewPane::default();
+        let cache = std::sync::Arc::new(katana_platform::InMemoryCacheService::default());
+
+        // 1. hit is_http = true and get_memory (L202)
+        // 2. hit DiagramResult::Err and ReduceConcurrency (L237)
+        // Note: is_http is true if the source contains "http://"
+        let source = "```drawio\nhttp://invalidxml\n```";
+        pane.full_render(
+            source,
+            std::path::Path::new("/tmp/test.md"),
+            cache.clone(),
+            false,
+            1,
+        );
+        pane.wait_for_renders();
+        assert!(pane.concurrency_reduction_requested);
+
+        // 3. hit force = true and return None (L207)
+        pane.concurrency_reduction_requested = false;
+        pane.full_render(
+            source,
+            std::path::Path::new("/tmp/test.md"),
+            cache.clone(),
+            true,
+            1,
+        );
+        pane.wait_for_renders();
+
+        // 4. hit cached path (L211) and successful recovery/reserialize (L212, L231)
+        // First, put a valid result in cache
+        let diag_src = "http://graph TD; A-->B";
+        let key = get_cache_key(
+            &std::path::PathBuf::from("/tmp/test.md"),
+            &DiagramKind::Mermaid,
+            diag_src,
+        );
+        let valid_res = DiagramResult::Ok("<s></s>".to_string());
+        let valid_json = serde_json::to_string(&valid_res).unwrap();
+        cache.set_memory(&key, valid_json);
+
+        let source2 = format!("```mermaid\n{diag_src}\n```"); // is_http=true
+        pane.full_render(
+            &source2,
+            std::path::Path::new("/tmp/test.md"),
+            cache.clone(),
+            false,
+            1,
+        );
+        pane.wait_for_renders();
+
+        // 5. hit cached path but JSON error -> re-render (L214-222)
+        cache.set_memory(&key, "invalid json".to_string());
+        pane.full_render(
+            &source2,
+            std::path::Path::new("/tmp/test.md"),
+            cache.clone(),
+            false,
+            1,
+        );
+        pane.wait_for_renders();
+    }
+
+    #[test]
+    fn test_coverage_gap_filler_render_message_processing() {
+        let mut pane = PreviewPane::default();
+        let (tx, rx) = std::sync::mpsc::channel();
+        pane.render_rx = Some(rx);
+
+        // hit RenderMessage::ReduceConcurrency in poll_renders (L309-311)
+        tx.send(RenderMessage::ReduceConcurrency).unwrap();
+        let ctx = egui::Context::default();
+        pane.poll_renders(&ctx);
+        assert!(pane.concurrency_reduction_requested);
+
+        // hit RenderMessage::ReduceConcurrency in wait_for_renders (L341-343)
+        pane.concurrency_reduction_requested = false;
+        let (tx, rx) = std::sync::mpsc::channel();
+        pane.render_rx = Some(rx);
+        tx.send(RenderMessage::ReduceConcurrency).unwrap();
+        pane.wait_for_renders();
+        assert!(pane.concurrency_reduction_requested);
     }
 }

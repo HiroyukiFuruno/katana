@@ -157,22 +157,34 @@ impl KatanaApp {
             .update_markdown_sections(source, path);
     }
 
-    /// Re-renders all sections. Updates the content hash as well.
-    fn full_refresh_preview(&mut self, path: &std::path::Path, source: &str) {
+    fn full_refresh_preview(
+        &mut self,
+        path: &std::path::Path,
+        source: &str,
+        force: bool,
+        concurrency: usize,
+    ) {
         let h = hash_str(source);
         let path_buf = path.to_path_buf();
         let pane = Self::get_preview_pane(&mut self.tab_previews, path_buf.clone());
-        pane.full_render(source, path);
+        pane.full_render(source, path, self.state.cache.clone(), force, concurrency);
 
         let tab = self
             .tab_previews
             .iter_mut()
             .find(|t| t.path == path_buf)
             .expect("just fetched pane");
+        // If force, also reset hash to 0 so it redraws on switch, or update it now.
+        // We update to true hash since we re-rendered anyway.
         tab.hash = h;
     }
 
     fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
+        // Save current workspace state (including open tabs) before unloading it
+        if self.state.workspace.is_some() {
+            self.save_workspace_state();
+        }
+
         self.state.is_loading_workspace = true;
         // Temporary feedback
         self.state.status_message = Some(crate::i18n::tf(
@@ -216,10 +228,17 @@ impl KatanaApp {
             struct TabState {
                 tabs: Vec<String>,
                 active_idx: Option<usize>,
+                #[serde(default)]
+                expanded_directories: std::collections::HashSet<String>,
             }
             if let Ok(state) = serde_json::from_str::<TabState>(&cache_json) {
                 to_open = state.tabs;
                 active_idx = state.active_idx;
+                self.state.expanded_directories = state
+                    .expanded_directories
+                    .into_iter()
+                    .map(std::path::PathBuf::from)
+                    .collect();
             }
         } else {
             // Fallback for first time after migration
@@ -269,7 +288,13 @@ impl KatanaApp {
                 let active_doc = &self.state.open_documents[idx];
                 let src = active_doc.buffer.clone();
                 let doc_path = active_doc.path.clone();
-                self.full_refresh_preview(&doc_path, &src);
+                let concurrency = self
+                    .state
+                    .settings
+                    .settings()
+                    .performance
+                    .diagram_concurrency;
+                self.full_refresh_preview(&doc_path, &src, false, concurrency);
             }
         }
 
@@ -359,7 +384,13 @@ impl KatanaApp {
                 .unwrap_or(0);
             if h != last_h {
                 // Re-render only if the content has changed
-                self.full_refresh_preview(&path, &src);
+                let concurrency = self
+                    .state
+                    .settings
+                    .settings()
+                    .performance
+                    .diagram_concurrency;
+                self.full_refresh_preview(&path, &src, false, concurrency);
             }
             self.save_workspace_state();
             // No change -> reuse existing PreviewPane (cached)
@@ -369,10 +400,16 @@ impl KatanaApp {
         match self.fs.load_document(&path) {
             Ok(doc) => {
                 let src = doc.buffer.clone();
+                let concurrency = self
+                    .state
+                    .settings
+                    .settings()
+                    .performance
+                    .diagram_concurrency;
+                self.full_refresh_preview(&path, &src, false, concurrency);
                 self.state.open_documents.push(doc);
                 self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
                 self.state.initialize_tab_split_state(path.clone());
-                self.full_refresh_preview(&path, &src);
                 self.save_workspace_state();
             }
             Err(e) => {
@@ -403,6 +440,13 @@ impl KatanaApp {
             .map(|d| d.path.display().to_string())
             .collect();
         let idx = self.state.active_doc_idx;
+        let expanded: std::collections::HashSet<String> = self
+            .state
+            .expanded_directories
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect();
+
         let settings = self.state.settings.settings_mut();
         settings.workspace.open_tabs = open_tabs.clone();
         settings.workspace.active_tab_idx = idx;
@@ -416,10 +460,12 @@ impl KatanaApp {
             struct TabState {
                 tabs: Vec<String>,
                 active_idx: Option<usize>,
+                expanded_directories: std::collections::HashSet<String>,
             }
             let state = TabState {
                 tabs: open_tabs,
                 active_idx: idx,
+                expanded_directories: expanded,
             };
             if let Ok(json) = serde_json::to_string(&state) {
                 let _ = self.state.cache.set_persistent(&key, json);
@@ -461,6 +507,11 @@ impl KatanaApp {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
             AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::SelectDocument(p) => self.handle_select_document(p),
+            AppAction::OpenMultipleDocuments(paths) => {
+                for path in paths {
+                    self.handle_select_document(path);
+                }
+            }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
             AppAction::CloseDocument(idx) => {
                 if idx < self.state.open_documents.len() {
@@ -482,9 +533,15 @@ impl KatanaApp {
                 }
                 // Re-render only the active tab immediately
                 if let Some(doc) = self.state.active_document() {
-                    let src = doc.buffer.clone();
                     let path = doc.path.clone();
-                    self.full_refresh_preview(&path, &src);
+                    let src = doc.buffer.clone();
+                    let concurrency = self
+                        .state
+                        .settings
+                        .settings()
+                        .performance
+                        .diagram_concurrency;
+                    self.full_refresh_preview(&path, &src, true, concurrency);
                 }
             }
             AppAction::ChangeLanguage(lang) => {
@@ -1009,7 +1066,7 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
-        app.full_refresh_preview(&path, "# Content");
+        app.full_refresh_preview(&path, "# Content", false, 4);
         assert!(app.tab_previews.iter().any(|t| t.path == path));
     }
 
@@ -1336,6 +1393,6 @@ mod tests_extra {
         let ui_ctx = egui::Context::default();
         app.poll_workspace_load(&ui_ctx);
 
-        assert_eq!(app.state.is_loading_workspace, false);
+        assert!(!app.state.is_loading_workspace);
     }
 }

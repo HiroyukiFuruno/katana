@@ -144,7 +144,11 @@ pub(crate) fn render_workspace_panel(
                         .on_hover_text(crate::i18n::get().action.expand_all.clone())
                         .clicked()
                     {
-                        state.force_tree_open = Some(true);
+                        if let Some(ws) = &state.workspace {
+                            state
+                                .expanded_directories
+                                .extend(ws.collect_all_directory_paths());
+                        }
                     }
                     if ui
                         .small_button("-")
@@ -251,8 +255,15 @@ pub(crate) fn render_workspace_content(
 ) {
     if let Some(ws) = &state.workspace {
         let entries = ws.tree.clone();
-        let mut selected: Option<std::path::PathBuf> = None;
-        let force = state.force_tree_open;
+        if let Some(force) = state.force_tree_open {
+            if force {
+                state
+                    .expanded_directories
+                    .extend(ws.collect_all_directory_paths());
+            } else {
+                state.expanded_directories.clear();
+            }
+        }
         let active_path = state.active_path().map(|p| p.to_path_buf());
 
         let ws_root = ws.root.clone();
@@ -276,20 +287,17 @@ pub(crate) fn render_workspace_content(
             .show(ui, |ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                 let mut ctx = TreeRenderContext {
-                    selected: &mut selected,
-                    force,
+                    action,
                     depth: 0,
                     active_path: active_path.as_deref(),
                     filter_set,
+                    expanded_directories: &mut state.expanded_directories,
                 };
                 for entry in &entries {
                     render_tree_entry(ui, entry, &mut ctx);
                 }
             });
         state.force_tree_open = None;
-        if let Some(path) = selected {
-            *action = AppAction::SelectDocument(path);
-        }
     } else {
         ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
         ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
@@ -671,11 +679,11 @@ pub(crate) fn render_editor_content(
 }
 
 pub(crate) struct TreeRenderContext<'a, 'b> {
-    pub selected: &'a mut Option<std::path::PathBuf>,
-    pub force: Option<bool>,
+    pub action: &'a mut AppAction,
     pub depth: usize,
     pub active_path: Option<&'b std::path::Path>,
     pub filter_set: Option<&'b std::collections::HashSet<std::path::PathBuf>>,
+    pub expanded_directories: &'a mut std::collections::HashSet<std::path::PathBuf>,
 }
 
 pub(crate) fn render_tree_entry(
@@ -715,25 +723,87 @@ pub(crate) fn render_directory_entry(
 ) {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
     let id = ui.make_persistent_id(format!("dir:{}", path.display()));
+
+    // Check programmatic state for expansion
+    let is_open = ctx.expanded_directories.contains(path);
+
+    // Sync egui animation state with programmatic state
     let mut state =
-        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
-    if let Some(open) = ctx.force {
-        state.set_open(open);
-    }
-    let is_open = state.is_open();
+        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
+    state.set_open(is_open);
 
     let arrow = if is_open { "▼" } else { "▶" };
     let dir_icon = if is_open { "📂" } else { "📁" };
     let prefix = indent_prefix(ctx.depth);
     let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
     let file_tree_color = ui.visuals().text_color();
-    let resp = ui.add(
+
+    // Full-width clickable label for better clickability and testability
+    let resp = ui.add_sized(
+        egui::vec2(ui.available_width(), 22.0),
         egui::Label::new(egui::RichText::new(label_text).color(file_tree_color))
-            .truncate()
-            .sense(egui::Sense::click()),
+            .sense(egui::Sense::click())
+            .truncate(),
     );
+
+    if resp.hovered() {
+        ui.painter()
+            .rect_filled(resp.rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+    }
+
+    // Directory level Meta Info on Hover
+    let path_str = path.display().to_string();
+    let meta_text = format!(
+        "{}\n{}",
+        crate::i18n::tf("Path", &[("path", path_str.as_str())]),
+        if let Ok(metadata) = std::fs::metadata(path) {
+            let mod_time = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            format!("Size: {} B\nModified (Unix): {}", metadata.len(), mod_time)
+        } else {
+            "Metadata unavailable".to_string()
+        }
+    );
+    let resp = resp.on_hover_ui(|ui| {
+        ui.label(meta_text);
+    });
+
+    // "Open All" Context Menu for directories
+    resp.context_menu(|ui| {
+        if ui
+            .button(crate::i18n::get().menu.open_all.clone())
+            .clicked()
+        {
+            let mut to_open = Vec::new();
+            let mut to_expand = Vec::new();
+            for child in children {
+                child.collect_all_markdown_file_paths(&mut to_open);
+                child.collect_all_directory_paths(&mut to_expand);
+            }
+            // Also expand the current directory
+            ctx.expanded_directories.insert(path.to_path_buf());
+            // And all subdirectories
+            ctx.expanded_directories.extend(to_expand);
+
+            if !to_open.is_empty() {
+                *ctx.action = crate::app_state::AppAction::OpenMultipleDocuments(to_open);
+            }
+            ui.close();
+        }
+    });
+
     if resp.clicked() {
-        state.set_open(!is_open);
+        let new_state = !is_open;
+        state.set_open(new_state);
+        if new_state {
+            ctx.expanded_directories.insert(path.to_path_buf());
+        } else {
+            ctx.expanded_directories.remove(path);
+        }
     }
     state.store(ui.ctx());
 
@@ -818,7 +888,7 @@ pub(crate) fn render_file_entry(
     let resp = row_resp.union(label_resp);
 
     if resp.clicked() && entry.is_markdown() {
-        *ctx.selected = Some(path.to_path_buf());
+        *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
     }
 }
 
@@ -1424,6 +1494,7 @@ impl eframe::App for KatanaApp {
     }
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1481,7 +1552,14 @@ mod tests {
             doc.buffer = markdown.to_string();
         }
         let mut pane = PreviewPane::default();
-        pane.full_render(markdown, path);
+        let cache = app.state.cache.clone();
+        let concurrency = app
+            .state
+            .settings
+            .settings()
+            .performance
+            .diagram_concurrency;
+        pane.full_render(markdown, path, cache, false, concurrency);
         pane.wait_for_renders();
         app.tab_previews.push(crate::shell::TabPreviewCache {
             path: path.to_path_buf(),
@@ -1518,16 +1596,18 @@ mod tests {
         let ctx = egui::Context::default();
         let path = std::path::PathBuf::from("/tmp/CHANGELOG.md");
         let entry = TreeEntry::File { path: path.clone() };
-        let mut selected = None;
+        let mut action = AppAction::None;
+        let mut expanded_directories = std::collections::HashSet::new();
 
         let output = ctx.run(test_input(egui::vec2(320.0, 200.0)), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
                 let mut render_ctx = TreeRenderContext {
-                    selected: &mut selected,
+                    action: &mut action,
                     force: None,
                     depth: 0,
                     active_path: Some(path.as_path()),
                     filter_set: None,
+                    expanded_directories: &mut expanded_directories,
                 };
                 render_file_entry(ui, &entry, &path, &mut render_ctx);
             });

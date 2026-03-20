@@ -59,6 +59,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub workspace: WorkspaceSettings,
 
+    /// Performance and advanced tuning (nesting).
+    #[serde(default)]
+    pub performance: PerformanceSettings,
+
     /// Terms of service accepted version (None = not accepted).
     #[serde(default)]
     pub terms_accepted_version: Option<String>,
@@ -139,6 +143,23 @@ pub struct WorkspaceSettings {
     pub active_tab_idx: Option<usize>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceSettings {
+    /// Number of concurrent diagram renders.
+    pub diagram_concurrency: usize,
+}
+
+const DEFAULT_DIAGRAM_CONCURRENCY: usize = 4;
+
+impl Default for PerformanceSettings {
+    fn default() -> Self {
+        Self {
+            // Default 4 workers, reduces dynamically upon errors like OOM
+            diagram_concurrency: DEFAULT_DIAGRAM_CONCURRENCY,
+        }
+    }
+}
+
 fn default_version() -> String {
     "0.2.0".to_string()
 }
@@ -184,6 +205,7 @@ impl Default for AppSettings {
             font: FontSettings::default(),
             layout: LayoutSettings::default(),
             workspace: WorkspaceSettings::default(),
+            performance: PerformanceSettings::default(),
             terms_accepted_version: None,
             language: default_language(),
             extra: Vec::new(),

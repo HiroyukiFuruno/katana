@@ -1,135 +1,136 @@
 {
-  "menu": {
-    "file": "File",
-    "settings": "Settings",
-    "language": "Language",
-    "open_workspace": "Open Workspace…",
-    "save": "Save"
-  },
-  "workspace": {
-    "no_workspace_open": "No workspace open.",
-    "no_document_selected": "No document open.",
-    "workspace_title": "Workspace",
-    "recent_workspaces": "Recent Workspaces"
-  },
-  "preview": {
-    "preview_title": "Preview",
-    "refresh_diagrams": "Refresh diagrams",
-    "rendering": "{kind} Rendering...",
-    "no_preview": "(No preview)"
-  },
-  "plantuml": {
-    "downloading_plantuml": "⬇ Downloading PlantUML JAR...",
-    "plantuml_installed": "✅ PlantUML installed. Refreshing preview...",
-    "download_error": "❌ Download error: "
-  },
-  "view_mode": {
-    "preview": "Preview",
-    "code": "Code",
-    "split": "Split"
-  },
-  "split_toggle": {
-    "horizontal": "Switch to horizontal split (left/right)",
-    "vertical": "Switch to vertical split (top/bottom)",
-    "editor_first": "Place editor left/top",
-    "preview_first": "Place preview left/top"
-  },
-  "error": {
-    "missing_dependency": "⚠️ {tool_name} is not found. Please install it using {install_hint}.",
-    "curl_launch_failed": "curl launch failed",
-    "download_failed": "Download failed",
-    "render_error": "⚠ [{kind}] {message}"
-  },
-  "status": {
-    "ready": "Ready",
-    "saved": "Saved.",
-    "save_failed": "Save failed: {error}",
-    "opened_workspace": "Opened workspace: {name}",
-    "cannot_open_workspace": "Cannot open workspace: {error}",
-    "cannot_open_file": "Cannot open file: {error}"
-  },
-  "action": {
-    "expand_all": "Expand all",
-    "collapse_all": "Collapse all",
-    "collapse_sidebar": "Hide Sidebar",
-    "refresh_workspace": "Refresh workspace",
-    "toggle_filter": "Toggle filter",
-    "remove_workspace": "Remove from history"
-  },
-  "ai": {
-    "ai_unconfigured": "[AI: unconfigured]"
-  },
-  "tool": {
-    "not_installed": "⚠ {tool} is not installed",
-    "install_path": "Install path: {path}",
-    "download": "⬇ Download {tool}"
-  },
-  "settings": {
-    "title": "Settings",
-    "toc_visible": "Show Table of Contents",
-    "theme": {
-      "preset": "Theme Preset",
-      "dark_section": "Dark",
-      "light_section": "Light",
-      "custom_colors": "Custom Colours",
-      "reset_custom": "Reset to Preset"
+    "menu": {
+        "file": "File",
+        "settings": "Settings",
+        "language": "Language",
+        "open_workspace": "Open Workspace…",
+        "save": "Save",
+        "open_all": "Open All"
     },
-    "font": {
-      "size": "Font Size",
-      "family": "Font Family",
-      "size_slider_hint": "Drag left or right to adjust size"
-    },
-    "layout": {
-      "split_direction": "Split Direction",
-      "horizontal": "Horizontal (Left / Right)",
-      "vertical": "Vertical (Top / Bottom)",
-      "pane_order": "Pane Order",
-      "editor_first": "Editor First",
-      "preview_first": "Preview First"
+    "workspace": {
+        "no_workspace_open": "No workspace open.",
+        "no_document_selected": "No document open.",
+        "workspace_title": "Workspace",
+        "recent_workspaces": "Recent Workspaces"
     },
     "preview": {
-      "title": "Preview",
-      "heading": "# Sample Heading",
-      "normal_text": "Normal text with ",
-      "accent_link": "accent link",
-      "secondary_text": "Secondary text sample",
-      "code_sample": "fn main() { println!(\"Hello!\"); }"
+        "preview_title": "Preview",
+        "refresh_diagrams": "Refresh diagrams",
+        "rendering": "{kind} Rendering...",
+        "no_preview": "(No preview)"
     },
-    "color": {
-      "background": "Background",
-      "panel_background": "Panel Background",
-      "text": "Text",
-      "text_secondary": "Secondary Text",
-      "accent": "Accent",
-      "border": "Border",
-      "selection": "Selection",
-      "code_background": "Code Background",
-      "preview_background": "Preview Background"
+    "plantuml": {
+        "downloading_plantuml": "⬇ Downloading PlantUML JAR...",
+        "plantuml_installed": "✅ PlantUML installed. Refreshing preview...",
+        "download_error": "❌ Download error: "
     },
-    "tabs": [
-      {
-        "key": "theme",
-        "name": "Theme"
-      },
-      {
-        "key": "font",
-        "name": "Font"
-      },
-      {
-        "key": "layout",
-        "name": "Layout"
-      }
-    ]
-  },
-  "tab": {
-    "nav_prev": "Move to previous tab",
-    "nav_next": "Move to next tab"
-  },
-  "search": {
-    "modal_title": "Search Files",
-    "query_hint": "Type to search by file name...",
-    "include_pattern_hint": "Include (regex, comma-separated)",
-    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
-    "no_results": "No files found."
-  }
+    "view_mode": {
+        "preview": "Preview",
+        "code": "Code",
+        "split": "Split"
+    },
+    "split_toggle": {
+        "horizontal": "Switch to horizontal split (left/right)",
+        "vertical": "Switch to vertical split (top/bottom)",
+        "editor_first": "Place editor left/top",
+        "preview_first": "Place preview left/top"
+    },
+    "error": {
+        "missing_dependency": "⚠️ {tool_name} is not found. Please install it using {install_hint}.",
+        "curl_launch_failed": "curl launch failed",
+        "download_failed": "Download failed",
+        "render_error": "⚠ [{kind}] {message}"
+    },
+    "status": {
+        "ready": "Ready",
+        "saved": "Saved.",
+        "save_failed": "Save failed: {error}",
+        "opened_workspace": "Opened workspace: {name}",
+        "cannot_open_workspace": "Cannot open workspace: {error}",
+        "cannot_open_file": "Cannot open file: {error}"
+    },
+    "action": {
+        "expand_all": "Expand all",
+        "collapse_all": "Collapse all",
+        "collapse_sidebar": "Hide Sidebar",
+        "refresh_workspace": "Refresh workspace",
+        "toggle_filter": "Toggle filter",
+        "remove_workspace": "Remove from history"
+    },
+    "ai": {
+        "ai_unconfigured": "[AI: unconfigured]"
+    },
+    "tool": {
+        "not_installed": "⚠ {tool} is not installed",
+        "install_path": "Install path: {path}",
+        "download": "⬇ Download {tool}"
+    },
+    "settings": {
+        "title": "Settings",
+        "toc_visible": "Show Table of Contents",
+        "theme": {
+            "preset": "Theme Preset",
+            "dark_section": "Dark",
+            "light_section": "Light",
+            "custom_colors": "Custom Colours",
+            "reset_custom": "Reset to Preset"
+        },
+        "font": {
+            "size": "Font Size",
+            "family": "Font Family",
+            "size_slider_hint": "Drag left or right to adjust size"
+        },
+        "layout": {
+            "split_direction": "Split Direction",
+            "horizontal": "Horizontal (Left / Right)",
+            "vertical": "Vertical (Top / Bottom)",
+            "pane_order": "Pane Order",
+            "editor_first": "Editor First",
+            "preview_first": "Preview First"
+        },
+        "preview": {
+            "title": "Preview",
+            "heading": "# Sample Heading",
+            "normal_text": "Normal text with ",
+            "accent_link": "accent link",
+            "secondary_text": "Secondary text sample",
+            "code_sample": "fn main() { println!(\"Hello!\"); }"
+        },
+        "color": {
+            "background": "Background",
+            "panel_background": "Panel Background",
+            "text": "Text",
+            "text_secondary": "Secondary Text",
+            "accent": "Accent",
+            "border": "Border",
+            "selection": "Selection",
+            "code_background": "Code Background",
+            "preview_background": "Preview Background"
+        },
+        "tabs": [
+            {
+                "key": "theme",
+                "name": "Theme"
+            },
+            {
+                "key": "font",
+                "name": "Font"
+            },
+            {
+                "key": "layout",
+                "name": "Layout"
+            }
+        ]
+    },
+    "tab": {
+        "nav_prev": "Move to previous tab",
+        "nav_next": "Move to next tab"
+    },
+    "search": {
+        "modal_title": "Search Files",
+        "query_hint": "Type to search by file name...",
+        "include_pattern_hint": "Include (regex, comma-separated)",
+        "exclude_pattern_hint": "Exclude (regex, comma-separated)",
+        "no_results": "No files found."
+    }
 }

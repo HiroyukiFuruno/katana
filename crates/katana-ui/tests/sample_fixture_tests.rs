@@ -43,7 +43,13 @@ fn load_fixture(filename: &str) -> (PreviewPane, std::path::PathBuf, String) {
         .unwrap_or_else(|e| panic!("Failed to read {}: {e}", fixture_path.display()));
 
     let mut pane = PreviewPane::default();
-    pane.full_render(&source, &fixture_path);
+    pane.full_render(
+        &source,
+        &fixture_path,
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
     pane.wait_for_renders();
     (pane, fixture_path, source)
 }

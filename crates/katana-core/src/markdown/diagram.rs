@@ -5,8 +5,10 @@
 //! - `plantuml` — raw PlantUML source with `@startuml`/`@enduml` delimiters
 //! - `drawio`   — raw uncompressed XML containing `<mxfile>` or `<mxGraphModel>`
 
+use serde::{Deserialize, Serialize};
+
 /// Supported diagram kinds.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagramKind {
     Mermaid,
     PlantUml,
@@ -90,7 +92,7 @@ pub enum DiagramValidationError {
 }
 
 /// Result returned by a diagram renderer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DiagramResult {
     /// Successfully rendered HTML/SVG fragment.
     Ok(String),

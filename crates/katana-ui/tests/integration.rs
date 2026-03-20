@@ -165,6 +165,108 @@ fn test_integration_view_modes() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
+#[test]
+fn test_integration_workspace_directory_toggle_non_recursive() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    // Use a globally unique name so egui doesn't remember previous states or animations for this ID
+    let unique_name = format!(
+        "katana_test_dir_toggle_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+    let temp_dir = std::env::temp_dir().join(unique_name);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    let dir2 = temp_dir.join("dir1").join("dir2");
+    std::fs::create_dir_all(&dir2).unwrap();
+    let test_file = dir2.join("test.md");
+    std::fs::write(&test_file, "# Content").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
+    wait_for_workspace_load(&mut harness);
+    harness.step();
+    harness.step();
+
+    // Depth 0: "" prefix
+    let dir1_closed = "▶ 📁 dir1";
+    let dir1_open = "▼ 📂 dir1";
+    // 1. Initial state: dir1 should be visible
+    let dir1_node = if let Some(n) = harness.get_all_by_value(dir1_closed).next() {
+        n
+    } else if let Some(n) = harness.get_all_by_value(dir1_open).next() {
+        n
+    } else {
+        panic!("Neither dir1 closed nor open found among visible labels");
+    };
+
+    dir1_node.click();
+    harness.step();
+    harness.step();
+
+    // 2. After clicking dir1, dir2 should be visible
+    let dir2_node = harness.get_by_label_contains("dir2");
+
+    // 3. BUT test.md should NOT be visible (non-recursive)
+    let test_md_visible = harness
+        .get_all_by_role(egui::accesskit::Role::Label)
+        .any(|n| n.value().map(|v| v.contains("test.md")).unwrap_or(false));
+    assert!(
+        !test_md_visible,
+        "test.md should NOT be visible (non-recursive expansion)"
+    );
+
+    // 4. Now click dir2
+    dir2_node.click();
+    harness.step();
+    harness.step();
+
+    // 5. Now test.md should be visible
+    let _ = harness.get_by_label_contains("test.md");
+
+    // 6. Verify cache is not empty
+    let cache_before = harness
+        .state_mut()
+        .app_state_mut()
+        .expanded_directories
+        .clone();
+    assert!(
+        !cache_before.is_empty(),
+        "Cache should contain expanded dirs"
+    );
+
+    // 7. Click "-" button (Collapse All)
+    let collapse_all = harness.get_by_label("-");
+    collapse_all.click();
+    harness.step();
+    harness.step();
+
+    // 8. Verify EVERYTHING is collapsed (dir2 should NOT be visible)
+    let dir2_visible = harness
+        .get_all_by_role(egui::accesskit::Role::Label)
+        .any(|n| n.value().map(|v| v.contains("dir2")).unwrap_or(false));
+    assert!(
+        !dir2_visible,
+        "dir2 should NOT be visible after Collapse All"
+    );
+
+    // 9. Verify cache is CLEARED
+    let cache_after = harness
+        .state_mut()
+        .app_state_mut()
+        .expanded_directories
+        .clone();
+    assert!(
+        cache_after.is_empty(),
+        "Cache should be EMPTY after Collapse All"
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
 // Additional integration tests to cover more shell.rs branches
 
 // Test UpdateBuffer action (shell.rs L886)
@@ -346,6 +448,149 @@ fn test_integration_workspace_with_subdirectory() {
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
+// Tests bulk opening from contextual menu
+#[test]
+fn test_integration_open_all_markdown() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = std::env::temp_dir().join("katana_test_open_all_md");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(temp_dir.join("docs")).unwrap();
+
+    let md1 = temp_dir.join("docs").join("a.md");
+    let md2 = temp_dir.join("docs").join("b.md");
+    let not_md = temp_dir.join("docs").join("c.txt");
+
+    std::fs::write(&md1, "# A").unwrap();
+    std::fs::write(&md2, "# B").unwrap();
+    std::fs::write(&not_md, "not md").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
+
+    wait_for_workspace_load(&mut harness);
+
+    wait_for_workspace_load(&mut harness);
+
+    // Simulate "Open All" using direct action (since kittest lacks secondary_click easily)
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenMultipleDocuments(vec![
+            md1.clone(),
+            md2.clone(),
+        ]));
+    harness.step();
+
+    let state = harness.state_mut().app_state_mut();
+    assert_eq!(state.open_documents.len(), 2, "Should open 2 documents");
+
+    // Test duplicate prevention using the action directly since UI is verified once
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenMultipleDocuments(vec![
+            md1.clone(),
+            md2.clone(),
+        ]));
+    harness.step();
+
+    let state = harness.state_mut().app_state_mut();
+    assert_eq!(
+        state.open_documents.len(),
+        2,
+        "Should not duplicate tabs on re-opening"
+    );
+
+    // Switch between them
+    assert_eq!(state.active_doc_idx, Some(1)); // The last one opened becomes active
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_directory_collapse_bug() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = std::env::temp_dir().join("katana_test_collapse_bug");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    let sub_dir = temp_dir.join("parent").join("child");
+    std::fs::create_dir_all(&sub_dir).unwrap();
+    std::fs::write(sub_dir.join("file.md"), "# File").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
+
+    wait_for_workspace_load(&mut harness);
+
+    use egui_kittest::kittest::Queryable;
+
+    // 1. Initial State: "▶ 📁 parent" should be collapsed
+    assert!(
+        harness.query_all_by_value("▶ 📁 parent").next().is_some(),
+        "Parent should be collapsed initially"
+    );
+    assert!(
+        harness.query_all_by_value("▶ 📁 child").next().is_none(),
+        "Child should not be visible initially"
+    );
+
+    // 2. Expand all via AppState
+    harness.state_mut().app_state_mut().force_tree_open = Some(true);
+    harness.step();
+    // Egui's collapsing header only opens 1 level per frame if programmatically triggered
+    harness.step();
+    harness.step();
+
+    // Everything should be open
+    assert!(
+        harness.query_all_by_value("▼ 📂 parent").next().is_some(),
+        "Parent should be open"
+    );
+    assert!(
+        harness.query_all_by_value("  ▼ 📂 child").next().is_some(),
+        "Child should be open"
+    );
+
+    // 3. Collapse all via AppState
+    harness.state_mut().app_state_mut().force_tree_open = Some(false);
+    harness.step();
+
+    // Now parent is closed
+    assert!(
+        harness.query_all_by_value("▶ 📁 parent").next().is_some(),
+        "Parent should be closed"
+    );
+    // Child should be completely unrendered (because parent is closed)
+    assert!(
+        harness.query_all_by_value("  ▶ 📁 child").next().is_none(),
+        "Child should be hidden"
+    );
+    assert!(
+        harness.query_all_by_value("  ▼ 📂 child").next().is_none(),
+        "Child should be hidden"
+    );
+
+    // 4. Manually open "parent"
+    let parent_node = harness.query_all_by_value("▶ 📁 parent").next().unwrap();
+    parent_node.click();
+    harness.step();
+
+    // The bug: child is still open because the `force=false` didn't traverse to hidden children!
+    // But we expect the child to NOT be open.
+    // If it is "  ▼ 📂 child", then the bug persists (RED state).
+    // The fixed behavior should be "  ▶ 📁 child".
+
+    assert!(
+        harness.query_all_by_value("  ▶ 📁 child").next().is_some(),
+        "Child should be reset to closed when manually expanded"
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
 // Covers workspace panel collapse UI (shell.rs: L394-407)
 #[test]
 fn test_integration_workspace_panel_collapsed() {
@@ -355,7 +600,7 @@ fn test_integration_workspace_panel_collapsed() {
     // Set show_workspace to false and then draw
     harness.state_mut().app_state_mut().show_workspace = false;
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().show_workspace, false);
+    assert!(!harness.state_mut().app_state_mut().show_workspace);
 
     // Try to click the "›" expand button using kittest (covers shell.rs L403-404)
     // If the button is not found, skip it (in kittest, button strings are
@@ -375,6 +620,67 @@ fn test_integration_workspace_panel_collapsed() {
 
     harness.state_mut().app_state_mut().show_workspace = true;
     harness.step();
+}
+
+#[test]
+fn test_integration_workspace_tab_persistence() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    // 1. Setup first workspace and open a tab
+    let ws1 = std::env::temp_dir().join("katana_test_ws1");
+    let _ = std::fs::remove_dir_all(&ws1);
+    std::fs::create_dir_all(&ws1).unwrap();
+    let file1 = ws1.join("file1.md");
+    std::fs::write(&file1, "# WS1").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(ws1.clone()));
+    wait_for_workspace_load(&mut harness);
+
+    let abs_file1 = file1.canonicalize().unwrap_or(file1);
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs_file1.clone()));
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+
+    // 2. Setup second workspace
+    let ws2 = std::env::temp_dir().join("katana_test_ws2");
+    let _ = std::fs::remove_dir_all(&ws2);
+    std::fs::create_dir_all(&ws2).unwrap();
+
+    // 3. Switch to second workspace (this MUST trigger save_workspace_state for ws1)
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(ws2.clone()));
+    wait_for_workspace_load(&mut harness);
+
+    // 4. Verify that ws1's tab state was persisted in CacheFacade
+    // Since AppAction::OpenWorkspace receives ws1 without canonicalization,
+    // ws.root is exactly ws1.
+    let cache_key = format!("workspace_tabs:{}", ws1.display());
+
+    let cache_json = harness
+        .state_mut()
+        .app_state_mut()
+        .cache
+        .get_persistent(&cache_key);
+    assert!(
+        cache_json.is_some(),
+        "Workspace 1 tab state must be saved to cache before switching. Key was: {}",
+        cache_key
+    );
+
+    let json_str = cache_json.unwrap();
+    assert!(
+        json_str.contains("file1.md"),
+        "The saved cache must contain the opened tab's path"
+    );
+
+    let _ = std::fs::remove_dir_all(&ws1);
+    let _ = std::fs::remove_dir_all(&ws2);
 }
 
 // Display both editor and preview in Split mode (shell.rs: L604-)

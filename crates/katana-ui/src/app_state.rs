@@ -58,6 +58,8 @@ pub enum AppAction {
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
     SelectDocument(std::path::PathBuf),
+    /// Open multiple files in the project tree at once.
+    OpenMultipleDocuments(Vec<std::path::PathBuf>),
     /// Remove a workspace from the persistence list.
     RemoveWorkspace(String),
     /// Close a tab.
@@ -139,6 +141,8 @@ pub struct AppState {
     pub is_loading_workspace: bool,
     /// Facade for memory and persistent cache storage.
     pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
+    /// Set of manually expanded directories in the workspace tree.
+    pub expanded_directories: std::collections::HashSet<std::path::PathBuf>,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -190,6 +194,7 @@ impl AppState {
             settings,
             is_loading_workspace: false,
             cache,
+            expanded_directories: std::collections::HashSet::new(),
         }
     }
 

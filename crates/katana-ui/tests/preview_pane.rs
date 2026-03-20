@@ -100,7 +100,13 @@ fn buffer_with_diagrams_immediately_updates_markdown_portion_only() {
 
     // Initial content with diagram
     let source = "# Title\n```mermaid\ngraph TD; A-->B\n```\n## Footer";
-    pane.full_render(source, std::path::Path::new("/tmp/test.md"));
+    pane.full_render(
+        source,
+        std::path::Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
 
     // Diagram is in Pending state
     assert!(pane.sections.len() >= 3);
@@ -121,7 +127,13 @@ fn full_render_splits_sections_correctly() {
     let mut pane = PreviewPane::default();
 
     let source = "Before\n```mermaid\ngraph TD; A-->B\n```\nAfter";
-    pane.full_render(source, std::path::Path::new("/tmp/test.md"));
+    pane.full_render(
+        source,
+        std::path::Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
 
     // 3 sections: Markdown, Diagram(Pending), Markdown
     assert_eq!(pane.sections.len(), 3);
@@ -137,6 +149,9 @@ fn buffer_without_diagrams_does_not_generate_pending_sections() {
     pane.full_render(
         "# Pure Markdown\n\nNo diagrams here.",
         std::path::Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
     );
 
     assert!(pane
@@ -280,7 +295,13 @@ fn centered_html_stays_in_markdown_section_update() {
 fn centered_html_stays_in_markdown_section_full_render() {
     let mut pane = PreviewPane::default();
     let src = "<p align=\"center\">centered</p>";
-    pane.full_render(src, std::path::Path::new("/tmp/test.md"));
+    pane.full_render(
+        src,
+        std::path::Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
     assert_eq!(pane.sections.len(), 1);
     assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
 }
@@ -418,6 +439,9 @@ fn poll_renders_with_pending_does_not_crash() {
     pane.full_render(
         "# Title\n```mermaid\ngraph TD; A-->B\n```\nAfter",
         std::path::Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
     );
 
     // execute poll_renders with egui context
