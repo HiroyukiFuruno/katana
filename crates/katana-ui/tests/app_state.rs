@@ -9,6 +9,7 @@ fn new_app_state_is_empty_and_default_view() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     assert!(state.workspace.is_none());
     assert!(state.open_documents.is_empty());
@@ -22,6 +23,7 @@ fn active_document_returns_correct_doc_when_set() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     let doc1 = Document::new("doc1.md", "Doc1");
     let doc2 = Document::new("doc2.md", "Doc2");
@@ -45,6 +47,7 @@ fn is_dirty_reflects_active_document_state() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     assert!(!state.is_dirty()); // no document
 
@@ -62,6 +65,7 @@ fn active_document_mut_returns_correct_mut_doc() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     let doc1 = Document::new("doc1.md", "Doc1");
     state.open_documents.push(doc1);
@@ -80,6 +84,7 @@ fn active_path_returns_path_of_active_document() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     let doc1 = Document::new("doc1.md", "Doc1");
     state.open_documents.push(doc1);

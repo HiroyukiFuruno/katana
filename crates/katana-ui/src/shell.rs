@@ -77,6 +77,15 @@ pub(crate) struct TabPreviewCache {
     pub hash: u64,
 }
 
+pub(crate) enum WorkspaceLoadType {
+    Open,
+    Refresh,
+}
+
+pub(crate) type WorkspaceLoadResult =
+    Result<katana_core::workspace::Workspace, katana_core::workspace::WorkspaceError>;
+pub(crate) type WorkspaceLoadMessage = (WorkspaceLoadType, std::path::PathBuf, WorkspaceLoadResult);
+
 pub struct KatanaApp {
     pub(crate) state: AppState,
     pub(crate) fs: FilesystemService,
@@ -85,6 +94,9 @@ pub struct KatanaApp {
     pub(crate) tab_previews: Vec<TabPreviewCache>,
     /// Receiver for background download completion notifications.
     pub(crate) download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
+    /// Receiver for background workspace loading.
+    pub(crate) workspace_rx: Option<std::sync::mpsc::Receiver<WorkspaceLoadMessage>>,
+
     /// Whether the About dialog is currently visible.
     pub(crate) show_about: bool,
     /// App icon texture for the About dialog.
@@ -108,6 +120,7 @@ impl KatanaApp {
             pending_action: AppAction::None,
             tab_previews: Vec::new(),
             download_rx: None,
+            workspace_rx: None,
             show_about: false,
             about_icon: None,
             cached_theme: None,
@@ -160,87 +173,108 @@ impl KatanaApp {
     }
 
     fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
-        match self.fs.open_workspace(&path) {
-            Ok(ws) => {
-                let name = ws.name().unwrap_or("unknown").to_string();
-                self.state.status_message = Some(crate::i18n::tf(
-                    "status_opened_workspace",
-                    &vec![("name", name.as_str())],
-                ));
-                self.state.workspace = Some(ws);
-                self.state.open_documents.clear();
-                self.state.active_doc_idx = None;
-                self.state.filter_cache = None;
-                let path_str = path.display().to_string();
-                let is_same_as_last = self
-                    .state
-                    .settings
-                    .settings()
-                    .workspace
-                    .last_workspace
-                    .as_deref()
-                    == Some(path_str.as_str());
+        self.state.is_loading_workspace = true;
+        // Temporary feedback
+        self.state.status_message = Some(crate::i18n::tf(
+            &crate::i18n::get().status.opened_workspace,
+            &vec![("name", "...")],
+        ));
 
-                // Clone what we need so we don't hold the immutable borrow
-                let (mut to_open, active_idx) = if is_same_as_last {
-                    let settings = self.state.settings.settings();
-                    (
-                        settings.workspace.open_tabs.clone(),
-                        settings.workspace.active_tab_idx,
-                    )
-                } else {
-                    (Vec::new(), None)
-                };
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.workspace_rx = Some(rx);
+        let path_clone = path.clone();
 
-                // Persist the last opened workspace path.
-                {
-                    let settings = self.state.settings.settings_mut();
-                    settings.workspace.last_workspace = Some(path_str.clone());
-                    if !settings.workspace.paths.contains(&path_str) {
-                        settings.workspace.paths.push(path_str);
-                    }
-                    if !is_same_as_last {
-                        settings.workspace.open_tabs.clear();
-                        settings.workspace.active_tab_idx = None;
-                    }
-                }
+        std::thread::spawn(move || {
+            let fs = katana_platform::FilesystemService::new();
+            let result = fs.open_workspace(&path_clone);
+            let _ = tx.send((WorkspaceLoadType::Open, path_clone, result));
+        });
+    }
 
-                // If opening the same workspace as last time (e.g. startup), restore tabs
-                if is_same_as_last {
-                    // Retain only files that exist
-                    to_open.retain(|p| std::path::Path::new(p).exists());
+    fn finish_open_workspace(
+        &mut self,
+        path: std::path::PathBuf,
+        ws: katana_core::workspace::Workspace,
+    ) {
+        let name = ws.name().unwrap_or("unknown").to_string();
+        self.state.status_message = Some(crate::i18n::tf(
+            &crate::i18n::get().status.opened_workspace,
+            &vec![("name", name.as_str())],
+        ));
+        self.state.workspace = Some(ws);
+        self.state.open_documents.clear();
+        self.state.active_doc_idx = None;
+        self.state.filter_cache = None;
+        let path_str = path.display().to_string();
 
-                    for p in &to_open {
-                        if let Ok(doc) = self.fs.load_document(std::path::PathBuf::from(p)) {
-                            self.state.open_documents.push(doc);
-                            self.state
-                                .initialize_tab_split_state(std::path::PathBuf::from(p));
-                        }
-                    }
-                    if !self.state.open_documents.is_empty() {
-                        let idx = active_idx
-                            .unwrap_or(0)
-                            .min(self.state.open_documents.len() - 1);
-                        self.state.active_doc_idx = Some(idx);
-                        let active_doc = &self.state.open_documents[idx];
-                        self.full_refresh_preview(
-                            &active_doc.path.clone(),
-                            &active_doc.buffer.clone(),
-                        );
-                    }
-                }
+        let mut to_open = Vec::new();
+        let mut active_idx = None;
 
-                if let Err(e) = self.state.settings.save() {
-                    tracing::warn!("Failed to save settings: {e}");
+        let cache_key = format!("workspace_tabs:{}", path_str);
+        if let Some(cache_json) = self.state.cache.get_persistent(&cache_key) {
+            #[derive(serde::Deserialize)]
+            struct TabState {
+                tabs: Vec<String>,
+                active_idx: Option<usize>,
+            }
+            if let Ok(state) = serde_json::from_str::<TabState>(&cache_json) {
+                to_open = state.tabs;
+                active_idx = state.active_idx;
+            }
+        } else {
+            // Fallback for first time after migration
+            let is_same_as_last = self
+                .state
+                .settings
+                .settings()
+                .workspace
+                .last_workspace
+                .as_deref()
+                == Some(path_str.as_str());
+
+            if is_same_as_last {
+                let settings = self.state.settings.settings();
+                to_open = settings.workspace.open_tabs.clone();
+                active_idx = settings.workspace.active_tab_idx;
+            }
+        }
+
+        // Persist the last opened workspace path.
+        {
+            let settings = self.state.settings.settings_mut();
+            settings.workspace.last_workspace = Some(path_str.clone());
+            if !settings.workspace.paths.contains(&path_str) {
+                settings.workspace.paths.push(path_str);
+            }
+            // We no longer clear here because we manage state via CacheFacade now
+        }
+
+        // Restore tabs for the opened workspace
+        if !to_open.is_empty() {
+            // Retain only files that exist
+            to_open.retain(|p| std::path::Path::new(p).exists());
+
+            for p in &to_open {
+                if let Ok(doc) = self.fs.load_document(std::path::PathBuf::from(p)) {
+                    self.state.open_documents.push(doc);
+                    self.state
+                        .initialize_tab_split_state(std::path::PathBuf::from(p));
                 }
             }
-            Err(e) => {
-                let error = e.to_string();
-                self.state.status_message = Some(crate::i18n::tf(
-                    "status_cannot_open_workspace",
-                    &vec![("error", error.as_str())],
-                ));
+            if !self.state.open_documents.is_empty() {
+                let idx = active_idx
+                    .unwrap_or(0)
+                    .min(self.state.open_documents.len() - 1);
+                self.state.active_doc_idx = Some(idx);
+                let active_doc = &self.state.open_documents[idx];
+                let src = active_doc.buffer.clone();
+                let doc_path = active_doc.path.clone();
+                self.full_refresh_preview(&doc_path, &src);
             }
+        }
+
+        if let Err(e) = self.state.settings.save() {
+            tracing::warn!("Failed to save settings: {e}");
         }
     }
 
@@ -249,18 +283,59 @@ impl KatanaApp {
             return;
         };
         let root = workspace.root.clone();
-        match self.fs.open_workspace(&root) {
-            Ok(ws) => {
-                self.state.workspace = Some(ws);
-                self.state.filter_cache = None;
+
+        self.state.is_loading_workspace = true;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.workspace_rx = Some(rx);
+
+        std::thread::spawn(move || {
+            let fs = katana_platform::FilesystemService::new();
+            let result = fs.open_workspace(&root);
+            let _ = tx.send((WorkspaceLoadType::Refresh, root, result));
+        });
+    }
+
+    pub(crate) fn poll_workspace_load(&mut self, ctx: &egui::Context) {
+        const WORKSPACE_LOAD_POLL_INTERVAL_MS: u64 = 50;
+        let done = if let Some(rx) = &self.workspace_rx {
+            match rx.try_recv() {
+                Ok((WorkspaceLoadType::Open, path, Ok(ws))) => {
+                    self.state.is_loading_workspace = false;
+                    self.finish_open_workspace(path, ws);
+                    true
+                }
+                Ok((WorkspaceLoadType::Refresh, _path, Ok(ws))) => {
+                    self.state.is_loading_workspace = false;
+                    self.state.workspace = Some(ws);
+                    self.state.filter_cache = None;
+                    true
+                }
+                Ok((_load_type, _path, Err(e))) => {
+                    self.state.is_loading_workspace = false;
+                    let error = e.to_string();
+                    self.state.status_message = Some(crate::i18n::tf(
+                        &crate::i18n::get().status.cannot_open_workspace,
+                        &vec![("error", error.as_str())],
+                    ));
+                    true
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    ctx.request_repaint_after(std::time::Duration::from_millis(
+                        WORKSPACE_LOAD_POLL_INTERVAL_MS,
+                    ));
+                    false
+                }
+                Err(_) => {
+                    self.state.is_loading_workspace = false;
+                    true
+                }
             }
-            Err(e) => {
-                let error = e.to_string();
-                self.state.status_message = Some(crate::i18n::tf(
-                    "status_cannot_open_workspace",
-                    &vec![("error", error.as_str())],
-                ));
-            }
+        } else {
+            false
+        };
+        if done {
+            self.workspace_rx = None;
         }
     }
 
@@ -329,10 +404,26 @@ impl KatanaApp {
             .collect();
         let idx = self.state.active_doc_idx;
         let settings = self.state.settings.settings_mut();
-        settings.workspace.open_tabs = open_tabs;
+        settings.workspace.open_tabs = open_tabs.clone();
         settings.workspace.active_tab_idx = idx;
         if let Err(e) = self.state.settings.save() {
             tracing::warn!("Failed to save workspace tab state: {e}");
+        }
+
+        if let Some(ws) = &self.state.workspace {
+            let key = format!("workspace_tabs:{}", ws.root.display());
+            #[derive(serde::Serialize)]
+            struct TabState {
+                tabs: Vec<String>,
+                active_idx: Option<usize>,
+            }
+            let state = TabState {
+                tabs: open_tabs,
+                active_idx: idx,
+            };
+            if let Ok(json) = serde_json::to_string(&state) {
+                let _ = self.state.cache.set_persistent(&key, json);
+            }
         }
     }
 
@@ -519,6 +610,7 @@ mod tests {
             AiProviderRegistry::new(),
             PluginRegistry::new(),
             katana_platform::SettingsService::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         KatanaApp::new(state)
     }
@@ -530,12 +622,24 @@ mod tests {
         dir
     }
 
+    fn wait_for_workspace(app: &mut KatanaApp) {
+        let ctx = egui::Context::default();
+        for _ in 0..100 {
+            app.poll_workspace_load(&ctx);
+            if app.workspace_rx.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
     // handle_open_workspace: Success with valid path (L149-160)
     #[test]
     fn handle_open_workspace_success_sets_workspace() {
         let mut app = make_app();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
         assert!(app.state.status_message.is_some());
     }
@@ -545,6 +649,7 @@ mod tests {
     fn handle_open_workspace_error_sets_status_message() {
         let mut app = make_app();
         app.handle_open_workspace(PathBuf::from("/nonexistent/path/that/cannot/exist"));
+        wait_for_workspace(&mut app);
         // Non-existent path, so workspace might be None (or opened as an empty directory)
         // Either an error is recorded or an empty workspace is opened
         assert!(
@@ -786,6 +891,7 @@ mod tests_extra {
             AiProviderRegistry::new(),
             PluginRegistry::new(),
             katana_platform::SettingsService::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         KatanaApp::new(state)
     }
@@ -883,6 +989,7 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         app.process_action(AppAction::OpenWorkspace(dir.path().to_path_buf()));
+        wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
     }
 
@@ -1037,8 +1144,24 @@ mod tests_extra {
 
     fn make_app_with_failing_repo() -> KatanaApp {
         let settings = katana_platform::SettingsService::new(Box::new(FailingRepository));
-        let state = AppState::new(AiProviderRegistry::new(), PluginRegistry::new(), settings);
+        let state = AppState::new(
+            AiProviderRegistry::new(),
+            PluginRegistry::new(),
+            settings,
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         KatanaApp::new(state)
+    }
+
+    fn wait_for_workspace(app: &mut KatanaApp) {
+        let ctx = egui::Context::default();
+        for _ in 0..100 {
+            app.poll_workspace_load(&ctx);
+            if app.workspace_rx.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
     }
 
     // handle_open_workspace: settings.save() error is logged, not panicked
@@ -1047,6 +1170,7 @@ mod tests_extra {
         let mut app = make_app_with_failing_repo();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         // Workspace is still opened despite save failure
         assert!(app.state.workspace.is_some());
     }
@@ -1116,12 +1240,14 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
 
         // Add a new file to the workspace
         std::fs::write(dir.path().join("new.md"), "# New").unwrap();
 
         app.handle_refresh_workspace();
+        wait_for_workspace(&mut app);
         let ws = app.state.workspace.as_ref().unwrap();
         let paths: Vec<_> = ws
             .tree
@@ -1145,6 +1271,7 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
 
         // Overwrite the workspace root to a non-existent path
@@ -1152,6 +1279,7 @@ mod tests_extra {
             std::path::PathBuf::from("/nonexistent/deleted/workspace");
 
         app.handle_refresh_workspace();
+        wait_for_workspace(&mut app);
         assert!(app.state.status_message.is_some());
     }
 
@@ -1161,7 +1289,9 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         app.process_action(AppAction::RefreshWorkspace);
+        wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
     }
     #[test]
@@ -1171,6 +1301,7 @@ mod tests_extra {
         let file_path = dir.path().join("a.md");
         std::fs::write(&file_path, "A").unwrap();
         app.handle_open_workspace(dir.path().to_path_buf());
+        wait_for_workspace(&mut app);
         app.handle_select_document(file_path.clone());
 
         let doc = app.state.active_document_mut().unwrap();
@@ -1183,5 +1314,28 @@ mod tests_extra {
             .find(|t| t.path == file_path)
             .unwrap();
         assert!(tab.hash != 0);
+    }
+
+    #[test]
+    fn test_poll_workspace_load_disconnect() {
+        let state = AppState::new(
+            katana_core::ai::AiProviderRegistry::default(),
+            katana_core::plugin::PluginRegistry::default(),
+            katana_platform::SettingsService::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
+        let mut app = KatanaApp::new(state);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.workspace_rx = Some(rx);
+        app.state.is_loading_workspace = true;
+
+        // Drop the transmitter to simulate thread panic / disconnect
+        drop(tx);
+
+        let ui_ctx = egui::Context::default();
+        app.poll_workspace_load(&ui_ctx);
+
+        assert_eq!(app.state.is_loading_workspace, false);
     }
 }

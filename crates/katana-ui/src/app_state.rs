@@ -135,6 +135,10 @@ pub struct AppState {
     pub preview_max_scroll: f32,
     /// Settings persistence service.
     pub settings: SettingsService,
+    /// Indicates if a workspace is currently being loaded asynchronously in the background.
+    pub is_loading_workspace: bool,
+    /// Facade for memory and persistent cache storage.
+    pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -154,6 +158,7 @@ impl AppState {
         ai_registry: AiProviderRegistry,
         plugin_registry: PluginRegistry,
         settings: SettingsService,
+        cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     ) -> Self {
         // ai_registry is planned for future AI integration. Currently unused.
         let _ = ai_registry;
@@ -183,6 +188,8 @@ impl AppState {
             editor_max_scroll: 0.0,
             preview_max_scroll: 0.0,
             settings,
+            is_loading_workspace: false,
+            cache,
         }
     }
 
@@ -323,7 +330,12 @@ mod tests {
     use std::path::PathBuf;
 
     fn make_state_with_doc(path: &str) -> AppState {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         let doc = Document {
             path: PathBuf::from(path),
             buffer: String::new(),
@@ -411,7 +423,12 @@ mod tests {
 
     #[test]
     fn test_ensure_active_split_state_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open, active_doc_idx is None — should return early without panic
         state.ensure_active_split_state();
         assert!(state.tab_split_states.is_empty());
@@ -419,7 +436,12 @@ mod tests {
 
     #[test]
     fn test_set_active_split_direction_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open — should return early without panic
         state.set_active_split_direction(SplitDirection::Vertical);
         assert!(state.tab_split_states.is_empty());
@@ -427,7 +449,12 @@ mod tests {
 
     #[test]
     fn test_set_active_pane_order_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open — should return early without panic
         state.set_active_pane_order(PaneOrder::PreviewFirst);
         assert!(state.tab_split_states.is_empty());
@@ -454,5 +481,22 @@ mod tests {
             state.tab_split_states[0].state.order,
             PaneOrder::PreviewFirst
         );
+    }
+
+    #[test]
+    fn test_ensure_active_split_state() {
+        let mut state = make_state_with_doc("/tmp/c.md");
+        state.tab_split_states.clear();
+        state.ensure_active_split_state();
+        assert_eq!(state.tab_split_states.len(), 1);
+
+        let mut empty_state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
+        empty_state.ensure_active_split_state(); // Should safely return early
+        assert_eq!(empty_state.tab_split_states.len(), 0);
     }
 }

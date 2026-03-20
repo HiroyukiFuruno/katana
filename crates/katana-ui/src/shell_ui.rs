@@ -107,6 +107,10 @@ pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
     });
 }
 
+const WORKSPACE_SPINNER_OUTER_MARGIN: f32 = 10.0;
+const WORKSPACE_SPINNER_INNER_MARGIN: f32 = 10.0;
+const WORKSPACE_SPINNER_TEXT_MARGIN: f32 = 5.0;
+
 pub(crate) fn render_workspace_panel(
     ctx: &egui::Context,
     state: &mut AppState,
@@ -226,7 +230,17 @@ pub(crate) fn render_workspace_panel(
                 }
             }
             ui.separator();
-            render_workspace_content(ui, state, action);
+            if state.is_loading_workspace {
+                ui.add_space(WORKSPACE_SPINNER_OUTER_MARGIN);
+                ui.horizontal(|ui| {
+                    ui.add_space(WORKSPACE_SPINNER_INNER_MARGIN);
+                    ui.spinner();
+                    ui.add_space(WORKSPACE_SPINNER_TEXT_MARGIN);
+                    ui.label(crate::i18n::get().action.refresh_workspace.clone());
+                });
+            } else {
+                render_workspace_content(ui, state, action);
+            }
         });
 }
 
@@ -1208,6 +1222,7 @@ impl eframe::App for KatanaApp {
         }
 
         self.poll_download(ctx);
+        self.poll_workspace_load(ctx);
 
         // macOS: Poll actions from the native menu.
         #[cfg(target_os = "macos")]
@@ -1447,7 +1462,12 @@ mod tests {
     }
 
     fn state_with_active_doc(path: &std::path::Path) -> AppState {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         state
             .open_documents
             .push(Document::new(path, "# Heading\n\nBody"));

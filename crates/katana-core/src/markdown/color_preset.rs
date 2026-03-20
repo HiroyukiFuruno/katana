@@ -302,6 +302,7 @@ mod tests {
 
     #[test]
     fn current_returns_dark_preset() {
+        DiagramColorPreset::set_dark_mode(true);
         assert_eq!(
             DiagramColorPreset::current().text,
             DiagramColorPreset::dark().text

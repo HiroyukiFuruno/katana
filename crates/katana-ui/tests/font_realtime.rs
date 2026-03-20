@@ -14,6 +14,7 @@ fn font_size_change_is_reflected_in_settings() {
         katana_core::ai::AiProviderRegistry::new(),
         katana_core::plugin::PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     let mut app = KatanaApp::new(state);
 
@@ -39,6 +40,7 @@ fn font_size_out_of_range_is_clamped_in_app() {
         katana_core::ai::AiProviderRegistry::new(),
         katana_core::plugin::PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     let mut app = KatanaApp::new(state);
 
