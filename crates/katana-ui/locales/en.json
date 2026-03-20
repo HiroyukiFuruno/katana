@@ -9,7 +9,8 @@
   "workspace": {
     "no_workspace_open": "No workspace open.",
     "no_document_selected": "No document open.",
-    "workspace_title": "Workspace"
+    "workspace_title": "Workspace",
+    "recent_workspaces": "Recent Workspaces"
   },
   "preview": {
     "preview_title": "Preview",
@@ -52,7 +53,8 @@
     "collapse_all": "Collapse all",
     "collapse_sidebar": "Hide Sidebar",
     "refresh_workspace": "Refresh workspace",
-    "toggle_filter": "Toggle filter"
+    "toggle_filter": "Toggle filter",
+    "remove_workspace": "Remove from history"
   },
   "ai": {
     "ai_unconfigured": "[AI: unconfigured]"

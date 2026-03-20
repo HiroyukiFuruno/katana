@@ -9,7 +9,8 @@
   "workspace": {
     "no_workspace_open": "未開啟工作區。",
     "no_document_selected": "未選擇文件。",
-    "workspace_title": "工作区"
+    "workspace_title": "工作区",
+    "recent_workspaces": "Recent Workspaces"
   },
   "preview": {
     "preview_title": "預覽",
@@ -52,7 +53,8 @@
     "collapse_all": "全部摺疊",
     "collapse_sidebar": "隱藏側邊欄",
     "refresh_workspace": "刷新工作區",
-    "toggle_filter": "フィルター切り替え"
+    "toggle_filter": "フィルター切り替え",
+    "remove_workspace": "Remove from history"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未配置]"

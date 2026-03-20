@@ -17,8 +17,9 @@ use crate::{
 
 use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
-    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, SCROLL_SYNC_DEAD_ZONE,
-    TAB_INTER_ITEM_SPACING, TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
+    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
+    RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
+    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
 };
 use crate::theme_bridge;
 use katana_platform::{PaneOrder, SplitDirection};
@@ -149,6 +150,32 @@ pub(crate) fn render_workspace_panel(
                         state.force_tree_open = Some(false);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if !state.settings.settings().workspace.paths.is_empty() {
+                            ui.menu_button("📄", |ui| {
+                                for path in state.settings.settings().workspace.paths.iter().rev() {
+                                    ui.horizontal(|ui| {
+                                        if ui
+                                            .button("×")
+                                            .on_hover_text(
+                                                crate::i18n::get().action.remove_workspace.clone(),
+                                            )
+                                            .clicked()
+                                        {
+                                            *action = AppAction::RemoveWorkspace(path.clone());
+                                            ui.close();
+                                        }
+                                        if ui.selectable_label(false, path).clicked() {
+                                            *action = AppAction::OpenWorkspace(
+                                                std::path::PathBuf::from(path),
+                                            );
+                                            ui.close();
+                                        }
+                                    });
+                                }
+                            })
+                            .response
+                            .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
+                        }
                         if ui
                             .small_button("🔄")
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
@@ -258,6 +285,29 @@ pub(crate) fn render_workspace_content(
         {
             if let Some(path) = open_folder_dialog() {
                 *action = AppAction::OpenWorkspace(path);
+            }
+        }
+
+        let recent_paths = &state.settings.settings().workspace.paths;
+        if !recent_paths.is_empty() {
+            ui.add_space(RECENT_WORKSPACES_SPACING);
+            ui.separator();
+            ui.add_space(RECENT_WORKSPACES_SPACING);
+            ui.heading(crate::i18n::get().workspace.recent_workspaces.clone());
+            ui.add_space(RECENT_WORKSPACES_ITEM_SPACING);
+            for path in recent_paths.iter().rev() {
+                ui.horizontal(|ui| {
+                    if ui
+                        .button("×")
+                        .on_hover_text(crate::i18n::get().action.remove_workspace.clone())
+                        .clicked()
+                    {
+                        *action = AppAction::RemoveWorkspace(path.clone());
+                    }
+                    if ui.selectable_label(false, path).clicked() {
+                        *action = AppAction::OpenWorkspace(std::path::PathBuf::from(path));
+                    }
+                });
             }
         }
     }
