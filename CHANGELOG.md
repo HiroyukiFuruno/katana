@@ -2,6 +2,33 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.2.0] - 2026-03-20
+
+### 🐛 Bug Fixes
+
+- Enforce strict lazy loading and restrict folder auto-expand on Open All
+- Abolish redundant filename tooltip and fix ast linter coverage
+- Restore missing absolute path in metadata tooltip and apply TDD
+
+### 👷 CI/CD
+
+- DMGのSHA256ハッシュ(checksums.txt)を自動生成・添付するよう改善
+
+### 📚 Documentation
+
+- CHANGELOG.ja.md に v0.1.6 のリリースノートを追加し Makefileのリリース対象に含める
+
+### 🔧 Miscellaneous
+
+- Refactor RwLock usage and fix external image caching on force reload
+
+### 🚀 Features
+
+- ワークスペース永続化・タブ復元ロジックの追加 (Task 1)
+- Implement CacheFacade and stabilize all integration tests
+- ワークスペースの再帰的展開・全て開くの実装と操作性改善 (Task 3, 5)
+- Localize metadata tooltips and apply to file items
+
 ## [0.1.6] - 2026-03-19
 
 ### 🐛 Bug Fixes
@@ -17,6 +44,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 
 - V0.1.7 リリース準備
 - Cargo.lock の更新 (v0.1.7版への追従)
+- V0.1.6 リリース準備
 
 ### 🚀 Features
 
