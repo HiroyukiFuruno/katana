@@ -639,6 +639,102 @@ fn extract_markdown_headings(path: &Path) -> Result<Vec<MarkdownHeading>, Vec<Vi
     Ok(headings)
 }
 
+fn parse_workspace_version_from_cargo_toml(path: &Path) -> Result<String, Vec<Violation>> {
+    let source = std::fs::read_to_string(path).map_err(|err| {
+        vec![Violation {
+            file: path.to_path_buf(),
+            line: 0,
+            column: 0,
+            message: format!("Cargo.toml read error: {err}"),
+        }]
+    })?;
+
+    let mut in_workspace_package = false;
+
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if line.starts_with('[') && line.ends_with(']') {
+            in_workspace_package = line == "[workspace.package]";
+            continue;
+        }
+
+        if !in_workspace_package {
+            continue;
+        }
+
+        let line = line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim() != "version" {
+            continue;
+        }
+
+        let value = value.trim();
+        let Some(value) = value.strip_prefix('"').and_then(|it| it.strip_suffix('"')) else {
+            return Err(vec![Violation {
+                file: path.to_path_buf(),
+                line: 0,
+                column: 0,
+                message: "workspace.package.version must be a TOML string.".to_string(),
+            }]);
+        };
+
+        return Ok(value.to_string());
+    }
+
+    Err(vec![Violation {
+        file: path.to_path_buf(),
+        line: 0,
+        column: 0,
+        message: "Missing workspace.package.version in Cargo.toml.".to_string(),
+    }])
+}
+
+fn changelog_contains_version_heading(path: &Path, version: &str) -> Result<bool, Vec<Violation>> {
+    let source = std::fs::read_to_string(path).map_err(|err| {
+        vec![Violation {
+            file: path.to_path_buf(),
+            line: 0,
+            column: 0,
+            message: format!("CHANGELOG.md read error: {err}"),
+        }]
+    })?;
+
+    let expected_prefix = format!("## [{version}]");
+    Ok(source
+        .lines()
+        .map(str::trim_start)
+        .any(|line| line.starts_with(&expected_prefix)))
+}
+
+fn lint_changelog_contains_current_version(root: &Path) -> Vec<Violation> {
+    let cargo_toml = root.join("Cargo.toml");
+    let changelog = root.join("CHANGELOG.md");
+
+    let version = match parse_workspace_version_from_cargo_toml(&cargo_toml) {
+        Ok(version) => version,
+        Err(violations) => return violations,
+    };
+
+    match changelog_contains_version_heading(&changelog, &version) {
+        Ok(true) => Vec::new(),
+        Ok(false) => vec![Violation {
+            file: changelog.clone(),
+            line: 0,
+            column: 0,
+            message: format!(
+                "CHANGELOG.md is missing a release heading for workspace version `{version}`."
+            ),
+        }],
+        Err(violations) => violations,
+    }
+}
+
 fn compare_markdown_heading_structure(pair: &MarkdownPair) -> Vec<Violation> {
     let base_headings = match extract_markdown_headings(&pair.base) {
         Ok(headings) => headings,
@@ -1111,20 +1207,23 @@ impl LazyCodeVisitor {
 
 impl<'ast> Visit<'ast> for LazyCodeVisitor {
     fn visit_macro(&mut self, mac: &'ast syn::Macro) {
-        if let Some(segment) = mac.path.segments.last() {
-            let ident = segment.ident.to_string();
-            if ident == "todo" || ident == "unimplemented" || ident == "dbg" {
-                let (line, column) = span_location(segment.ident.span());
-                self.violations.push(Violation {
-                    file: self.file.clone(),
-                    line,
-                    column,
-                    message: format!(
-                        "Lazy code macro `{}!()` detected. Please implement properly instead of deferring.",
-                        ident
-                    ),
-                });
-            }
+        let segment = mac
+            .path
+            .segments
+            .last()
+            .expect("macro path should contain at least one segment");
+        let ident = segment.ident.to_string();
+        if ident == "todo" || ident == "unimplemented" || ident == "dbg" {
+            let (line, column) = span_location(segment.ident.span());
+            self.violations.push(Violation {
+                file: self.file.clone(),
+                line,
+                column,
+                message: format!(
+                    "Lazy code macro `{}!()` detected. Please implement properly instead of deferring.",
+                    ident
+                ),
+            });
         }
         syn::visit::visit_macro(self, mac);
     }
@@ -1235,16 +1334,21 @@ impl<'ast> Visit<'ast> for ProhibitedTypesVisitor {
     }
 
     fn visit_type_path(&mut self, node: &'ast syn::TypePath) {
-        if let Some(segment) = node.path.segments.last() {
-            if segment.ident == "HashMap" {
-                let (line, column) = span_location(segment.ident.span());
-                self.violations.push(Violation {
-                    file: self.file.clone(),
-                    line,
-                    column,
-                    message: "Prohibited type `HashMap` detected. Please use `Vec` or a typed struct instead.".to_string(),
-                });
-            }
+        let segment = node
+            .path
+            .segments
+            .last()
+            .expect("type path should contain at least one segment");
+        if segment.ident == "HashMap" {
+            let (line, column) = span_location(segment.ident.span());
+            self.violations.push(Violation {
+                file: self.file.clone(),
+                line,
+                column,
+                message:
+                    "Prohibited type `HashMap` detected. Please use `Vec` or a typed struct instead."
+                        .to_string(),
+            });
         }
         syn::visit::visit_type_path(self, node);
     }
@@ -1418,6 +1522,16 @@ fn ast_linter_markdown_heading_pairs_match() {
     );
 }
 
+#[test]
+fn ast_linter_changelog_contains_current_workspace_version() {
+    let all_violations = lint_changelog_contains_current_version(workspace_root());
+    panic_with_violations(
+        "changelog-version-sync",
+        "Fix: Add a `## [x.y.z]` release heading to CHANGELOG.md that matches workspace.package.version in Cargo.toml.",
+        &all_violations,
+    );
+}
+
 // ─────────────────────────────────────────────
 // Allowlist Unit Tests
 // ─────────────────────────────────────────────
@@ -1519,6 +1633,13 @@ mod internal_tests {
     use super::*;
     use serde_json::json;
     use std::path::PathBuf;
+
+    fn cfg_test_attr_for_item(item: &syn::Item) -> bool {
+        match item {
+            syn::Item::Mod(m) => has_cfg_test_attr(&m.attrs),
+            _ => false,
+        }
+    }
 
     // Violation::fmt (L26-35)
     #[test]
@@ -1824,18 +1945,21 @@ mod internal_tests {
             mod dummy_mac {}
         "#;
         let syntax = syn::parse_file(code).unwrap();
-        let has_test = if let syn::Item::Mod(m) = &syntax.items[0] {
-            has_cfg_test_attr(&m.attrs)
-        } else {
-            false
-        };
-        let has_mac = if let syn::Item::Mod(m) = &syntax.items[1] {
-            has_cfg_test_attr(&m.attrs)
-        } else {
-            false
-        };
+        let has_test = cfg_test_attr_for_item(&syntax.items[0]);
+        let has_mac = cfg_test_attr_for_item(&syntax.items[1]);
         assert!(has_test);
         assert!(!has_mac);
+    }
+
+    #[test]
+    fn test_has_cfg_test_attr_returns_false_for_non_mod_items() {
+        let code = r#"
+            fn dummy() {}
+            const VALUE: usize = 1;
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        assert!(!cfg_test_attr_for_item(&syntax.items[0]));
+        assert!(!cfg_test_attr_for_item(&syntax.items[1]));
     }
 
     // Detect hardcoded format in format!() (L178-201)
@@ -2208,6 +2332,30 @@ mod internal_tests {
     }
 
     #[test]
+    fn collect_json_shape_and_placeholders_cover_root_array_paths() {
+        let value = json!([{"message": "Hello {name}"}]);
+        let mut shape = BTreeMap::new();
+        let mut placeholders = BTreeMap::new();
+        collect_json_shape(&value, None, &mut shape);
+        collect_json_placeholders(&value, None, &mut placeholders);
+
+        assert_eq!(shape.get("[0]"), Some(&JsonNodeKind::Object));
+        assert_eq!(shape.get("[0].message"), Some(&JsonNodeKind::String));
+        assert_eq!(
+            placeholders.get("[0].message"),
+            Some(&BTreeSet::from(["name".to_string()]))
+        );
+    }
+
+    #[test]
+    fn collect_json_placeholders_ignores_root_string_without_path() {
+        let value = json!("Hello {name}");
+        let mut placeholders = BTreeMap::new();
+        collect_json_placeholders(&value, None, &mut placeholders);
+        assert!(placeholders.is_empty());
+    }
+
+    #[test]
     fn extract_placeholders_handles_unclosed_and_empty_placeholders() {
         assert!(extract_placeholders("Hello {name").is_empty());
         assert!(extract_placeholders("{}").is_empty());
@@ -2391,6 +2539,15 @@ mod internal_tests {
     }
 
     #[test]
+    fn parse_languages_catalog_propagates_read_errors() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let violations =
+            parse_languages_catalog(tmp.path()).expect_err("missing languages.json should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("Locale file read error"));
+    }
+
+    #[test]
     fn parse_languages_catalog_validates_entry_shape_and_duplicates() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(
@@ -2479,6 +2636,19 @@ mod internal_tests {
     }
 
     #[test]
+    fn collect_rs_files_excludes_tests_directory() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("src")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("tests")).unwrap();
+        std::fs::write(tmp.path().join("src/lib.rs"), "fn main() {}\n").unwrap();
+        std::fs::write(tmp.path().join("tests/ignored.rs"), "fn helper() {}\n").unwrap();
+
+        let files = collect_rs_files(tmp.path());
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("src/lib.rs"));
+    }
+
+    #[test]
     fn collect_markdown_pairs_includes_changelog_pair() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join("CHANGELOG.md"), "# Changelog\n").unwrap();
@@ -2556,5 +2726,169 @@ mod internal_tests {
         let violations = compare_markdown_heading_structure(&pair);
         assert_eq!(violations.len(), 1);
         assert!(violations[0].message.contains("Markdown file read error"));
+    }
+
+    #[test]
+    fn parse_workspace_version_from_cargo_toml_extracts_workspace_package_version() {
+        let tmp = tempfile::NamedTempFile::with_suffix(".toml").unwrap();
+        std::fs::write(
+            tmp.path(),
+            r#"[workspace]
+members = ["crates/foo"]
+
+[workspace.package]
+version = "1.2.3"
+edition = "2021"
+"#,
+        )
+        .unwrap();
+
+        let version = parse_workspace_version_from_cargo_toml(tmp.path()).unwrap();
+        assert_eq!(version, "1.2.3");
+    }
+
+    #[test]
+    fn parse_workspace_version_from_cargo_toml_skips_blank_invalid_and_non_version_lines() {
+        let tmp = tempfile::NamedTempFile::with_suffix(".toml").unwrap();
+        std::fs::write(
+            tmp.path(),
+            r#"[workspace]
+members = ["crates/foo"]
+
+[workspace.package]
+# comment
+edition
+name = "katana"
+version = "1.2.3"
+"#,
+        )
+        .unwrap();
+
+        let version = parse_workspace_version_from_cargo_toml(tmp.path()).unwrap();
+        assert_eq!(version, "1.2.3");
+    }
+
+    #[test]
+    fn parse_workspace_version_from_cargo_toml_reports_read_error_for_missing_file() {
+        let violations =
+            parse_workspace_version_from_cargo_toml(Path::new("/nonexistent/Cargo.toml"))
+                .expect_err("missing Cargo.toml should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("Cargo.toml read error"));
+    }
+
+    #[test]
+    fn parse_workspace_version_from_cargo_toml_reports_non_string_version() {
+        let tmp = tempfile::NamedTempFile::with_suffix(".toml").unwrap();
+        std::fs::write(
+            tmp.path(),
+            r#"[workspace.package]
+version = 123
+"#,
+        )
+        .unwrap();
+
+        let violations = parse_workspace_version_from_cargo_toml(tmp.path())
+            .expect_err("non-string version should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("must be a TOML string"));
+    }
+
+    #[test]
+    fn parse_workspace_version_from_cargo_toml_reports_missing_workspace_package_version() {
+        let tmp = tempfile::NamedTempFile::with_suffix(".toml").unwrap();
+        std::fs::write(
+            tmp.path(),
+            r#"[workspace]
+members = ["crates/foo"]
+"#,
+        )
+        .unwrap();
+
+        let violations = parse_workspace_version_from_cargo_toml(tmp.path())
+            .expect_err("missing workspace.package version should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("workspace.package.version"));
+    }
+
+    #[test]
+    fn build_locale_baseline_propagates_read_errors_for_missing_base_files() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let ja_path = tmp.path().join("ja.json");
+        let en_path = tmp.path().join("en.json");
+        std::fs::write(&ja_path, r#"{"status":{"saved":"保存しました。"}}"#).unwrap();
+
+        let violations =
+            build_locale_baseline(&ja_path, &en_path).expect_err("missing en.json should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("Locale file read error"));
+    }
+
+    #[test]
+    fn build_locale_baseline_propagates_read_errors_for_missing_ja_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let ja_path = tmp.path().join("ja.json");
+        let en_path = tmp.path().join("en.json");
+        std::fs::write(&en_path, r#"{"status":{"saved":"Saved."}}"#).unwrap();
+
+        let violations =
+            build_locale_baseline(&ja_path, &en_path).expect_err("missing ja.json should fail");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("Locale file read error"));
+    }
+
+    #[test]
+    fn lint_changelog_contains_current_version_propagates_cargo_read_errors() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let violations = lint_changelog_contains_current_version(tmp.path());
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("Cargo.toml read error"));
+    }
+
+    #[test]
+    fn lint_changelog_contains_current_version_reports_missing_heading() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join("Cargo.toml"),
+            r#"[workspace]
+members = ["crates/foo"]
+
+[workspace.package]
+version = "2.0.0"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            tmp.path().join("CHANGELOG.md"),
+            r#"# Changelog
+
+## [1.9.9] - 2026-03-21
+"#,
+        )
+        .unwrap();
+
+        let violations = lint_changelog_contains_current_version(tmp.path());
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("2.0.0"));
+        assert!(violations[0].message.contains("CHANGELOG.md"));
+    }
+
+    #[test]
+    fn lint_changelog_contains_current_version_reports_changelog_read_errors() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join("Cargo.toml"),
+            r#"[workspace]
+members = ["crates/foo"]
+
+[workspace.package]
+version = "2.0.0"
+"#,
+        )
+        .unwrap();
+
+        let violations = lint_changelog_contains_current_version(tmp.path());
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("CHANGELOG.md read error"));
     }
 }

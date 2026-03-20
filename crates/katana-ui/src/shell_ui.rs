@@ -782,20 +782,7 @@ pub(crate) fn render_directory_entry(
     }
 
     // Directory level Meta Info on Hover
-    let path_str = path.display().to_string();
-    let meta_text = format!(
-        "{name}\n{}\n{}",
-        crate::i18n::tf("Path", &[("path", path_str.as_str())]),
-        if let Ok(metadata) = std::fs::metadata(path) {
-            crate::shell_logic::format_metadata_tooltip(
-                metadata.len(),
-                metadata.modified().ok(),
-                &crate::i18n::get().workspace.metadata_tooltip,
-            )
-        } else {
-            "Metadata unavailable".to_string()
-        }
-    );
+    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
     let resp = resp.on_hover_ui(|ui| {
         ui.label(meta_text);
     });
@@ -945,20 +932,7 @@ pub(crate) fn render_file_entry(
     }
 
     // File level Meta Info on Hover
-    let path_str = path.display().to_string();
-    let meta_text = format!(
-        "{name}\n{}\n{}",
-        crate::i18n::tf("Path", &[("path", path_str.as_str())]),
-        if let Ok(metadata) = std::fs::metadata(path) {
-            crate::shell_logic::format_metadata_tooltip(
-                metadata.len(),
-                metadata.modified().ok(),
-                &crate::i18n::get().workspace.metadata_tooltip,
-            )
-        } else {
-            "Metadata unavailable".to_string()
-        }
-    );
+    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
     let resp = resp.on_hover_ui(|ui| {
         ui.label(meta_text);
     });
