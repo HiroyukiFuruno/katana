@@ -16,10 +16,17 @@
 #   - tokei           : Count lines of source code (make loc)
 #   - lefthook        : Git hooks runner (pre-commit / pre-push)
 #   - create-dmg      : macOS .dmg installer builder
+#   - Optional AI skill copies from `.agents/skills` to other agent layouts
 #
 # =============================================================================
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+CANONICAL_SKILLS_DIR="${REPO_ROOT}/.agents/skills"
+
+cd "${REPO_ROOT}"
 
 # ── Colours ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -44,6 +51,139 @@ confirm() {
   case "${reply:-Y}" in
     [Yy]*|"") return 0 ;;
     *)         return 1 ;;
+  esac
+}
+
+copy_skills_to_layout() {
+  local agent_name="$1"
+  local dest_dir="$2"
+  local skill_dir=""
+  local skill_name=""
+  local copied=0
+
+  if [[ ! -d "${CANONICAL_SKILLS_DIR}" ]]; then
+    warn "Canonical skills directory not found: ${CANONICAL_SKILLS_DIR}"
+    return 0
+  fi
+
+  mkdir -p "${dest_dir}"
+
+  for skill_dir in "${CANONICAL_SKILLS_DIR}"/*; do
+    [[ -d "${skill_dir}" ]] || continue
+    skill_name="$(basename "${skill_dir}")"
+    rm -rf "${dest_dir}/${skill_name}"
+    cp -R "${skill_dir}" "${dest_dir}/"
+    copied=$((copied + 1))
+  done
+
+  if [[ ${copied} -eq 0 ]]; then
+    warn "No skills found to copy from ${CANONICAL_SKILLS_DIR}"
+    return 0
+  fi
+
+  success "Copied ${copied} skill(s) to ${agent_name} layout (${dest_dir})"
+}
+
+choose_menu_option() {
+  local prompt="$1"
+  shift
+
+  local -a options=("$@")
+  local selected=1
+  local option_count=${#options[@]}
+  local key=""
+  local seq=""
+  local first_render=1
+  local i=0
+
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    REPLY="1"
+    info "Non-interactive terminal detected. Defaulting to option 1."
+    return 0
+  fi
+
+  echo "${prompt}"
+  echo "Use Up/Down arrows and press Enter."
+  echo ""
+
+  {
+    while true; do
+      if (( first_render == 0 )); then
+        printf '\033[%dA' "${option_count}"
+      fi
+
+      for (( i = 1; i <= option_count; i++ )); do
+        printf '\033[2K\r'
+        if (( i == selected )); then
+          printf "  ${BOLD}${CYAN}> %s${RESET}\n" "${options[i]}"
+        else
+          printf "    %s\n" "${options[i]}"
+        fi
+      done
+
+      first_render=0
+      read -rsk1 key
+
+      case "${key}" in
+        ""|$'\n'|$'\r')
+          REPLY="${selected}"
+          echo ""
+          return 0
+          ;;
+        $'\x1b')
+          read -rsk2 seq
+          case "${seq}" in
+            "[A") (( selected = selected == 1 ? option_count : selected - 1 )) ;;
+            "[B") (( selected = selected == option_count ? 1 : selected + 1 )) ;;
+          esac
+          ;;
+        [1-9])
+          if (( key >= 1 && key <= option_count )); then
+            selected="${key}"
+          fi
+          ;;
+      esac
+    done
+  } always {
+    printf '\033[?25h'
+  }
+}
+
+prompt_skill_copy_layout() {
+  local choice=""
+
+  header "Optional AI Skill Layout Copy"
+  echo "Canonical repository-local skills live in:"
+  echo "  ${CANONICAL_SKILLS_DIR}"
+  echo ""
+
+  choose_menu_option \
+    "Select the optional target layout to prepare:" \
+    "1) Antigravity only (skip copy) [recommended]" \
+    "2) Codex (.codex/skills)" \
+    "3) Claude Code (.claude/skills)" \
+    "4) GitHub Copilot / VS Code (.github/skills)" \
+    "5) All supported layouts"
+  choice="${REPLY:-1}"
+
+  case "${choice}" in
+    1)
+      info "Skipping skill copy. Antigravity remains the primary local setup."
+      ;;
+    2)
+      copy_skills_to_layout "Codex" "${REPO_ROOT}/.codex/skills"
+      ;;
+    3)
+      copy_skills_to_layout "Claude Code" "${REPO_ROOT}/.claude/skills"
+      ;;
+    4)
+      copy_skills_to_layout "GitHub Copilot / VS Code" "${REPO_ROOT}/.github/skills"
+      ;;
+    5)
+      copy_skills_to_layout "Codex" "${REPO_ROOT}/.codex/skills"
+      copy_skills_to_layout "Claude Code" "${REPO_ROOT}/.claude/skills"
+      copy_skills_to_layout "GitHub Copilot / VS Code" "${REPO_ROOT}/.github/skills"
+      ;;
   esac
 }
 
@@ -76,6 +216,9 @@ echo "  ${BOLD}Development utilities${RESET}"
 echo "    • tokei           (make loc)"
 echo "    • lefthook        (Git hooks: pre-commit + pre-push)"
 echo "    • create-dmg      (make dmg)"
+echo ""
+echo "  ${BOLD}Optional AI agent setup${RESET}"
+echo "    • Copy repository-local skills from .agents/skills to other agent layouts"
 echo ""
 
 if ! confirm "Proceed with the installation?"; then
@@ -286,6 +429,8 @@ else
   warn "lefthook.yml not found in current directory — skipping hook registration."
   warn "Run 'lefthook install' from the project root when ready."
 fi
+
+prompt_skill_copy_layout
 
 # =============================================================================
 # Summary

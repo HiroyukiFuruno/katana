@@ -40,12 +40,14 @@ Pre-built binaries are not yet available. Please build from source (see below).
 
 ### One-command Setup
 
-Run the setup script from the project root. It will check for and install every
+Run `make init` from the project root. It will check for and install every
 required tool interactively:
 
 ```sh
-./scripts/setup.sh
+make init
 ```
+
+`make init` is the documented entry point and currently delegates to `scripts/setup.sh`.
 
 The script installs:
 
@@ -65,6 +67,7 @@ The script installs:
 ### Common `make` Commands
 
 ```sh
+make init         # Bootstrap the development environment interactively
 make run          # Build and launch KatanA
 make test         # Run the full test suite
 make check-light  # Full CI check: fmt + clippy + tests
@@ -83,7 +86,7 @@ katana/
 │   ├── katana-ui/        # egui application shell, preview pane, i18n, snapshots
 │   └── katana-platform/  # Filesystem abstraction, settings persistence
 ├── scripts/
-│   └── setup.sh          # Development environment installer
+│   └── setup.sh          # Implementation behind `make init`
 ├── docs/                 # Architecture decisions, coding rules
 ├── fixtures/             # Test fixtures (sample Markdown files)
 └── Makefile              # Developer task runner

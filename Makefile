@@ -10,6 +10,10 @@
 # Force all warnings to be treated as errors for every cargo command run via make
 export RUSTFLAGS=-D warnings
 
+.PHONY: init
+init: ## Bootstrap the development environment interactively
+	scripts/setup.sh
+
 # ---------- Build / Run ----------
 
 .PHONY: build
@@ -99,9 +103,10 @@ endif
 	@# 6. Create signed annotated tag
 	git tag -s "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo "✅ Release v$(VERSION) committed and tagged"
-	@echo "   Next steps:"
-	@echo "     make dmg                  # Build the DMG installer"
-	@echo "     git push && git push --tags  # Push to remote"
+	@# 7. Push to remote to trigger GitHub Actions release workflow
+	git push origin HEAD
+	git push origin v$(VERSION)
+	@echo "✅ Pushed to remote. GitHub Actions release workflow has been triggered."
 
 # ---------- Formatters ----------
 
