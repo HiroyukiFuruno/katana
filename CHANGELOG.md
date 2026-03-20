@@ -2,6 +2,12 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.2.1] - 2026-03-21
+
+### 🔧 Miscellaneous
+
+- Update Rust dependencies and GitHub Actions plugins
+
 ## [0.2.0] - 2026-03-20
 
 ### 🐛 Bug Fixes

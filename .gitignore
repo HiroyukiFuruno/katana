@@ -53,9 +53,15 @@ Temporary Items
 /.agent/workflows/opsx-*.md
 /.agent/skills/openspec-*/
 /.agents/skills/openspec-*/
+/.claude/
+/CLAUDE.md
 /.claude/commands/opsx/
 /.claude/skills/openspec-*/
+/.codex/
 /.codex/skills/openspec-*/
+/.github/copilot-instructions.md
+/.github/instructions/
+/.github/skills/
 /.github/prompts/opsx-*.md
 /.github/skills/openspec-*/
 

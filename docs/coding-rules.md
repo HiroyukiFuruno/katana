@@ -8,6 +8,15 @@
 This document defines the Rust coding conventions to be followed throughout the project.
 Rules that can be checked automatically by linters are enforced via `.clippy.toml` and `#![deny(...)]` in each crate.
 
+## Project Operating Context
+
+This repository assumes day-to-day development with AI agents.
+The owner primarily uses [Antigravity](https://antigravity.google/) as the main development agent.
+Repository-local skills are maintained canonically under `.agents/skills/`.
+If another AI agent needs the same skill under a different directory hierarchy, copy the same content from `.agents/skills/` into that agent-specific path instead of maintaining divergent versions.
+Operational familiarity and maintenance priority are Antigravity-first, but the rules themselves are written so other agents can follow the same standards.
+When an AI agent works in this repository, it should treat these rules and the paired-document sync requirements as the default contract.
+
 ---
 
 ## 1. Structure and Responsibility
