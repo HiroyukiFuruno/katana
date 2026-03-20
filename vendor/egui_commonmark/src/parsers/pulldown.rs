@@ -14,9 +14,13 @@ use egui_commonmark_backend::pulldown::*;
 use pulldown_cmark::{CowStr, HeadingLevel};
 use unicode_segmentation::UnicodeSegmentation;
 
+#[allow(dead_code)]
 const INLINE_EMOJI_URI_PREFIX: &str = "bytes://katana-inline-emoji-";
+#[allow(dead_code)]
 const INLINE_EMOJI_FILENAME_SUFFIX: &str = ".png";
+#[allow(dead_code)]
 const INLINE_EMOJI_MIN_PIXEL_SIZE: u32 = 16;
+#[allow(dead_code)]
 const INLINE_EMOJI_DISPLAY_SCALE: f32 = 1.0;
 
 /// Newline logic is constructed by the following:
@@ -223,6 +227,7 @@ impl CommonMarkViewerInternal {
         self.after_inline_widget = false;
     }
 
+    #[allow(dead_code)]
     fn current_inline_font_size(&self, ui: &Ui) -> f32 {
         let body_size = TextStyle::Body.resolve(ui.style()).size;
         let heading_size = TextStyle::Heading.resolve(ui.style()).size;
@@ -1081,6 +1086,7 @@ fn is_emoji_scalar(ch: char) -> bool {
     )
 }
 
+#[allow(dead_code)]
 fn inline_emoji_uri(grapheme: &str, pixel_size: u32) -> String {
     let mut hasher = DefaultHasher::new();
     grapheme.hash(&mut hasher);
