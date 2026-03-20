@@ -2236,3 +2236,490 @@ fn test_integration_open_workspace_failed() {
     // Validate that the system safely recovered and is_loading_workspace is false
     assert!(!harness.state_mut().app_state_mut().is_loading_workspace);
 }
+
+#[test]
+fn test_integration_tab_context_menu_close_others() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = std::env::temp_dir().join("katana_test_ws_context_menu");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file1 = temp_dir.join("a.md");
+    let file2 = temp_dir.join("b.md");
+    let file3 = temp_dir.join("c.md");
+    std::fs::write(&file1, "# A").unwrap();
+    std::fs::write(&file2, "# B").unwrap();
+    std::fs::write(&file3, "# C").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
+    wait_for_workspace_load(&mut harness);
+
+    let abs1 = file1.canonicalize().unwrap_or(file1);
+    let abs2 = file2.canonicalize().unwrap_or(file2);
+    let abs3 = file3.canonicalize().unwrap_or(file3);
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs3));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+
+    // Red Phase: Trigger the unimplemented action
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseOtherDocuments(1));
+    harness.step();
+
+    let state = harness.state_mut().app_state_mut();
+    // These should fail because the match arm for CloseOtherDocuments is currently empty.
+    assert_eq!(state.open_documents.len(), 1, "Should close other tabs");
+    assert_eq!(
+        state.recently_closed_tabs.len(),
+        2,
+        "Should put 2 tabs into history"
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_ui_context_menu_close_others() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = std::env::temp_dir().join("katana_test_ws_context_menu_ui");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file1 = temp_dir.join("a.md");
+    let file2 = temp_dir.join("b.md");
+    let file3 = temp_dir.join("c.md");
+    std::fs::write(&file1, "# A").unwrap();
+    std::fs::write(&file2, "# B").unwrap();
+    std::fs::write(&file3, "# C").unwrap();
+    let abs1 = file1.canonicalize().unwrap_or(file1);
+    let abs2 = file2.canonicalize().unwrap_or(file2);
+    let abs3 = file3.canonicalize().unwrap_or(file3);
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1));
+    harness.run_steps(5);
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.run_steps(5);
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs3));
+    harness.run_steps(5);
+
+    let tab_b = harness.get_by_label_contains("b.md");
+
+    // Fix Flaky: ensure popup correctly renders with harness.run_steps() to await all frames
+    tab_b.click_secondary();
+    harness.run_steps(5);
+
+    // The localized label is "Close Others" because language is forced to "en"
+    let btn = harness.get_by_label("Close Others");
+    btn.click();
+    harness.run_steps(5);
+
+    // Verify it successfully closed everything except b.md
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs2
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_restore_closed() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    let abs2 = temp_dir.path().join("b.md");
+    std::fs::write(&abs1, "# A").unwrap();
+    std::fs::write(&abs2, "# B").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocument(1));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::RestoreClosedDocument);
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs2
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_reorder() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    let abs2 = temp_dir.path().join("b.md");
+    let abs3 = temp_dir.path().join("c.md");
+    std::fs::write(&abs1, "# A").unwrap();
+    std::fs::write(&abs2, "# B").unwrap();
+    std::fs::write(&abs3, "# C").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs3.clone()));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs1
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[2].path,
+        abs3
+    );
+
+    // Reorder 0 to 2: move A after B -> B, A, C
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ReorderDocument { from: 0, to: 2 });
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs1
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[2].path,
+        abs3
+    );
+
+    // Reorder 2 to 0: move C before B -> C, B, A
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ReorderDocument { from: 2, to: 0 });
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs3
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[2].path,
+        abs1
+    );
+
+    // Reorder out of bounds: no-op
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ReorderDocument { from: 5, to: 10 });
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_pinning() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    let abs2 = temp_dir.path().join("b.md");
+    std::fs::write(&abs1, "# A").unwrap();
+    std::fs::write(&abs2, "# B").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.step();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::TogglePinDocument(1));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+    assert!(harness.state_mut().app_state_mut().open_documents[0].is_pinned);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs2
+    );
+    assert!(!harness.state_mut().app_state_mut().open_documents[1].is_pinned);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs1
+    );
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::TogglePinDocument(0));
+    harness.step();
+
+    assert!(!harness.state_mut().app_state_mut().open_documents[0].is_pinned);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_close_directions() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    let abs2 = temp_dir.path().join("b.md");
+    let abs3 = temp_dir.path().join("c.md");
+    std::fs::write(&abs1, "# A").unwrap();
+    std::fs::write(&abs2, "# B").unwrap();
+    std::fs::write(&abs3, "# C").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs3.clone()));
+    harness.step();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocumentsToLeft(1));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[1].path,
+        abs3
+    );
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocumentsToRight(0));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+    assert_eq!(
+        harness.state_mut().app_state_mut().open_documents[0].path,
+        abs2
+    );
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_close_edges() {
+    let mut harness = setup_harness();
+    harness.step();
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    let abs2 = temp_dir.path().join("b.md");
+    let abs3 = temp_dir.path().join("c.md");
+    std::fs::write(&abs1, "# A").unwrap();
+    std::fs::write(&abs2, "# B").unwrap();
+    std::fs::write(&abs3, "# C").unwrap();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs3.clone()));
+    harness.step();
+
+    // a_idx = 2 (c.md). CloseLeft(1). Since a_idx(2) >= idx(1), we hit line 670
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocumentsToLeft(1));
+    harness.step();
+
+    // Now open_documents: [abs2, abs3]. a_idx=1 (which is c.md).
+    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(1));
+
+    // Now index 0 is abs2, index 1 is abs3. active is abs3.
+    // CloseRight(0). a_idx=1, idx=0 => a_idx > idx => hit line 649
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocumentsToRight(0));
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(0));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_close_all() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let abs1 = temp_dir.path().join("a.md");
+    std::fs::write(&abs1, "# A").unwrap();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs1.clone()));
+    harness.step();
+
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseAllDocuments);
+    harness.step();
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 0);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_tab_restore_closed_limit() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut paths = Vec::new();
+
+    // Create and open 11 documents
+    for i in 0..11 {
+        let p = temp_dir.path().join(format!("file_{}.md", i));
+        std::fs::write(&p, format!("# {}", i)).unwrap();
+        harness
+            .state_mut()
+            .trigger_action(AppAction::SelectDocument(p.clone()));
+        harness.step();
+        paths.push(p);
+    }
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 11);
+
+    // Close all of them
+    for _ in 0..11 {
+        // Closing the active tab (assuming last one is active, which is index 10 down to 0)
+        harness
+            .state_mut()
+            .trigger_action(AppAction::CloseDocument(0));
+        harness.step();
+    }
+
+    // Now open_documents should be 0, and recently closed should be 10 (since max is 10)
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 0);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .recently_closed_tabs
+            .len(),
+        10
+    );
+
+    // Provide 10 Restore actions, the oldest one (file_0) was popped, so we'll get file_1 up to file_10
+    for _ in 0..10 {
+        harness
+            .state_mut()
+            .trigger_action(AppAction::RestoreClosedDocument);
+        harness.step();
+    }
+
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 10);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .recently_closed_tabs
+            .len(),
+        0
+    );
+
+    // An extra restore does nothing
+    harness
+        .state_mut()
+        .trigger_action(AppAction::RestoreClosedDocument);
+    harness.step();
+    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 10);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}

@@ -127,7 +127,15 @@
     },
     "tab": {
         "nav_prev": "Move to previous tab",
-        "nav_next": "Move to next tab"
+        "nav_next": "Move to next tab",
+        "close": "Close",
+        "close_others": "Close Others",
+        "close_all": "Close All",
+        "close_right": "Close to the Right",
+        "close_left": "Close to the Left",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "restore_closed": "Restore Closed Tab"
     },
     "search": {
         "modal_title": "Search Files",

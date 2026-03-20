@@ -127,7 +127,15 @@
     },
     "tab": {
         "nav_prev": "이전 탭으로 이동",
-        "nav_next": "다음 탭으로 이동"
+        "nav_next": "다음 탭으로 이동",
+        "close": "Close",
+        "close_others": "Close Others",
+        "close_all": "Close All",
+        "close_right": "Close Right",
+        "close_left": "Close Left",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "restore_closed": "Restore Closed Tab"
     },
     "search": {
         "modal_title": "파일 찾기",

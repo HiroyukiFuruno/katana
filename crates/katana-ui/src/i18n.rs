@@ -228,6 +228,22 @@ pub struct SettingsColorMessages {
 pub struct TabMessages {
     pub nav_prev: String,
     pub nav_next: String,
+    #[serde(default)]
+    pub close: String,
+    #[serde(default)]
+    pub close_others: String,
+    #[serde(default)]
+    pub close_all: String,
+    #[serde(default)]
+    pub close_right: String,
+    #[serde(default)]
+    pub close_left: String,
+    #[serde(default)]
+    pub pin: String,
+    #[serde(default)]
+    pub unpin: String,
+    #[serde(default)]
+    pub restore_closed: String,
 }
 
 /// Language definition JSON entry.

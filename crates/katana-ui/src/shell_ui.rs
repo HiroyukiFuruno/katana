@@ -438,9 +438,12 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
 /// Tab bar: Displays tabs of open documents side-by-side.
 pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
     const MAX_TAB_WIDTH: f32 = 200.0;
+    const PINNED_TAB_MAX_WIDTH: f32 = 60.0;
 
     let mut close_idx: Option<usize> = None;
     let mut tab_action: Option<AppAction> = None;
+    let mut dragged_source: Option<(usize, egui::Pos2)> = None;
+    let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
 
     let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
     let doc_count = state.open_documents.len();
@@ -461,19 +464,78 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                         let is_active = state.active_doc_idx == Some(idx);
                         let filename = doc.file_name().unwrap_or("untitled").to_string();
                         let dirty_suffix = if doc.is_dirty { " *" } else { "" };
-                        let title = format!("{filename}{dirty_suffix}");
+                        let title = if doc.is_pinned {
+                            format!("📌 {filename}{dirty_suffix}")
+                        } else {
+                            format!("{filename}{dirty_suffix}")
+                        };
                         let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
 
                         let resp = ui
                             .push_id(format!("tab_{idx}"), |ui| {
-                                ui.set_max_width(MAX_TAB_WIDTH);
+                                ui.set_max_width(if doc.is_pinned {
+                                    PINNED_TAB_MAX_WIDTH
+                                } else {
+                                    MAX_TAB_WIDTH
+                                });
                                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-                                ui.selectable_label(is_active, &title)
+                                let inner_resp = ui.selectable_label(is_active, &title);
+                                ui.interact(
+                                    inner_resp.rect,
+                                    inner_resp.id,
+                                    egui::Sense::click_and_drag(),
+                                )
                             })
                             .inner;
 
+                        tab_rects.push((idx, resp.rect));
+                        if resp.drag_stopped() {
+                            if let Some(pos) = ui.input(|i| i.pointer.hover_pos()) {
+                                dragged_source = Some((idx, pos));
+                            }
+                        }
+
                         let clicked = resp.clicked();
-                        resp.on_hover_text(&tooltip_path);
+                        let resp = resp.on_hover_text(&tooltip_path);
+
+                        resp.context_menu(|ui| {
+                            let i18n = crate::i18n::get();
+
+                            if ui.button(&i18n.tab.close).clicked() {
+                                tab_action = Some(AppAction::CloseDocument(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_others).clicked() {
+                                tab_action = Some(AppAction::CloseOtherDocuments(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_right).clicked() {
+                                tab_action = Some(AppAction::CloseDocumentsToRight(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_left).clicked() {
+                                tab_action = Some(AppAction::CloseDocumentsToLeft(idx));
+                                ui.close();
+                            }
+                            ui.separator();
+                            let pin_label = if doc.is_pinned {
+                                &i18n.tab.unpin
+                            } else {
+                                &i18n.tab.pin
+                            };
+                            if ui.button(pin_label).clicked() {
+                                tab_action = Some(AppAction::TogglePinDocument(idx));
+                                ui.close();
+                            }
+                            if !state.recently_closed_tabs.is_empty() {
+                                ui.separator();
+                                if ui.button(&i18n.tab.restore_closed).clicked() {
+                                    tab_action = Some(AppAction::RestoreClosedDocument);
+                                    ui.close();
+                                }
+                            }
+                        });
+
                         if clicked && !is_active {
                             tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
                         }
@@ -514,6 +576,18 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             }
         }
     });
+
+    if let Some((src_idx, drop_pos)) = dragged_source {
+        for (target_idx, rect) in &tab_rects {
+            if rect.contains(drop_pos) && src_idx != *target_idx {
+                tab_action = Some(AppAction::ReorderDocument {
+                    from: src_idx,
+                    to: *target_idx,
+                });
+                break;
+            }
+        }
+    }
 
     if let Some(action_val) = tab_action {
         *action = action_val;
@@ -1335,6 +1409,20 @@ impl eframe::App for KatanaApp {
         if self.cached_font_family.as_deref() != Some(&font_family) {
             theme_bridge::apply_font_family(ctx, &font_family);
             self.cached_font_family = Some(font_family);
+        }
+
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers {
+                    command: true,
+                    shift: true,
+                    ..Default::default()
+                },
+                egui::Key::T,
+            ))
+        }) && !self.state.recently_closed_tabs.is_empty()
+        {
+            self.pending_action = AppAction::RestoreClosedDocument;
         }
 
         if ctx.input_mut(|i| {

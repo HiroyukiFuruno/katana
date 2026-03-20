@@ -278,6 +278,7 @@ The convention "a defined rule without enforcement is meaningless" applies here 
 ❌ Modify implementation code and ask the user to "verify visually"
 ❌ Make multiple implementation attempts without automated verification
 ❌ Remove or weaken a test to make the implementation pass
+❌ Delete a test solely because it is flaky or fails intermittently. Flaky tests are critical for regression detection—investigate and fix the root cause instead.
 ```
 
 #### UI Testing with egui_kittest (Snapshots are Prohibited — Validate Actual Responses)

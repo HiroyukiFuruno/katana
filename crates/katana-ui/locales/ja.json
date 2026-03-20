@@ -127,7 +127,15 @@
     },
     "tab": {
         "nav_prev": "前のタブへ移動",
-        "nav_next": "次のタブへ移動"
+        "nav_next": "次のタブへ移動",
+        "close": "閉じる",
+        "close_others": "他を閉じる",
+        "close_all": "すべて閉じる",
+        "close_right": "右側を閉じる",
+        "close_left": "左側を閉じる",
+        "pin": "ピン留め",
+        "unpin": "ピン留め解除",
+        "restore_closed": "閉じたタブを復元"
     },
     "search": {
         "modal_title": "ファイル検索",

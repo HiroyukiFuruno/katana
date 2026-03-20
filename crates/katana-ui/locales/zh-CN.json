@@ -127,7 +127,15 @@
     },
     "tab": {
         "nav_prev": "移至上一个标签页",
-        "nav_next": "移至下一个标签页"
+        "nav_next": "移至下一个标签页",
+        "close": "Close",
+        "close_others": "Close Others",
+        "close_all": "Close All",
+        "close_right": "Close Right",
+        "close_left": "Close Left",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "restore_closed": "Restore Closed Tab"
     },
     "search": {
         "modal_title": "搜索文件",
