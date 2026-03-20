@@ -518,7 +518,7 @@ mod tests {
 
         let size = loader.byte_size();
         let expected =
-            file.bytes.len() + file.mime.as_ref().map_or(0, String::len) + "error msg".len() + 0; // Pending contributes 0
+            file.bytes.len() + file.mime.as_ref().map_or(0, String::len) + "error msg".len(); // Pending contributes 0
         assert_eq!(size, expected);
     }
 

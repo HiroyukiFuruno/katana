@@ -1,3 +1,4 @@
+#![allow(clippy::items_after_test_module)]
 //! Theme color definitions and presets.
 //!
 //! `ThemeColors` aggregates all UI colors. Ten presets (5 dark, 5 light) ship

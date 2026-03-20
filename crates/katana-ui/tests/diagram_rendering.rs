@@ -48,7 +48,13 @@ fn assert_image(sections: &[RenderedSection], idx: usize, context: &str) {
 fn render_and_wait(lang: &str, source: &str) -> PreviewPane {
     let md = diagram_md(lang, source);
     let mut pane = PreviewPane::default();
-    pane.full_render(&md, Path::new("/tmp/test.md"));
+    pane.full_render(
+        &md,
+        Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
     pane.wait_for_renders();
     pane
 }
@@ -254,7 +260,13 @@ fn mixed_diagram_document_renders_all_independently() {
          ## End\n"
     );
     let mut pane = PreviewPane::default();
-    pane.full_render(&source, Path::new("/tmp/test.md"));
+    pane.full_render(
+        &source,
+        Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
 
     assert_eq!(
         pane.sections.len(),
@@ -378,7 +390,13 @@ fn snapshot_diagram_pending_spinner() {
 fn update_after_render_preserves_diagram_images() {
     let source = format!("# Title\n\n```drawio\n{DRAWIO_SOURCE}\n```\n\n## Footer\n");
     let mut pane = PreviewPane::default();
-    pane.full_render(&source, Path::new("/tmp/test.md"));
+    pane.full_render(
+        &source,
+        Path::new("/tmp/test.md"),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        false,
+        4,
+    );
     pane.wait_for_renders();
 
     assert_image(&pane.sections, 1, "Before update");

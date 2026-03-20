@@ -39,8 +39,9 @@ make release VERSION=0.1.7
 1. `Cargo.toml` の workspace version を更新
 2. `crates/katana-ui/Info.plist` の `CFBundleShortVersionString` を更新 (古いバージョンが残るバグを防止)
 3. `CHANGELOG.md` を `vX.Y.Z` のタグ内容で自動更新 (git-cliff)
-4. 更新ファイル群をステージ・コミット (`chore: vX.Y.Z リリース準備`)
-5. Gitの注釈付きタグ (`vX.Y.Z`) を作成
+4. 更新後の内容に対して `make check` を実行し、品質ゲートを通過させる
+5. 更新ファイル群をステージ・コミット (`chore: vX.Y.Z リリース準備`)
+6. Gitの注釈付きタグ (`vX.Y.Z`) を作成
 
 ### Step 3: リモートへのプッシュ
 

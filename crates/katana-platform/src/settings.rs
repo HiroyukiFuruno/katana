@@ -10,6 +10,7 @@ use std::path::PathBuf;
 pub mod migration;
 pub mod migration_0_1_2;
 pub mod migration_0_1_3_to_0_1_4;
+pub mod migration_0_1_4_to_0_2_0;
 use migration::MigrationRunner;
 
 /// Split direction for editor/preview layout.
@@ -54,12 +55,14 @@ pub struct AppSettings {
     #[serde(default)]
     pub layout: LayoutSettings,
 
-    /// ID of the last opened workspace root path, restored on next launch.
+    /// Workspace settings (nesting).
     #[serde(default)]
-    pub last_workspace: Option<String>,
-    /// Workspace directory paths.
+    pub workspace: WorkspaceSettings,
+
+    /// Performance and advanced tuning (nesting).
     #[serde(default)]
-    pub workspace_paths: Vec<String>,
+    pub performance: PerformanceSettings,
+
     /// Terms of service accepted version (None = not accepted).
     #[serde(default)]
     pub terms_accepted_version: Option<String>,
@@ -124,8 +127,41 @@ pub struct LayoutSettings {
     pub toc_visible: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WorkspaceSettings {
+    /// ID of the last opened workspace root path, restored on next launch.
+    #[serde(default)]
+    pub last_workspace: Option<String>,
+    /// Workspace directory paths.
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Previously opened document tabs.
+    #[serde(default)]
+    pub open_tabs: Vec<String>,
+    /// Index of the actively selected tab.
+    #[serde(default)]
+    pub active_tab_idx: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceSettings {
+    /// Number of concurrent diagram renders.
+    pub diagram_concurrency: usize,
+}
+
+const DEFAULT_DIAGRAM_CONCURRENCY: usize = 4;
+
+impl Default for PerformanceSettings {
+    fn default() -> Self {
+        Self {
+            // Default 4 workers, reduces dynamically upon errors like OOM
+            diagram_concurrency: DEFAULT_DIAGRAM_CONCURRENCY,
+        }
+    }
+}
+
 fn default_version() -> String {
-    "0.1.4".to_string()
+    "0.2.0".to_string()
 }
 
 fn default_theme() -> String {
@@ -168,8 +204,8 @@ impl Default for AppSettings {
             theme: ThemeSettings::default(),
             font: FontSettings::default(),
             layout: LayoutSettings::default(),
-            last_workspace: None,
-            workspace_paths: Vec::new(),
+            workspace: WorkspaceSettings::default(),
+            performance: PerformanceSettings::default(),
             terms_accepted_version: None,
             language: default_language(),
             extra: Vec::new(),
@@ -256,6 +292,7 @@ impl SettingsRepository for JsonFileRepository {
                         let mut runner = MigrationRunner::new();
                         runner.add_strategy(Box::new(migration_0_1_2::Migration0_1_2));
                         runner.add_strategy(Box::new(migration_0_1_3_to_0_1_4::Migration013To014));
+                        runner.add_strategy(Box::new(migration_0_1_4_to_0_2_0::Migration014To020));
                         value = runner.migrate(value);
                         serde_json::from_value(value).unwrap_or_default()
                     }
@@ -383,7 +420,8 @@ mod tests {
         assert!((s.font.size - DEFAULT_FONT_SIZE).abs() < f32::EPSILON);
         assert_eq!(s.font.family, "monospace");
         assert_eq!(s.language, "en");
-        assert!(s.last_workspace.is_none());
+        assert!(s.workspace.last_workspace.is_none());
+        assert!(s.workspace.paths.is_empty());
     }
 
     #[test]

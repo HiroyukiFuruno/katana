@@ -1,133 +1,139 @@
 {
-  "menu": {
-    "file": "檔案",
-    "settings": "設定",
-    "language": "語言 (Language)",
-    "open_workspace": "開啟工作區…",
-    "save": "儲存"
-  },
-  "workspace": {
-    "no_workspace_open": "未開啟工作區。",
-    "no_document_selected": "未選擇文件。",
-    "workspace_title": "工作区"
-  },
-  "preview": {
-    "preview_title": "預覽",
-    "refresh_diagrams": "重新整理圖表",
-    "rendering": "{kind} 渲染中...",
-    "no_preview": "(無預覽)"
-  },
-  "plantuml": {
-    "downloading_plantuml": "⬇ 正在下載 PlantUML JAR...",
-    "plantuml_installed": "✅ PlantUML 已安裝。正在刷新預覽...",
-    "download_error": "❌ 下載錯誤: "
-  },
-  "view_mode": {
-    "preview": "預覽",
-    "code": "程式碼",
-    "split": "分割"
-  },
-  "split_toggle": {
-    "horizontal": "切換至水平分割（左/右）",
-    "vertical": "切換至垂直分割（上/下）",
-    "editor_first": "將編輯器放置在左/上",
-    "preview_first": "將預覽放置在左/上"
-  },
-  "error": {
-    "missing_dependency": "⚠️ {tool_name} 找不到。請使用 {install_hint} 安裝。",
-    "curl_launch_failed": "curl 啟動失敗",
-    "download_failed": "下載失敗",
-    "render_error": "⚠ [{kind}] {message}"
-  },
-  "status": {
-    "ready": "就緒",
-    "saved": "已儲存。",
-    "save_failed": "儲存失敗: {error}",
-    "opened_workspace": "已開啟工作區: {name}",
-    "cannot_open_workspace": "無法開啟工作區: {error}",
-    "cannot_open_file": "無法開啟檔案: {error}"
-  },
-  "action": {
-    "expand_all": "全部展開",
-    "collapse_all": "全部摺疊",
-    "collapse_sidebar": "隱藏側邊欄",
-    "refresh_workspace": "刷新工作區",
-    "toggle_filter": "フィルター切り替え"
-  },
-  "ai": {
-    "ai_unconfigured": "[AI: 未配置]"
-  },
-  "tool": {
-    "not_installed": "⚠ {tool} 未安裝",
-    "install_path": "安裝路徑: {path}",
-    "download": "⬇ 下載 {tool}"
-  },
-  "settings": {
-    "title": "設定",
-    "toc_visible": "顯示目錄",
-    "theme": {
-      "preset": "主題預設",
-      "dark_section": "深色",
-      "light_section": "淺色",
-      "custom_colors": "自訂顏色",
-      "reset_custom": "重設為預設"
+    "menu": {
+        "file": "檔案",
+        "settings": "設定",
+        "language": "語言 (Language)",
+        "open_workspace": "開啟工作區…",
+        "save": "儲存",
+        "open_all": "全部開啟"
     },
-    "font": {
-      "size": "字體大小",
-      "family": "字體系列",
-      "size_slider_hint": "向左或向右拖曳以調整大小"
-    },
-    "layout": {
-      "split_direction": "分割方向",
-      "horizontal": "水平（左 / 右）",
-      "vertical": "垂直（上 / 下）",
-      "pane_order": "窗格順序",
-      "editor_first": "編輯器優先",
-      "preview_first": "預覽優先"
+    "workspace": {
+        "no_workspace_open": "未開啟工作區。",
+        "no_document_selected": "未開啟文件。",
+        "workspace_title": "工作區",
+        "recent_workspaces": "最近的工作區",
+        "metadata_tooltip": "大小: {size} B\n修改時間: {mod_time}"
     },
     "preview": {
-      "title": "預覽",
-      "heading": "# 範例標題",
-      "normal_text": "正常文字與",
-      "accent_link": "強調連結",
-      "secondary_text": "次要文字範例",
-      "code_sample": "fn main() { println!(\"你好!\"); }"
+        "preview_title": "預覽",
+        "refresh_diagrams": "重新整理圖表",
+        "rendering": "{kind} 渲染中...",
+        "no_preview": "(無預覽)"
     },
-    "color": {
-      "background": "背景",
-      "panel_background": "面板背景",
-      "text": "文字",
-      "text_secondary": "次要文字",
-      "accent": "強調",
-      "border": "邊框",
-      "selection": "選擇",
-      "code_background": "程式碼背景",
-      "preview_background": "預覽背景"
+    "plantuml": {
+        "downloading_plantuml": "⬇ 正在下載 PlantUML JAR...",
+        "plantuml_installed": "✅ PlantUML 已安裝。正在重新整理預覽...",
+        "download_error": "❌ 下載錯誤: "
     },
-    "tabs": [
-      {
-        "key": "theme",
-        "name": "主題"
-      },
-      {
-        "key": "font",
-        "name": "字型"
-      },
-      {
-        "key": "layout",
-        "name": "配置"
-      }
-    ]
-  },
-  "tab": {
-    "nav_prev": "移至上一個標籤頁",
-    "nav_next": "移至下一個標籤頁"
-  },
-  "search": {
-    "modal_title": "搜尋檔案",
-    "query_hint": "輸入檔名進行搜尋...",
-    "include_pattern_hint": "Include (regex, comma-separated)",
-    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
-    "no_results": "沒有找到檔案。"
-  }
+    "view_mode": {
+        "preview": "預覽",
+        "code": "程式碼",
+        "split": "分割"
+    },
+    "split_toggle": {
+        "horizontal": "切換至水平分割（左/右）",
+        "vertical": "切換至垂直分割（上/下）",
+        "editor_first": "將編輯器放置在左/上",
+        "preview_first": "將預覽放置在左/上"
+    },
+    "error": {
+        "missing_dependency": "⚠️ {tool_name} 找不到。請使用 {install_hint} 安裝。",
+        "curl_launch_failed": "curl 啟動失敗",
+        "download_failed": "下載失敗",
+        "render_error": "⚠ [{kind}] {message}"
+    },
+    "status": {
+        "ready": "就緒",
+        "saved": "已儲存。",
+        "save_failed": "儲存失敗: {error}",
+        "opened_workspace": "已開啟工作區: {name}",
+        "cannot_open_workspace": "無法開啟工作區: {error}",
+        "cannot_open_file": "無法開啟檔案: {error}"
+    },
+    "action": {
+        "expand_all": "全部展開",
+        "collapse_all": "全部摺疊",
+        "collapse_sidebar": "隱藏側邊欄",
+        "refresh_workspace": "重新整理工作區",
+        "toggle_filter": "切換篩選器",
+        "remove_workspace": "從歷史紀錄中移除",
+        "recursive_expand": "遞迴展開子目錄",
+        "recursive_open_all": "遞迴開啟所有檔案"
+    },
+    "ai": {
+        "ai_unconfigured": "[AI: 未設定]"
+    },
+    "tool": {
+        "not_installed": "⚠ {tool} 未安裝",
+        "install_path": "安裝路徑: {path}",
+        "download": "⬇ 下載 {tool}"
+    },
+    "settings": {
+        "title": "設定",
+        "toc_visible": "顯示目錄",
+        "theme": {
+            "preset": "主題預設",
+            "dark_section": "深色",
+            "light_section": "淺色",
+            "custom_colors": "自訂顏色",
+            "reset_custom": "重設為預設"
+        },
+        "font": {
+            "size": "字體大小",
+            "family": "字體系列",
+            "size_slider_hint": "向左或向右拖曳以調整大小"
+        },
+        "layout": {
+            "split_direction": "分割方向",
+            "horizontal": "水平（左 / 右）",
+            "vertical": "垂直（上 / 下）",
+            "pane_order": "窗格順序",
+            "editor_first": "編輯器優先",
+            "preview_first": "預覽優先"
+        },
+        "preview": {
+            "title": "預覽",
+            "heading": "# 範例標題",
+            "normal_text": "正常文字與",
+            "accent_link": "強調連結",
+            "secondary_text": "次要文字範例",
+            "code_sample": "fn main() { println!(\"你好!\"); }"
+        },
+        "color": {
+            "background": "背景",
+            "panel_background": "面板背景",
+            "text": "文字",
+            "text_secondary": "次要文字",
+            "accent": "強調",
+            "border": "邊框",
+            "selection": "選擇",
+            "code_background": "程式碼背景",
+            "preview_background": "預覽背景"
+        },
+        "tabs": [
+            {
+                "key": "theme",
+                "name": "主題"
+            },
+            {
+                "key": "font",
+                "name": "字型"
+            },
+            {
+                "key": "layout",
+                "name": "配置"
+            }
+        ]
+    },
+    "tab": {
+        "nav_prev": "移至上一個標籤頁",
+        "nav_next": "移至下一個標籤頁"
+    },
+    "search": {
+        "modal_title": "搜尋檔案",
+        "query_hint": "輸入檔名進行搜尋...",
+        "include_pattern_hint": "包含（正則表示式，以逗號分隔）",
+        "exclude_pattern_hint": "排除（正則表示式，以逗號分隔）",
+        "no_results": "沒有找到檔案。"
+    }
 }

@@ -10,6 +10,8 @@ pub struct Document {
     pub buffer: String,
     /// Whether the buffer has unsaved changes.
     pub is_dirty: bool,
+    /// Whether the document content is currently loaded.
+    pub is_loaded: bool,
 }
 
 impl Document {
@@ -19,6 +21,17 @@ impl Document {
             path: path.into(),
             buffer: content.into(),
             is_dirty: false,
+            is_loaded: true,
+        }
+    }
+
+    /// Create a new empty document for lazy loading.
+    pub fn new_empty(path: impl Into<PathBuf>) -> Self {
+        Self {
+            path: path.into(),
+            buffer: String::new(),
+            is_dirty: false,
+            is_loaded: false,
         }
     }
 
@@ -73,5 +86,19 @@ impl DocumentError {
             path: path.into(),
             source,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_new_empty() {
+        let path = PathBuf::from("test.md");
+        let doc = Document::new_empty(path.clone());
+        assert_eq!(doc.path, path);
+        assert!(doc.buffer.is_empty());
+        assert!(!doc.is_loaded);
     }
 }

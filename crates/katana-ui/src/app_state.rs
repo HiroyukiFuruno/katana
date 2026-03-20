@@ -58,6 +58,10 @@ pub enum AppAction {
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
     SelectDocument(std::path::PathBuf),
+    /// Open multiple files in the project tree at once.
+    OpenMultipleDocuments(Vec<std::path::PathBuf>),
+    /// Remove a workspace from the persistence list.
+    RemoveWorkspace(String),
     /// Close a tab.
     CloseDocument(usize),
     /// Update the buffer of the active document.
@@ -133,6 +137,12 @@ pub struct AppState {
     pub preview_max_scroll: f32,
     /// Settings persistence service.
     pub settings: SettingsService,
+    /// Indicates if a workspace is currently being loaded asynchronously in the background.
+    pub is_loading_workspace: bool,
+    /// Facade for memory and persistent cache storage.
+    pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
+    /// Set of manually expanded directories in the workspace tree.
+    pub expanded_directories: std::collections::HashSet<std::path::PathBuf>,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -152,6 +162,7 @@ impl AppState {
         ai_registry: AiProviderRegistry,
         plugin_registry: PluginRegistry,
         settings: SettingsService,
+        cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     ) -> Self {
         // ai_registry is planned for future AI integration. Currently unused.
         let _ = ai_registry;
@@ -181,6 +192,9 @@ impl AppState {
             editor_max_scroll: 0.0,
             preview_max_scroll: 0.0,
             settings,
+            is_loading_workspace: false,
+            cache,
+            expanded_directories: std::collections::HashSet::new(),
         }
     }
 
@@ -317,15 +331,22 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use katana_core::workspace::TreeEntry;
     use katana_platform::{PaneOrder, SplitDirection};
     use std::path::PathBuf;
 
     fn make_state_with_doc(path: &str) -> AppState {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         let doc = Document {
             path: PathBuf::from(path),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(0);
@@ -366,6 +387,7 @@ mod tests {
             path: PathBuf::from("/tmp/b.md"),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(1);
@@ -395,6 +417,7 @@ mod tests {
             path: PathBuf::from("/tmp/b.md"),
             buffer: String::new(),
             is_dirty: false,
+            is_loaded: true,
         });
         state.active_doc_idx = Some(1);
         state.initialize_tab_split_state("/tmp/b.md");
@@ -409,7 +432,12 @@ mod tests {
 
     #[test]
     fn test_ensure_active_split_state_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open, active_doc_idx is None — should return early without panic
         state.ensure_active_split_state();
         assert!(state.tab_split_states.is_empty());
@@ -417,7 +445,12 @@ mod tests {
 
     #[test]
     fn test_set_active_split_direction_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open — should return early without panic
         state.set_active_split_direction(SplitDirection::Vertical);
         assert!(state.tab_split_states.is_empty());
@@ -425,7 +458,12 @@ mod tests {
 
     #[test]
     fn test_set_active_pane_order_no_active_doc() {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         // No documents open — should return early without panic
         state.set_active_pane_order(PaneOrder::PreviewFirst);
         assert!(state.tab_split_states.is_empty());
@@ -452,5 +490,60 @@ mod tests {
             state.tab_split_states[0].state.order,
             PaneOrder::PreviewFirst
         );
+    }
+
+    #[test]
+    fn test_ensure_active_split_state() {
+        let mut state = make_state_with_doc("/tmp/c.md");
+        state.tab_split_states.clear();
+        state.ensure_active_split_state();
+        assert_eq!(state.tab_split_states.len(), 1);
+
+        let mut empty_state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
+        empty_state.ensure_active_split_state(); // Should safely return early
+        assert_eq!(empty_state.tab_split_states.len(), 0);
+    }
+    #[test]
+    fn test_tree_entry_collection() {
+        let root = PathBuf::from("/root");
+        let file1 = root.join("a.md");
+        let file2 = root.join("b.txt");
+        let sub = root.join("sub");
+        let file3 = sub.join("c.md");
+
+        let entry = TreeEntry::Directory {
+            path: root.clone(),
+            children: vec![
+                TreeEntry::File {
+                    path: file1.clone(),
+                },
+                TreeEntry::File {
+                    path: file2.clone(),
+                },
+                TreeEntry::Directory {
+                    path: sub.clone(),
+                    children: vec![TreeEntry::File {
+                        path: file3.clone(),
+                    }],
+                },
+            ],
+        };
+
+        let mut md_files = Vec::new();
+        entry.collect_all_markdown_file_paths(&mut md_files);
+        assert_eq!(md_files.len(), 2);
+        assert!(md_files.contains(&file1));
+        assert!(md_files.contains(&file3));
+
+        let mut dirs = Vec::new();
+        entry.collect_all_directory_paths(&mut dirs);
+        assert_eq!(dirs.len(), 2);
+        assert!(dirs.contains(&root));
+        assert!(dirs.contains(&sub));
     }
 }

@@ -20,6 +20,7 @@ fn app_state_show_settings_defaults_to_false() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     assert!(!state.show_settings);
 }
@@ -30,6 +31,7 @@ fn app_state_active_settings_tab_defaults_to_theme() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
     assert_eq!(state.active_settings_tab, SettingsTab::Theme);
 }
@@ -40,6 +42,7 @@ fn show_settings_can_be_toggled() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
 
     assert!(!state.show_settings);
@@ -55,6 +58,7 @@ fn active_settings_tab_can_be_changed() {
         AiProviderRegistry::new(),
         PluginRegistry::new(),
         katana_platform::SettingsService::default(),
+        std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
 
     assert_eq!(state.active_settings_tab, SettingsTab::Theme);

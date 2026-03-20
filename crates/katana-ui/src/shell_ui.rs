@@ -17,8 +17,9 @@ use crate::{
 
 use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
-    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, SCROLL_SYNC_DEAD_ZONE,
-    TAB_INTER_ITEM_SPACING, TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
+    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
+    RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
+    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
 };
 use crate::theme_bridge;
 use katana_platform::{PaneOrder, SplitDirection};
@@ -106,6 +107,10 @@ pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
     });
 }
 
+const WORKSPACE_SPINNER_OUTER_MARGIN: f32 = 10.0;
+const WORKSPACE_SPINNER_INNER_MARGIN: f32 = 10.0;
+const WORKSPACE_SPINNER_TEXT_MARGIN: f32 = 5.0;
+
 pub(crate) fn render_workspace_panel(
     ctx: &egui::Context,
     state: &mut AppState,
@@ -139,7 +144,11 @@ pub(crate) fn render_workspace_panel(
                         .on_hover_text(crate::i18n::get().action.expand_all.clone())
                         .clicked()
                     {
-                        state.force_tree_open = Some(true);
+                        if let Some(ws) = &state.workspace {
+                            state
+                                .expanded_directories
+                                .extend(ws.collect_all_directory_paths());
+                        }
                     }
                     if ui
                         .small_button("-")
@@ -149,6 +158,32 @@ pub(crate) fn render_workspace_panel(
                         state.force_tree_open = Some(false);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if !state.settings.settings().workspace.paths.is_empty() {
+                            ui.menu_button("📄", |ui| {
+                                for path in state.settings.settings().workspace.paths.iter().rev() {
+                                    ui.horizontal(|ui| {
+                                        if ui
+                                            .button("×")
+                                            .on_hover_text(
+                                                crate::i18n::get().action.remove_workspace.clone(),
+                                            )
+                                            .clicked()
+                                        {
+                                            *action = AppAction::RemoveWorkspace(path.clone());
+                                            ui.close();
+                                        }
+                                        if ui.selectable_label(false, path).clicked() {
+                                            *action = AppAction::OpenWorkspace(
+                                                std::path::PathBuf::from(path),
+                                            );
+                                            ui.close();
+                                        }
+                                    });
+                                }
+                            })
+                            .response
+                            .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
+                        }
                         if ui
                             .small_button("🔄")
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
@@ -199,7 +234,17 @@ pub(crate) fn render_workspace_panel(
                 }
             }
             ui.separator();
-            render_workspace_content(ui, state, action);
+            if state.is_loading_workspace {
+                ui.add_space(WORKSPACE_SPINNER_OUTER_MARGIN);
+                ui.horizontal(|ui| {
+                    ui.add_space(WORKSPACE_SPINNER_INNER_MARGIN);
+                    ui.spinner();
+                    ui.add_space(WORKSPACE_SPINNER_TEXT_MARGIN);
+                    ui.label(crate::i18n::get().action.refresh_workspace.clone());
+                });
+            } else {
+                render_workspace_content(ui, state, action);
+            }
         });
 }
 
@@ -210,8 +255,15 @@ pub(crate) fn render_workspace_content(
 ) {
     if let Some(ws) = &state.workspace {
         let entries = ws.tree.clone();
-        let mut selected: Option<std::path::PathBuf> = None;
-        let force = state.force_tree_open;
+        if let Some(force) = state.force_tree_open {
+            if force {
+                state
+                    .expanded_directories
+                    .extend(ws.collect_all_directory_paths());
+            } else {
+                state.expanded_directories.clear();
+            }
+        }
         let active_path = state.active_path().map(|p| p.to_path_buf());
 
         let ws_root = ws.root.clone();
@@ -235,20 +287,17 @@ pub(crate) fn render_workspace_content(
             .show(ui, |ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                 let mut ctx = TreeRenderContext {
-                    selected: &mut selected,
-                    force,
+                    action,
                     depth: 0,
                     active_path: active_path.as_deref(),
                     filter_set,
+                    expanded_directories: &mut state.expanded_directories,
                 };
                 for entry in &entries {
                     render_tree_entry(ui, entry, &mut ctx);
                 }
             });
         state.force_tree_open = None;
-        if let Some(path) = selected {
-            *action = AppAction::SelectDocument(path);
-        }
     } else {
         ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
         ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
@@ -258,6 +307,29 @@ pub(crate) fn render_workspace_content(
         {
             if let Some(path) = open_folder_dialog() {
                 *action = AppAction::OpenWorkspace(path);
+            }
+        }
+
+        let recent_paths = &state.settings.settings().workspace.paths;
+        if !recent_paths.is_empty() {
+            ui.add_space(RECENT_WORKSPACES_SPACING);
+            ui.separator();
+            ui.add_space(RECENT_WORKSPACES_SPACING);
+            ui.heading(crate::i18n::get().workspace.recent_workspaces.clone());
+            ui.add_space(RECENT_WORKSPACES_ITEM_SPACING);
+            for path in recent_paths.iter().rev() {
+                ui.horizontal(|ui| {
+                    if ui
+                        .button("×")
+                        .on_hover_text(crate::i18n::get().action.remove_workspace.clone())
+                        .clicked()
+                    {
+                        *action = AppAction::RemoveWorkspace(path.clone());
+                    }
+                    if ui.selectable_label(false, path).clicked() {
+                        *action = AppAction::OpenWorkspace(std::path::PathBuf::from(path));
+                    }
+                });
             }
         }
     }
@@ -607,11 +679,11 @@ pub(crate) fn render_editor_content(
 }
 
 pub(crate) struct TreeRenderContext<'a, 'b> {
-    pub selected: &'a mut Option<std::path::PathBuf>,
-    pub force: Option<bool>,
+    pub action: &'a mut AppAction,
     pub depth: usize,
     pub active_path: Option<&'b std::path::Path>,
     pub filter_set: Option<&'b std::collections::HashSet<std::path::PathBuf>>,
+    pub expanded_directories: &'a mut std::collections::HashSet<std::path::PathBuf>,
 }
 
 pub(crate) fn render_tree_entry(
@@ -651,25 +723,107 @@ pub(crate) fn render_directory_entry(
 ) {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
     let id = ui.make_persistent_id(format!("dir:{}", path.display()));
+
+    // Check programmatic state for expansion
+    let is_open = ctx.expanded_directories.contains(path);
+
+    // Sync egui animation state with programmatic state
     let mut state =
-        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
-    if let Some(open) = ctx.force {
-        state.set_open(open);
-    }
-    let is_open = state.is_open();
+        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
+    state.set_open(is_open);
 
     let arrow = if is_open { "▼" } else { "▶" };
     let dir_icon = if is_open { "📂" } else { "📁" };
     let prefix = indent_prefix(ctx.depth);
     let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
     let file_tree_color = ui.visuals().text_color();
-    let resp = ui.add(
-        egui::Label::new(egui::RichText::new(label_text).color(file_tree_color))
-            .truncate()
-            .sense(egui::Sense::click()),
+    let (rect, mut resp) = ui.allocate_at_least(
+        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
+        egui::Sense::click(),
     );
+
+    if ui.is_rect_visible(rect) {
+        let mut child_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        child_ui.add_space(TREE_LABEL_HOFFSET);
+        let rich = egui::RichText::new(label_text.clone()).color(file_tree_color);
+        let text_widget = egui::WidgetText::from(rich);
+        let galley = text_widget.into_galley(
+            &child_ui,
+            Some(egui::TextWrapMode::Extend),
+            f32::INFINITY,
+            egui::FontSelection::Default,
+        );
+        let desired_size = egui::vec2(
+            galley.size().x.min(child_ui.available_width()),
+            galley.size().y,
+        );
+        let (rect, label_resp) = child_ui.allocate_at_least(desired_size, egui::Sense::click());
+        label_resp
+            .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label_text));
+
+        if child_ui.is_rect_visible(rect) {
+            let mut clip_rect = child_ui.clip_rect();
+            clip_rect.max.x = clip_rect.max.x.min(rect.max.x);
+            child_ui
+                .painter()
+                .with_clip_rect(clip_rect)
+                .galley(rect.min, galley, file_tree_color);
+        }
+        resp = resp.union(label_resp);
+    }
+
+    if resp.hovered() {
+        ui.painter()
+            .rect_filled(rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+    }
+
+    // Directory level Meta Info on Hover
+    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
+    let resp = resp.on_hover_ui(|ui| {
+        ui.label(meta_text);
+    });
+
+    // "Open All" Context Menu for directories
+    resp.context_menu(|ui| {
+        if ui
+            .button(crate::i18n::get().action.recursive_expand.clone())
+            .clicked()
+        {
+            let mut to_expand = Vec::new();
+            for child in children {
+                child.collect_all_directory_paths(&mut to_expand);
+            }
+            ctx.expanded_directories.insert(path.to_path_buf()); // Expand self too
+            ctx.expanded_directories.extend(to_expand);
+            ui.close();
+        }
+        if ui
+            .button(crate::i18n::get().action.recursive_open_all.clone())
+            .clicked()
+        {
+            let mut to_open = Vec::new();
+            for child in children {
+                child.collect_all_markdown_file_paths(&mut to_open);
+            }
+            if !to_open.is_empty() {
+                *ctx.action = crate::app_state::AppAction::OpenMultipleDocuments(to_open);
+            }
+            ui.close();
+        }
+    });
+
     if resp.clicked() {
-        state.set_open(!is_open);
+        let new_state = !is_open;
+        state.set_open(new_state);
+        if new_state {
+            ctx.expanded_directories.insert(path.to_path_buf());
+        } else {
+            ctx.expanded_directories.remove(path);
+        }
     }
     state.store(ui.ctx());
 
@@ -728,33 +882,63 @@ pub(crate) fn render_file_entry(
     } else {
         ui.visuals().text_color()
     };
-    let rich = egui::RichText::new(&label).color(text_color);
-    let rich = if is_active { rich.strong() } else { rich };
+    let label_text = label;
+    let (full_rect, mut resp) = ui.allocate_at_least(
+        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
+        egui::Sense::click(),
+    );
 
-    let row_height = ui.spacing().interact_size.y;
-    let desired_size = egui::vec2(ui.available_width(), row_height);
-    let (full_rect, row_resp) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if ui.is_rect_visible(full_rect) {
+        if is_active {
+            let highlight_color = ui.visuals().selection.bg_fill;
+            ui.painter()
+                .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
+        } else if resp.hovered() {
+            ui.painter()
+                .rect_filled(full_rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+        }
 
-    if is_active {
-        let highlight_color = ui.visuals().selection.bg_fill;
-        ui.painter()
-            .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
+        let mut child_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(full_rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        child_ui.add_space(TREE_LABEL_HOFFSET);
+        let rich = egui::RichText::new(label_text.clone()).color(text_color);
+        let text_widget = egui::WidgetText::from(if is_active { rich.strong() } else { rich });
+        let galley = text_widget.into_galley(
+            &child_ui,
+            Some(egui::TextWrapMode::Extend),
+            f32::INFINITY,
+            egui::FontSelection::Default,
+        );
+        let desired_size = egui::vec2(
+            galley.size().x.min(child_ui.available_width()),
+            galley.size().y,
+        );
+        let (rect, label_resp) = child_ui.allocate_at_least(desired_size, egui::Sense::click());
+        label_resp
+            .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label_text));
+
+        if child_ui.is_rect_visible(rect) {
+            let mut clip_rect = child_ui.clip_rect();
+            clip_rect.max.x = clip_rect.max.x.min(rect.max.x);
+            child_ui
+                .painter()
+                .with_clip_rect(clip_rect)
+                .galley(rect.min, galley, text_color);
+        }
+        resp = resp.union(label_resp);
     }
-    let mut child_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(full_rect)
-            .layout(egui::Layout::left_to_right(egui::Align::Center)),
-    );
-    child_ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-    let label_resp = child_ui.add(
-        egui::Label::new(rich)
-            .truncate()
-            .sense(egui::Sense::click()),
-    );
-    let resp = row_resp.union(label_resp);
+
+    // File level Meta Info on Hover
+    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
+    let resp = resp.on_hover_ui(|ui| {
+        ui.label(meta_text);
+    });
 
     if resp.clicked() && entry.is_markdown() {
-        *ctx.selected = Some(path.to_path_buf());
+        *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
     }
 }
 
@@ -1158,6 +1342,7 @@ impl eframe::App for KatanaApp {
         }
 
         self.poll_download(ctx);
+        self.poll_workspace_load(ctx);
 
         // macOS: Poll actions from the native menu.
         #[cfg(target_os = "macos")]
@@ -1359,6 +1544,7 @@ impl eframe::App for KatanaApp {
     }
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1397,7 +1583,12 @@ mod tests {
     }
 
     fn state_with_active_doc(path: &std::path::Path) -> AppState {
-        let mut state = AppState::new(Default::default(), Default::default(), Default::default());
+        let mut state = AppState::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
         state
             .open_documents
             .push(Document::new(path, "# Heading\n\nBody"));
@@ -1411,7 +1602,14 @@ mod tests {
             doc.buffer = markdown.to_string();
         }
         let mut pane = PreviewPane::default();
-        pane.full_render(markdown, path);
+        let cache = app.state.cache.clone();
+        let concurrency = app
+            .state
+            .settings
+            .settings()
+            .performance
+            .diagram_concurrency;
+        pane.full_render(markdown, path, cache, false, concurrency);
         pane.wait_for_renders();
         app.tab_previews.push(crate::shell::TabPreviewCache {
             path: path.to_path_buf(),
@@ -1448,16 +1646,17 @@ mod tests {
         let ctx = egui::Context::default();
         let path = std::path::PathBuf::from("/tmp/CHANGELOG.md");
         let entry = TreeEntry::File { path: path.clone() };
-        let mut selected = None;
+        let mut action = AppAction::None;
+        let mut expanded_directories = std::collections::HashSet::new();
 
         let output = ctx.run(test_input(egui::vec2(320.0, 200.0)), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
                 let mut render_ctx = TreeRenderContext {
-                    selected: &mut selected,
-                    force: None,
+                    action: &mut action,
                     depth: 0,
                     active_path: Some(path.as_path()),
                     filter_set: None,
+                    expanded_directories: &mut expanded_directories,
                 };
                 render_file_entry(ui, &entry, &path, &mut render_ctx);
             });

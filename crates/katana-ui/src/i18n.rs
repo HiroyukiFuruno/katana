@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::sync::{OnceLock, RwLock};
+use std::sync::{OnceLock, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
@@ -38,6 +38,7 @@ pub struct MenuMessages {
     pub language: String,
     pub open_workspace: String,
     pub save: String,
+    pub open_all: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,6 +47,13 @@ pub struct WorkspaceMessages {
     pub no_workspace_open: String,
     pub no_document_selected: String,
     pub workspace_title: String,
+    pub recent_workspaces: String,
+    #[serde(default = "default_metadata_tooltip")]
+    pub metadata_tooltip: String,
+}
+
+fn default_metadata_tooltip() -> String {
+    "Size: {size} B\nModified: {mod_time}".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -102,7 +110,7 @@ pub struct StatusMessages {
     pub cannot_open_file: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[allow(dead_code)]
 pub struct ActionMessages {
     pub expand_all: String,
@@ -110,6 +118,11 @@ pub struct ActionMessages {
     pub collapse_sidebar: String,
     pub refresh_workspace: String,
     pub toggle_filter: String,
+    pub remove_workspace: String,
+    #[serde(default)]
+    pub recursive_expand: String,
+    #[serde(default)]
+    pub recursive_open_all: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -265,8 +278,16 @@ pub struct I18nDictionaryEntry {
 static DICTIONARY: OnceLock<Vec<I18nDictionaryEntry>> = OnceLock::new();
 static CURRENT_LANGUAGE: RwLock<String> = RwLock::new(String::new());
 
+fn read_guard<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn write_guard<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(PoisonError::into_inner)
+}
+
 fn init_current_language() {
-    let mut lang = CURRENT_LANGUAGE.write().unwrap();
+    let mut lang = write_guard(&CURRENT_LANGUAGE);
     if lang.is_empty() {
         *lang = "en".to_string();
     }
@@ -300,26 +321,25 @@ fn get_dictionary() -> &'static Vec<I18nDictionaryEntry> {
 
 /// Sets the current language.
 pub fn set_language(lang: &str) {
-    if let Ok(mut current) = CURRENT_LANGUAGE.write() {
-        *current = lang.to_string();
-    }
+    let mut current = write_guard(&CURRENT_LANGUAGE);
+    *current = lang.to_string();
 }
 
 /// Gets the current language.
 pub fn get_language() -> String {
     init_current_language();
-    CURRENT_LANGUAGE.read().unwrap().clone()
+    read_guard(&CURRENT_LANGUAGE).clone()
 }
 
 /// Access the strongly-typed message hierarchy.
 pub fn get() -> &'static I18nMessages {
     let lang = get_language();
     let dict = get_dictionary();
-    if let Some(entry) = dict.iter().find(|e| e.lang == lang.as_str()) {
-        &entry.messages
-    } else {
-        &dict.iter().find(|e| e.lang == "en").unwrap().messages
-    }
+    let fallback = &dict[0].messages;
+    dict.iter()
+        .find(|entry| entry.lang == lang.as_str())
+        .map(|entry| &entry.messages)
+        .unwrap_or(fallback)
 }
 
 /// Gets the parameter-substituted translated string.
@@ -336,6 +356,8 @@ pub fn tf(template: &str, params: &[(&str, &str)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::RwLock;
 
     #[test]
     fn test_get_fallback_to_en() {
@@ -346,5 +368,29 @@ mod tests {
         assert!(!msgs.menu.file.is_empty());
         // Restore to avoid polluting global state for other tests running in parallel.
         set_language("en");
+    }
+
+    #[test]
+    fn test_default_metadata_tooltip() {
+        assert_eq!(
+            super::default_metadata_tooltip(),
+            "Size: {size} B\nModified: {mod_time}"
+        );
+    }
+
+    #[test]
+    fn test_rwlock_helpers_recover_from_poison() {
+        let lock = RwLock::new(String::new());
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            let _guard = lock.write().expect("poison test must acquire write lock");
+            panic!("poison language lock");
+        }));
+
+        {
+            let mut guard = write_guard(&lock);
+            *guard = "en".to_string();
+        }
+
+        assert_eq!(read_guard(&lock).as_str(), "en");
     }
 }

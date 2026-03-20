@@ -128,9 +128,10 @@ fn main() -> eframe::Result<()> {
 
     // Read saved values before moving settings into AppState.
     let saved_language = settings.settings().language.clone();
-    let saved_workspace = settings.settings().last_workspace.clone();
+    let saved_workspace = settings.settings().workspace.last_workspace.clone();
 
-    let state = AppState::new(ai_registry, plugin_registry, settings);
+    let cache = std::sync::Arc::new(katana_platform::DefaultCacheService::default());
+    let state = AppState::new(ai_registry, plugin_registry, settings, cache);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

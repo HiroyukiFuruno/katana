@@ -1,133 +1,139 @@
 {
-  "menu": {
-    "file": "파일",
-    "settings": "설정",
-    "language": "언어 (Language)",
-    "open_workspace": "워크스페이스 열기…",
-    "save": "저장"
-  },
-  "workspace": {
-    "no_workspace_open": "열린 워크스페이스가 없습니다.",
-    "no_document_selected": "열린 문서가 없습니다.",
-    "workspace_title": "워크스페이스"
-  },
-  "preview": {
-    "preview_title": "미리보기",
-    "refresh_diagrams": "다이어그램 새로고침",
-    "rendering": "{kind} 렌더링 중...",
-    "no_preview": "(미리보기 없음)"
-  },
-  "plantuml": {
-    "downloading_plantuml": "⬇ PlantUML JAR 다운로드 중...",
-    "plantuml_installed": "✅ PlantUML 설치됨. 미리보기 새로고침 중...",
-    "download_error": "❌ 다운로드 오류: "
-  },
-  "view_mode": {
-    "preview": "미리보기",
-    "code": "코드",
-    "split": "분할"
-  },
-  "split_toggle": {
-    "horizontal": "수평 분할 (좌/우) 전환",
-    "vertical": "수직 분할 (상/하) 전환",
-    "editor_first": "에디터를 좌측/상단에 배치",
-    "preview_first": "미리보기를 좌측/상단에 배치"
-  },
-  "error": {
-    "missing_dependency": "⚠️ {tool_name}을(를) 찾을 수 없습니다. {install_hint}을(를) 사용하여 설치해 주세요.",
-    "curl_launch_failed": "curl 실행 실패",
-    "download_failed": "다운로드 실패",
-    "render_error": "⚠ [{kind}] {message}"
-  },
-  "status": {
-    "ready": "준비됨",
-    "saved": "저장됨.",
-    "save_failed": "저장 실패: {error}",
-    "opened_workspace": "워크스페이스 열림: {name}",
-    "cannot_open_workspace": "워크스페이스 열기 실패: {error}",
-    "cannot_open_file": "파일 열기 실패: {error}"
-  },
-  "action": {
-    "expand_all": "모두 펼치기",
-    "collapse_all": "모두 접기",
-    "collapse_sidebar": "사이드바 숨기기",
-    "refresh_workspace": "워크스페이스 새로고침",
-    "toggle_filter": "フィルター切り替え"
-  },
-  "ai": {
-    "ai_unconfigured": "[AI: 설정되지 않음]"
-  },
-  "tool": {
-    "not_installed": "⚠ {tool}이(가) 설치되지 않았습니다.",
-    "install_path": "설치 경로: {path}",
-    "download": "⬇ {tool} 다운로드"
-  },
-  "settings": {
-    "title": "설정",
-    "toc_visible": "목차 표시",
-    "theme": {
-      "preset": "테마 프리셋",
-      "dark_section": "어두운 테마",
-      "light_section": "밝은 테마",
-      "custom_colors": "사용자 지정 색상",
-      "reset_custom": "프리셋으로 초기화"
+    "menu": {
+        "file": "파일",
+        "settings": "설정",
+        "language": "언어 (Language)",
+        "open_workspace": "워크스페이스 열기…",
+        "save": "저장",
+        "open_all": "모두 열기"
     },
-    "font": {
-      "size": "글꼴 크기",
-      "family": "글꼴",
-      "size_slider_hint": "크기를 조절하려면 좌우로 드래그하세요."
-    },
-    "layout": {
-      "split_direction": "분할 방향",
-      "horizontal": "수평 (좌 / 우)",
-      "vertical": "수직 (상 / 하)",
-      "pane_order": "패널 순서",
-      "editor_first": "에디터 우선",
-      "preview_first": "미리보기 우선"
+    "workspace": {
+        "no_workspace_open": "열린 워크스페이스가 없습니다.",
+        "no_document_selected": "열린 문서가 없습니다.",
+        "workspace_title": "워크스페이스",
+        "recent_workspaces": "최근 워크스페이스",
+        "metadata_tooltip": "크기: {size} B\n수정: {mod_time}"
     },
     "preview": {
-      "title": "미리보기",
-      "heading": "# 샘플 제목",
-      "normal_text": "일반 텍스트 및 ",
-      "accent_link": "강조 링크",
-      "secondary_text": "보조 텍스트 샘플",
-      "code_sample": "fn main() { println!(\"안녕하세요!\"); }"
+        "preview_title": "미리보기",
+        "refresh_diagrams": "다이어그램 새로고침",
+        "rendering": "{kind} 렌더링 중...",
+        "no_preview": "(미리보기 없음)"
     },
-    "color": {
-      "background": "배경",
-      "panel_background": "패널 배경",
-      "text": "텍스트",
-      "text_secondary": "보조 텍스트",
-      "accent": "강조",
-      "border": "테두리",
-      "selection": "선택",
-      "code_background": "코드 배경",
-      "preview_background": "미리보기 배경"
+    "plantuml": {
+        "downloading_plantuml": "⬇ PlantUML JAR 다운로드 중...",
+        "plantuml_installed": "✅ PlantUML 설치됨. 미리보기 새로고침 중...",
+        "download_error": "❌ 다운로드 오류: "
     },
-    "tabs": [
-      {
-        "key": "theme",
-        "name": "테마"
-      },
-      {
-        "key": "font",
-        "name": "글꼴"
-      },
-      {
-        "key": "layout",
-        "name": "레이아웃"
-      }
-    ]
-  },
-  "tab": {
-    "nav_prev": "이전 탭으로 이동",
-    "nav_next": "다음 탭으로 이동"
-  },
-  "search": {
-    "modal_title": "파일 찾기",
-    "query_hint": "파일 이름으로 검색...",
-    "include_pattern_hint": "Include (regex, comma-separated)",
-    "exclude_pattern_hint": "Exclude (regex, comma-separated)",
-    "no_results": "파일을 찾을 수 없습니다."
-  }
+    "view_mode": {
+        "preview": "미리보기",
+        "code": "코드",
+        "split": "분할"
+    },
+    "split_toggle": {
+        "horizontal": "수평 분할 (좌/우) 전환",
+        "vertical": "수직 분할 (상/하) 전환",
+        "editor_first": "에디터를 좌측/상단에 배치",
+        "preview_first": "미리보기를 좌측/상단에 배치"
+    },
+    "error": {
+        "missing_dependency": "⚠️ {tool_name}을(를) 찾을 수 없습니다. {install_hint}을(를) 사용하여 설치해 주세요.",
+        "curl_launch_failed": "curl 실행 실패",
+        "download_failed": "다운로드 실패",
+        "render_error": "⚠ [{kind}] {message}"
+    },
+    "status": {
+        "ready": "준비됨",
+        "saved": "저장됨.",
+        "save_failed": "저장 실패: {error}",
+        "opened_workspace": "워크스페이스 열림: {name}",
+        "cannot_open_workspace": "워크스페이스 열기 실패: {error}",
+        "cannot_open_file": "파일 열기 실패: {error}"
+    },
+    "action": {
+        "expand_all": "모두 펼치기",
+        "collapse_all": "모두 접기",
+        "collapse_sidebar": "사이드바 숨기기",
+        "refresh_workspace": "워크스페이스 새로고침",
+        "toggle_filter": "필터 전환",
+        "remove_workspace": "기록에서 제거",
+        "recursive_expand": "하위 디렉토리 재귀적 확장",
+        "recursive_open_all": "모든 파일 재귀적으로 열기"
+    },
+    "ai": {
+        "ai_unconfigured": "[AI: 설정되지 않음]"
+    },
+    "tool": {
+        "not_installed": "⚠ {tool}이(가) 설치되지 않았습니다.",
+        "install_path": "설치 경로: {path}",
+        "download": "⬇ {tool} 다운로드"
+    },
+    "settings": {
+        "title": "설정",
+        "toc_visible": "목차 표시",
+        "theme": {
+            "preset": "테마 프리셋",
+            "dark_section": "어두운 테마",
+            "light_section": "밝은 테마",
+            "custom_colors": "사용자 지정 색상",
+            "reset_custom": "프리셋으로 초기화"
+        },
+        "font": {
+            "size": "글꼴 크기",
+            "family": "글꼴",
+            "size_slider_hint": "크기를 조절하려면 좌우로 드래그하세요."
+        },
+        "layout": {
+            "split_direction": "분할 방향",
+            "horizontal": "수평 (좌 / 우)",
+            "vertical": "수직 (상 / 하)",
+            "pane_order": "패널 순서",
+            "editor_first": "에디터 우선",
+            "preview_first": "미리보기 우선"
+        },
+        "preview": {
+            "title": "미리보기",
+            "heading": "# 샘플 제목",
+            "normal_text": "일반 텍스트 및 ",
+            "accent_link": "강조 링크",
+            "secondary_text": "보조 텍스트 샘플",
+            "code_sample": "fn main() { println!(\"안녕하세요!\"); }"
+        },
+        "color": {
+            "background": "배경",
+            "panel_background": "패널 배경",
+            "text": "텍스트",
+            "text_secondary": "보조 텍스트",
+            "accent": "강조",
+            "border": "테두리",
+            "selection": "선택",
+            "code_background": "코드 배경",
+            "preview_background": "미리보기 배경"
+        },
+        "tabs": [
+            {
+                "key": "theme",
+                "name": "테마"
+            },
+            {
+                "key": "font",
+                "name": "글꼴"
+            },
+            {
+                "key": "layout",
+                "name": "레이아웃"
+            }
+        ]
+    },
+    "tab": {
+        "nav_prev": "이전 탭으로 이동",
+        "nav_next": "다음 탭으로 이동"
+    },
+    "search": {
+        "modal_title": "파일 찾기",
+        "query_hint": "파일 이름으로 검색...",
+        "include_pattern_hint": "포함 (정규식, 쉼표로 구분)",
+        "exclude_pattern_hint": "제외 (정규식, 쉼표로 구분)",
+        "no_results": "파일을 찾을 수 없습니다."
+    }
 }

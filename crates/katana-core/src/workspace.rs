@@ -33,9 +33,34 @@ impl TreeEntry {
         match self {
             Self::File { path } => {
                 let ext = path.extension();
-                ext.map(|e| e.eq_ignore_ascii_case("md")).unwrap_or(false)
+                ext.map(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"))
+                    .unwrap_or(false)
             }
             _ => false,
+        }
+    }
+
+    pub fn collect_all_directory_paths(&self, paths: &mut Vec<PathBuf>) {
+        if let Self::Directory { path, children } = self {
+            paths.push(path.clone());
+            for child in children {
+                child.collect_all_directory_paths(paths);
+            }
+        }
+    }
+
+    pub fn collect_all_markdown_file_paths(&self, paths: &mut Vec<PathBuf>) {
+        match self {
+            Self::File { path } => {
+                if self.is_markdown() {
+                    paths.push(path.clone());
+                }
+            }
+            Self::Directory { children, .. } => {
+                for child in children {
+                    child.collect_all_markdown_file_paths(paths);
+                }
+            }
         }
     }
 }
@@ -62,6 +87,22 @@ impl Workspace {
     pub fn name(&self) -> Option<&str> {
         self.root.file_name()?.to_str()
     }
+
+    pub fn collect_all_directory_paths(&self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        for entry in &self.tree {
+            entry.collect_all_directory_paths(&mut paths);
+        }
+        paths
+    }
+
+    pub fn collect_all_markdown_file_paths(&self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        for entry in &self.tree {
+            entry.collect_all_markdown_file_paths(&mut paths);
+        }
+        paths
+    }
 }
 
 /// Errors related to workspace operations.
@@ -84,5 +125,42 @@ impl WorkspaceError {
             path: path.into(),
             source,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_workspace_collection() {
+        let root = PathBuf::from("/root");
+        let file1 = root.join("a.md");
+        let sub = root.join("sub");
+        let file2 = sub.join("b.md");
+
+        let workspace = Workspace::new(
+            root.clone(),
+            vec![
+                TreeEntry::File {
+                    path: file1.clone(),
+                },
+                TreeEntry::Directory {
+                    path: sub.clone(),
+                    children: vec![TreeEntry::File {
+                        path: file2.clone(),
+                    }],
+                },
+            ],
+        );
+
+        let mds = workspace.collect_all_markdown_file_paths();
+        assert_eq!(mds.len(), 2);
+        assert!(mds.contains(&file1));
+        assert!(mds.contains(&file2));
+
+        let dirs = workspace.collect_all_directory_paths();
+        assert_eq!(dirs.len(), 1);
+        assert!(dirs.contains(&sub));
     }
 }

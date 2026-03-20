@@ -91,10 +91,12 @@ endif
 	perl -i -0pe 's/(<key>CFBundleShortVersionString<\/key>\s*<string>).*?(<\/string>)/$$1v$(VERSION)$$2/' crates/katana-ui/Info.plist
 	@# 3. Generate/update CHANGELOG.md
 	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
-	@# 4. Stage and commit
+	@# 4. Verify release artifacts and quality gates after version/changelog updates
+	$(MAKE) check
+	@# 5. Stage and commit
 	git add Cargo.toml Cargo.lock crates/*/Cargo.toml crates/katana-ui/Info.plist CHANGELOG.md CHANGELOG.ja.md
 	git commit -m "chore: v$(VERSION) リリース準備"
-	@# 5. Create signed annotated tag
+	@# 6. Create signed annotated tag
 	git tag -s "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo "✅ Release v$(VERSION) committed and tagged"
 	@echo "   Next steps:"
@@ -175,6 +177,8 @@ coverage: ## Run tests and verify 100% test coverage (requires cargo-llvm-cov)
 	#     (volta/fnm/which/login-shell) never execute once nvm probe succeeds.
 	#   - plantuml_renderer.rs: jar path resolution + render error path.
 	#
+	cargo llvm-cov clean --workspace
+	#
 	# ── Test Execution + Table Report ──
 	cargo llvm-cov --workspace --lib --tests \
 		--ignore-filename-regex '$(COVERAGE_IGNORE)' \
@@ -222,6 +226,9 @@ coverage: ## Run tests and verify 100% test coverage (requires cargo-llvm-cov)
 
 .PHONY: check
 check: fmt-check lint test-integration coverage ## Full verification (fmt + clippy + IT + 100% coverage enforced)
+	@echo "✅ All checks passed"
+
+check-local: fmt lint test-integration coverage ## Full verification (fmt + clippy + IT + 100% coverage enforced)
 	@echo "✅ All checks passed"
 
 .PHONY: check-light

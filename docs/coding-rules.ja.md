@@ -173,15 +173,15 @@ pub struct AppState {
 ## 6. コメント規約
 
 **コメントは「なぜ（WHY）」のみ。何をしているか（WHAT）はコードで表現する。**
-コメントは **日本語** で記載する。
+コメントは **英語** で記載する（English First Policy に従う）。
 
 ```rust
-// ✅ Good — WHY のみ、日本語
-// comrak はデフォルトで GFM 無効なので、拡張を明示的に有効化する。
+// ✅ Good — WHY のみ、英語
+// comrak disables GFM by default, so we explicitly enable the extension here.
 opts.extension.table = true;
 
 // ❌ Bad — WHAT をコメントしている（コードを読めばわかる）
-// テーブル拡張を有効にする
+// Enable the table extension
 opts.extension.table = true;
 ```
 
@@ -193,15 +193,11 @@ opts.extension.table = true;
 
 ### 7.1 テスト命名
 
-**テストの `fn` 名は日本語スネークケース（ascii のみ）またはスネークケース英語で意味を表す。**
+**テストの `fn` 名はスネークケース英語で意味を表す。**
 `describe` に相当するグルーピングは `mod` で行う。
 
 ```rust
 // ✅ Good
-#[test]
-fn 未保存バッファはディスクに書き込まれない() { ... }
-
-// または英語スネークケース（長い日本語が難しい場合）
 #[test]
 fn unsaved_buffer_does_not_write_to_disk() { ... }
 ```
