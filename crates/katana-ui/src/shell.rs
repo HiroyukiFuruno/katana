@@ -48,6 +48,12 @@ pub(crate) const TAB_TOOLTIP_SHOW_DELAY_SECS: f32 = 0.25;
 /// Spacing below the 'No workspace selected' display in the file tree (px).
 pub(crate) const NO_WORKSPACE_BOTTOM_SPACING: f32 = 8.0;
 
+/// Vertical spacing between the "recent workspaces" section and other elements (px).
+pub(crate) const RECENT_WORKSPACES_SPACING: f32 = 8.0;
+
+/// Vertical spacing between items in the "recent workspaces" section (px).
+pub(crate) const RECENT_WORKSPACES_ITEM_SPACING: f32 = 4.0;
+
 /// Polling interval for checking download completion (ms).
 pub(crate) const DOWNLOAD_STATUS_CHECK_INTERVAL_MS: u64 = 200;
 
@@ -165,10 +171,65 @@ impl KatanaApp {
                 self.state.open_documents.clear();
                 self.state.active_doc_idx = None;
                 self.state.filter_cache = None;
+                let path_str = path.display().to_string();
+                let is_same_as_last = self
+                    .state
+                    .settings
+                    .settings()
+                    .workspace
+                    .last_workspace
+                    .as_deref()
+                    == Some(path_str.as_str());
+
+                // Clone what we need so we don't hold the immutable borrow
+                let (mut to_open, active_idx) = if is_same_as_last {
+                    let settings = self.state.settings.settings();
+                    (
+                        settings.workspace.open_tabs.clone(),
+                        settings.workspace.active_tab_idx,
+                    )
+                } else {
+                    (Vec::new(), None)
+                };
 
                 // Persist the last opened workspace path.
-                self.state.settings.settings_mut().last_workspace =
-                    Some(path.display().to_string());
+                {
+                    let settings = self.state.settings.settings_mut();
+                    settings.workspace.last_workspace = Some(path_str.clone());
+                    if !settings.workspace.paths.contains(&path_str) {
+                        settings.workspace.paths.push(path_str);
+                    }
+                    if !is_same_as_last {
+                        settings.workspace.open_tabs.clear();
+                        settings.workspace.active_tab_idx = None;
+                    }
+                }
+
+                // If opening the same workspace as last time (e.g. startup), restore tabs
+                if is_same_as_last {
+                    // Retain only files that exist
+                    to_open.retain(|p| std::path::Path::new(p).exists());
+
+                    for p in &to_open {
+                        if let Ok(doc) = self.fs.load_document(std::path::PathBuf::from(p)) {
+                            self.state.open_documents.push(doc);
+                            self.state
+                                .initialize_tab_split_state(std::path::PathBuf::from(p));
+                        }
+                    }
+                    if !self.state.open_documents.is_empty() {
+                        let idx = active_idx
+                            .unwrap_or(0)
+                            .min(self.state.open_documents.len() - 1);
+                        self.state.active_doc_idx = Some(idx);
+                        let active_doc = &self.state.open_documents[idx];
+                        self.full_refresh_preview(
+                            &active_doc.path.clone(),
+                            &active_doc.buffer.clone(),
+                        );
+                    }
+                }
+
                 if let Err(e) = self.state.settings.save() {
                     tracing::warn!("Failed to save settings: {e}");
                 }
@@ -225,6 +286,7 @@ impl KatanaApp {
                 // Re-render only if the content has changed
                 self.full_refresh_preview(&path, &src);
             }
+            self.save_workspace_state();
             // No change -> reuse existing PreviewPane (cached)
             return;
         }
@@ -236,6 +298,7 @@ impl KatanaApp {
                 self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
                 self.state.initialize_tab_split_state(path.clone());
                 self.full_refresh_preview(&path, &src);
+                self.save_workspace_state();
             }
             Err(e) => {
                 let error = e.to_string();
@@ -244,6 +307,32 @@ impl KatanaApp {
                     &vec![("error", error.as_str())],
                 ));
             }
+        }
+    }
+
+    fn handle_remove_workspace(&mut self, path: String) {
+        let settings = self.state.settings.settings_mut();
+        settings.workspace.paths.retain(|p| p != &path);
+        // If the removed workspace matches the last_workspace, we don't necessarily clear last_workspace
+        // because it's still the active one, but it won't appear in the history list anymore.
+        if let Err(e) = self.state.settings.save() {
+            tracing::warn!("Failed to save settings after removing workspace: {e}");
+        }
+    }
+
+    fn save_workspace_state(&mut self) {
+        let open_tabs: Vec<String> = self
+            .state
+            .open_documents
+            .iter()
+            .map(|d| d.path.display().to_string())
+            .collect();
+        let idx = self.state.active_doc_idx;
+        let settings = self.state.settings.settings_mut();
+        settings.workspace.open_tabs = open_tabs;
+        settings.workspace.active_tab_idx = idx;
+        if let Err(e) = self.state.settings.save() {
+            tracing::warn!("Failed to save workspace tab state: {e}");
         }
     }
 
@@ -262,7 +351,10 @@ impl KatanaApp {
             return;
         };
         match self.fs.save_document(doc) {
-            Ok(()) => self.state.status_message = Some(crate::i18n::get().status.saved.clone()),
+            Ok(()) => {
+                self.state.status_message = Some(crate::i18n::get().status.saved.clone());
+                self.save_workspace_state();
+            }
             Err(e) => {
                 let error = e.to_string();
                 self.state.status_message = Some(crate::i18n::tf(
@@ -276,7 +368,9 @@ impl KatanaApp {
     pub(crate) fn process_action(&mut self, action: AppAction) {
         match action {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
+            AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::SelectDocument(p) => self.handle_select_document(p),
+            AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
             AppAction::CloseDocument(idx) => {
                 if idx < self.state.open_documents.len() {
                     self.state.open_documents.remove(idx);
@@ -286,6 +380,7 @@ impl KatanaApp {
                         Some(self.state.open_documents.len() - 1)
                     };
                 }
+                self.save_workspace_state();
             }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
@@ -320,7 +415,6 @@ impl KatanaApp {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_pane_order(order);
             }
-            AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::None => {}
         }
     }

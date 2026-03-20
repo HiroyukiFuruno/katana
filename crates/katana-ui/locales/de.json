@@ -9,7 +9,8 @@
   "workspace": {
     "no_workspace_open": "Kein Arbeitsbereich geöffnet.",
     "no_document_selected": "Kein Dokument geöffnet.",
-    "workspace_title": "Arbeitsbereich"
+    "workspace_title": "Arbeitsbereich",
+    "recent_workspaces": "Recent Workspaces"
   },
   "preview": {
     "preview_title": "Vorschau",
@@ -52,7 +53,8 @@
     "collapse_all": "Alle minimieren",
     "collapse_sidebar": "Seitenleiste ausblenden",
     "refresh_workspace": "Arbeitsbereich aktualisieren",
-    "toggle_filter": "フィルター切り替え"
+    "toggle_filter": "フィルター切り替え",
+    "remove_workspace": "Remove from history"
   },
   "ai": {
     "ai_unconfigured": "[AI: nicht konfiguriert]"

@@ -128,7 +128,7 @@ fn main() -> eframe::Result<()> {
 
     // Read saved values before moving settings into AppState.
     let saved_language = settings.settings().language.clone();
-    let saved_workspace = settings.settings().last_workspace.clone();
+    let saved_workspace = settings.settings().workspace.last_workspace.clone();
 
     let state = AppState::new(ai_registry, plugin_registry, settings);
 

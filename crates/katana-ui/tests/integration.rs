@@ -827,7 +827,7 @@ fn test_persistence_workspace_roundtrip() {
     {
         let repo = katana_platform::JsonFileRepository::new(settings_path.to_path_buf());
         let settings = katana_platform::SettingsService::new(Box::new(repo));
-        let restored_ws = settings.settings().last_workspace.clone();
+        let restored_ws = settings.settings().workspace.last_workspace.clone();
 
         assert!(
             restored_ws.is_some(),
@@ -907,7 +907,7 @@ fn test_persistence_multiple_changes_accumulate() {
         let s = settings.settings();
 
         assert!(
-            s.last_workspace.is_some(),
+            s.workspace.last_workspace.is_some(),
             "last_workspace should be persisted"
         );
         assert_eq!(s.language, "ja", "language should be persisted");
@@ -938,7 +938,7 @@ fn test_persistence_corrupt_file_falls_back_to_defaults() {
         "Should fall back to default language"
     );
     assert!(
-        s.settings.settings().last_workspace.is_none(),
+        s.settings.settings().workspace.last_workspace.is_none(),
         "Should fall back to no workspace"
     );
 }
@@ -1738,4 +1738,123 @@ fn test_search_sidebar_buttons() {
         !filter_nodes.is_empty(),
         "Filter button (\u{25BC}) must be present in the workspace sidebar"
     );
+}
+
+#[test]
+fn test_integration_open_workspace_restores_tabs() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+    let ws_dir = tempfile::tempdir().unwrap();
+    let doc_path1 = ws_dir.path().join("doc1.md");
+    let doc_path2 = ws_dir.path().join("doc2.md");
+    std::fs::write(&doc_path1, "# Doc 1").unwrap();
+    std::fs::write(&doc_path2, "# Doc 2").unwrap();
+
+    // Session 1: Open workspace, open tabs
+    {
+        let mut harness = setup_harness_with_json_repo(&settings_path);
+        harness.step();
+        harness
+            .state_mut()
+            .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+        harness.step();
+        harness
+            .state_mut()
+            .trigger_action(AppAction::SelectDocument(doc_path1.clone()));
+        harness.step();
+        harness
+            .state_mut()
+            .trigger_action(AppAction::SelectDocument(doc_path2.clone()));
+        harness.step();
+
+        // Ensure tabs are saved
+        let settings = harness.state_mut().app_state_mut().settings.settings();
+        assert_eq!(settings.workspace.open_tabs.len(), 2);
+        assert_eq!(settings.workspace.active_tab_idx, Some(1));
+    }
+
+    // Session 2: Reload same workspace, tabs should be restored
+    {
+        let mut harness = setup_harness_with_json_repo(&settings_path);
+        harness.step();
+        harness
+            .state_mut()
+            .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+        harness.step();
+
+        let state = harness.state_mut().app_state_mut();
+        assert_eq!(state.open_documents.len(), 2);
+        assert_eq!(state.active_doc_idx, Some(1));
+    }
+}
+
+#[test]
+fn test_integration_remove_workspace() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    let settings_path = settings_dir.path().join("settings.json");
+    let ws_dir = tempfile::tempdir().unwrap();
+
+    let mut harness = setup_harness_with_json_repo(&settings_path);
+    harness.step();
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+    harness.step();
+
+    // Verify it's in paths
+    {
+        let settings = harness.state_mut().app_state_mut().settings.settings();
+        assert!(settings
+            .workspace
+            .paths
+            .contains(&ws_dir.path().display().to_string()));
+    }
+
+    // Remove it
+    harness
+        .state_mut()
+        .trigger_action(AppAction::RemoveWorkspace(
+            ws_dir.path().display().to_string(),
+        ));
+    harness.step();
+
+    // Verify it's removed
+    {
+        let settings = harness.state_mut().app_state_mut().settings.settings();
+        assert!(!settings
+            .workspace
+            .paths
+            .contains(&ws_dir.path().display().to_string()));
+    }
+}
+
+#[test]
+fn test_integration_save_workspace_state_error() {
+    let settings_dir = tempfile::tempdir().unwrap();
+    // Use a directory path as the settings file path so saving will fail
+    let settings_path = settings_dir.path().to_path_buf();
+    let ws_dir = tempfile::tempdir().unwrap();
+
+    let mut harness = setup_harness_with_json_repo(&settings_path);
+    harness.step();
+
+    // Actions that trigger saving workspace state
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(ws_dir.path().to_path_buf()));
+    harness.step();
+
+    // Removing a workspace triggers save in handle_remove_workspace
+    harness
+        .state_mut()
+        .trigger_action(AppAction::RemoveWorkspace(
+            ws_dir.path().display().to_string(),
+        ));
+    harness.step();
+
+    // Changing active documents triggers save_workspace_state
+    harness
+        .state_mut()
+        .trigger_action(AppAction::CloseDocument(0));
+    harness.step();
 }

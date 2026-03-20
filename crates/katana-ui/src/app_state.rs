@@ -58,6 +58,8 @@ pub enum AppAction {
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
     SelectDocument(std::path::PathBuf),
+    /// Remove a workspace from the persistence list.
+    RemoveWorkspace(String),
     /// Close a tab.
     CloseDocument(usize),
     /// Update the buffer of the active document.

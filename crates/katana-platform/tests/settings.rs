@@ -4,7 +4,7 @@ use katana_platform::SettingsService;
 fn new_settings_service_has_defaults() {
     let svc = SettingsService::default();
     let settings = svc.settings();
-    assert!(settings.last_workspace.is_none());
+    assert!(settings.workspace.last_workspace.is_none());
     assert_eq!(settings.theme.theme, "dark");
     assert!(settings.extra.is_empty());
 }
@@ -20,7 +20,7 @@ fn settings_returns_immutable_reference() {
 #[test]
 fn settings_mut_allows_modification() {
     let mut svc = SettingsService::default();
-    svc.settings_mut().last_workspace = Some("/workspace".to_string());
+    svc.settings_mut().workspace.last_workspace = Some("/workspace".to_string());
     svc.settings_mut().theme.theme = "light".to_string();
     svc.settings_mut()
         .extra
@@ -30,7 +30,10 @@ fn settings_mut_allows_modification() {
         });
 
     let settings = svc.settings();
-    assert_eq!(settings.last_workspace.as_deref(), Some("/workspace"));
+    assert_eq!(
+        settings.workspace.last_workspace.as_deref(),
+        Some("/workspace")
+    );
     assert_eq!(settings.theme.theme, "light");
     assert_eq!(
         settings
@@ -48,8 +51,8 @@ fn default_trait_matches_new() {
     let from_new = SettingsService::new(Box::new(katana_platform::InMemoryRepository));
     // Both should produce equivalent default settings
     assert_eq!(
-        from_new.settings().last_workspace,
-        from_default.settings().last_workspace
+        from_new.settings().workspace.last_workspace,
+        from_default.settings().workspace.last_workspace
     );
     assert_eq!(
         from_new.settings().theme.theme,

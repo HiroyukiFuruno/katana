@@ -9,7 +9,8 @@
   "workspace": {
     "no_workspace_open": "열린 워크스페이스가 없습니다.",
     "no_document_selected": "열린 문서가 없습니다.",
-    "workspace_title": "워크스페이스"
+    "workspace_title": "워크스페이스",
+    "recent_workspaces": "Recent Workspaces"
   },
   "preview": {
     "preview_title": "미리보기",
@@ -52,7 +53,8 @@
     "collapse_all": "모두 접기",
     "collapse_sidebar": "사이드바 숨기기",
     "refresh_workspace": "워크스페이스 새로고침",
-    "toggle_filter": "フィルター切り替え"
+    "toggle_filter": "フィルター切り替え",
+    "remove_workspace": "Remove from history"
   },
   "ai": {
     "ai_unconfigured": "[AI: 설정되지 않음]"

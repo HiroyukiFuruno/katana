@@ -46,6 +46,7 @@ pub struct WorkspaceMessages {
     pub no_workspace_open: String,
     pub no_document_selected: String,
     pub workspace_title: String,
+    pub recent_workspaces: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,6 +111,7 @@ pub struct ActionMessages {
     pub collapse_sidebar: String,
     pub refresh_workspace: String,
     pub toggle_filter: String,
+    pub remove_workspace: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
