@@ -1017,6 +1017,24 @@ mod tests {
             1,
         );
         pane.wait_for_renders();
+
+        // 6. corrupt cache + render error -> hit L223 ReduceConcurrency
+        let diag_src3 = "invalid drawio";
+        let key3 = get_cache_key(
+            &std::path::PathBuf::from("/tmp/test.md"),
+            &katana_core::markdown::diagram::DiagramKind::DrawIo,
+            diag_src3,
+        );
+        let _ = cache.set_persistent(&key3, "invalid json".to_string());
+        let source3 = format!("```drawio\n{diag_src3}\n```");
+        pane.full_render(
+            &source3,
+            std::path::Path::new("/tmp/test.md"),
+            cache.clone(),
+            false,
+            1,
+        );
+        pane.wait_for_renders();
     }
 
     #[test]
