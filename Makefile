@@ -94,8 +94,8 @@ endif
 	@# 4. Stage and commit
 	git add Cargo.toml Cargo.lock crates/*/Cargo.toml crates/katana-ui/Info.plist CHANGELOG.md CHANGELOG.ja.md
 	git commit -m "chore: v$(VERSION) リリース準備"
-	@# 5. Create annotated tag
-	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
+	@# 5. Create signed annotated tag
+	git tag -s "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo "✅ Release v$(VERSION) committed and tagged"
 	@echo "   Next steps:"
 	@echo "     make dmg                  # Build the DMG installer"
