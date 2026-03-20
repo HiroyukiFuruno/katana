@@ -925,17 +925,6 @@ pub(crate) fn render_file_entry(
     });
 
     if resp.clicked() && entry.is_markdown() {
-        // Auto-expand parents when clicking a file
-        let mut parent = path.parent();
-        while let Some(p) = parent {
-            if p == std::path::Path::new("") {
-                break;
-            }
-            if ctx.expanded_directories.insert(p.to_path_buf()) {
-                // If we added a new parent, it might be newly visible
-            }
-            parent = p.parent();
-        }
         *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
     }
 }

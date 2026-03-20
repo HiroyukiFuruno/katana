@@ -503,7 +503,7 @@ fn test_integration_open_all_markdown() {
     );
 
     // Switch between them
-    assert_eq!(state.active_doc_idx, Some(1)); // The last one opened becomes active
+    assert_eq!(state.active_doc_idx, None); // OpenAll is completely lazy and activates none
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

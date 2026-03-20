@@ -383,14 +383,16 @@ impl KatanaApp {
     }
 
     fn handle_select_document(&mut self, path: std::path::PathBuf, activate: bool) {
-        // Auto-expand parents whenever a file is selected (activated or not)
-        let mut parent = path.parent();
-        while let Some(p) = parent {
-            if p == std::path::Path::new("") {
-                break;
+        // Auto-expand parents only when a file is explicitly activated (not during lazy background loads)
+        if activate {
+            let mut parent = path.parent();
+            while let Some(p) = parent {
+                if p == std::path::Path::new("") {
+                    break;
+                }
+                self.state.expanded_directories.insert(p.to_path_buf());
+                parent = p.parent();
             }
-            self.state.expanded_directories.insert(p.to_path_buf());
-            parent = p.parent();
         }
 
         if let Some(idx) = self
@@ -539,10 +541,10 @@ impl KatanaApp {
             AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::SelectDocument(p) => self.handle_select_document(p, true),
             AppAction::OpenMultipleDocuments(paths) => {
-                let len = paths.len();
-                for (i, path) in paths.into_iter().enumerate() {
-                    let activate = i == len - 1;
-                    self.handle_select_document(path, activate);
+                // When recursively opening a directory, open all files lazily
+                // and do not artificially activate the last file nor auto-expand the directory tree.
+                for path in paths.into_iter() {
+                    self.handle_select_document(path, false);
                 }
             }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
@@ -1471,5 +1473,36 @@ mod tests_extra {
         // Path with no parent (relative) should not crash and hit the break
         app.handle_select_document(std::path::PathBuf::from("root_file.md"), true);
         assert!(app.state.expanded_directories.is_empty());
+    }
+
+    #[test]
+    fn test_handle_select_document_lazy_does_not_expand_parents() {
+        let mut app = make_app();
+        let path = std::path::PathBuf::from("/a/b/c.md");
+        app.handle_select_document(path, false); // Lazy load
+
+        // Ensure no directories were added to expanded_directories
+        assert!(
+            app.state.expanded_directories.is_empty(),
+            "Expanded directories should be empty on lazy load"
+        );
+    }
+
+    #[test]
+    fn test_open_multiple_documents_is_entirely_lazy() {
+        let mut app = make_app();
+        let paths = vec![
+            std::path::PathBuf::from("/a/1.md"),
+            std::path::PathBuf::from("/a/2.md"),
+        ];
+
+        app.process_action(AppAction::OpenMultipleDocuments(paths));
+
+        // Ensure documents were opened but none of them triggered auto-expansion
+        assert_eq!(app.state.open_documents.len(), 2);
+        assert!(app.state.expanded_directories.is_empty());
+        // Ensure they are not loaded
+        assert!(!app.state.open_documents[0].is_loaded);
+        assert!(!app.state.open_documents[1].is_loaded);
     }
 }
