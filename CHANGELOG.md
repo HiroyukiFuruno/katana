@@ -4,9 +4,25 @@ All notable changes to KatanA Desktop will be documented in this file.
 
 ## [0.2.1] - 2026-03-21
 
+### 🚀 Features
+
+- Make init command implementation and release automatic push for development environment and flow enhancement
+
+### ♻️ Refactoring
+
+- Rename repository to KatanA, reorganize documents, and support English translation
+
+### 🧪 Testing
+
+- Specify language in settings window integration test to stabilize test
+- Collect_matches logic extraction and partial setting screen integration test addition for coverage improvement
+
 ### 🔧 Miscellaneous
 
 - Update Rust dependencies and GitHub Actions plugins
+- Fix coverage gap in preview_pane and codify release bypass rules
+- Resolve V0.2.0 archive omission and add AI warning block to next tasks
+- Integrate GitHub Actions CI build command into Makefile target
 
 ## [0.2.0] - 2026-03-20
 
