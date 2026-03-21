@@ -139,6 +139,7 @@ fn main() -> eframe::Result<()> {
             .with_icon(load_icon())
             .with_inner_size(initial_window_size())
             .with_min_inner_size(min_window_size()),
+        centered: true,
         ..Default::default()
     };
 

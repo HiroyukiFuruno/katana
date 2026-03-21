@@ -116,6 +116,8 @@ pub struct KatanaApp {
     pub(crate) cached_font_family: Option<String>,
     /// Dedicated PreviewPane for the settings window live preview.
     pub(crate) settings_preview: PreviewPane,
+    /// Tracks the startup time for the splash screen fade animation.
+    pub(crate) splash_start: Option<std::time::Instant>,
 }
 
 impl KatanaApp {
@@ -133,7 +135,17 @@ impl KatanaApp {
             cached_font_size: None,
             cached_font_family: None,
             settings_preview: PreviewPane::default(),
+            splash_start: if cfg!(test) {
+                None
+            } else {
+                Some(std::time::Instant::now())
+            },
         }
+    }
+
+    /// Explicitly skips the splash screen. Useful for integration testing.
+    pub fn skip_splash(&mut self) {
+        self.splash_start = None;
     }
 
     pub(crate) fn take_action(&mut self) -> AppAction {

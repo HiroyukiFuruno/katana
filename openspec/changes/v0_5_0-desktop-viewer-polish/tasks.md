@@ -6,11 +6,7 @@
 
 ## Branch Rule
 
-タスクグループ（##単位）= 1セッションで以下のサイクルを回す:
-
-1. **ベースブランチ作成**: 最初に `desktop-viewer-polish-v0.5.0` を `master` から作成する
-2. **タスクブランチ作成**: 各タスクごとの作業は `1` のブランチから `desktop-viewer-polish-v0.5.0-task{N}` を派生させる
-3. **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` (マージ先は `master` ではなく `1` のブランチとする。マージ完了後は `1` のベースブランチへ切り替え、最新化を行う)
+Tasks Grouped by ## = Adhere unconditionally to the branching standard defined in the `/openspec-branching` workflow (`.agents/workflows/openspec-branching.md`) throughout your implementation sessions.
 
 ---
 
@@ -22,10 +18,11 @@
 - [ ] 1.4 外部ツールが未インストールの場合に、GUI上でエラーメッセージとインストールガイドを表示する
 
 ### Definition of Done (DoD)
+
 - [ ] HTML, PDF, および画像ファイルへのエクスポート処理が実行され、ファイルが生成されること。
 - [ ] 外部ツールが存在しない環境では、クラッシュせずに適切なエラーダイアログがユーザーに提示されること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -38,10 +35,11 @@
 - [ ] 2.5 バージョンが上がった際に再同意を要求するロジックを実装する
 
 ### Definition of Done (DoD)
+
 - [ ] 初回起動時に多言語対応の規約画面が必ず表示され、同意するまでアプリ本来の機能にアクセスできないこと。
 - [ ] 一度同意すれば次回以降の起動時はスキップされること（ただし規約バージョンが上がった場合は再提示されること）。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -54,12 +52,13 @@
 - [ ] 3.5 新UI要素に対するi18nキー（日・英）を追加する
 
 ### Definition of Done (DoD)
+
 - [ ] TDDの原則に従い、検索オプション（Include/Exclude）に対するテストが実装・パスしていること。
 - [ ] 検索モーダルにInclude/Excludeオプションが存在し、カンマ区切りの正規表現で想定通りに絞り込み・除外が行えること。
 - [ ] ワークスペースサイドバーに検索ボタンと新しいフィルターアイコンが配置されていること。
 - [ ] 追加されたテキスト群が日・英のi18n対応を行っていること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -68,11 +67,12 @@
 > [!CAUTION]
 > **【AIエージェントへの厳重警告】**
 > 過去のリリースにおいて、AIが以下の致命的な違反を犯しました。
+>
 > 1. `make release` が失敗した際、勝手に `git tag -a` などの代替コマンドを実行し、タスクを強行完了(`[x]`)として虚偽入力した。
 > 2. `openspec` のアーカイブ(`/opsx-archive`)を忘却し、不要なディレクトリを残したままリリースに進んだ。
 > 3. カバレッジ低下（エラーハンドリングパスのテスト漏れ）を放置した。
 > 4. `process_rules.md` で指定された「日本語での報告・コミット」を無視し英語で行った。
-> 
+>
 > これらはプロセスの信頼性を根底から覆す行為です。以下の手順は**絶対に独自解釈でスキップ・代替実行せず**、一つずつ確実に完了させてください。エラー発生時は即座に中断し、人間に報告すること。
 
 - [ ] 4.1 本バージョンの `tasks.md` にて、先行するすべてのタスクが完了し `[x]` が付いていることを確認する。

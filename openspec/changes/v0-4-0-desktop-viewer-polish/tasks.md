@@ -6,41 +6,38 @@
 
 ## Branch Rule
 
-タスクグループ（##単位）= 1セッションで以下のサイクルを回す:
-
-1. **ベースブランチ作成**: 最初に `desktop-viewer-polish-v0.4.0` を `master` から作成する
-2. **タスクブランチ作成**: 各タスクごとの作業は `1` のブランチから `desktop-viewer-polish-v0.4.0-task{N}` を派生させる
-3. **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` (マージ先は `master` ではなく `1` のブランチとする。マージ完了後は `1` のベースブランチへ切り替え、最新化を行う)
+Tasks Grouped by ## = Adhere unconditionally to the branching standard defined in the `/openspec-branching` workflow (`.agents/workflows/openspec-branching.md`) throughout your implementation sessions.
 
 ---
 
 ## 1. ローカル画像の遅延読み込みプレビュー
 
-- [ ] 1.1 comrak AST から画像ノードのローカル相対パスを検出・解決する
-- [ ] 1.2 バックグラウンドで全画像を読み込み、完了するまでプレースホルダーを表示する
-- [ ] 1.3 `HashMap<PathBuf, TextureHandle>` 等の画像キャッシュ機構を実装する
+- [x] 1.1 comrak AST から画像ノードのローカル相対パスを検出・解決する
+- [x] 1.2 バックグラウンドで全画像を読み込み、完了するまでプレースホルダーを表示する
+- [x] 1.3 `HashMap<PathBuf, TextureHandle>` 等の画像キャッシュ機構を実装する
 
 ### Definition of Done (DoD)
 
-- [ ] Markdown内の相対パス画像（PNG, JPG, GIF, SVGs）が表示されること。
-- [ ] 未ロード中または未発見時には適切なプレースホルダーが表示されること。
-- [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [x] Markdown内の相対パス画像（PNG, JPG, GIF, SVGs）が表示されること。
+- [x] 未ロード中または未発見時には適切なプレースホルダーが表示されること。
+- [x] `make check-local` が exit 0 で全てパスすること。
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
 ## 2. スプラッシュスクリーン
 
-- [ ] 2.1 起動時（eguiの初期フレーム）に約1秒間、アイコン＋バージョン番号を表示する
-- [ ] 2.2 フレーム推移によりフェードアウトさせるアニメーションを実装
-- [ ] 2.3 画面クリックによるスプラッシュのスキップ機能を実装
+- [x] 2.1 起動時（eguiの初期フレーム）に約1.5秒間（初回の画面表示のロードをバックグラウンドで行うこと、メインのウィンドを非表示で開き1.5秒経過後に表示にすると複雑な制御が不要になると思われる。）、アイコン＋バージョン番号を表示する
+- [x] 2.2 フレーム推移によりフェードアウトさせるアニメーションを実装
+- [x] 2.3 画面クリックによるスプラッシュのスキップ機能を実装
+- [x] 2.4 スプラッシュ画面を画面中央に配置し、読み込み状態とフェイク・テキストを含むプログレスバーを実装
 
 ### Definition of Done (DoD)
 
-- [ ] アプリ起動時に独立したスプラッシュ画面が表示され、その後メインUIに遷移すること。
-- [ ] ユーザーのクリック操作で瞬時にスキップできること。
-- [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [x] アプリ起動時に独立したスプラッシュ画面が表示され、その後メインUIに遷移すること。
+- [x] ユーザーのクリック操作で瞬時にスキップできること。
+- [x] `make check-local` が exit 0 で全てパスすること。
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -54,7 +51,7 @@
 
 - [ ] OSネイティブのメニューから About, Help の各種ダイアログ（または遷移）が正常に呼び出せること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -69,7 +66,7 @@
 - [ ] Markdown内の画像およびダイアグラム上にコントロールUIが表示され、拡大・縮小などのパン＆ズーム操作が正常に行えること。
 - [ ] モーダルでの別表示機能が正常に動作し、元のプレビュー画面全体のレイアウトに干渉したりアプリがクラッシュしないこと。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 

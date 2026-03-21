@@ -433,6 +433,53 @@ fi
 prompt_skill_copy_layout
 
 # =============================================================================
+# 11. nvm & Node.js
+# =============================================================================
+header "nvm & Node.js"
+
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  success "nvm is already installed"
+  source "$NVM_DIR/nvm.sh"
+else
+  info "Installing nvm..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  source "$NVM_DIR/nvm.sh"
+  success "nvm installed"
+fi
+
+if command -v node &>/dev/null && node -v | grep -q 'v24'; then
+  success "Node.js v24 is already installed ($(node -v))"
+else
+  info "Installing Node.js v24 (LTS)..."
+  nvm install 24
+  nvm use 24
+  nvm alias default 24
+  success "Node.js installed ($(node -v))"
+fi
+
+# =============================================================================
+# 12. OpenSpec
+# =============================================================================
+header "OpenSpec"
+
+if command -v openspec &>/dev/null; then
+  success "OpenSpec CLI is already installed ($(openspec --version))"
+else
+  info "Installing OpenSpec CLI globally..."
+  npm install -g @fission-ai/openspec
+  success "OpenSpec CLI installed"
+fi
+
+if [[ -f ".openspec.yaml" || -f "openspec.yaml" || -d "openspec" ]]; then
+  success "OpenSpec is already initialized in this repository"
+else
+  info "Initializing OpenSpec..."
+  npx @fission-ai/openspec init --yes || true
+  success "OpenSpec initialized"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 echo ""
