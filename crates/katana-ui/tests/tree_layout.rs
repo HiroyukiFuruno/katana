@@ -14,7 +14,7 @@ mod tests {
         Harness::builder().build_eframe(move |_cc| {
             let ai_registry = AiProviderRegistry::new();
             let plugin_registry = PluginRegistry::new();
-            let state = AppState::new(
+            let mut state = AppState::new(
                 ai_registry,
                 plugin_registry,
                 katana_platform::SettingsService::new(Box::new(
@@ -22,6 +22,8 @@ mod tests {
                 )),
                 std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
             );
+            // Pre-accept terms for testing
+            state.settings.settings_mut().terms_accepted_version = Some("v1.0.0".to_string());
             katana_ui::i18n::set_language("en");
             KatanaApp::new(state)
         })

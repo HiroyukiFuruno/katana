@@ -19,26 +19,26 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Done (DoD)
 
-- [ ] HTML, PDF, および画像ファイルへのエクスポート処理が実行され、ファイルが生成されること。
-- [ ] 外部ツールが存在しない環境では、クラッシュせずに適切なエラーダイアログがユーザーに提示されること。
-- [ ] `make check-local` が exit 0 で全てパスすること。
+- [x] HTML, PDF, および画像ファイルへのエクスポート処理が実行され、ファイルが生成されること。
+- [x] 外部ツールが存在しない環境では、クラッシュせずに適切なエラーダイアログがユーザーに提示されること。
+- [x] `make check-local` が exit 0 で全てパスすること。
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
 ## 2. 規約同意画面
 
-- [ ] 2.1 EULA（エンドユーザー使用許諾契約）同意画面を構築し、未同意時のブロック機能を追加するi18nリソースとして組み込む
-- [ ] 2.2 起動時（スプラッシュ表示後、メインUI表示前）に全画面モーダルとして規約同意UIを表示する
-- [ ] 2.3 日本語・英語の切り替えプルダウンを配置する
-- [ ] 2.4 「同意する」ボタンにて `AppSettings` の `terms_accepted_version` を更新・永続化する。不同意の場合はアプリを終了する
-- [ ] 2.5 バージョンが上がった際に再同意を要求するロジックを実装する ※但し規約に変更がない場合は必要がないため、永続化する規約への同意の記憶はversionを含めた形で保存できる形式で実装すること。
+- [x] 2.1 EULA（エンドユーザー使用許諾契約）同意画面を構築し、未同意時のブロック機能を追加するi18nリソースとして組み込む
+- [x] 2.2 起動時（スプラッシュ表示後、メインUI表示前）に全画面モーダルとして規約同意UIを表示する
+- [x] 2.3 日本語・英語の切り替えプルダウンを配置する
+- [x] 2.4 「同意する」ボタンにて `AppSettings` の `terms_accepted_version` を更新・永続化する。不同意の場合はアプリを終了する
+- [x] 2.5 バージョンが上がった際に再同意を要求するロジックを実装する ※但し規約に変更がない場合は必要がないため、永続化する規約への同意の記憶はversionを含めた形で保存できる形式で実装すること。
 
 ### Definition of Done (DoD)
 
-- [ ] 初回起動時に多言語対応の規約画面が必ず表示され、同意するまでアプリ本来の機能にアクセスできないこと。
-- [ ] 一度同意すれば次回以降の起動時はスキップされること（ただし規約バージョンが上がった場合は再提示されること）。
-- [ ] `make check-local` が exit 0 で全てパスすること。
+- [x] 初回起動時に多言語対応の規約画面が必ず表示され、同意するまでアプリ本来の機能にアクセスできないこと。
+- [x] 一度同意すれば次回以降の起動時はスキップされること（ただし規約バージョンが上がった場合は再提示されること）。
+- [x] `make check-local` が exit 0 で全てパスすること。
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---

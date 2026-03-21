@@ -211,5 +211,13 @@
     "temp_file_error": "Impossibile creare il file temporaneo: {error}",
     "write_error": "Impossibile scrivere il contenuto: {error}",
     "persist_error": "Impossibile salvare il file temporaneo"
+  },
+  "terms": {
+    "title": "Termini di servizio",
+    "version": "v1.0.0",
+    "version_label": "Versione: {version}",
+    "content": "Terms content.",
+    "accept": "Accetta",
+    "decline": "Rifiuta"
   }
 }

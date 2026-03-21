@@ -752,6 +752,15 @@ impl KatanaApp {
             AppAction::ExportDocument(fmt) => {
                 self.handle_export_document(ctx, fmt);
             }
+            AppAction::AcceptTerms(version) => {
+                self.state.settings.settings_mut().terms_accepted_version = Some(version);
+                if let Err(e) = self.state.settings.save() {
+                    tracing::warn!("Failed to save terms acceptance: {e}");
+                }
+            }
+            AppAction::DeclineTerms => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
             AppAction::None => {}
         }
     }

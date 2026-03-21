@@ -211,5 +211,13 @@
     "temp_file_error": "Error al crear archivo temporal: {error}",
     "write_error": "Error al escribir el contenido: {error}",
     "persist_error": "Error al guardar el archivo temporal"
+  },
+  "terms": {
+    "title": "Términos de Servicio",
+    "version": "v1.0.0",
+    "version_label": "Versión: {version}",
+    "content": "Terms content.",
+    "accept": "Aceptar",
+    "decline": "Rechazar"
   }
 }

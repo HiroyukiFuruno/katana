@@ -32,7 +32,7 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
     Harness::builder().build_eframe(move |_cc| {
         let ai_registry = AiProviderRegistry::new();
         let plugin_registry = PluginRegistry::new();
-        let state = AppState::new(
+        let mut state = AppState::new(
             ai_registry,
             plugin_registry,
             katana_platform::SettingsService::new(Box::new(
@@ -40,6 +40,9 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
             )),
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
+        // Pre-accept terms to bypass the blocking UI in integration tests.
+        state.settings.settings_mut().terms_accepted_version = Some("v1.0.0".to_string());
+
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
         app.skip_splash();
@@ -1335,12 +1338,15 @@ fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'sta
     Harness::builder().build_eframe(move |_cc| {
         let repo = katana_platform::JsonFileRepository::new(path.clone());
         let settings = katana_platform::SettingsService::new(Box::new(repo));
-        let state = AppState::new(
+        let mut state = AppState::new(
             AiProviderRegistry::new(),
             PluginRegistry::new(),
             settings,
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
+        // Pre-accept terms to bypass the blocking UI in persistence tests.
+        state.settings.settings_mut().terms_accepted_version = Some("v1.0.0".to_string());
+
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
         app.skip_splash();

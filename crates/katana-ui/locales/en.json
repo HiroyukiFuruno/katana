@@ -211,5 +211,13 @@
     "temp_file_error": "Failed to create temp file: {error}",
     "write_error": "Failed to write content: {error}",
     "persist_error": "Failed to persist temp file"
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "version": "v1.0.0",
+    "version_label": "Version: {version}",
+    "content": "Thank you for using KatanA.\n\nThis software is open source and provided under the MIT License.\n\n[Disclaimer]\n1. In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in the software.\n2. THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\n\n[Privacy]\n1. This software does not transmit your document contents to any external servers.\n2. Anonymous crash reports or usage statistics may be sent, but these can be disabled in settings.\n\nBy clicking \"Accept\", you agree to the terms above.",
+    "accept": "Accept",
+    "decline": "Decline"
   }
 }

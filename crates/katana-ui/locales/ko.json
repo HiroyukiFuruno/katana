@@ -211,5 +211,13 @@
     "temp_file_error": "임시 파일 생성 실패: {error}",
     "write_error": "내용 쓰기 실패: {error}",
     "persist_error": "임시 파일 저장 실패"
+  },
+  "terms": {
+    "title": "이용 약관",
+    "version": "v1.0.0",
+    "version_label": "버전: {version}",
+    "content": "Terms content.",
+    "accept": "동의",
+    "decline": "거부"
   }
 }

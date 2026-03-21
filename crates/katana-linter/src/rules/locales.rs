@@ -316,6 +316,21 @@ struct LocaleException {
     value: &'static str,
 }
 
+/// 翻訳値の検証から除外する例外リスト。
+///
+/// 【運用ルール】
+/// 1. 原則として、すべての言語で同一の値（英語と同一）になるものはここに追加する。
+/// 2. 固有名詞（アプリ名、ツール名等）、プログラミング用語（Rust等）、およびバージョン番号が対象。
+/// 3. キー(`key`) または 値(`value`) に `*` を使用することで、広範なマッチングが可能。
+/// 4. ただし、意味のある単語（"File", "Search" 等）を広範に除外してはならない。それらは翻訳が必要。
+///
+/// 【除外してはいけないパターンの例】
+/// - "Edit", "View", "Help" などの一般的なメニュー項目（各言語で翻訳すべき）。
+/// - 文章の断片や、ユーザーに意味を伝えるメッセージ本文。
+///
+/// 【追加の手順】
+/// 新しい固有名詞や普遍的な識別子（v1.0.0等）が導入された際に、Linterが誤検知した場合は
+/// 慎重に検討した上でこのリストに追加すること。
 const LOCALE_VALUE_EXCEPTIONS: &[LocaleException] = &[
     LocaleException {
         key: "rust",
@@ -372,6 +387,14 @@ const LOCALE_VALUE_EXCEPTIONS: &[LocaleException] = &[
     LocaleException {
         key: "*",
         value: "Version",
+    },
+    LocaleException {
+        key: "*",
+        value: "v1.0.0",
+    },
+    LocaleException {
+        key: "*",
+        value: "Version: {version}",
     },
     LocaleException {
         key: "*",

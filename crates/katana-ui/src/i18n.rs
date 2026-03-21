@@ -23,6 +23,8 @@ pub struct I18nMessages {
     pub toc: TocMessages,
     #[serde(default)]
     pub export: ExportMessages,
+    #[serde(default)]
+    pub terms: TermsMessages,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -34,6 +36,17 @@ pub struct ExportMessages {
     pub temp_file_error: String,
     pub write_error: String,
     pub persist_error: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct TermsMessages {
+    pub title: String,
+    pub version: String,
+    pub version_label: String,
+    pub content: String,
+    pub accept: String,
+    pub decline: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -110,6 +110,10 @@ pub enum AppAction {
     ReorderDocument { from: usize, to: usize },
     /// Export the active document to a specified format.
     ExportDocument(ExportFormat),
+    /// Accept the terms of service.
+    AcceptTerms(String),
+    /// Decline the terms of service (exits the app).
+    DeclineTerms,
     /// No-op (used internally).
     None,
 }

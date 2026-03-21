@@ -211,5 +211,13 @@
     "temp_file_error": "Fehler beim Erstellen der temporären Datei: {error}",
     "write_error": "Fehler beim Schreiben des Inhalts: {error}",
     "persist_error": "Fehler beim Speichern der temporären Datei"
+  },
+  "terms": {
+    "title": "Nutzungsbedingungen",
+    "version": "v1.0.0",
+    "version_label": "Version: {version}",
+    "content": "Terms content.",
+    "accept": "Akzeptieren",
+    "decline": "Ablehnen"
   }
 }

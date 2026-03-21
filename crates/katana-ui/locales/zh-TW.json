@@ -211,5 +211,13 @@
     "temp_file_error": "建立暫存檔案失敗: {error}",
     "write_error": "寫入內容失敗: {error}",
     "persist_error": "持久化暫存檔案失敗"
+  },
+  "terms": {
+    "title": "服務條款",
+    "version": "v1.0.0",
+    "version_label": "版本: {version}",
+    "content": "Terms content.",
+    "accept": "接受",
+    "decline": "拒絶"
   }
 }

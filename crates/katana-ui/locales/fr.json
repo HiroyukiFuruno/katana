@@ -211,5 +211,13 @@
     "temp_file_error": "Échec de création du fichier temporaire : {error}",
     "write_error": "Échec de l'écriture : {error}",
     "persist_error": "Échec de persistance du fichier temporaire"
+  },
+  "terms": {
+    "title": "Conditions d'utilisation",
+    "version": "v1.0.0",
+    "version_label": "Version : {version}",
+    "content": "Terms content.",
+    "accept": "Accepter",
+    "decline": "Décliner"
   }
 }

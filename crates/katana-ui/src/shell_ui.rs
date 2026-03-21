@@ -1621,6 +1621,143 @@ fn invalidate_preview_image_cache(ctx: &egui::Context, action: &AppAction) {
     }
 }
 
+impl KatanaApp {
+    const TERMS_MODAL_WIDTH: f32 = 600.0;
+    const TERMS_TITLE_SIZE: f32 = 28.0;
+    const TERMS_INNER_MARGIN: f32 = 24.0;
+    const TERMS_CONVAS_MARGIN: f32 = 16.0;
+    const TERMS_ROUNDING_LARGE: f32 = 12.0;
+    const TERMS_ROUNDING_SMALL: f32 = 8.0;
+    const TERMS_SPACING_SMALL: f32 = 8.0;
+    const TERMS_SPACING_MEDIUM: f32 = 20.0;
+    const TERMS_SPACING_LARGE: f32 = 24.0;
+    const TERMS_SPACING_XLARGE: f32 = 32.0;
+    const TERMS_BUTTON_WIDTH: f32 = 120.0;
+    const TERMS_BUTTON_HEIGHT: f32 = 40.0;
+    const TERMS_BUTTON_TEXT_SIZE: f32 = 16.0;
+    const TERMS_BUTTON_SPACING: f32 = 24.0;
+    const TERMS_SCROLL_HEIGHT_RATIO: f32 = 0.5;
+    const TERMS_CENTER_OFFSET_RATIO: f32 = 0.1;
+
+    fn render_terms_modal(&mut self, ctx: &egui::Context, version: &str) {
+        let terms = crate::i18n::get().terms.clone();
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let width = ui.available_width();
+            let content_width = width.min(Self::TERMS_MODAL_WIDTH);
+
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() * Self::TERMS_CENTER_OFFSET_RATIO);
+
+                ui.set_max_width(content_width);
+
+                egui::Frame::window(ui.style())
+                    .inner_margin(Self::TERMS_INNER_MARGIN)
+                    .corner_radius(Self::TERMS_ROUNDING_LARGE)
+                    .show(ui, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.heading(
+                                egui::RichText::new(&terms.title)
+                                    .size(Self::TERMS_TITLE_SIZE)
+                                    .strong()
+                                    .color(ui.visuals().strong_text_color()),
+                            );
+                            ui.add_space(Self::TERMS_SPACING_SMALL);
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new(crate::i18n::tf(
+                                        &terms.version_label,
+                                        &[("version", version)],
+                                    ))
+                                    .weak(),
+                                );
+                                ui.add_space(Self::TERMS_SPACING_MEDIUM);
+                                for (code, name) in crate::i18n::supported_languages() {
+                                    if ui
+                                        .selectable_label(
+                                            crate::i18n::get_language() == *code,
+                                            name,
+                                        )
+                                        .clicked()
+                                    {
+                                        self.pending_action =
+                                            AppAction::ChangeLanguage(code.clone());
+                                    }
+                                }
+                            });
+                            ui.add_space(Self::TERMS_SPACING_LARGE);
+
+                            egui::Frame::canvas(ui.style())
+                                .inner_margin(Self::TERMS_CONVAS_MARGIN)
+                                .corner_radius(Self::TERMS_ROUNDING_SMALL)
+                                .show(ui, |ui| {
+                                    egui::ScrollArea::vertical()
+                                        .max_height(
+                                            ui.available_height() * Self::TERMS_SCROLL_HEIGHT_RATIO,
+                                        )
+                                        .show(ui, |ui| {
+                                            ui.add(egui::Label::new(&terms.content).wrap());
+                                        });
+                                });
+
+                            ui.add_space(Self::TERMS_SPACING_XLARGE);
+
+                            ui.horizontal(|ui| {
+                                let spacing = Self::TERMS_BUTTON_SPACING;
+                                ui.add_space(
+                                    (ui.available_width()
+                                        - (Self::TERMS_BUTTON_WIDTH * 2.0 + spacing))
+                                        / 2.0,
+                                );
+
+                                let accept_btn = egui::Button::new(
+                                    egui::RichText::new(&terms.accept)
+                                        .strong()
+                                        .size(Self::TERMS_BUTTON_TEXT_SIZE),
+                                )
+                                .min_size(egui::vec2(
+                                    Self::TERMS_BUTTON_WIDTH,
+                                    Self::TERMS_BUTTON_HEIGHT,
+                                ))
+                                .corner_radius(Self::TERMS_ROUNDING_SMALL);
+
+                                if ui
+                                    .add(accept_btn)
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                    .clicked()
+                                {
+                                    self.pending_action =
+                                        AppAction::AcceptTerms(version.to_string());
+                                }
+
+                                ui.add_space(spacing);
+
+                                let decline_btn = egui::Button::new(
+                                    egui::RichText::new(&terms.decline)
+                                        .size(Self::TERMS_BUTTON_TEXT_SIZE),
+                                )
+                                .min_size(egui::vec2(
+                                    Self::TERMS_BUTTON_WIDTH,
+                                    Self::TERMS_BUTTON_HEIGHT,
+                                ))
+                                .corner_radius(Self::TERMS_ROUNDING_SMALL);
+
+                                if ui
+                                    .add(decline_btn)
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                    .clicked()
+                                {
+                                    self.pending_action = AppAction::DeclineTerms;
+                                }
+                            });
+                            ui.add_space(Self::TERMS_SPACING_SMALL);
+                        });
+                    });
+            });
+        });
+    }
+}
+
 impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Apply theme colours to egui Visuals (only when the palette changed)
@@ -1738,6 +1875,19 @@ impl eframe::App for KatanaApp {
         let action = self.take_action();
         invalidate_preview_image_cache(ctx, &action);
         self.process_action(ctx, action);
+
+        // Terms of Service check (Blocking UI)
+        let terms_ver = crate::i18n::get().terms.version.clone();
+        let accepted_ver = self
+            .state
+            .settings
+            .settings()
+            .terms_accepted_version
+            .as_ref();
+        if accepted_ver != Some(&terms_ver) {
+            self.render_terms_modal(ctx, &terms_ver);
+            return;
+        }
 
         // On macOS, the egui menu is hidden because the native menu bar is used.
         #[cfg(not(target_os = "macos"))]
