@@ -6,6 +6,11 @@
     "open_workspace": "Open Workspace…",
     "save": "Save",
     "open_all": "Open All",
+    "export": "Export",
+    "export_html": "HTML Document (.html)",
+    "export_pdf": "PDF Document (.pdf)",
+    "export_png": "PNG Image (.png)",
+    "export_jpg": "JPEG Image (.jpg)",
     "about": "About KatanA",
     "quit": "Quit KatanA",
     "hide": "Hide KatanA",
@@ -198,5 +203,13 @@
   "toc": {
     "title": "Table of Contents",
     "empty": "No headings found."
+  },
+  "export": {
+    "success": "Exported to {format} at {path}",
+    "failed": "{format} export failed: {error}",
+    "tool_missing": "Tool '{tool}' not found. Please install it (e.g. `brew install wkhtmltopdf`) to export as {format}.",
+    "temp_file_error": "Failed to create temp file: {error}",
+    "write_error": "Failed to write content: {error}",
+    "persist_error": "Failed to persist temp file"
   }
 }

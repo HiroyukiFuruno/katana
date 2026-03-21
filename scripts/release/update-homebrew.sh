@@ -77,8 +77,8 @@ end
 EOF
 )
 
-# Base64 encode for GitHub API
-ENCODED=$(echo "$CASK_CONTENT" | base64)
+# Base64 encode for GitHub API (strip newlines to prevent invalid JSON)
+ENCODED=$(echo "$CASK_CONTENT" | base64 | tr -d '\n')
 
 echo "[INFO] Updating Cask in $REPO..."
 RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \

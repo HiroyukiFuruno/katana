@@ -21,6 +21,19 @@ pub struct I18nMessages {
     pub about: AboutMessages,
     pub update: UpdateMessages,
     pub toc: TocMessages,
+    #[serde(default)]
+    pub export: ExportMessages,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct ExportMessages {
+    pub success: String,
+    pub failed: String,
+    pub tool_missing: String,
+    pub temp_file_error: String,
+    pub write_error: String,
+    pub persist_error: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -88,6 +101,16 @@ pub struct MenuMessages {
     pub hide: String,
     pub hide_others: String,
     pub show_all: String,
+    #[serde(default)]
+    pub export: String,
+    #[serde(default)]
+    pub export_html: String,
+    #[serde(default)]
+    pub export_pdf: String,
+    #[serde(default)]
+    pub export_png: String,
+    #[serde(default)]
+    pub export_jpg: String,
     pub help: String,
     pub check_updates: String,
 }
@@ -509,5 +532,16 @@ mod tests {
         assert_eq!(dc.pan_up, "Move up");
         assert_eq!(dc.zoom_in, "Zoom in");
         assert_eq!(dc.close, "Close");
+    }
+
+    #[test]
+    fn test_export_menu_keys_exist() {
+        // Red phase: testing that export menu strings are present
+        let msgs = super::get();
+        assert!(!msgs.menu.export.is_empty());
+        assert!(!msgs.menu.export_html.is_empty());
+        assert!(!msgs.menu.export_pdf.is_empty());
+        assert!(!msgs.menu.export_png.is_empty());
+        assert!(!msgs.menu.export_jpg.is_empty());
     }
 }

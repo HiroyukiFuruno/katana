@@ -6,13 +6,18 @@
     "open_workspace": "Abrir Espacio de Trabajo…",
     "save": "Guardar",
     "open_all": "Abrir todo",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "Exportar",
+    "export_html": "Documento HTML (.html)",
+    "export_pdf": "Documento PDF (.pdf)",
+    "export_png": "Imagen PNG (.png)",
+    "export_jpg": "Imagen JPEG (.jpg)",
+    "about": "Acerca de KatanA",
+    "quit": "Salir de KatanA",
+    "hide": "Ocultar KatanA",
+    "hide_others": "Ocultar otros",
+    "show_all": "Mostrar todo",
+    "help": "Ayuda",
+    "check_updates": "Buscar actualizaciones..."
   },
   "workspace": {
     "no_workspace_open": "Ningún espacio de trabajo abierto.",
@@ -27,16 +32,16 @@
     "rendering": "Renderizando {kind}...",
     "no_preview": "(Sin vista previa)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "Subir",
+      "pan_down": "Bajar",
+      "pan_left": "Izquierda",
+      "pan_right": "Derecha",
+      "zoom_in": "Aumentar",
+      "zoom_out": "Disminuir",
+      "reset": "Restablecer",
+      "fullscreen": "Pantalla completa",
+      "close": "Cerrar",
+      "trackpad_help": "Trackpad: Pellizcar con 2 dedos para zoom, arrastrar con 1 dedo para desplazar"
     }
   },
   "plantuml": {
@@ -72,13 +77,13 @@
   "action": {
     "expand_all": "Expandir todo",
     "collapse_all": "Contraer todo",
-    "collapse_sidebar": "Ocultar la barra lateral",
+    "collapse_sidebar": "Ocultar barra lateral",
     "refresh_workspace": "Actualizar espacio de trabajo",
     "toggle_filter": "Alternar filtro",
-    "remove_workspace": "Eliminar del historial",
-    "recursive_expand": "Expandir subdirectorios recursivamente",
+    "remove_workspace": "Eliminar de la historia",
+    "recursive_expand": "Expansión recursiva",
     "recursive_open_all": "Abrir todos los archivos recursivamente",
-    "toggle_toc": "Toggle Table of Contents"
+    "toggle_toc": "Alternar tabla de contenidos"
   },
   "ai": {
     "ai_unconfigured": "[IA: no configurado]"
@@ -90,7 +95,7 @@
   },
   "settings": {
     "title": "Ajustes",
-    "toc_visible": "Mostrar Índice",
+    "toc_visible": "Mostrar tabla de contenidos",
     "theme": {
       "preset": "Preajuste de Tema",
       "dark_section": "Oscuro",
@@ -110,9 +115,9 @@
       "pane_order": "Orden de Paneles",
       "editor_first": "Editor Primero",
       "preview_first": "Vista Previa Primero",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "Posición de la tabla",
+      "left": "Izquierda",
+      "right": "Derecha"
     },
     "preview": {
       "title": "Vista Previa",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "Ir a la pestaña anterior",
     "nav_next": "Ir a la siguiente pestaña",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "Cerrar",
+    "close_others": "Cerrar otros",
+    "close_all": "Cerrar todos",
+    "close_right": "Cerrar a la derecha",
+    "close_left": "Cerrar a la izquierda",
+    "pin": "Fijar",
+    "unpin": "Desfijar",
+    "restore_closed": "Restaurar pestaña cerrada"
   },
   "search": {
     "modal_title": "Buscar archivos",
@@ -168,35 +173,43 @@
     "no_results": "No se encontraron archivos."
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "Tabla de contenidos",
+    "empty": "No se encontraron encabezados"
   },
   "about": {
-    "basic_info": "Basic Info",
-    "version": "Version",
+    "basic_info": "Información básica",
+    "version": "Versión",
     "build": "Build",
     "copyright": "Copyright",
     "runtime": "Runtime",
-    "platform": "Platform",
-    "architecture": "Architecture",
+    "platform": "Plataforma",
+    "architecture": "Arquitectura",
     "rust": "Rust",
-    "license": "License",
-    "links": "Links",
-    "source_code": "Source Code",
-    "documentation": "Documentation",
-    "report_issue": "Report Issue",
-    "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "license": "Licencia",
+    "links": "Enlaces",
+    "source_code": "Código fuente",
+    "documentation": "Documentación",
+    "report_issue": "Informar un problema",
+    "support": "Soporte",
+    "sponsor": "Patrocinar",
+    "coming_soon": "Próximamente"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "Actualización disponible",
+    "update_available_desc": "Una nueva versión de KatanA ({version}) está disponible. Por favor, ejecute `brew upgrade katana` para actualizar.",
+    "up_to_date": "Actualizado",
+    "up_to_date_desc": "KatanA está actualizado.",
+    "failed_to_check": "Error al buscar actualizaciones.",
+    "action_close": "Aceptar",
+    "title": "Buscar actualizaciones",
+    "checking_for_updates": "Buscando actualizaciones..."
+  },
+  "export": {
+    "success": "Exportado a {format} en: {path}",
+    "failed": "Exportación a {format} fallida: {error}",
+    "tool_missing": "Herramienta '{tool}' no encontrada. Por favor, instálela (ej: `brew install wkhtmltopdf`) para exportar como {format}.",
+    "temp_file_error": "Error al crear archivo temporal: {error}",
+    "write_error": "Error al escribir el contenido: {error}",
+    "persist_error": "Error al guardar el archivo temporal"
   }
 }

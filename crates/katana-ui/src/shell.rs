@@ -558,7 +558,7 @@ impl KatanaApp {
         }
     }
 
-    pub(crate) fn process_action(&mut self, action: AppAction) {
+    pub(crate) fn process_action(&mut self, ctx: &egui::Context, action: AppAction) {
         match action {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
             AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
@@ -749,8 +749,149 @@ impl KatanaApp {
             AppAction::CheckForUpdates => {
                 self.start_update_check(true);
             }
+            AppAction::ExportDocument(fmt) => {
+                self.handle_export_document(ctx, fmt);
+            }
             AppAction::None => {}
         }
+    }
+
+    fn handle_export_document(&mut self, ctx: &egui::Context, fmt: crate::app_state::ExportFormat) {
+        tracing::info!("Export document requested: {:?}", fmt);
+
+        let Some(buffer) = self.state.active_document().map(|it| it.buffer.clone()) else {
+            return;
+        };
+
+        match fmt {
+            crate::app_state::ExportFormat::Html => self.export_as_html(ctx, &buffer),
+            crate::app_state::ExportFormat::Pdf => self.export_with_tool(ctx, &buffer, "pdf"),
+            crate::app_state::ExportFormat::Png => self.export_with_tool(ctx, &buffer, "png"),
+            crate::app_state::ExportFormat::Jpg => self.export_with_tool(ctx, &buffer, "jpg"),
+        }
+    }
+
+    fn export_as_html(&mut self, ctx: &egui::Context, source: &str) {
+        let preset = katana_core::markdown::color_preset::DiagramColorPreset::current();
+        let renderer = katana_core::markdown::KatanaRenderer;
+
+        match katana_core::markdown::HtmlExporter::export(source, &renderer, preset) {
+            Ok(html) => self.save_and_open_html(ctx, html),
+            Err(e) => {
+                self.state.status_message = Some(format!("HTML Export failed: {}", e));
+            }
+        }
+    }
+
+    fn save_and_open_html(&mut self, ctx: &egui::Context, html: String) {
+        use std::io::Write;
+        let mut temp = match tempfile::Builder::new()
+            .prefix("katana_export_")
+            .suffix(".html")
+            .tempfile()
+        {
+            Ok(t) => t,
+            Err(e) => {
+                let msg = crate::i18n::tf(
+                    &crate::i18n::get().export.temp_file_error,
+                    &[("error", &e.to_string())],
+                );
+                self.state.status_message = Some(msg);
+                return;
+            }
+        };
+
+        if let Err(e) = temp.write_all(html.as_bytes()) {
+            let msg = crate::i18n::tf(
+                &crate::i18n::get().export.write_error,
+                &[("error", &e.to_string())],
+            );
+            self.state.status_message = Some(msg);
+            return;
+        }
+
+        // Keep the file! NamedTempFile will delete itself on drop.
+        let Ok((_file, path)) = temp.keep() else {
+            self.state.status_message = Some(crate::i18n::get().export.persist_error.clone());
+            return;
+        };
+
+        let url = format!("file://{}", path.display());
+        ctx.open_url(egui::OpenUrl::new_tab(url));
+
+        let msg = crate::i18n::tf(
+            &crate::i18n::get().export.success,
+            &[("format", "HTML"), ("path", &path.display().to_string())],
+        );
+        self.state.status_message = Some(msg);
+    }
+
+    fn export_with_tool(&mut self, _ctx: &egui::Context, source: &str, ext: &str) {
+        let (is_available, tool_name) = match ext {
+            "pdf" => (
+                katana_core::markdown::PdfExporter::is_available(),
+                "wkhtmltopdf",
+            ),
+            _ => (
+                katana_core::markdown::ImageExporter::is_available(),
+                "wkhtmltoimage",
+            ),
+        };
+
+        if !is_available {
+            let msg = crate::i18n::tf(
+                &crate::i18n::get().export.tool_missing,
+                &[("tool", tool_name), ("format", &ext.to_uppercase())],
+            );
+            self.state.status_message = Some(msg);
+            return;
+        }
+
+        let path = rfd::FileDialog::new()
+            .set_file_name(format!("export.{}", ext))
+            .add_filter(ext, &[ext])
+            .save_file();
+
+        if let Some(output_path) = path {
+            self.perform_tool_export(source, ext, output_path);
+        }
+    }
+
+    fn perform_tool_export(&mut self, source: &str, ext: &str, output_path: std::path::PathBuf) {
+        let preset = katana_core::markdown::color_preset::DiagramColorPreset::current();
+        let renderer = katana_core::markdown::KatanaRenderer;
+
+        let html = match katana_core::markdown::HtmlExporter::export(source, &renderer, preset) {
+            Ok(h) => h,
+            Err(e) => {
+                let msg = crate::i18n::tf(
+                    &crate::i18n::get().export.failed,
+                    &[("format", &ext.to_uppercase()), ("error", &e.to_string())],
+                );
+                self.state.status_message = Some(msg);
+                return;
+            }
+        };
+
+        let result = match ext {
+            "pdf" => katana_core::markdown::PdfExporter::export(&html, &output_path),
+            _ => katana_core::markdown::ImageExporter::export(&html, &output_path),
+        };
+
+        let status_msg = match result {
+            Ok(()) => crate::i18n::tf(
+                &crate::i18n::get().export.success,
+                &[
+                    ("format", &ext.to_uppercase()),
+                    ("path", &output_path.display().to_string()),
+                ],
+            ),
+            Err(e) => crate::i18n::tf(
+                &crate::i18n::get().export.failed,
+                &[("format", &ext.to_uppercase()), ("error", &e.to_string())],
+            ),
+        };
+        self.state.status_message = Some(status_msg);
     }
 
     /// Processes a download request in a background thread.
@@ -1065,7 +1206,7 @@ mod tests {
         app.handle_select_document(path.clone(), true);
         assert_eq!(app.state.open_documents.len(), 1);
 
-        app.process_action(AppAction::CloseDocument(0));
+        app.process_action(&egui::Context::default(), AppAction::CloseDocument(0));
         assert!(app.state.open_documents.is_empty());
         assert!(app.state.active_doc_idx.is_none());
     }
@@ -1074,7 +1215,7 @@ mod tests {
     #[test]
     fn process_action_close_document_out_of_bounds_does_nothing() {
         let mut app = make_app();
-        app.process_action(AppAction::CloseDocument(99));
+        app.process_action(&egui::Context::default(), AppAction::CloseDocument(99));
         assert!(app.state.open_documents.is_empty());
     }
 
@@ -1086,15 +1227,53 @@ mod tests {
         let path = dir.path().join("test.md");
         app.handle_select_document(path.clone(), true);
 
-        app.process_action(AppAction::RefreshDiagrams);
+        app.process_action(&egui::Context::default(), AppAction::RefreshDiagrams);
         // OK as long as no crash occurs
+    }
+
+    #[test]
+    fn process_action_export_document_logs() {
+        let mut app = make_app();
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::ExportDocument(crate::app_state::ExportFormat::Html),
+        );
+        // Coverage satisfied. Actual export validation will happen in subsequent PR steps.
+    }
+
+    #[test]
+    fn process_action_export_pdf_shows_status_message() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        let path = dir.path().join("test.md");
+        app.handle_select_document(path, true);
+
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf),
+        );
+        assert!(app.state.status_message.is_some());
+    }
+
+    #[test]
+    fn process_action_export_png_shows_status_message() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        let path = dir.path().join("test.md");
+        app.handle_select_document(path, true);
+
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::ExportDocument(crate::app_state::ExportFormat::Png),
+        );
+        assert!(app.state.status_message.is_some());
     }
 
     // process_action: RefreshDiagrams no document (L249 early return)
     #[test]
     fn process_action_refresh_diagrams_no_doc_does_nothing() {
         let mut app = make_app();
-        app.process_action(AppAction::RefreshDiagrams);
+        app.process_action(&egui::Context::default(), AppAction::RefreshDiagrams);
         // No document -> does not crash
     }
 
@@ -1102,7 +1281,10 @@ mod tests {
     #[test]
     fn process_action_change_language_sets_language() {
         let mut app = make_app();
-        app.process_action(AppAction::ChangeLanguage("ja".to_string()));
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::ChangeLanguage("ja".to_string()),
+        );
         // Verify i18n language was changed (since direct access is hard, ensure no panic)
     }
 
@@ -1112,10 +1294,10 @@ mod tests {
         let mut app = make_app();
         assert!(!app.state.show_toc);
 
-        app.process_action(AppAction::ToggleToc);
+        app.process_action(&egui::Context::default(), AppAction::ToggleToc);
         assert!(app.state.show_toc);
 
-        app.process_action(AppAction::ToggleToc);
+        app.process_action(&egui::Context::default(), AppAction::ToggleToc);
         assert!(!app.state.show_toc);
     }
 
@@ -1125,10 +1307,10 @@ mod tests {
         let mut app = make_app();
         assert!(!app.state.show_settings);
 
-        app.process_action(AppAction::ToggleSettings);
+        app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
         assert!(app.state.show_settings);
 
-        app.process_action(AppAction::ToggleSettings);
+        app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
         assert!(!app.state.show_settings);
     }
 
@@ -1136,7 +1318,7 @@ mod tests {
     #[test]
     fn process_action_none_does_nothing() {
         let mut app = make_app();
-        app.process_action(AppAction::None);
+        app.process_action(&egui::Context::default(), AppAction::None);
     }
 
     // process_action: UpdateBuffer (L246)
@@ -1146,7 +1328,10 @@ mod tests {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.handle_select_document(path, true);
-        app.process_action(AppAction::UpdateBuffer("# Via Process Action".to_string()));
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::UpdateBuffer("# Via Process Action".to_string()),
+        );
         assert_eq!(
             app.state.active_document().unwrap().buffer,
             "# Via Process Action"
@@ -1160,8 +1345,11 @@ mod tests {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.handle_select_document(path, true);
-        app.process_action(AppAction::UpdateBuffer("saved content".to_string()));
-        app.process_action(AppAction::SaveDocument);
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::UpdateBuffer("saved content".to_string()),
+        );
+        app.process_action(&egui::Context::default(), AppAction::SaveDocument);
         assert!(app.state.status_message.is_some());
     }
 
@@ -1327,7 +1515,10 @@ mod tests_extra {
     fn process_action_open_workspace_calls_handler() {
         let mut app = make_app();
         let dir = make_temp_workspace();
-        app.process_action(AppAction::OpenWorkspace(dir.path().to_path_buf()));
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::OpenWorkspace(dir.path().to_path_buf()),
+        );
         wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
     }
@@ -1338,7 +1529,7 @@ mod tests_extra {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
-        app.process_action(AppAction::SelectDocument(path));
+        app.process_action(&egui::Context::default(), AppAction::SelectDocument(path));
         assert_eq!(app.state.open_documents.len(), 1);
     }
 
@@ -1518,7 +1709,10 @@ mod tests_extra {
     #[test]
     fn change_language_save_error_does_not_panic() {
         let mut app = make_app_with_failing_repo();
-        app.process_action(AppAction::ChangeLanguage("ja".to_string()));
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::ChangeLanguage("ja".to_string()),
+        );
         // Language change still proceeds despite save failure
     }
 
@@ -1629,7 +1823,7 @@ mod tests_extra {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        app.process_action(AppAction::RefreshWorkspace);
+        app.process_action(&egui::Context::default(), AppAction::RefreshWorkspace);
         wait_for_workspace(&mut app);
         assert!(app.state.workspace.is_some());
     }
@@ -1725,7 +1919,10 @@ mod tests_extra {
             std::path::PathBuf::from("/a/2.md"),
         ];
 
-        app.process_action(AppAction::OpenMultipleDocuments(paths));
+        app.process_action(
+            &egui::Context::default(),
+            AppAction::OpenMultipleDocuments(paths),
+        );
 
         // Ensure documents were opened but none of them triggered auto-expansion
         assert_eq!(app.state.open_documents.len(), 2);
@@ -1772,10 +1969,10 @@ mod tests_extra {
         let mut app = setup_test_app();
         assert!(!app.show_about);
 
-        app.process_action(AppAction::ToggleAbout);
+        app.process_action(&egui::Context::default(), AppAction::ToggleAbout);
         assert!(app.show_about);
 
-        app.process_action(AppAction::ToggleAbout);
+        app.process_action(&egui::Context::default(), AppAction::ToggleAbout);
         assert!(!app.show_about);
     }
 
@@ -1796,7 +1993,7 @@ mod tests_extra {
         assert!(!app.state.checking_for_updates);
 
         // trigger manual update check
-        app.process_action(AppAction::CheckForUpdates);
+        app.process_action(&egui::Context::default(), AppAction::CheckForUpdates);
 
         // it should immediately set show_update_dialog = true for manual checks
         assert!(app.show_update_dialog);

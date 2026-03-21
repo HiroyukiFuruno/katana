@@ -52,6 +52,14 @@ pub enum SettingsTab {
 }
 
 /// User-visible actions dispatched from UI components to the core update loop.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ExportFormat {
+    Html,
+    Pdf,
+    Png,
+    Jpg,
+}
+
 #[derive(Debug)]
 pub enum AppAction {
     /// Open a workspace at the given path.
@@ -100,6 +108,8 @@ pub enum AppAction {
     RestoreClosedDocument,
     /// Reorder tab from one index to another.
     ReorderDocument { from: usize, to: usize },
+    /// Export the active document to a specified format.
+    ExportDocument(ExportFormat),
     /// No-op (used internally).
     None,
 }
@@ -596,5 +606,15 @@ mod tests {
         assert_eq!(dirs.len(), 2);
         assert!(dirs.contains(&root));
         assert!(dirs.contains(&sub));
+    }
+
+    #[test]
+    fn test_export_action_exists() {
+        // Red phase: testing that ExportDocument variant and ExportFormat exist
+        let action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
+        match action {
+            AppAction::ExportDocument(fmt) => assert_eq!(fmt, crate::app_state::ExportFormat::Html),
+            _ => panic!("Expected ExportDocument action"),
+        }
     }
 }

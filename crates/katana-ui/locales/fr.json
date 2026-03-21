@@ -6,13 +6,18 @@
     "open_workspace": "Ouvrir un espace de travail…",
     "save": "Enregistrer",
     "open_all": "Tout ouvrir",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "Exporter",
+    "export_html": "Document HTML (.html)",
+    "export_pdf": "Document PDF (.pdf)",
+    "export_png": "Image PNG (.png)",
+    "export_jpg": "Image JPEG (.jpg)",
+    "about": "À propos de KatanA",
+    "quit": "Quitter KatanA",
+    "hide": "Masquer KatanA",
+    "hide_others": "Masquer les autres",
+    "show_all": "Tout afficher",
+    "help": "Aide",
+    "check_updates": "Vérifier les mises à jour..."
   },
   "workspace": {
     "no_workspace_open": "Aucun espace de travail ouvert.",
@@ -27,16 +32,16 @@
     "rendering": "Rendu de {kind} en cours...",
     "no_preview": "(Aucun aperçu)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "Monter",
+      "pan_down": "Descendre",
+      "pan_left": "Gauche",
+      "pan_right": "Droite",
+      "zoom_in": "Zoom avant",
+      "zoom_out": "Zoom arrière",
+      "reset": "Réinitialiser",
+      "fullscreen": "Plein écran",
+      "close": "Fermer",
+      "trackpad_help": "Pavé tactile : pincement à 2 doigts pour zoomer, glissement à 1 doigt pour panoramique"
     }
   },
   "plantuml": {
@@ -72,13 +77,13 @@
   "action": {
     "expand_all": "Tout développer",
     "collapse_all": "Tout réduire",
-    "collapse_sidebar": "Masquer la barre latérale",
+    "collapse_sidebar": "Masquer la sidebar",
     "refresh_workspace": "Actualiser l'espace de travail",
     "toggle_filter": "Basculer le filtre",
     "remove_workspace": "Supprimer de l'historique",
-    "recursive_expand": "Développer les sous-répertoires récursivement",
-    "recursive_open_all": "Ouvrir tous les fichiers récursivement",
-    "toggle_toc": "Toggle Table of Contents"
+    "recursive_expand": "Expansion récursive",
+    "recursive_open_all": "Tout ouvrir récursivement",
+    "toggle_toc": "Basculer la table des matières"
   },
   "ai": {
     "ai_unconfigured": "[AI : non configuré]"
@@ -110,9 +115,9 @@
       "pane_order": "Ordre des volets",
       "editor_first": "Éditeur en premier",
       "preview_first": "Aperçu en premier",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "Position de la table des matières",
+      "left": "Gauche",
+      "right": "Droite"
     },
     "preview": {
       "title": "Aperçu",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "Passer à l'onglet précédent",
     "nav_next": "Passer à l'onglet suivant",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "Fermer",
+    "close_others": "Fermer les autres",
+    "close_all": "Tout fermer",
+    "close_right": "Fermer à droite",
+    "close_left": "Fermer à gauche",
+    "pin": "Épingler",
+    "unpin": "Désépingler",
+    "restore_closed": "Restaurer l'onglet fermé"
   },
   "search": {
     "modal_title": "Rechercher des fichiers",
@@ -168,35 +173,43 @@
     "no_results": "Aucun fichier trouvé."
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "Table des matières",
+    "empty": "Aucun titre trouvé"
   },
   "about": {
-    "basic_info": "Basic Info",
+    "basic_info": "Informations de base",
     "version": "Version",
     "build": "Build",
     "copyright": "Copyright",
     "runtime": "Runtime",
-    "platform": "Platform",
+    "platform": "Plateforme",
     "architecture": "Architecture",
     "rust": "Rust",
-    "license": "License",
-    "links": "Links",
-    "source_code": "Source Code",
+    "license": "Licence",
+    "links": "Liens",
+    "source_code": "Code source",
     "documentation": "Documentation",
-    "report_issue": "Report Issue",
+    "report_issue": "Signaler un problème",
     "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "sponsor": "Soutenir",
+    "coming_soon": "Bientôt disponible"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "Mise à jour disponible",
+    "update_available_desc": "Une nouvelle version de KatanA ({version}) est disponible. Veuillez exécuter `brew upgrade katana` pour mettre à jour.",
+    "up_to_date": "À jour",
+    "up_to_date_desc": "KatanA est à jour.",
+    "failed_to_check": "Échec de la vérification des mises à jour.",
+    "action_close": "OK",
+    "title": "Vérifier les mises à jour",
+    "checking_for_updates": "Vérification des mises à jour..."
+  },
+  "export": {
+    "success": "Exporté vers {format} : {path}",
+    "failed": "L'exportation vers {format} a échoué : {error}",
+    "tool_missing": "Outil '{tool}' non trouvé. Veuillez l'installer (ex: `brew install wkhtmltopdf`) pour exporter en {format}.",
+    "temp_file_error": "Échec de création du fichier temporaire : {error}",
+    "write_error": "Échec de l'écriture : {error}",
+    "persist_error": "Échec de persistance du fichier temporaire"
   }
 }

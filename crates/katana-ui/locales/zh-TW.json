@@ -6,13 +6,18 @@
     "open_workspace": "開啟工作區…",
     "save": "儲存",
     "open_all": "全部開啟",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "匯出",
+    "export_html": "HTML 文件 (.html)",
+    "export_pdf": "PDF 文件 (.pdf)",
+    "export_png": "PNG 圖片 (.png)",
+    "export_jpg": "JPEG 圖片 (.jpg)",
+    "about": "關於 KatanA",
+    "quit": "退出 KatanA",
+    "hide": "隱藏 KatanA",
+    "hide_others": "隱藏其他",
+    "show_all": "顯示全部",
+    "help": "幫助",
+    "check_updates": "檢查更新..."
   },
   "workspace": {
     "no_workspace_open": "未開啟工作區。",
@@ -27,16 +32,16 @@
     "rendering": "{kind} 渲染中...",
     "no_preview": "(無預覽)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "上移",
+      "pan_down": "下移",
+      "pan_left": "左移",
+      "pan_right": "右移",
+      "zoom_in": "放大",
+      "zoom_out": "縮小",
+      "reset": "重置位置和大小",
+      "fullscreen": "全屏",
+      "close": "關閉",
+      "trackpad_help": "觸控板：雙指捏合縮放，單指拖動平移"
     }
   },
   "plantuml": {
@@ -71,14 +76,14 @@
   },
   "action": {
     "expand_all": "全部展開",
-    "collapse_all": "全部摺疊",
+    "collapse_all": "全部折疊",
     "collapse_sidebar": "隱藏側邊欄",
-    "refresh_workspace": "重新整理工作區",
+    "refresh_workspace": "刷新工作區",
     "toggle_filter": "切換篩選器",
-    "remove_workspace": "從歷史紀錄中移除",
-    "recursive_expand": "遞迴展開子目錄",
-    "recursive_open_all": "遞迴開啟所有檔案",
-    "toggle_toc": "Toggle Table of Contents"
+    "remove_workspace": "從歷史記錄中移除",
+    "recursive_expand": "遞迴展開",
+    "recursive_open_all": "遞迴打開所有文件",
+    "toggle_toc": "切換目錄"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未設定]"
@@ -110,9 +115,9 @@
       "pane_order": "窗格順序",
       "editor_first": "編輯器優先",
       "preview_first": "預覽優先",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "目錄位置",
+      "left": "左側",
+      "right": "右側"
     },
     "preview": {
       "title": "預覽",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "移至上一個標籤頁",
     "nav_next": "移至下一個標籤頁",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "關閉",
+    "close_others": "關閉其他",
+    "close_all": "全部關閉",
+    "close_right": "關閉右側",
+    "close_left": "關閉左側",
+    "pin": "固定",
+    "unpin": "取消固定",
+    "restore_closed": "恢復關閉的分頁"
   },
   "search": {
     "modal_title": "搜尋檔案",
@@ -168,35 +173,43 @@
     "no_results": "沒有找到檔案。"
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "目錄",
+    "empty": "未找到標題。"
   },
   "about": {
-    "basic_info": "Basic Info",
-    "version": "Version",
-    "build": "Build",
-    "copyright": "Copyright",
-    "runtime": "Runtime",
-    "platform": "Platform",
-    "architecture": "Architecture",
+    "basic_info": "基本資訊",
+    "version": "版本",
+    "build": "構建",
+    "copyright": "版權",
+    "runtime": "執行階段",
+    "platform": "平台",
+    "architecture": "架構",
     "rust": "Rust",
-    "license": "License",
-    "links": "Links",
-    "source_code": "Source Code",
-    "documentation": "Documentation",
-    "report_issue": "Report Issue",
-    "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "license": "許可證",
+    "links": "連結",
+    "source_code": "源代碼",
+    "documentation": "文檔",
+    "report_issue": "報告問題",
+    "support": "支持",
+    "sponsor": "贊助",
+    "coming_soon": "敬請期待"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "有新版本可用",
+    "update_available_desc": "KatanA 有新版本 ({version}) 可用。請執行 `brew upgrade katana` 進行更新。",
+    "up_to_date": "已是最新版本",
+    "up_to_date_desc": "您使用的是最新版本的 KatanA。",
+    "failed_to_check": "檢查更新失敗。",
+    "action_close": "確定",
+    "title": "檢查更新",
+    "checking_for_updates": "正在檢查更新..."
+  },
+  "export": {
+    "success": "已成功匯出 {format} 至 {path}",
+    "failed": "{format} 匯出失敗: {error}",
+    "tool_missing": "未找到工具 '{tool}'。請安裝（如 `brew install wkhtmltopdf`）以匯出為 {format}。",
+    "temp_file_error": "建立暫存檔案失敗: {error}",
+    "write_error": "寫入內容失敗: {error}",
+    "persist_error": "持久化暫存檔案失敗"
   }
 }

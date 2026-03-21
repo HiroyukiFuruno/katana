@@ -6,13 +6,18 @@
     "open_workspace": "Abrir Espaço de Trabalho…",
     "save": "Salvar",
     "open_all": "Abrir tudo",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "Exportar",
+    "export_html": "Documento HTML (.html)",
+    "export_pdf": "Documento PDF (.pdf)",
+    "export_png": "Imagem PNG (.png)",
+    "export_jpg": "Imagem JPEG (.jpg)",
+    "about": "Sobre o KatanA",
+    "quit": "Sair do KatanA",
+    "hide": "Ocultar KatanA",
+    "hide_others": "Ocultar outros",
+    "show_all": "Mostrar tudo",
+    "help": "Ajuda",
+    "check_updates": "Verificar atualizações..."
   },
   "workspace": {
     "no_workspace_open": "Nenhum espaço de trabalho aberto.",
@@ -27,16 +32,16 @@
     "rendering": "Renderizando {kind}...",
     "no_preview": "(Sem visualização)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "Para cima",
+      "pan_down": "Para baixo",
+      "pan_left": "Esquerda",
+      "pan_right": "Direita",
+      "zoom_in": "Aumentar",
+      "zoom_out": "Diminuir",
+      "reset": "Redefinir",
+      "fullscreen": "Tela cheia",
+      "close": "Fechar",
+      "trackpad_help": "Trackpad: use 2 dedos para zoom, 1 dedo para arrastar"
     }
   },
   "plantuml": {
@@ -72,13 +77,13 @@
   "action": {
     "expand_all": "Expandir tudo",
     "collapse_all": "Recolher tudo",
-    "collapse_sidebar": "Ocultar a Barra Lateral",
+    "collapse_sidebar": "Ocultar barra lateral",
     "refresh_workspace": "Atualizar espaço de trabalho",
     "toggle_filter": "Alternar filtro",
     "remove_workspace": "Remover do histórico",
-    "recursive_expand": "Expandir subdiretórios recursivamente",
+    "recursive_expand": "Expansão recursiva",
     "recursive_open_all": "Abrir todos os arquivos recursivamente",
-    "toggle_toc": "Toggle Table of Contents"
+    "toggle_toc": "Alternar sumário"
   },
   "ai": {
     "ai_unconfigured": "[AI: não configurado]"
@@ -90,7 +95,7 @@
   },
   "settings": {
     "title": "Configurações",
-    "toc_visible": "Mostrar Índice",
+    "toc_visible": "Mostrar sumário",
     "theme": {
       "preset": "Predefinição de Tema",
       "dark_section": "Escuro",
@@ -110,9 +115,9 @@
       "pane_order": "Ordem dos Painéis",
       "editor_first": "Editor Primeiro",
       "preview_first": "Visualização Primeiro",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "Posição do sumário",
+      "left": "Esquerda",
+      "right": "Direita"
     },
     "preview": {
       "title": "Visualização",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "Ir para a aba anterior",
     "nav_next": "Ir para a próxima aba",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "Fechar",
+    "close_others": "Fechar outras",
+    "close_all": "Fechar todas",
+    "close_right": "Fechar à direita",
+    "close_left": "Fechar à esquerda",
+    "pin": "Fixar",
+    "unpin": "Desafixar",
+    "restore_closed": "Restaurar aba fechada"
   },
   "search": {
     "modal_title": "Buscar arquivos",
@@ -168,35 +173,43 @@
     "no_results": "Nenhum arquivo encontrado."
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "Sumário",
+    "empty": "Nenhum cabeçalho encontrado"
   },
   "about": {
-    "basic_info": "Basic Info",
-    "version": "Version",
+    "basic_info": "Informações básicas",
+    "version": "Versão",
     "build": "Build",
     "copyright": "Copyright",
     "runtime": "Runtime",
-    "platform": "Platform",
-    "architecture": "Architecture",
+    "platform": "Plataforma",
+    "architecture": "Arquitetura",
     "rust": "Rust",
-    "license": "License",
+    "license": "Licença",
     "links": "Links",
-    "source_code": "Source Code",
-    "documentation": "Documentation",
-    "report_issue": "Report Issue",
-    "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "source_code": "Código fonte",
+    "documentation": "Documentação",
+    "report_issue": "Relatar problema",
+    "support": "Suporte",
+    "sponsor": "Patrocinar",
+    "coming_soon": "Em breve"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "Atualização disponível",
+    "update_available_desc": "Uma nova versione do KatanA ({version}) está disponível. Execute `brew upgrade katana` para atualizar.",
+    "up_to_date": "Atualizado",
+    "up_to_date_desc": "O KatanA está atualizado.",
+    "failed_to_check": "Falha ao verificar atualizações.",
+    "action_close": "OK",
+    "title": "Verificar atualizações",
+    "checking_for_updates": "Verificando atualizações..."
+  },
+  "export": {
+    "success": "Exportado para {format} em: {path}",
+    "failed": "Exportação para {format} falhou: {error}",
+    "tool_missing": "Ferramenta '{tool}' not found. Instale-a (ex: `brew install wkhtmltopdf`) para exportar como {format}.",
+    "temp_file_error": "Falha ao criar arquivo temporário: {error}",
+    "write_error": "Falha ao gravar conteúdo: {error}",
+    "persist_error": "Falha ao persistir arquivo temporário"
   }
 }
