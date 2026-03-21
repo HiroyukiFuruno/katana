@@ -41,7 +41,9 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         katana_ui::i18n::set_language("en");
-        KatanaApp::new(state)
+        let mut app = KatanaApp::new(state);
+        app.skip_splash();
+        app
     })
 }
 
@@ -1340,7 +1342,9 @@ fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'sta
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         katana_ui::i18n::set_language("en");
-        KatanaApp::new(state)
+        let mut app = KatanaApp::new(state);
+        app.skip_splash();
+        app
     })
 }
 
