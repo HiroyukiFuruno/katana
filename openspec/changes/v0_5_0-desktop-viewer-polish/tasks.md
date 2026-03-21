@@ -26,8 +26,8 @@
 - [ ] 外部ツールが存在しない環境では、クラッシュせずに適切なエラーダイアログがユーザーに提示されること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
 - [ ] `.agents/skills/self-review/SKILL.md` を利用して自己レビューと品質確認を行うこと。
-- [ ] `.agents/skills/commit_and_push/SKILL.md` を利用してコミットとプッシュを行うこと。
-- [ ] `.agents/skills/create_pull_request/SKILL.md` を利用してタスクPRを作成すること。
+- [ ] `commit_and_push` スキルを利用してコミットとプッシュを行うこと。
+- [ ] `create_pull_request` スキルを利用してタスクPRを作成すること。
 - [ ] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
 
 ---
@@ -45,8 +45,8 @@
 - [ ] 一度同意すれば次回以降の起動時はスキップされること（ただし規約バージョンが上がった場合は再提示されること）。
 - [ ] `make check-local` が exit 0 で全てパスすること。
 - [ ] `.agents/skills/self-review/SKILL.md` を利用して自己レビューと品質確認を行うこと。
-- [ ] `.agents/skills/commit_and_push/SKILL.md` を利用してコミットとプッシュを行うこと。
-- [ ] `.agents/skills/create_pull_request/SKILL.md` を利用してタスクPRを作成すること。
+- [ ] `commit_and_push` スキルを利用してコミットとプッシュを行うこと。
+- [ ] `create_pull_request` スキルを利用してタスクPRを作成すること。
 - [ ] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
 
 ---
