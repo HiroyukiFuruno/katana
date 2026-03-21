@@ -3,7 +3,7 @@
 # KatanA — Release Automation
 # =============================================================================
 # This script automates the versioning, tagging, and pushing of a new release.
-# Usage: ./scripts/release.sh <VERSION>
+# Usage: ./scripts/release/release.sh <VERSION>
 # =============================================================================
 
 set -euo pipefail
@@ -24,6 +24,9 @@ error()   { echo "${RED}[ERROR]${RESET} $*" >&2; }
 header()  { echo "\n${BOLD}${CYAN}==> $*${RESET}"; }
 
 confirm() {
+  if [[ "${FORCE:-0}" = "1" ]]; then
+    return 0
+  fi
   local prompt="${1:-Proceed?}"
   printf "%s [Y/n]: " "$prompt"
   read -r reply
@@ -34,13 +37,21 @@ confirm() {
 }
 
 # ── Argument Validation ───────────────────────────────────────────────────────
-VERSION=$1
+VERSION=${1:-$VERSION}
+USE_GITHUB_WORKFLOW=${USE_GITHUB_WORKFLOW:-${2:-0}}
+FORCE=${FORCE:-${3:-0}}
+
 if [[ -z "$VERSION" ]]; then
-    error "VERSION is required. Usage: scripts/release.sh x.y.z"
+    error "VERSION is required. Usage: scripts/release/release.sh x.y.z [USE_GITHUB_WORKFLOW=1] [FORCE=1]"
     exit 1
 fi
 
 header "Releasing v${VERSION}"
+if [[ "$USE_GITHUB_WORKFLOW" = "1" ]]; then
+    info "Mode: GitHub Actions (CI) Release requested (USE_GITHUB_WORKFLOW=1)"
+else
+    info "Mode: Local Release"
+fi
 
 # ── 0. Check for existing tag ─────────────────────────────────────────────────
 TAG_EXISTS=false
@@ -138,14 +149,51 @@ else
     info "Reusing existing tag v${VERSION}."
 fi
 
-# ── 5. Push to remote ─────────────────────────────────────────────────────────
-if confirm "Push to origin?"; then
-    info "Pushing changes and tag..."
-    git push origin HEAD
-    git push origin "v${VERSION}"
-    success "Pushed to remote. GitHub Actions release workflow triggered."
+# ── 5. Push and/or Publish ────────────────────────────────────────────────────
+if [[ "$USE_GITHUB_WORKFLOW" = "1" ]]; then
+    # CI Release Path
+    if confirm "Push to origin to trigger CI release?"; then
+        info "Pushing changes and tag..."
+        git push origin HEAD --no-verify
+        git push origin "v${VERSION}" --no-verify
+        success "Pushed to remote. GitHub Actions release workflow triggered."
+    else
+        warn "Push skipped. You must push manually to trigger the release."
+    fi
 else
-    warn "Push skipped. You must push manually to trigger the release."
+    # Local Release Path
+    header "Building and Publishing locally..."
+    
+    info "Building DMG locally..."
+    make dmg
+
+    DMG_PATH=$(find target/release -name "KatanA-Desktop-*.dmg" -maxdepth 1 | sort -V | tail -1)
+    if [[ -z "$DMG_PATH" ]]; then
+        error "Local DMG build failed or file not found."
+        exit 1
+    fi
+    success "Local DMG built: $DMG_PATH"
+
+    RELEASE_NOTES_PATH="/tmp/RELEASE_NOTES_${VERSION}.md"
+    info "Extracting release notes..."
+    ./scripts/release/extract-notes.sh "$VERSION" > "$RELEASE_NOTES_PATH"
+    
+    if confirm "Publish to GitHub and Update Homebrew now?"; then
+        ./scripts/release/publish-github.sh "$VERSION" "$DMG_PATH" "$RELEASE_NOTES_PATH"
+        
+        SHA256=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+        DMG_NAME=$(basename "$DMG_PATH")
+        ./scripts/release/update-homebrew.sh "$VERSION" "$SHA256" "$DMG_NAME"
+        
+        info "Pushing changes and tag to origin..."
+        git push origin HEAD --no-verify
+        git push origin "v${VERSION}" --no-verify
+        success "Local release and publication complete!"
+    else
+        warn "Publication skipped. You must publish manually."
+    fi
+    
+    rm -f "$RELEASE_NOTES_PATH"
 fi
 
 success "Release v${VERSION} process finished! 🚀"
