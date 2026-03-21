@@ -40,7 +40,7 @@ package-mac: ## Build macOS .app bundle (release)
 
 .PHONY: dmg
 dmg: package-mac ## Build macOS .dmg installer from .app bundle
-	scripts/dmg.sh $(VERSION)
+	@FORCE=$(FORCE) scripts/dmg.sh $(VERSION)
 
 # ---------- Release ----------
 

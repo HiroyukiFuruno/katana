@@ -33,10 +33,19 @@ info "Creating macOS DMG for v${VERSION}..."
 
 rm -f "${DMG_OUT}"
 
-if command -v create-dmg >/dev/null 2>&1; then
+# Determine builder (FORCE=1 skips create-dmg to avoid GUI window)
+if [[ "${FORCE:-0}" = "1" ]]; then
+    info "FORCE=1 detected: Skipping create-dmg to avoid GUI. Using hdiutil..."
+    USE_CREATE_DMG=false
+elif command -v create-dmg >/dev/null 2>&1; then
+    USE_CREATE_DMG=true
+else
+    USE_CREATE_DMG=false
+fi
+
+if [[ "$USE_CREATE_DMG" = "true" ]]; then
     info "Building DMG with create-dmg..."
     create-dmg \
-        --no-gui \
         --volname "KatanA Desktop ${VERSION}" \
         --window-pos 200 120 \
         --window-size 600 400 \
@@ -47,7 +56,7 @@ if command -v create-dmg >/dev/null 2>&1; then
         "${DMG_OUT}" \
         "${APP_BUNDLE}"
 else
-    warn "create-dmg not found, falling back to hdiutil..."
+    info "Using hdiutil fallback..."
     TMP_DMG=$(mktemp -d)/staging
     mkdir -p "$TMP_DMG"
     cp -R "${APP_BUNDLE}" "$TMP_DMG/"
