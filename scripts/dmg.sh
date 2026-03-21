@@ -36,6 +36,7 @@ rm -f "${DMG_OUT}"
 if command -v create-dmg >/dev/null 2>&1; then
     info "Building DMG with create-dmg..."
     create-dmg \
+        --no-gui \
         --volname "KatanA Desktop ${VERSION}" \
         --window-pos 200 120 \
         --window-size 600 400 \
