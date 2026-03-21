@@ -28,7 +28,7 @@
 - [x] `.agents/skills/self-review/SKILL.md` を利用して自己レビューと品質確認を行うこと。
 - [ ] `.agents/skills/commit_and_push/SKILL.md` を利用してコミットとプッシュを行うこと。
 - [ ] `.agents/skills/create_pull_request/SKILL.md` を利用してタスクPRを作成すること。
-- [ ] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
+- [x] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
 
 ---
 
