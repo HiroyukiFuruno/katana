@@ -1768,6 +1768,82 @@ impl eframe::App for KatanaApp {
         if !unprocessed_commands.is_empty() {
             ctx.output_mut(|o| o.commands.extend(unprocessed_commands));
         }
+
+        // --- Splash Screen Overlay ---
+        if let Some(start) = self.splash_start {
+            let elapsed = start.elapsed().as_secs_f32();
+            let opacity = crate::shell_logic::calculate_splash_opacity(elapsed);
+            let any_pressed =
+                ctx.input(|i| i.pointer.any_pressed() || i.key_pressed(egui::Key::Escape));
+
+            if opacity <= 0.0 || any_pressed {
+                self.splash_start = None;
+            } else {
+                egui::Area::new(egui::Id::new("splash_screen_area"))
+                    .order(egui::Order::Foreground)
+                    .interactable(true) // Consume interactions directly falling through
+                    .show(ctx, |ui| {
+                        const SPLASH_BG_DARK: u8 = 30;
+                        const SPLASH_BG_LIGHT: u8 = 240;
+                        const SPLASH_ICON_SIZE: f32 = 128.0;
+                        const SPLASH_ICON_SPACING: f32 = 16.0;
+                        const SPLASH_HEADING_SIZE: f32 = 32.0;
+                        const SPLASH_HEADING_SPACING: f32 = 8.0;
+                        const SPLASH_VERSION_SIZE: f32 = 16.0;
+
+                        let is_dark = ctx.style().visuals.dark_mode;
+                        let content_rect = ctx.content_rect();
+                        let bg_color = if is_dark {
+                            egui::Color32::from_rgb(SPLASH_BG_DARK, SPLASH_BG_DARK, SPLASH_BG_DARK)
+                        } else {
+                            egui::Color32::from_rgb(
+                                SPLASH_BG_LIGHT,
+                                SPLASH_BG_LIGHT,
+                                SPLASH_BG_LIGHT,
+                            )
+                        };
+                        let fill_color = bg_color.gamma_multiply(opacity);
+                        ui.painter().rect_filled(content_rect, 0.0, fill_color);
+
+                        let text_color = if is_dark {
+                            egui::Color32::WHITE
+                        } else {
+                            egui::Color32::BLACK
+                        }
+                        .gamma_multiply(opacity);
+
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
+                            ui.centered_and_justified(|ui| {
+                                ui.vertical_centered(|ui| {
+                                    if let Some(tex) = &self.about_icon {
+                                        ui.image(egui::load::SizedTexture::new(
+                                            tex.id(),
+                                            egui::vec2(SPLASH_ICON_SIZE, SPLASH_ICON_SIZE),
+                                        ));
+                                        ui.add_space(SPLASH_ICON_SPACING);
+                                    }
+                                    let heading =
+                                        egui::RichText::new(crate::about_info::APP_DISPLAY_NAME)
+                                            .strong()
+                                            .size(SPLASH_HEADING_SIZE)
+                                            .color(text_color);
+                                    ui.label(heading);
+
+                                    ui.add_space(SPLASH_HEADING_SPACING);
+
+                                    let version_str =
+                                        format!("Version {}", env!("CARGO_PKG_VERSION"));
+                                    let version = egui::RichText::new(version_str)
+                                        .size(SPLASH_VERSION_SIZE)
+                                        .color(text_color);
+                                    ui.label(version);
+                                });
+                            });
+                        });
+                    });
+                ctx.request_repaint();
+            }
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

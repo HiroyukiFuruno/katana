@@ -27,16 +27,16 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 2. スプラッシュスクリーン
 
-- [ ] 2.1 起動時（eguiの初期フレーム）に約1.5秒間（初回の画面表示のロードをバックグラウンドで行うこと、メインのウィンドを非表示で開き1.5秒経過後に表示にすると複雑な制御が不要になると思われる。）、アイコン＋バージョン番号を表示する
-- [ ] 2.2 フレーム推移によりフェードアウトさせるアニメーションを実装
-- [ ] 2.3 画面クリックによるスプラッシュのスキップ機能を実装
+- [x] 2.1 起動時（eguiの初期フレーム）に約1.5秒間（初回の画面表示のロードをバックグラウンドで行うこと、メインのウィンドを非表示で開き1.5秒経過後に表示にすると複雑な制御が不要になると思われる。）、アイコン＋バージョン番号を表示する
+- [x] 2.2 フレーム推移によりフェードアウトさせるアニメーションを実装
+- [x] 2.3 画面クリックによるスプラッシュのスキップ機能を実装
 
 ### Definition of Done (DoD)
 
-- [ ] アプリ起動時に独立したスプラッシュ画面が表示され、その後メインUIに遷移すること。
-- [ ] ユーザーのクリック操作で瞬時にスキップできること。
-- [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] アプリ起動時に独立したスプラッシュ画面が表示され、その後メインUIに遷移すること。
+- [x] ユーザーのクリック操作で瞬時にスキップできること。
+- [x] `make check-local` が exit 0 で全てパスすること。
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
