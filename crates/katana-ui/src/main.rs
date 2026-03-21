@@ -379,7 +379,7 @@ mod tests {
     ];
 
     #[test]
-    fn test_proportional_font_is_first_in_proportional_family() {
+    fn test_proportional_font_is_primary_in_proportional_family() {
         init_tracing();
         if load_first_font(PROP_CANDIDATES).is_none() {
             return;
@@ -391,13 +391,14 @@ mod tests {
             .expect("Proportional family missing");
         let loaded_name = load_first_font(PROP_CANDIDATES).unwrap().0;
         assert_eq!(
-            proportional[0], loaded_name,
-            "Proportional font must be at position 0 in Proportional family"
+            proportional.first().unwrap(),
+            &loaded_name,
+            "CJK font SHOULD be at position 0 to dictate proper row height and fix jitter"
         );
     }
 
     #[test]
-    fn test_monospace_font_is_first_in_monospace_family() {
+    fn test_monospace_font_is_primary_in_monospace_family() {
         init_tracing();
         if load_first_font(MONO_CANDIDATES).is_none() {
             return;
@@ -409,8 +410,9 @@ mod tests {
             .expect("Monospace family missing");
         let mono_name = load_first_font(MONO_CANDIDATES).unwrap().0;
         assert_eq!(
-            monospace[0], mono_name,
-            "Monospace font (e.g. Menlo) must be at position 0 in Monospace family"
+            monospace.first().unwrap(),
+            &mono_name,
+            "Monospace CJK font SHOULD be at position 0 to provide correct line height"
         );
     }
 
@@ -427,13 +429,17 @@ mod tests {
             .get(&egui::FontFamily::Monospace)
             .expect("Monospace family missing");
         let prop_name = load_first_font(PROP_CANDIDATES).unwrap().0;
+        let mono_fallback_name = format!("{}_mono_fallback", prop_name);
         assert!(
-            monospace.contains(&prop_name),
+            monospace.contains(&mono_fallback_name),
             "Proportional font should be in Monospace family as CJK fallback"
         );
         let mono_name = load_first_font(MONO_CANDIDATES).unwrap().0;
         let mono_pos = monospace.iter().position(|n| n == &mono_name).unwrap();
-        let prop_pos = monospace.iter().position(|n| n == &prop_name).unwrap();
+        let prop_pos = monospace
+            .iter()
+            .position(|n| n == &mono_fallback_name)
+            .unwrap();
         assert!(
             mono_pos < prop_pos,
             "Monospace font must appear before proportional (CJK fallback)"

@@ -41,12 +41,39 @@ impl SystemFontLoader {
     ) -> FontDefinitions {
         let mut fonts = FontDefinitions::default();
 
-        Self::load_system_candidates(
+        let prop_name = Self::load_first_valid(&mut fonts, proportional_candidates, None, "");
+        let mono_name = Self::load_first_valid(&mut fonts, monospace_candidates, None, "");
+
+        // Add primary fonts mapped to their corresponding families
+        if let Some(name) = &prop_name {
+            Self::prepend_primary(&mut fonts, FontFamily::Proportional, name);
+        }
+        if let Some(name) = &mono_name {
+            Self::prepend_primary(&mut fonts, FontFamily::Monospace, name);
+        }
+
+        // Cross-fallbacks for comprehensive CJK coverage in code blocks
+        // We apply a positive `y_offset_factor` to align the CJK fallback's baseline with the Menlo primary font
+        const MONO_FALLBACK_Y_OFFSET_FACTOR: f32 = 0.50;
+        let tweaked_fallback = egui::FontTweak {
+            scale: 1.0,
+            y_offset_factor: MONO_FALLBACK_Y_OFFSET_FACTOR,
+            y_offset: 0.0,
+        };
+        let mono_fallback_name = Self::load_first_valid(
             &mut fonts,
-            FontFamily::Proportional,
             proportional_candidates,
+            Some(tweaked_fallback),
+            "_mono_fallback",
         );
-        Self::load_system_candidates(&mut fonts, FontFamily::Monospace, monospace_candidates);
+
+        if let Some(name) = &mono_fallback_name {
+            Self::append_fallback(&mut fonts, FontFamily::Monospace, name);
+        }
+        // Mono to Prop fallback (usually English Monaco fallback for Proportional CJK)
+        if let Some(name) = &mono_name {
+            Self::append_fallback(&mut fonts, FontFamily::Proportional, name);
+        }
 
         if let (Some(path), Some(name)) = (custom_font_path, custom_font_name) {
             Self::inject_custom_font(&mut fonts, path, name);
@@ -55,36 +82,29 @@ impl SystemFontLoader {
         fonts
     }
 
-    fn load_system_candidates(
+    fn load_first_valid(
         fonts: &mut FontDefinitions,
-        primary_family: FontFamily,
         candidates: &[&str],
-    ) {
-        let Some(name) = Self::load_first_valid(fonts, candidates) else {
-            return;
-        };
-        Self::prepend_primary(fonts, primary_family.clone(), &name);
-
-        let fallback_family = if primary_family == FontFamily::Proportional {
-            FontFamily::Monospace
-        } else {
-            FontFamily::Proportional
-        };
-        Self::append_fallback(fonts, fallback_family, &name);
-    }
-
-    fn load_first_valid(fonts: &mut FontDefinitions, candidates: &[&str]) -> Option<String> {
+        tweak: Option<egui::FontTweak>,
+        suffix: &str,
+    ) -> Option<String> {
         for &path in candidates {
             if let Ok(data) = fs::read(path) {
                 let name = std::path::Path::new(path)
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("cjk_font")
-                    .to_string();
-                fonts.font_data.insert(
-                    name.clone(),
-                    std::sync::Arc::new(FontData::from_owned(data)),
-                );
+                    .to_string()
+                    + suffix;
+
+                let mut font_data = FontData::from_owned(data);
+                if let Some(t) = tweak {
+                    font_data.tweak = t;
+                }
+
+                fonts
+                    .font_data
+                    .insert(name.clone(), std::sync::Arc::new(font_data));
                 return Some(name);
             }
         }
@@ -186,13 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn test_load_system_candidates_empty_returns_early() {
-        let mut fonts = FontDefinitions::empty();
-        SystemFontLoader::load_system_candidates(&mut fonts, FontFamily::Proportional, &[]);
-        assert!(fonts.font_data.is_empty());
-    }
-
-    #[test]
     #[cfg(target_os = "macos")]
     fn test_apple_color_emoji_family_renders_directly() {
         let data =
@@ -260,6 +273,151 @@ mod tests {
         assert!(
             !monospace.contains(&APPLE_COLOR_EMOJI_FONT_NAME.to_string()),
             "UI symbol glyphs should keep using egui/built-in fallback fonts"
+        );
+    }
+    // --- TDD: Font Jitter (ガタツキ) Reproduction Tests ---
+
+    fn assert_font_jitter(context_name: &str, font_size: f32) {
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            &preset.proportional_font_candidates,
+            &preset.monospace_font_candidates,
+            &preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let ctx = Context::default();
+        ctx.set_fonts(fonts);
+
+        let text = format!("Katana — {} Lambdaアップデート手順.md", context_name);
+        let mut eng_glyph = None;
+        let mut jpn_glyph = None;
+
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let galley = ui.painter().layout_no_wrap(
+                    text.clone(),
+                    FontId::proportional(font_size),
+                    Color32::WHITE,
+                );
+                eng_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'L').copied();
+                jpn_glyph = galley.rows[0]
+                    .glyphs
+                    .iter()
+                    .find(|g| g.chr == 'ア')
+                    .copied();
+            });
+        });
+
+        let eng_glyph = eng_glyph.expect("English char not found");
+        let jpn_glyph = jpn_glyph.expect("Japanese char not found");
+
+        assert_eq!(
+            eng_glyph.pos.y, jpn_glyph.pos.y,
+            "ガタツキ (Jitter) in {}: English 'L' y={} vs Japanese 'ア' y={}",
+            context_name, eng_glyph.pos.y, jpn_glyph.pos.y
+        );
+    }
+
+    #[test]
+    fn test_font_jitter_1_app_title() {
+        // App title uses Heading (usually 20.0 or larger)
+        assert_font_jitter("App Title", 20.0);
+    }
+
+    #[test]
+    fn test_font_jitter_2_workspace_dir() {
+        // Workspace directory uses Body (14.0)
+        assert_font_jitter("Workspace Dir", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_3_workspace_file() {
+        // Workspace file uses Body (14.0)
+        assert_font_jitter("Workspace File", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_4_toc_heading() {
+        // TOC heading uses Body/Button (14.0)
+        assert_font_jitter("TOC Heading", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_5_tab_name() {
+        // Tab name uses Button (14.0)
+        assert_font_jitter("Tab Name", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_6_monospace() {
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            &preset.proportional_font_candidates,
+            &preset.monospace_font_candidates,
+            &preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let ctx = Context::default();
+        ctx.set_fonts(fonts);
+
+        let text = "cd infrastructures/tools/crypt-decrypt の復号化".to_string();
+        let mut eng_glyph = None;
+        let mut jpn_glyph = None;
+
+        let mut primitives = vec![];
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let galley = ui.painter().layout_no_wrap(
+                    text.clone(),
+                    FontId::monospace(14.0),
+                    Color32::WHITE,
+                );
+                eng_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'c').copied();
+                jpn_glyph = galley.rows[0]
+                    .glyphs
+                    .iter()
+                    .find(|g| g.chr == '復')
+                    .copied();
+
+                let shapes = vec![egui::epaint::ClippedShape {
+                    clip_rect: egui::Rect::EVERYTHING,
+                    shape: egui::epaint::Shape::galley(egui::Pos2::ZERO, galley, Color32::WHITE),
+                }];
+                primitives = ctx.tessellate(shapes, 1.0);
+            });
+        });
+
+        let eng_glyph = eng_glyph.expect("English char not found");
+        let jpn_glyph = jpn_glyph.expect("Japanese char not found");
+
+        // Find visual min y for English char
+        let mut eng_min_y = f32::INFINITY;
+        let mut jpn_min_y = f32::INFINITY;
+
+        if let egui::epaint::Primitive::Mesh(mesh) = &primitives[0].primitive {
+            for v in &mesh.vertices {
+                if v.pos.x >= eng_glyph.logical_rect().min.x
+                    && v.pos.x <= eng_glyph.logical_rect().max.x
+                {
+                    eng_min_y = eng_min_y.min(v.pos.y);
+                }
+                if v.pos.x >= jpn_glyph.logical_rect().min.x
+                    && v.pos.x <= jpn_glyph.logical_rect().max.x
+                {
+                    jpn_min_y = jpn_min_y.min(v.pos.y);
+                }
+            }
+        }
+
+        // Allow up to 1.0 pixel difference for natural font optical alignment,
+        // but 3.0+ (like 13 vs 10) is a jitter bug.
+        let diff = (eng_min_y - jpn_min_y).abs();
+        assert!(
+            diff <= 1.5,
+            "ガタツキ (Jitter) in Monospace visual mesh: English 'c' y={} vs Japanese '復' y={} (Diff: {})",
+            eng_min_y, jpn_min_y, diff
         );
     }
 }

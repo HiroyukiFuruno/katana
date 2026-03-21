@@ -756,15 +756,99 @@ pub(crate) fn render_editor_content(
         }
 
         let output = scroll_area.show(ui, |ui| {
-            let response = ui.add(
-                egui::TextEdit::multiline(&mut buffer)
+            ui.horizontal_top(|ui| {
+                const LINE_NUMBER_MARGIN: f32 = 40.0;
+                const LINE_NUMBER_PAD_RIGHT: f32 = 8.0;
+                let left_margin = LINE_NUMBER_MARGIN;
+                let (ln_rect, _) =
+                    ui.allocate_exact_size(egui::vec2(left_margin, 0.0), egui::Sense::hover());
+                let text_output = egui::TextEdit::multiline(&mut buffer)
                     .font(egui::TextStyle::Monospace)
                     .desired_width(f32::INFINITY)
-                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS),
-            );
-            if response.changed() {
-                *action = AppAction::UpdateBuffer(buffer);
-            }
+                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS)
+                    .frame(false)
+                    .show(ui);
+                let response = text_output.response;
+                let galley = text_output.galley;
+
+                // Draw current line background
+                let mut current_cursor_y = None;
+                if let Some(c) = text_output.cursor_range {
+                    let cursor_rect = galley.pos_from_cursor(c.primary);
+                    current_cursor_y = Some(cursor_rect.min.y);
+
+                    let min_y = cursor_rect.min.y;
+                    let max_y = cursor_rect.max.y;
+
+                    let highlight_rect = egui::Rect::from_min_max(
+                        egui::pos2(ln_rect.min.x, response.rect.min.y + min_y),
+                        egui::pos2(response.rect.max.x, response.rect.min.y + max_y),
+                    );
+
+                    const HIGHLIGHT_ALPHA: u8 = 15;
+                    let highlight_color = if ui.visuals().dark_mode {
+                        egui::Color32::from_white_alpha(HIGHLIGHT_ALPHA)
+                    } else {
+                        egui::Color32::from_black_alpha(HIGHLIGHT_ALPHA)
+                    };
+                    ui.painter()
+                        .rect_filled(highlight_rect, 0.0, highlight_color);
+                }
+
+                // Draw line numbers
+                let clip_rect = ui.clip_rect().expand(100.0);
+
+                let mut p = 0;
+                let mut is_start_of_para = true;
+
+                for row in &galley.rows {
+                    let top_y = row.rect().min.y;
+                    let y = response.rect.min.y + top_y;
+
+                    if is_start_of_para
+                        && y <= clip_rect.max.y
+                        && (y + row.rect().height()) >= clip_rect.min.y
+                    {
+                        let is_current = current_cursor_y == Some(top_y);
+                        let text = format!("{}", p + 1);
+                        let color = if is_current {
+                            ui.visuals().text_color()
+                        } else {
+                            ui.visuals().weak_text_color()
+                        };
+                        let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+
+                        let label_rect = egui::Rect::from_min_size(
+                            egui::pos2(ln_rect.min.x, y),
+                            egui::vec2(left_margin - LINE_NUMBER_PAD_RIGHT, row.rect().height()),
+                        );
+                        let mut text_rt = egui::RichText::new(text).color(color).font(font_id);
+                        if is_current {
+                            text_rt = text_rt.strong();
+                        }
+                        let label = egui::Label::new(text_rt).selectable(false);
+                        // align right
+                        let galley_ln = label.layout_in_ui(ui);
+                        let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
+                        ui.put(
+                            label_rect.translate(egui::vec2(offset_x, 0.0)),
+                            egui::Label::new(galley_ln.1),
+                        ); // just use the laid out text or label again
+                    }
+
+                    is_start_of_para = row.ends_with_newline;
+                    if row.ends_with_newline {
+                        p += 1;
+                    }
+                }
+
+                if response.changed() {
+                    *action = AppAction::UpdateBuffer(buffer);
+                }
+
+                response
+            })
+            .inner
         });
 
         if sync_scroll {
@@ -1684,6 +1768,11 @@ impl eframe::App for KatanaApp {
         if !unprocessed_commands.is_empty() {
             ctx.output_mut(|o| o.commands.extend(unprocessed_commands));
         }
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // Persist the open tabs state right before the application process is terminated
+        self.save_workspace_state();
     }
 }
 
@@ -2704,6 +2793,7 @@ pub(crate) fn render_search_modal(
 }
 
 const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+const TOC_PANEL_MARGIN: f32 = 8.0;
 const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
 const TOC_INDENT_PER_LEVEL: f32 = 12.0;
 
@@ -2720,7 +2810,10 @@ pub(crate) fn render_toc_panel(
         TocPosition::Right => egui::SidePanel::right("toc_panel"),
     };
 
+    let frame = egui::Frame::side_top_panel(&ctx.style()).inner_margin(TOC_PANEL_MARGIN);
+
     panel
+        .frame(frame)
         .resizable(true)
         .default_width(TOC_PANEL_DEFAULT_WIDTH)
         .show(ctx, |ui| {

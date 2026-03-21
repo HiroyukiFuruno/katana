@@ -389,6 +389,60 @@ fn test_integration_settings_window() {
 }
 
 #[test]
+fn test_integration_editor_line_numbers_and_highlight() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    // Create a markdown file with 3 lines
+    let temp_dir = std::env::temp_dir().join("katana_test_editor_lines");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let test_file = temp_dir.join("lines.md");
+    std::fs::write(&test_file, "Line 1\nLine 2\nLine 3").unwrap();
+
+    // Open workspace and file
+    harness
+        .state_mut()
+        .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
+    wait_for_workspace_load(&mut harness);
+    let abs_path = test_file.canonicalize().unwrap_or(test_file);
+    harness
+        .state_mut()
+        .trigger_action(AppAction::SelectDocument(abs_path));
+    harness.step();
+    harness.step();
+
+    // Switch to CodeOnly mode to view editor
+    harness
+        .state_mut()
+        .app_state_mut()
+        .set_active_view_mode(ViewMode::CodeOnly);
+    harness.step();
+    harness.step();
+
+    // The line numbers 1, 2, and 3 should be rendered as distinct UI elements (labels).
+    // kittest get_all_by_text returns nodes containing the exact text.
+    let count_1 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        harness.get_all_by_label("1").count()
+    }))
+    .unwrap_or(0);
+    let count_2 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        harness.get_all_by_label("2").count()
+    }))
+    .unwrap_or(0);
+    let count_3 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        harness.get_all_by_label("3").count()
+    }))
+    .unwrap_or(0);
+
+    assert!(count_1 > 0, "Line number 1 should be visible");
+    assert!(count_2 > 0, "Line number 2 should be visible");
+    assert!(count_3 > 0, "Line number 3 should be visible");
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
 fn test_integration_workspace_directory_toggle_non_recursive() {
     let mut harness = setup_harness();
     harness.step();

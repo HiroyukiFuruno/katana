@@ -465,7 +465,7 @@ impl KatanaApp {
         }
     }
 
-    fn save_workspace_state(&mut self) {
+    pub(crate) fn save_workspace_state(&mut self) {
         let open_tabs: Vec<String> = self
             .state
             .open_documents

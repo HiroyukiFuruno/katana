@@ -2,6 +2,52 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.3.1] - 2026-03-21
+
+### 🚀 Features
+
+- Add `FORCE=1` option to `make release` to skip all interactive confirmation prompts
+- Implement `USE_GITHUB_WORKFLOW` flag to conditionally trigger GitHub Actions release
+
+### ♻️ Refactoring
+
+- Modularize release logic into independent scripts under `scripts/release/`
+- Move main release control script to `scripts/release/release.sh`
+
+### 🔧 Miscellaneous
+
+- Skip Git hooks (`--no-verify`) during release push as quality checks are pre-verified
+- Enable full local release flow (DMG build, GitHub publication, Homebrew update) as default
+
+## [0.3.0] - 2026-03-21
+
+### 🚀 Features
+
+- Implement Tab Context Menu (Close, Close Others, Close All) and Tab Restoration actions
+- Support automatic restoration of previously opened workspace tabs on startup
+- Add Editor Table of Contents (TOC) side panel with setting persistence and i18n support
+- Enable Editor Line Numbers and Current Line Highlighting features
+
+### 🐛 Bug Fixes
+
+- Resolve Japanese CJK font baseline jitter (ガタツキ) in UI components
+- Prevent TOC side panel auto-expansion and ignore YAML frontmatter in outline
+- Allow dead_code for macOS specific emoji rendering constants on Linux CI
+
+### 📚 Documentation
+
+- Add implementation plan workflow and exclude related artifacts
+- Enforce prohibition rule against deleting flaky tests in coding rules
+
+### 👷 CI/CD
+
+- Fix missing tool argument for cargo-llvm-cov in install-action
+
+### 🔧 Miscellaneous
+
+- Restore signed tag generation config after GPG environment setup
+- Update dependencies (rustls-webpki)
+
 ## [0.2.1] - 2026-03-21
 
 ### 🚀 Features
