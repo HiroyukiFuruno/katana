@@ -1,147 +1,155 @@
 {
-    "menu": {
-        "file": "Arquivo",
-        "settings": "Configurações",
-        "language": "Idioma (Language)",
-        "open_workspace": "Abrir Espaço de Trabalho…",
-        "save": "Salvar",
-        "open_all": "Abrir tudo"
+  "menu": {
+    "file": "Arquivo",
+    "settings": "Configurações",
+    "language": "Idioma (Language)",
+    "open_workspace": "Abrir Espaço de Trabalho…",
+    "save": "Salvar",
+    "open_all": "Abrir tudo"
+  },
+  "workspace": {
+    "no_workspace_open": "Nenhum espaço de trabalho aberto.",
+    "no_document_selected": "Nenhum documento aberto.",
+    "workspace_title": "Espaço de Trabalho",
+    "recent_workspaces": "Espaços de trabalho recentes",
+    "metadata_tooltip": "Tamanho: {size} B\nModificado: {mod_time}"
+  },
+  "preview": {
+    "preview_title": "Visualização",
+    "refresh_diagrams": "Atualizar diagramas",
+    "rendering": "Renderizando {kind}...",
+    "no_preview": "(Sem visualização)"
+  },
+  "plantuml": {
+    "downloading_plantuml": "⬇ Baixando PlantUML JAR...",
+    "plantuml_installed": "✅ PlantUML instalado. Atualizando visualização...",
+    "download_error": "❌ Erro no download: "
+  },
+  "view_mode": {
+    "preview": "Visualização",
+    "code": "Código",
+    "split": "Dividir"
+  },
+  "split_toggle": {
+    "horizontal": "Mudar para divisão horizontal (esquerda/direita)",
+    "vertical": "Mudar para divisão vertical (cima/baixo)",
+    "editor_first": "Colocar o editor à esquerda/cima",
+    "preview_first": "Colocar a visualização à esquerda/cima"
+  },
+  "error": {
+    "missing_dependency": "⚠️ {tool_name} não encontrado. Por favor, instale usando {install_hint}.",
+    "curl_launch_failed": "Falha ao iniciar o curl",
+    "download_failed": "Falha no download",
+    "render_error": "⚠ [{kind}] {message}"
+  },
+  "status": {
+    "ready": "Pronto",
+    "saved": "Salvo.",
+    "save_failed": "Falha ao salvar: {error}",
+    "opened_workspace": "Espaço de trabalho aberto: {name}",
+    "cannot_open_workspace": "Não foi possível abrir o espaço de trabalho: {error}",
+    "cannot_open_file": "Não foi possível abrir o arquivo: {error}"
+  },
+  "action": {
+    "expand_all": "Expandir tudo",
+    "collapse_all": "Recolher tudo",
+    "collapse_sidebar": "Ocultar a Barra Lateral",
+    "refresh_workspace": "Atualizar espaço de trabalho",
+    "toggle_filter": "Alternar filtro",
+    "remove_workspace": "Remover do histórico",
+    "recursive_expand": "Expandir subdiretórios recursivamente",
+    "recursive_open_all": "Abrir todos os arquivos recursivamente",
+    "toggle_toc": "Toggle Table of Contents"
+  },
+  "ai": {
+    "ai_unconfigured": "[AI: não configurado]"
+  },
+  "tool": {
+    "not_installed": "⚠ {tool} não está instalado",
+    "install_path": "Caminho de instalação: {path}",
+    "download": "⬇ Baixar {tool}"
+  },
+  "settings": {
+    "title": "Configurações",
+    "toc_visible": "Mostrar Índice",
+    "theme": {
+      "preset": "Predefinição de Tema",
+      "dark_section": "Escuro",
+      "light_section": "Claro",
+      "custom_colors": "Cores Personalizadas",
+      "reset_custom": "Restaurar Predefinições"
     },
-    "workspace": {
-        "no_workspace_open": "Nenhum espaço de trabalho aberto.",
-        "no_document_selected": "Nenhum documento aberto.",
-        "workspace_title": "Espaço de Trabalho",
-        "recent_workspaces": "Espaços de trabalho recentes",
-        "metadata_tooltip": "Tamanho: {size} B\nModificado: {mod_time}"
+    "font": {
+      "size": "Tamanho da Fonte",
+      "family": "Fonte",
+      "size_slider_hint": "Arraste para a esquerda ou direita para ajustar"
+    },
+    "layout": {
+      "split_direction": "Direção da Divisão",
+      "horizontal": "Horizontal (Esquerda / Direita)",
+      "vertical": "Vertical (Cima / Baixo)",
+      "pane_order": "Ordem dos Painéis",
+      "editor_first": "Editor Primeiro",
+      "preview_first": "Visualização Primeiro",
+      "toc_position": "TOC Position",
+      "left": "Left",
+      "right": "Right"
     },
     "preview": {
-        "preview_title": "Visualização",
-        "refresh_diagrams": "Atualizar diagramas",
-        "rendering": "Renderizando {kind}...",
-        "no_preview": "(Sem visualização)"
+      "title": "Visualização",
+      "heading": "# Exemplo de Título",
+      "normal_text": "Texto normal e ",
+      "accent_link": "link destacado",
+      "secondary_text": "Exemplo de texto secundário",
+      "code_sample": "fn main() { println!(\"Olá!\"); }"
     },
-    "plantuml": {
-        "downloading_plantuml": "⬇ Baixando PlantUML JAR...",
-        "plantuml_installed": "✅ PlantUML instalado. Atualizando visualização...",
-        "download_error": "❌ Erro no download: "
+    "color": {
+      "background": "Fundo",
+      "panel_background": "Fundo do Painel",
+      "text": "Texto",
+      "text_secondary": "Texto Secundário",
+      "accent": "Destaque",
+      "border": "Borda",
+      "selection": "Seleção",
+      "code_background": "Fundo do Código",
+      "preview_background": "Fundo da Visualização"
     },
-    "view_mode": {
-        "preview": "Visualização",
-        "code": "Código",
-        "split": "Dividir"
-    },
-    "split_toggle": {
-        "horizontal": "Mudar para divisão horizontal (esquerda/direita)",
-        "vertical": "Mudar para divisão vertical (cima/baixo)",
-        "editor_first": "Colocar o editor à esquerda/cima",
-        "preview_first": "Colocar a visualização à esquerda/cima"
-    },
-    "error": {
-        "missing_dependency": "⚠️ {tool_name} não encontrado. Por favor, instale usando {install_hint}.",
-        "curl_launch_failed": "Falha ao iniciar o curl",
-        "download_failed": "Falha no download",
-        "render_error": "⚠ [{kind}] {message}"
-    },
-    "status": {
-        "ready": "Pronto",
-        "saved": "Salvo.",
-        "save_failed": "Falha ao salvar: {error}",
-        "opened_workspace": "Espaço de trabalho aberto: {name}",
-        "cannot_open_workspace": "Não foi possível abrir o espaço de trabalho: {error}",
-        "cannot_open_file": "Não foi possível abrir o arquivo: {error}"
-    },
-    "action": {
-        "expand_all": "Expandir tudo",
-        "collapse_all": "Recolher tudo",
-        "collapse_sidebar": "Ocultar a Barra Lateral",
-        "refresh_workspace": "Atualizar espaço de trabalho",
-        "toggle_filter": "Alternar filtro",
-        "remove_workspace": "Remover do histórico",
-        "recursive_expand": "Expandir subdiretórios recursivamente",
-        "recursive_open_all": "Abrir todos os arquivos recursivamente"
-    },
-    "ai": {
-        "ai_unconfigured": "[AI: não configurado]"
-    },
-    "tool": {
-        "not_installed": "⚠ {tool} não está instalado",
-        "install_path": "Caminho de instalação: {path}",
-        "download": "⬇ Baixar {tool}"
-    },
-    "settings": {
-        "title": "Configurações",
-        "toc_visible": "Mostrar Índice",
-        "theme": {
-            "preset": "Predefinição de Tema",
-            "dark_section": "Escuro",
-            "light_section": "Claro",
-            "custom_colors": "Cores Personalizadas",
-            "reset_custom": "Restaurar Predefinições"
-        },
-        "font": {
-            "size": "Tamanho da Fonte",
-            "family": "Fonte",
-            "size_slider_hint": "Arraste para a esquerda ou direita para ajustar"
-        },
-        "layout": {
-            "split_direction": "Direção da Divisão",
-            "horizontal": "Horizontal (Esquerda / Direita)",
-            "vertical": "Vertical (Cima / Baixo)",
-            "pane_order": "Ordem dos Painéis",
-            "editor_first": "Editor Primeiro",
-            "preview_first": "Visualização Primeiro"
-        },
-        "preview": {
-            "title": "Visualização",
-            "heading": "# Exemplo de Título",
-            "normal_text": "Texto normal e ",
-            "accent_link": "link destacado",
-            "secondary_text": "Exemplo de texto secundário",
-            "code_sample": "fn main() { println!(\"Olá!\"); }"
-        },
-        "color": {
-            "background": "Fundo",
-            "panel_background": "Fundo do Painel",
-            "text": "Texto",
-            "text_secondary": "Texto Secundário",
-            "accent": "Destaque",
-            "border": "Borda",
-            "selection": "Seleção",
-            "code_background": "Fundo do Código",
-            "preview_background": "Fundo da Visualização"
-        },
-        "tabs": [
-            {
-                "key": "theme",
-                "name": "Tema"
-            },
-            {
-                "key": "font",
-                "name": "Fonte"
-            },
-            {
-                "key": "layout",
-                "name": "Layout"
-            }
-        ]
-    },
-    "tab": {
-        "nav_prev": "Ir para a aba anterior",
-        "nav_next": "Ir para a próxima aba",
-        "close": "Close",
-        "close_others": "Close Others",
-        "close_all": "Close All",
-        "close_right": "Close Right",
-        "close_left": "Close Left",
-        "pin": "Pin",
-        "unpin": "Unpin",
-        "restore_closed": "Restore Closed Tab"
-    },
-    "search": {
-        "modal_title": "Buscar arquivos",
-        "query_hint": "Digite para buscar pelo nome do arquivo...",
-        "include_pattern_hint": "Incluir (regex, separado por vírgulas)",
-        "exclude_pattern_hint": "Excluir (regex, separado por vírgulas)",
-        "no_results": "Nenhum arquivo encontrado."
-    }
+    "tabs": [
+      {
+        "key": "theme",
+        "name": "Tema"
+      },
+      {
+        "key": "font",
+        "name": "Fonte"
+      },
+      {
+        "key": "layout",
+        "name": "Layout"
+      }
+    ]
+  },
+  "tab": {
+    "nav_prev": "Ir para a aba anterior",
+    "nav_next": "Ir para a próxima aba",
+    "close": "Close",
+    "close_others": "Close Others",
+    "close_all": "Close All",
+    "close_right": "Close Right",
+    "close_left": "Close Left",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "restore_closed": "Restore Closed Tab"
+  },
+  "search": {
+    "modal_title": "Buscar arquivos",
+    "query_hint": "Digite para buscar pelo nome do arquivo...",
+    "include_pattern_hint": "Incluir (regex, separado por vírgulas)",
+    "exclude_pattern_hint": "Excluir (regex, separado por vírgulas)",
+    "no_results": "Nenhum arquivo encontrado."
+  },
+  "toc": {
+    "title": "Table of Contents",
+    "empty": "No headings found."
+  }
 }

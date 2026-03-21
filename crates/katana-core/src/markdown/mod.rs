@@ -6,6 +6,7 @@ pub mod color_preset;
 pub mod diagram;
 pub mod drawio_renderer;
 pub mod mermaid_renderer;
+pub mod outline;
 pub mod plantuml_renderer;
 pub mod svg_rasterize;
 

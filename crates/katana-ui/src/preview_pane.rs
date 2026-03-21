@@ -9,6 +9,7 @@
 use eframe::egui::{self, ScrollArea};
 use egui_commonmark::CommonMarkCache;
 use katana_core::markdown::diagram::DiagramKind;
+use katana_core::markdown::outline::OutlineItem;
 use katana_core::{
     markdown::{
         diagram::{DiagramBlock, DiagramResult},
@@ -71,6 +72,10 @@ pub struct DownloadRequest {
 pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
     pub sections: Vec<RenderedSection>,
+    pub outline_items: Vec<OutlineItem>,
+    pub heading_rects: Vec<egui::Rect>,
+    pub visible_rect: Option<egui::Rect>,
+    pub scroll_request: Option<usize>,
     /// Channel for background rendering completion notifications.
     pub render_rx: Option<std::sync::mpsc::Receiver<RenderMessage>>,
     /// Path to the currently previewed Markdown file (for resolving relative paths in render_html_fn).
@@ -97,6 +102,7 @@ impl PreviewPane {
     /// Immediately updates only text sections from the Markdown source (diagrams are preserved).
     pub fn update_markdown_sections(&mut self, source: &str, md_file_path: &std::path::Path) {
         self.md_file_path = md_file_path.to_path_buf();
+        self.outline_items = katana_core::markdown::outline::extract_outline(source);
         let resolved = resolve_image_paths(source, md_file_path);
         let flattened = flatten_list_code_blocks(&resolved);
         let raw = split_into_sections(&flattened);
@@ -145,6 +151,7 @@ impl PreviewPane {
         }
 
         self.md_file_path = md_file_path.to_path_buf();
+        self.outline_items = katana_core::markdown::outline::extract_outline(source);
         let resolved = resolve_image_paths(source, md_file_path);
         let flattened = flatten_list_code_blocks(&resolved);
         let raw = split_into_sections(&flattened);
@@ -290,12 +297,18 @@ impl PreviewPane {
     /// Internal method to sequentially render sections.
     /// Actual UI rendering is delegated to preview_pane_ui::render_sections.
     fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
-        crate::preview_pane_ui::render_sections(
+        self.visible_rect = Some(ui.clip_rect());
+        self.heading_rects.clear();
+        let request = crate::preview_pane_ui::render_sections(
             ui,
             &mut self.commonmark_cache,
             &self.sections,
             &self.md_file_path,
-        )
+            self.scroll_request,
+            Some(&mut self.heading_rects),
+        );
+        self.scroll_request = None;
+        request
     }
 
     /// Polls for background rendering completion and updates sections with received results.

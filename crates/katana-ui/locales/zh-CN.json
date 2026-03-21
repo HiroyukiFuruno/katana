@@ -1,147 +1,155 @@
 {
-    "menu": {
-        "file": "文件",
-        "settings": "设置",
-        "language": "语言 (Language)",
-        "open_workspace": "打开工作区…",
-        "save": "保存",
-        "open_all": "全部打开"
+  "menu": {
+    "file": "文件",
+    "settings": "设置",
+    "language": "语言 (Language)",
+    "open_workspace": "打开工作区…",
+    "save": "保存",
+    "open_all": "全部打开"
+  },
+  "workspace": {
+    "no_workspace_open": "未打开工作区。",
+    "no_document_selected": "未打开文档。",
+    "workspace_title": "工作区",
+    "recent_workspaces": "最近的工作区",
+    "metadata_tooltip": "大小: {size} B\n修改时间: {mod_time}"
+  },
+  "preview": {
+    "preview_title": "预览",
+    "refresh_diagrams": "刷新图表",
+    "rendering": "{kind} 渲染中...",
+    "no_preview": "(无预览)"
+  },
+  "plantuml": {
+    "downloading_plantuml": "⬇ 正在下载 PlantUML JAR...",
+    "plantuml_installed": "✅ PlantUML 已安装。正在刷新预览...",
+    "download_error": "❌ 下载错误: "
+  },
+  "view_mode": {
+    "preview": "预览",
+    "code": "代码",
+    "split": "分屏"
+  },
+  "split_toggle": {
+    "horizontal": "切换至水平分屏（左右）",
+    "vertical": "切换至垂直分屏（上下）",
+    "editor_first": "将编辑器放置在左/上",
+    "preview_first": "将预览放置在左/上"
+  },
+  "error": {
+    "missing_dependency": "⚠️ {tool_name} 未找到。请使用 {install_hint} 安装。",
+    "curl_launch_failed": "curl 启动失败",
+    "download_failed": "下载失败",
+    "render_error": "⚠ [{kind}] {message}"
+  },
+  "status": {
+    "ready": "就绪",
+    "saved": "已保存。",
+    "save_failed": "保存失败: {error}",
+    "opened_workspace": "已打开工作区: {name}",
+    "cannot_open_workspace": "无法打开工作区: {error}",
+    "cannot_open_file": "无法打开文件: {error}"
+  },
+  "action": {
+    "expand_all": "全部展开",
+    "collapse_all": "全部折叠",
+    "collapse_sidebar": "隐藏侧边栏",
+    "refresh_workspace": "刷新工作区",
+    "toggle_filter": "切换过滤器",
+    "remove_workspace": "从历史记录中移除",
+    "recursive_expand": "递归展开子目录",
+    "recursive_open_all": "递归打开所有文件",
+    "toggle_toc": "Toggle Table of Contents"
+  },
+  "ai": {
+    "ai_unconfigured": "[AI: 未配置]"
+  },
+  "tool": {
+    "not_installed": "⚠ {tool} 未安装",
+    "install_path": "安装路径: {path}",
+    "download": "⬇ 下载 {tool}"
+  },
+  "settings": {
+    "title": "设置",
+    "toc_visible": "显示目录",
+    "theme": {
+      "preset": "主题预设",
+      "dark_section": "深色",
+      "light_section": "浅色",
+      "custom_colors": "自定义颜色",
+      "reset_custom": "重置为预设"
     },
-    "workspace": {
-        "no_workspace_open": "未打开工作区。",
-        "no_document_selected": "未打开文档。",
-        "workspace_title": "工作区",
-        "recent_workspaces": "最近的工作区",
-        "metadata_tooltip": "大小: {size} B\n修改时间: {mod_time}"
+    "font": {
+      "size": "字体大小",
+      "family": "字体系列",
+      "size_slider_hint": "向左或向右拖动以调整大小"
+    },
+    "layout": {
+      "split_direction": "分屏方向",
+      "horizontal": "水平（左 / 右）",
+      "vertical": "垂直（上 / 下）",
+      "pane_order": "窗格顺序",
+      "editor_first": "编辑器优先",
+      "preview_first": "预览优先",
+      "toc_position": "TOC Position",
+      "left": "Left",
+      "right": "Right"
     },
     "preview": {
-        "preview_title": "预览",
-        "refresh_diagrams": "刷新图表",
-        "rendering": "{kind} 渲染中...",
-        "no_preview": "(无预览)"
+      "title": "预览",
+      "heading": "# 示例标题",
+      "normal_text": "正常文本与",
+      "accent_link": "强调链接",
+      "secondary_text": "次要文本示例",
+      "code_sample": "fn main() { println!(\"你好!\"); }"
     },
-    "plantuml": {
-        "downloading_plantuml": "⬇ 正在下载 PlantUML JAR...",
-        "plantuml_installed": "✅ PlantUML 已安装。正在刷新预览...",
-        "download_error": "❌ 下载错误: "
+    "color": {
+      "background": "背景",
+      "panel_background": "面板背景",
+      "text": "文本",
+      "text_secondary": "次要文本",
+      "accent": "强调",
+      "border": "边框",
+      "selection": "选择",
+      "code_background": "代码背景",
+      "preview_background": "预览背景"
     },
-    "view_mode": {
-        "preview": "预览",
-        "code": "代码",
-        "split": "分屏"
-    },
-    "split_toggle": {
-        "horizontal": "切换至水平分屏（左右）",
-        "vertical": "切换至垂直分屏（上下）",
-        "editor_first": "将编辑器放置在左/上",
-        "preview_first": "将预览放置在左/上"
-    },
-    "error": {
-        "missing_dependency": "⚠️ {tool_name} 未找到。请使用 {install_hint} 安装。",
-        "curl_launch_failed": "curl 启动失败",
-        "download_failed": "下载失败",
-        "render_error": "⚠ [{kind}] {message}"
-    },
-    "status": {
-        "ready": "就绪",
-        "saved": "已保存。",
-        "save_failed": "保存失败: {error}",
-        "opened_workspace": "已打开工作区: {name}",
-        "cannot_open_workspace": "无法打开工作区: {error}",
-        "cannot_open_file": "无法打开文件: {error}"
-    },
-    "action": {
-        "expand_all": "全部展开",
-        "collapse_all": "全部折叠",
-        "collapse_sidebar": "隐藏侧边栏",
-        "refresh_workspace": "刷新工作区",
-        "toggle_filter": "切换过滤器",
-        "remove_workspace": "从历史记录中移除",
-        "recursive_expand": "递归展开子目录",
-        "recursive_open_all": "递归打开所有文件"
-    },
-    "ai": {
-        "ai_unconfigured": "[AI: 未配置]"
-    },
-    "tool": {
-        "not_installed": "⚠ {tool} 未安装",
-        "install_path": "安装路径: {path}",
-        "download": "⬇ 下载 {tool}"
-    },
-    "settings": {
-        "title": "设置",
-        "toc_visible": "显示目录",
-        "theme": {
-            "preset": "主题预设",
-            "dark_section": "深色",
-            "light_section": "浅色",
-            "custom_colors": "自定义颜色",
-            "reset_custom": "重置为预设"
-        },
-        "font": {
-            "size": "字体大小",
-            "family": "字体系列",
-            "size_slider_hint": "向左或向右拖动以调整大小"
-        },
-        "layout": {
-            "split_direction": "分屏方向",
-            "horizontal": "水平（左 / 右）",
-            "vertical": "垂直（上 / 下）",
-            "pane_order": "窗格顺序",
-            "editor_first": "编辑器优先",
-            "preview_first": "预览优先"
-        },
-        "preview": {
-            "title": "预览",
-            "heading": "# 示例标题",
-            "normal_text": "正常文本与",
-            "accent_link": "强调链接",
-            "secondary_text": "次要文本示例",
-            "code_sample": "fn main() { println!(\"你好!\"); }"
-        },
-        "color": {
-            "background": "背景",
-            "panel_background": "面板背景",
-            "text": "文本",
-            "text_secondary": "次要文本",
-            "accent": "强调",
-            "border": "边框",
-            "selection": "选择",
-            "code_background": "代码背景",
-            "preview_background": "预览背景"
-        },
-        "tabs": [
-            {
-                "key": "theme",
-                "name": "主题"
-            },
-            {
-                "key": "font",
-                "name": "字体"
-            },
-            {
-                "key": "layout",
-                "name": "布局"
-            }
-        ]
-    },
-    "tab": {
-        "nav_prev": "移至上一个标签页",
-        "nav_next": "移至下一个标签页",
-        "close": "Close",
-        "close_others": "Close Others",
-        "close_all": "Close All",
-        "close_right": "Close Right",
-        "close_left": "Close Left",
-        "pin": "Pin",
-        "unpin": "Unpin",
-        "restore_closed": "Restore Closed Tab"
-    },
-    "search": {
-        "modal_title": "搜索文件",
-        "query_hint": "输入文件名进行搜索...",
-        "include_pattern_hint": "包含（正则表达式，逗号分隔）",
-        "exclude_pattern_hint": "排除（正则表达式，逗号分隔）",
-        "no_results": "没有找到文件。"
-    }
+    "tabs": [
+      {
+        "key": "theme",
+        "name": "主题"
+      },
+      {
+        "key": "font",
+        "name": "字体"
+      },
+      {
+        "key": "layout",
+        "name": "布局"
+      }
+    ]
+  },
+  "tab": {
+    "nav_prev": "移至上一个标签页",
+    "nav_next": "移至下一个标签页",
+    "close": "Close",
+    "close_others": "Close Others",
+    "close_all": "Close All",
+    "close_right": "Close Right",
+    "close_left": "Close Left",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "restore_closed": "Restore Closed Tab"
+  },
+  "search": {
+    "modal_title": "搜索文件",
+    "query_hint": "输入文件名进行搜索...",
+    "include_pattern_hint": "包含（正则表达式，逗号分隔）",
+    "exclude_pattern_hint": "排除（正则表达式，逗号分隔）",
+    "no_results": "没有找到文件。"
+  },
+  "toc": {
+    "title": "Table of Contents",
+    "empty": "No headings found."
+  }
 }

@@ -9,6 +9,8 @@ pub mod font_loader;
 pub mod html_renderer;
 pub(crate) mod http_cache_loader;
 pub mod i18n;
+pub mod icon;
+pub use icon::*;
 pub mod preview_pane;
 pub mod preview_pane_ui;
 pub mod settings_window;

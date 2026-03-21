@@ -100,7 +100,7 @@ pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
             ui.label(msg);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if state.is_dirty() {
-                    ui.label("●");
+                    ui.label(crate::Icon::Dot.as_str());
                 }
             });
         });
@@ -129,7 +129,7 @@ pub(crate) fn render_workspace_panel(
                 ui.heading(crate::i18n::get().workspace.workspace_title.clone());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .small_button("‹")
+                        .small_button(crate::icon::Icon::ChevronLeft.as_str())
                         .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                         .clicked()
                     {
@@ -185,7 +185,7 @@ pub(crate) fn render_workspace_panel(
                             .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
                         }
                         if ui
-                            .small_button("🔄")
+                            .small_button(crate::Icon::Refresh.as_str())
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
                             .clicked()
                         {
@@ -197,14 +197,18 @@ pub(crate) fn render_workspace_panel(
                             egui::Color32::TRANSPARENT
                         };
                         if ui
-                            .add(egui::Button::new("\u{25BC}").small().fill(filter_btn_color))
+                            .add(
+                                egui::Button::new(crate::Icon::TriangleDown.as_str())
+                                    .small()
+                                    .fill(filter_btn_color),
+                            )
                             .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                             .clicked()
                         {
                             state.filter_enabled = !state.filter_enabled;
                         }
                         if ui
-                            .add(egui::Button::new("🔍").small())
+                            .add(egui::Button::new(crate::Icon::Search.as_str()).small())
                             .on_hover_text(crate::i18n::get().search.modal_title.clone())
                             .clicked()
                         {
@@ -410,12 +414,16 @@ pub(crate) fn render_preview_content(
 pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
     let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
     let margin = f32::from(PREVIEW_CONTENT_PADDING);
+    let spacing = ui.spacing().item_spacing.x;
+    let button_count = 2.0;
+    let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
+
     let button_rect = egui::Rect::from_min_size(
         egui::pos2(
-            ui.max_rect().right() - margin - button_size.x,
+            ui.max_rect().right() - margin - total_width,
             ui.max_rect().top() + margin,
         ),
-        button_size,
+        egui::vec2(total_width, button_size.y),
     );
     let mut overlay_ui = ui.new_child(
         egui::UiBuilder::new()
@@ -426,12 +434,32 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     if overlay_ui
         .add_enabled(
             has_doc,
-            egui::Button::new("\u{1F504}").min_size(button_size),
+            egui::Button::new(crate::Icon::Refresh.as_str()).min_size(button_size),
         )
         .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
         .clicked()
     {
         *action = AppAction::RefreshDiagrams;
+    }
+
+    if state.settings.settings().layout.toc_visible {
+        let toc_bg = if state.show_toc {
+            ui.visuals().selection.bg_fill
+        } else {
+            egui::Color32::TRANSPARENT
+        };
+        if overlay_ui
+            .add_enabled(
+                has_doc,
+                egui::Button::new(crate::Icon::Toc.as_str())
+                    .min_size(button_size)
+                    .fill(toc_bg),
+            )
+            .on_hover_text(crate::i18n::get().action.toggle_toc.clone())
+            .clicked()
+        {
+            *action = AppAction::ToggleToc;
+        }
     }
 }
 
@@ -509,6 +537,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                 tab_action = Some(AppAction::CloseOtherDocuments(idx));
                                 ui.close();
                             }
+                            if ui.button(&i18n.tab.close_all).clicked() {
+                                tab_action = Some(AppAction::CloseAllDocuments);
+                                ui.close();
+                            }
                             if ui.button(&i18n.tab.close_right).clicked() {
                                 tab_action = Some(AppAction::CloseDocumentsToRight(idx));
                                 ui.close();
@@ -540,7 +572,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                             tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
                         }
 
-                        if ui.small_button("x").clicked() {
+                        if ui.small_button(crate::Icon::Close.as_str()).clicked() {
                             close_idx = Some(idx);
                         }
                         ui.add_space(TAB_INTER_ITEM_SPACING);
@@ -552,7 +584,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
 
         let nav_enabled = doc_count > 1;
         if ui
-            .add_enabled(nav_enabled, egui::Button::new("◀").small())
+            .add_enabled(
+                nav_enabled,
+                egui::Button::new(crate::Icon::TriangleLeft.as_str()).small(),
+            )
             .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
         {
@@ -564,7 +599,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             }
         }
         if ui
-            .add_enabled(nav_enabled, egui::Button::new("▶").small())
+            .add_enabled(
+                nav_enabled,
+                egui::Button::new(crate::Icon::TriangleRight.as_str()).small(),
+            )
             .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
         {
@@ -1529,7 +1567,7 @@ impl eframe::App for KatanaApp {
                 .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
                         if ui
-                            .button("›")
+                            .button(crate::Icon::ChevronRight.as_str())
                             .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                             .clicked()
                         {
@@ -1551,7 +1589,9 @@ impl eframe::App for KatanaApp {
                     let segments: Vec<&str> = rel.split('/').collect();
                     for (i, seg) in segments.iter().enumerate() {
                         if i > 0 {
-                            ui.label(egui::RichText::new("›").small());
+                            ui.label(
+                                egui::RichText::new(crate::Icon::ChevronRight.as_str()).small(),
+                            );
                         }
                         ui.label(egui::RichText::new(*seg).small());
                     }
@@ -1563,6 +1603,14 @@ impl eframe::App for KatanaApp {
         let mut download_req: Option<DownloadRequest> = None;
         let current_mode = self.state.active_view_mode();
         let is_split = current_mode == ViewMode::Split;
+
+        if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
+            if let Some(doc) = self.state.active_document() {
+                if let Some(preview) = self.tab_previews.iter_mut().find(|p| p.path == doc.path) {
+                    render_toc_panel(ctx, &mut preview.pane, &self.state);
+                }
+            }
+        }
 
         if is_split {
             let split_dir = self.state.active_split_direction();
@@ -2520,7 +2568,7 @@ fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(label).weak());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.hyperlink_to("↗", url);
+            ui.hyperlink_to(crate::Icon::ExternalLink.as_str(), url);
         });
     });
 }
@@ -2653,4 +2701,78 @@ pub(crate) fn render_search_modal(
     if !is_open {
         state.show_search_modal = false;
     }
+}
+
+const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
+const TOC_INDENT_PER_LEVEL: f32 = 12.0;
+
+pub(crate) fn render_toc_panel(
+    ctx: &egui::Context,
+    preview: &mut crate::preview_pane::PreviewPane,
+    state: &crate::app_state::AppState,
+) {
+    use katana_platform::settings::TocPosition;
+    let position = state.settings.settings().layout.toc_position;
+
+    let panel = match position {
+        TocPosition::Left => egui::SidePanel::left("toc_panel"),
+        TocPosition::Right => egui::SidePanel::right("toc_panel"),
+    };
+
+    panel
+        .resizable(true)
+        .default_width(TOC_PANEL_DEFAULT_WIDTH)
+        .show(ctx, |ui| {
+            ui.heading(crate::i18n::get().toc.title.clone());
+            ui.separator();
+
+            // Prevent text from wrapping or pushing the SidePanel width. Text will truncate with `...`
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+
+            egui::ScrollArea::vertical()
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    if preview.outline_items.is_empty() {
+                        ui.label(
+                            egui::RichText::new(crate::i18n::get().toc.empty.clone())
+                                .weak()
+                                .italics(),
+                        );
+                    } else {
+                        let mut active_index = 0;
+                        if let Some(visible_rect) = preview.visible_rect {
+                            let threshold = visible_rect.min.y + TOC_HEADING_VISIBILITY_THRESHOLD;
+                            for (i, rect) in preview.heading_rects.iter().enumerate() {
+                                if rect.min.y <= threshold {
+                                    active_index = i;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        let mut next_scroll = None;
+                        for (i, item) in preview.outline_items.iter().enumerate() {
+                            let indent = (item.level as f32 - 1.0) * TOC_INDENT_PER_LEVEL;
+                            ui.horizontal(|ui| {
+                                ui.add_space(indent);
+                                let is_active = i == active_index;
+                                let mut text = egui::RichText::new(&item.text);
+                                if is_active {
+                                    text = text
+                                        .strong()
+                                        .color(ui.visuals().widgets.active.text_color());
+                                }
+                                if ui.selectable_label(is_active, text).clicked() {
+                                    next_scroll = Some(item.index);
+                                }
+                            });
+                        }
+                        if next_scroll.is_some() {
+                            preview.scroll_request = next_scroll;
+                        }
+                    }
+                });
+        });
 }

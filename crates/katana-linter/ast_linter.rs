@@ -881,7 +881,7 @@ fn ui_functions() -> Vec<&'static str> {
 
 /// Target type names for function calls.
 fn ui_types_for_new() -> Vec<&'static str> {
-    vec!["RichText"]
+    vec!["RichText", "Button"]
 }
 
 struct I18nHardcodeVisitor {
@@ -1387,6 +1387,104 @@ fn lint_prohibited_types(path: &Path, syntax: &syn::File) -> Vec<Violation> {
 }
 
 // ─────────────────────────────────────────────
+// Icon Facade Detection Visitor
+// ─────────────────────────────────────────────
+
+struct IconFacadeVisitor {
+    file: PathBuf,
+    violations: Vec<Violation>,
+}
+
+fn is_raw_icon(s: &str) -> bool {
+    let trimmed = s.trim();
+    if trimmed == "x" || trimmed == "X" {
+        return true;
+    }
+    trimmed.chars().any(is_emoji_or_symbol)
+}
+
+impl IconFacadeVisitor {
+    fn new(file: PathBuf) -> Self {
+        Self {
+            file,
+            violations: Vec::new(),
+        }
+    }
+
+    fn check_expr_for_raw_icon(&mut self, expr: &syn::Expr, context: &str) {
+        match expr {
+            syn::Expr::Lit(expr_lit) => {
+                if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                    let value = lit_str.value();
+                    if is_raw_icon(&value) {
+                        let (line, column) = span_location(lit_str.span());
+                        self.violations.push(Violation {
+                            file: self.file.clone(),
+                            line,
+                            column,
+                            message: format!(
+                                "Raw icon string \"{value}\" detected in {context}. \
+                                 Please use `Icon::Name.as_str()` instead."
+                            ),
+                        });
+                    }
+                }
+            }
+            syn::Expr::Reference(expr_ref) => self.check_expr_for_raw_icon(&expr_ref.expr, context),
+            syn::Expr::Paren(expr_paren) => self.check_expr_for_raw_icon(&expr_paren.expr, context),
+            _ => {}
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for IconFacadeVisitor {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        if has_cfg_test_attr(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_item_mod(self, node);
+    }
+
+    fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
+        let method_name = node.method.to_string();
+        if ui_methods().contains(&method_name.as_str()) {
+            for arg in node.args.iter() {
+                self.check_expr_for_raw_icon(arg, &format!("{}()", method_name));
+            }
+        }
+        syn::visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(expr_path) = &*node.func {
+            if let Some(last_segment) = expr_path.path.segments.last() {
+                let func_name = last_segment.ident.to_string();
+                if ui_functions().contains(&func_name.as_str()) {
+                    if let Some(type_name) = extract_type_from_call(&node.func) {
+                        if ui_types_for_new().contains(&type_name.as_str()) {
+                            for arg in node.args.iter() {
+                                self.check_expr_for_raw_icon(
+                                    arg,
+                                    &format!("{}::{}", type_name, func_name),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+}
+
+/// Apply icon facade rule to a single file and return a list of violations.
+fn lint_icon_facade(path: &Path, syntax: &syn::File) -> Vec<Violation> {
+    let mut visitor = IconFacadeVisitor::new(path.to_path_buf());
+    visitor.visit_file(syntax);
+    visitor.violations
+}
+
+// ─────────────────────────────────────────────
 // Test Entry Point
 // ─────────────────────────────────────────────
 
@@ -1509,6 +1607,23 @@ fn ast_linter_locale_files_match_base_structure() {
         "locale-structure",
         "Fix: Keep every locale JSON aligned with ja.json/en.json, including placeholder names.",
         &all_violations,
+    );
+}
+
+/// Icon facade rule: Detect raw icon strings like "🔄", "x", "▶".
+/// Scope: All crates.
+#[test]
+fn ast_linter_no_raw_icons() {
+    let root = workspace_root();
+    run_ast_lint(
+        "icon-facade",
+        "Fix: Use `Icon::Name.as_str()` instead of raw icon string literals like \"🔄\".",
+        &[
+            root.join("crates/katana-core/src"),
+            root.join("crates/katana-platform/src"),
+            root.join("crates/katana-ui/src"),
+        ],
+        lint_icon_facade,
     );
 }
 
@@ -2227,6 +2342,28 @@ mod internal_tests {
         assert!(violations
             .iter()
             .any(|v| v.message.contains("Array literal")));
+    }
+
+    // ── lint_icon_facade: IconFacadeVisitor coverage ──
+
+    #[test]
+    fn lint_icon_facade_detects_raw_icon_in_button() {
+        let code =
+            r#"fn render(ui: &mut Ui) { ui.button("🔄"); ui.label(("x")); ui.button(&"▶"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_icon_facade(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 3);
+        assert!(violations
+            .iter()
+            .any(|v| v.message.contains("Raw icon string")));
+    }
+
+    #[test]
+    fn lint_icon_facade_allows_regular_symbols() {
+        let code = r#"fn render(ui: &mut Ui) { ui.label("/"); ui.label("..."); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_icon_facade(&PathBuf::from("fake.rs"), &syntax);
+        assert!(violations.is_empty());
     }
 
     #[test]

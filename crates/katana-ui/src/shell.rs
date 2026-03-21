@@ -601,6 +601,9 @@ impl KatanaApp {
             AppAction::ToggleSettings => {
                 self.state.show_settings = !self.state.show_settings;
             }
+            AppAction::ToggleToc => {
+                self.state.show_toc = !self.state.show_toc;
+            }
             AppAction::SetSplitDirection(dir) => {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_split_direction(dir);
@@ -1007,6 +1010,19 @@ mod tests {
         let mut app = make_app();
         app.process_action(AppAction::ChangeLanguage("ja".to_string()));
         // Verify i18n language was changed (since direct access is hard, ensure no panic)
+    }
+
+    // process_action: ToggleToc
+    #[test]
+    fn process_action_toggle_toc_toggles_flag() {
+        let mut app = make_app();
+        assert!(!app.state.show_toc);
+
+        app.process_action(AppAction::ToggleToc);
+        assert!(app.state.show_toc);
+
+        app.process_action(AppAction::ToggleToc);
+        assert!(!app.state.show_toc);
     }
 
     // process_action: ToggleSettings

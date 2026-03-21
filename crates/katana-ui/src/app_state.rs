@@ -74,6 +74,8 @@ pub enum AppAction {
     ChangeLanguage(String),
     /// Toggle the settings window.
     ToggleSettings,
+    /// Toggle the table of contents panel.
+    ToggleToc,
     /// Change the split view direction (Horizontal / Vertical).
     SetSplitDirection(katana_platform::SplitDirection),
     /// Change the pane order within the split view (EditorFirst / PreviewFirst).
@@ -125,6 +127,8 @@ pub struct AppState {
     pub filter_cache: Option<(String, std::collections::HashSet<std::path::PathBuf>)>,
     /// Show/hide the settings window.
     pub show_settings: bool,
+    /// Show/hide the table of contents panel.
+    pub show_toc: bool,
     /// Show/hide the search modal.
     pub show_search_modal: bool,
     /// The search query for the file search modal.
@@ -195,6 +199,7 @@ impl AppState {
             filter_query: String::new(),
             filter_cache: None,
             show_settings: false,
+            show_toc: false,
             show_search_modal: false,
             search_query: String::new(),
             search_include_pattern: String::new(),

@@ -26,12 +26,16 @@ pub(crate) fn open_tab(ctx: &egui::Context, url: &str) {
 
 /// Renders a single section.
 /// Returns `Some(DownloadRequest)` if the download button is pressed.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn show_section(
     ui: &mut egui::Ui,
     cache: &mut CommonMarkCache,
     section: &RenderedSection,
     id: usize,
     md_file_path: &std::path::Path,
+    scroll_to_heading_index: Option<usize>,
+    populate_heading_rects: Option<&mut Vec<egui::Rect>>,
+    heading_offset: usize,
 ) -> Option<DownloadRequest> {
     match section {
         RenderedSection::Markdown(md) => {
@@ -48,13 +52,25 @@ pub(crate) fn show_section(
                 };
                 let text_color = ui.visuals().override_text_color;
                 let md_path_owned = md_file_path.to_path_buf();
-                CommonMarkViewer::new()
+
+                let binding = move |ui: &mut egui::Ui, html: &str| {
+                    render_html_block(ui, html, text_color, &md_path_owned);
+                };
+
+                let mut viewer = CommonMarkViewer::new()
                     .syntax_theme_dark(preset.syntax_theme_dark)
                     .syntax_theme_light(preset.syntax_theme_light)
-                    .render_html_fn(Some(&move |ui: &mut egui::Ui, html: &str| {
-                        render_html_block(ui, html, text_color, &md_path_owned);
-                    }))
-                    .show(ui, cache, md);
+                    .heading_offset(heading_offset)
+                    .render_html_fn(Some(&binding));
+
+                if let Some(idx) = scroll_to_heading_index {
+                    viewer = viewer.scroll_to_heading_index(idx);
+                }
+                if let Some(rects) = populate_heading_rects {
+                    viewer = viewer.populate_heading_rects(rects);
+                }
+
+                viewer.show(ui, cache, md);
             });
             None
         }
@@ -238,11 +254,29 @@ pub(crate) fn render_sections(
     cache: &mut CommonMarkCache,
     sections: &[RenderedSection],
     md_file_path: &std::path::Path,
+    scroll_to_heading_index: Option<usize>,
+    mut populate_heading_rects: Option<&mut Vec<egui::Rect>>,
 ) -> Option<DownloadRequest> {
     let mut request: Option<DownloadRequest> = None;
+    let mut current_heading_offset = 0;
+
     for (i, section) in sections.iter().enumerate() {
         ui.push_id(format!("section_{i}"), |ui| {
-            if let Some(req) = show_section(ui, cache, section, i, md_file_path) {
+            let mut offset = 0;
+            if let RenderedSection::Markdown(md) = section {
+                offset = current_heading_offset;
+                current_heading_offset += katana_core::markdown::outline::extract_outline(md).len();
+            }
+            if let Some(req) = show_section(
+                ui,
+                cache,
+                section,
+                i,
+                md_file_path,
+                scroll_to_heading_index,
+                populate_heading_rects.as_deref_mut(),
+                offset,
+            ) {
                 request = Some(req);
             }
         });

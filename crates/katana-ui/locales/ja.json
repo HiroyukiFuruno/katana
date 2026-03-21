@@ -1,147 +1,155 @@
 {
-    "menu": {
-        "file": "ファイル",
-        "settings": "設定",
-        "language": "言語 (Language)",
-        "open_workspace": "ワークスペースを開く…",
-        "save": "保存",
-        "open_all": "全て開く"
+  "menu": {
+    "file": "ファイル",
+    "settings": "設定",
+    "language": "言語 (Language)",
+    "open_workspace": "ワークスペースを開く…",
+    "save": "保存",
+    "open_all": "全て開く"
+  },
+  "workspace": {
+    "no_workspace_open": "ワークスペースが開かれていません。",
+    "no_document_selected": "ドキュメントが開かれていません。",
+    "workspace_title": "ワークスペース",
+    "recent_workspaces": "最近のワークスペース",
+    "metadata_tooltip": "サイズ: {size} B\n更新日時: {mod_time}"
+  },
+  "preview": {
+    "preview_title": "プレビュー",
+    "refresh_diagrams": "ダイアグラムを更新",
+    "rendering": "{kind} レンダリング中…",
+    "no_preview": "（プレビューなし）"
+  },
+  "plantuml": {
+    "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",
+    "plantuml_installed": "✅ PlantUML のインストールが完了しました。プレビューを更新中…",
+    "download_error": "❌ ダウンロードエラー: "
+  },
+  "view_mode": {
+    "preview": "プレビュー",
+    "code": "コード",
+    "split": "分割"
+  },
+  "split_toggle": {
+    "horizontal": "水平分割（左右）に切り替え",
+    "vertical": "垂直分割（上下）に切り替え",
+    "editor_first": "エディタを左/上に配置",
+    "preview_first": "プレビューを左/上に配置"
+  },
+  "error": {
+    "missing_dependency": "⚠️ {tool_name} が見つかりません。{install_hint} を使用してインストールしてください。",
+    "curl_launch_failed": "curl 起動失敗",
+    "download_failed": "ダウンロードに失敗しました",
+    "render_error": "⚠ [{kind}] {message}"
+  },
+  "status": {
+    "ready": "準備完了",
+    "saved": "保存しました。",
+    "save_failed": "保存に失敗しました: {error}",
+    "opened_workspace": "{name} を開きました",
+    "cannot_open_workspace": "ワークスペースを開けませんでした: {error}",
+    "cannot_open_file": "ファイルを開けませんでした: {error}"
+  },
+  "action": {
+    "expand_all": "すべて展開",
+    "collapse_all": "すべて折りたたむ",
+    "collapse_sidebar": "サイドバーを隠す",
+    "refresh_workspace": "ワークスペースを更新",
+    "toggle_filter": "フィルター切り替え",
+    "remove_workspace": "履歴から削除",
+    "recursive_expand": "再帰的にディレクトリを展開",
+    "recursive_open_all": "再帰的に全ファイルを開く",
+    "toggle_toc": "目次の表示切替"
+  },
+  "ai": {
+    "ai_unconfigured": "[AI: 未設定]"
+  },
+  "tool": {
+    "not_installed": "⚠ {tool} がインストールされていません",
+    "install_path": "インストール先: {path}",
+    "download": "⬇ {tool} をダウンロード"
+  },
+  "settings": {
+    "title": "設定",
+    "toc_visible": "目次の有効化・無効化",
+    "theme": {
+      "preset": "テーマプリセット",
+      "dark_section": "ダーク",
+      "light_section": "ライト",
+      "custom_colors": "カスタムカラー",
+      "reset_custom": "プリセットに戻す"
     },
-    "workspace": {
-        "no_workspace_open": "ワークスペースが開かれていません。",
-        "no_document_selected": "ドキュメントが開かれていません。",
-        "workspace_title": "ワークスペース",
-        "recent_workspaces": "最近のワークスペース",
-        "metadata_tooltip": "サイズ: {size} B\n更新日時: {mod_time}"
+    "font": {
+      "size": "フォントサイズ",
+      "family": "フォントファミリー",
+      "size_slider_hint": "左右にドラッグしてサイズを増減"
+    },
+    "layout": {
+      "split_direction": "分割方向",
+      "horizontal": "水平（左右）",
+      "vertical": "垂直（上下）",
+      "pane_order": "配置順",
+      "editor_first": "エディタ優先",
+      "preview_first": "プレビュー優先",
+      "toc_position": "目次の配置",
+      "left": "左側",
+      "right": "右側"
     },
     "preview": {
-        "preview_title": "プレビュー",
-        "refresh_diagrams": "ダイアグラムを更新",
-        "rendering": "{kind} レンダリング中…",
-        "no_preview": "（プレビューなし）"
+      "title": "プレビュー",
+      "heading": "# サンプル見出し",
+      "normal_text": "通常テキストと",
+      "accent_link": "アクセントリンク",
+      "secondary_text": "セカンダリテキストのサンプル",
+      "code_sample": "fn main() { println!(\"こんにちは!\"); }"
     },
-    "plantuml": {
-        "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",
-        "plantuml_installed": "✅ PlantUML のインストールが完了しました。プレビューを更新中…",
-        "download_error": "❌ ダウンロードエラー: "
+    "color": {
+      "background": "背景",
+      "panel_background": "パネル背景",
+      "text": "テキスト",
+      "text_secondary": "セカンダリテキスト",
+      "accent": "アクセント",
+      "border": "ボーダー",
+      "selection": "選択",
+      "code_background": "コード背景",
+      "preview_background": "プレビュー背景"
     },
-    "view_mode": {
-        "preview": "プレビュー",
-        "code": "コード",
-        "split": "分割"
-    },
-    "split_toggle": {
-        "horizontal": "水平分割（左右）に切り替え",
-        "vertical": "垂直分割（上下）に切り替え",
-        "editor_first": "エディタを左/上に配置",
-        "preview_first": "プレビューを左/上に配置"
-    },
-    "error": {
-        "missing_dependency": "⚠️ {tool_name} が見つかりません。{install_hint} を使用してインストールしてください。",
-        "curl_launch_failed": "curl 起動失敗",
-        "download_failed": "ダウンロードに失敗しました",
-        "render_error": "⚠ [{kind}] {message}"
-    },
-    "status": {
-        "ready": "準備完了",
-        "saved": "保存しました。",
-        "save_failed": "保存に失敗しました: {error}",
-        "opened_workspace": "{name} を開きました",
-        "cannot_open_workspace": "ワークスペースを開けませんでした: {error}",
-        "cannot_open_file": "ファイルを開けませんでした: {error}"
-    },
-    "action": {
-        "expand_all": "すべて展開",
-        "collapse_all": "すべて折りたたむ",
-        "collapse_sidebar": "サイドバーを隠す",
-        "refresh_workspace": "ワークスペースを更新",
-        "toggle_filter": "フィルター切り替え",
-        "remove_workspace": "履歴から削除",
-        "recursive_expand": "再帰的にディレクトリを展開",
-        "recursive_open_all": "再帰的に全ファイルを開く"
-    },
-    "ai": {
-        "ai_unconfigured": "[AI: 未設定]"
-    },
-    "tool": {
-        "not_installed": "⚠ {tool} がインストールされていません",
-        "install_path": "インストール先: {path}",
-        "download": "⬇ {tool} をダウンロード"
-    },
-    "settings": {
-        "title": "設定",
-        "toc_visible": "目次を表示",
-        "theme": {
-            "preset": "テーマプリセット",
-            "dark_section": "ダーク",
-            "light_section": "ライト",
-            "custom_colors": "カスタムカラー",
-            "reset_custom": "プリセットに戻す"
-        },
-        "font": {
-            "size": "フォントサイズ",
-            "family": "フォントファミリー",
-            "size_slider_hint": "左右にドラッグしてサイズを増減"
-        },
-        "layout": {
-            "split_direction": "分割方向",
-            "horizontal": "水平（左右）",
-            "vertical": "垂直（上下）",
-            "pane_order": "配置順",
-            "editor_first": "エディタ優先",
-            "preview_first": "プレビュー優先"
-        },
-        "preview": {
-            "title": "プレビュー",
-            "heading": "# サンプル見出し",
-            "normal_text": "通常テキストと",
-            "accent_link": "アクセントリンク",
-            "secondary_text": "セカンダリテキストのサンプル",
-            "code_sample": "fn main() { println!(\"こんにちは!\"); }"
-        },
-        "color": {
-            "background": "背景",
-            "panel_background": "パネル背景",
-            "text": "テキスト",
-            "text_secondary": "セカンダリテキスト",
-            "accent": "アクセント",
-            "border": "ボーダー",
-            "selection": "選択",
-            "code_background": "コード背景",
-            "preview_background": "プレビュー背景"
-        },
-        "tabs": [
-            {
-                "key": "theme",
-                "name": "テーマ"
-            },
-            {
-                "key": "font",
-                "name": "フォント"
-            },
-            {
-                "key": "layout",
-                "name": "レイアウト"
-            }
-        ]
-    },
-    "tab": {
-        "nav_prev": "前のタブへ移動",
-        "nav_next": "次のタブへ移動",
-        "close": "閉じる",
-        "close_others": "他を閉じる",
-        "close_all": "すべて閉じる",
-        "close_right": "右側を閉じる",
-        "close_left": "左側を閉じる",
-        "pin": "ピン留め",
-        "unpin": "ピン留め解除",
-        "restore_closed": "閉じたタブを復元"
-    },
-    "search": {
-        "modal_title": "ファイル検索",
-        "query_hint": "ファイル名で検索...",
-        "include_pattern_hint": "含める（正規表現, カンマ区切り）",
-        "exclude_pattern_hint": "除外する（正規表現, カンマ区切り）",
-        "no_results": "ファイルが見つかりません"
-    }
+    "tabs": [
+      {
+        "key": "theme",
+        "name": "テーマ"
+      },
+      {
+        "key": "font",
+        "name": "フォント"
+      },
+      {
+        "key": "layout",
+        "name": "レイアウト"
+      }
+    ]
+  },
+  "tab": {
+    "nav_prev": "前のタブへ移動",
+    "nav_next": "次のタブへ移動",
+    "close": "閉じる",
+    "close_others": "他を閉じる",
+    "close_all": "すべて閉じる",
+    "close_right": "右側を閉じる",
+    "close_left": "左側を閉じる",
+    "pin": "ピン留め",
+    "unpin": "ピン留め解除",
+    "restore_closed": "閉じたタブを復元"
+  },
+  "search": {
+    "modal_title": "ファイル検索",
+    "query_hint": "ファイル名で検索...",
+    "include_pattern_hint": "含める（正規表現, カンマ区切り）",
+    "exclude_pattern_hint": "除外する（正規表現, カンマ区切り）",
+    "no_results": "ファイルが見つかりません"
+  },
+  "toc": {
+    "title": "目次",
+    "empty": "見出しが見つかりません"
+  }
 }
