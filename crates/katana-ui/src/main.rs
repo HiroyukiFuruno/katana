@@ -429,13 +429,17 @@ mod tests {
             .get(&egui::FontFamily::Monospace)
             .expect("Monospace family missing");
         let prop_name = load_first_font(PROP_CANDIDATES).unwrap().0;
+        let mono_fallback_name = format!("{}_mono_fallback", prop_name);
         assert!(
-            monospace.contains(&prop_name),
+            monospace.contains(&mono_fallback_name),
             "Proportional font should be in Monospace family as CJK fallback"
         );
         let mono_name = load_first_font(MONO_CANDIDATES).unwrap().0;
         let mono_pos = monospace.iter().position(|n| n == &mono_name).unwrap();
-        let prop_pos = monospace.iter().position(|n| n == &prop_name).unwrap();
+        let prop_pos = monospace
+            .iter()
+            .position(|n| n == &mono_fallback_name)
+            .unwrap();
         assert!(
             mono_pos < prop_pos,
             "Monospace font must appear before proportional (CJK fallback)"
