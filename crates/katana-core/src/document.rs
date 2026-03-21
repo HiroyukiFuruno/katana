@@ -12,6 +12,8 @@ pub struct Document {
     pub is_dirty: bool,
     /// Whether the document content is currently loaded.
     pub is_loaded: bool,
+    /// Whether the document tab is pinned to the left.
+    pub is_pinned: bool,
 }
 
 impl Document {
@@ -22,6 +24,7 @@ impl Document {
             buffer: content.into(),
             is_dirty: false,
             is_loaded: true,
+            is_pinned: false,
         }
     }
 
@@ -32,6 +35,7 @@ impl Document {
             buffer: String::new(),
             is_dirty: false,
             is_loaded: false,
+            is_pinned: false,
         }
     }
 

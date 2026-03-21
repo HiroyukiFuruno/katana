@@ -25,7 +25,7 @@ build-release: ## Release build (optimized)
 	cargo build --workspace --release
 
 .PHONY: run
-run: ## Run the application (KatanA)
+run: build ## Run the application (KatanA)
 	cargo run --bin KatanA
 
 .PHONY: run-release

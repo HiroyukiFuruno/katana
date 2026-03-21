@@ -465,7 +465,7 @@ impl KatanaApp {
         }
     }
 
-    fn save_workspace_state(&mut self) {
+    pub(crate) fn save_workspace_state(&mut self) {
         let open_tabs: Vec<String> = self
             .state
             .open_documents
@@ -550,11 +550,22 @@ impl KatanaApp {
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
             AppAction::CloseDocument(idx) => {
                 if idx < self.state.open_documents.len() {
-                    self.state.open_documents.remove(idx);
+                    let closed_doc = self.state.open_documents.remove(idx);
+                    self.state.push_recently_closed(closed_doc.path);
                     self.state.active_doc_idx = if self.state.open_documents.is_empty() {
                         None
                     } else {
-                        Some(self.state.open_documents.len() - 1)
+                        Some(
+                            self.state
+                                .active_doc_idx
+                                .unwrap_or(0)
+                                .saturating_sub(if self.state.active_doc_idx == Some(idx) {
+                                    1
+                                } else {
+                                    0
+                                })
+                                .min(self.state.open_documents.len().saturating_sub(1)),
+                        )
                     };
                 }
                 self.save_workspace_state();
@@ -590,6 +601,9 @@ impl KatanaApp {
             AppAction::ToggleSettings => {
                 self.state.show_settings = !self.state.show_settings;
             }
+            AppAction::ToggleToc => {
+                self.state.show_toc = !self.state.show_toc;
+            }
             AppAction::SetSplitDirection(dir) => {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_split_direction(dir);
@@ -597,6 +611,114 @@ impl KatanaApp {
             AppAction::SetPaneOrder(order) => {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_pane_order(order);
+            }
+            AppAction::CloseOtherDocuments(idx) => {
+                if idx < self.state.open_documents.len() {
+                    let mut keep = Vec::new();
+                    let old_docs = std::mem::take(&mut self.state.open_documents);
+                    for (i, doc) in old_docs.into_iter().enumerate() {
+                        if i == idx {
+                            keep.push(doc);
+                        } else {
+                            self.state.push_recently_closed(doc.path);
+                        }
+                    }
+                    self.state.open_documents = keep;
+                    self.state.active_doc_idx = Some(0);
+                }
+                self.save_workspace_state();
+            }
+            AppAction::CloseAllDocuments => {
+                let old_docs = std::mem::take(&mut self.state.open_documents);
+                for doc in old_docs.into_iter() {
+                    self.state.push_recently_closed(doc.path);
+                }
+                self.state.active_doc_idx = None;
+                self.save_workspace_state();
+            }
+            AppAction::CloseDocumentsToRight(idx) => {
+                let mut keep = Vec::new();
+                let old_docs = std::mem::take(&mut self.state.open_documents);
+                for (i, doc) in old_docs.into_iter().enumerate() {
+                    if i <= idx {
+                        keep.push(doc);
+                    } else {
+                        self.state.push_recently_closed(doc.path);
+                    }
+                }
+                self.state.open_documents = keep;
+                if let Some(a_idx) = self.state.active_doc_idx {
+                    if a_idx > idx {
+                        self.state.active_doc_idx = Some(idx);
+                    }
+                }
+                self.save_workspace_state();
+            }
+            AppAction::CloseDocumentsToLeft(idx) => {
+                let mut keep = Vec::new();
+                let new_active_idx = self.state.active_doc_idx;
+                let old_docs = std::mem::take(&mut self.state.open_documents);
+                for (i, doc) in old_docs.into_iter().enumerate() {
+                    if i >= idx {
+                        keep.push(doc);
+                    } else {
+                        self.state.push_recently_closed(doc.path);
+                    }
+                }
+                self.state.open_documents = keep;
+                if let Some(a_idx) = new_active_idx {
+                    if a_idx < idx {
+                        self.state.active_doc_idx = Some(0);
+                    } else {
+                        self.state.active_doc_idx = Some(a_idx - idx);
+                    }
+                }
+                self.save_workspace_state();
+            }
+            AppAction::TogglePinDocument(idx) => {
+                if idx < self.state.open_documents.len() {
+                    let active_path = self.state.active_document().map(|d| d.path.clone());
+                    let doc = &mut self.state.open_documents[idx];
+                    doc.is_pinned = !doc.is_pinned;
+                    // Stable sort to move pinned tabs to the front
+                    self.state.open_documents.sort_by_key(|d| !d.is_pinned);
+                    if let Some(path) = active_path {
+                        if let Some(new_idx) = self
+                            .state
+                            .open_documents
+                            .iter()
+                            .position(|d| d.path == path)
+                        {
+                            self.state.active_doc_idx = Some(new_idx);
+                        }
+                    }
+                }
+                self.save_workspace_state();
+            }
+            AppAction::RestoreClosedDocument => {
+                if let Some(path) = self.state.recently_closed_tabs.pop_back() {
+                    self.handle_select_document(path, true);
+                }
+            }
+            AppAction::ReorderDocument { from, to } => {
+                let len = self.state.open_documents.len();
+                if from < len && to <= len && from != to {
+                    let active_path = self.state.active_document().map(|d| d.path.clone());
+                    let doc = self.state.open_documents.remove(from);
+                    let actual_to = if to > from { to - 1 } else { to };
+                    self.state.open_documents.insert(actual_to, doc);
+                    if let Some(path) = active_path {
+                        if let Some(new_idx) = self
+                            .state
+                            .open_documents
+                            .iter()
+                            .position(|d| d.path == path)
+                        {
+                            self.state.active_doc_idx = Some(new_idx);
+                        }
+                    }
+                }
+                self.save_workspace_state();
             }
             AppAction::None => {}
         }
@@ -888,6 +1010,19 @@ mod tests {
         let mut app = make_app();
         app.process_action(AppAction::ChangeLanguage("ja".to_string()));
         // Verify i18n language was changed (since direct access is hard, ensure no panic)
+    }
+
+    // process_action: ToggleToc
+    #[test]
+    fn process_action_toggle_toc_toggles_flag() {
+        let mut app = make_app();
+        assert!(!app.state.show_toc);
+
+        app.process_action(AppAction::ToggleToc);
+        assert!(app.state.show_toc);
+
+        app.process_action(AppAction::ToggleToc);
+        assert!(!app.state.show_toc);
     }
 
     // process_action: ToggleSettings

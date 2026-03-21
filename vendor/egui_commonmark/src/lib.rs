@@ -91,14 +91,42 @@ pub use egui_commonmark_backend;
 
 use egui_commonmark_backend::*;
 
-#[derive(Debug, Default)]
 pub struct CommonMarkViewer<'f> {
     options: CommonMarkOptions<'f>,
+    scroll_to_heading_index: Option<usize>,
+    populate_heading_rects: Option<&'f mut Vec<egui::Rect>>,
+    heading_offset: usize,
+}
+
+impl<'f> Default for CommonMarkViewer<'f> {
+    fn default() -> Self {
+        Self {
+            options: Default::default(),
+            scroll_to_heading_index: None,
+            populate_heading_rects: None,
+            heading_offset: 0,
+        }
+    }
 }
 
 impl<'f> CommonMarkViewer<'f> {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn scroll_to_heading_index(mut self, index: usize) -> Self {
+        self.scroll_to_heading_index = Some(index);
+        self
+    }
+
+    pub fn populate_heading_rects(mut self, rects: &'f mut Vec<egui::Rect>) -> Self {
+        self.populate_heading_rects = Some(rects);
+        self
+    }
+
+    pub fn heading_offset(mut self, offset: usize) -> Self {
+        self.heading_offset = offset;
+        self
     }
 
     /// The amount of spaces a bullet point is indented. By default this is 4
@@ -231,7 +259,11 @@ impl<'f> CommonMarkViewer<'f> {
     ) -> egui::InnerResponse<()> {
         egui_commonmark_backend::prepare_show(cache, ui.ctx());
 
-        let (response, _) = parsers::pulldown::CommonMarkViewerInternal::new().show(
+        let (response, _) = parsers::pulldown::CommonMarkViewerInternal::new(
+            self.scroll_to_heading_index,
+            self.populate_heading_rects,
+            self.heading_offset,
+        ).show(
             ui,
             cache,
             &self.options,
@@ -255,7 +287,11 @@ impl<'f> CommonMarkViewer<'f> {
         egui_commonmark_backend::prepare_show(cache, ui.ctx());
 
         let (mut inner_response, checkmark_events) =
-            parsers::pulldown::CommonMarkViewerInternal::new().show(
+            parsers::pulldown::CommonMarkViewerInternal::new(
+                self.scroll_to_heading_index,
+                self.populate_heading_rects,
+                self.heading_offset,
+            ).show(
                 ui,
                 cache,
                 &self.options,
@@ -300,7 +336,11 @@ impl<'f> CommonMarkViewer<'f> {
         text: &str,
     ) {
         egui_commonmark_backend::prepare_show(cache, ui.ctx());
-        parsers::pulldown::CommonMarkViewerInternal::new().show_scrollable(
+        parsers::pulldown::CommonMarkViewerInternal::new(
+            self.scroll_to_heading_index,
+            self.populate_heading_rects,
+            self.heading_offset,
+        ).show_scrollable(
             Id::new(source_id),
             ui,
             cache,

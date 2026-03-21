@@ -100,7 +100,7 @@ pub(crate) fn render_status_bar(ctx: &egui::Context, state: &AppState) {
             ui.label(msg);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if state.is_dirty() {
-                    ui.label("●");
+                    ui.label(crate::Icon::Dot.as_str());
                 }
             });
         });
@@ -129,7 +129,7 @@ pub(crate) fn render_workspace_panel(
                 ui.heading(crate::i18n::get().workspace.workspace_title.clone());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .small_button("‹")
+                        .small_button(crate::icon::Icon::ChevronLeft.as_str())
                         .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                         .clicked()
                     {
@@ -185,7 +185,7 @@ pub(crate) fn render_workspace_panel(
                             .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
                         }
                         if ui
-                            .small_button("🔄")
+                            .small_button(crate::Icon::Refresh.as_str())
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
                             .clicked()
                         {
@@ -197,14 +197,18 @@ pub(crate) fn render_workspace_panel(
                             egui::Color32::TRANSPARENT
                         };
                         if ui
-                            .add(egui::Button::new("\u{25BC}").small().fill(filter_btn_color))
+                            .add(
+                                egui::Button::new(crate::Icon::TriangleDown.as_str())
+                                    .small()
+                                    .fill(filter_btn_color),
+                            )
                             .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                             .clicked()
                         {
                             state.filter_enabled = !state.filter_enabled;
                         }
                         if ui
-                            .add(egui::Button::new("🔍").small())
+                            .add(egui::Button::new(crate::Icon::Search.as_str()).small())
                             .on_hover_text(crate::i18n::get().search.modal_title.clone())
                             .clicked()
                         {
@@ -410,12 +414,16 @@ pub(crate) fn render_preview_content(
 pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
     let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
     let margin = f32::from(PREVIEW_CONTENT_PADDING);
+    let spacing = ui.spacing().item_spacing.x;
+    let button_count = 2.0;
+    let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
+
     let button_rect = egui::Rect::from_min_size(
         egui::pos2(
-            ui.max_rect().right() - margin - button_size.x,
+            ui.max_rect().right() - margin - total_width,
             ui.max_rect().top() + margin,
         ),
-        button_size,
+        egui::vec2(total_width, button_size.y),
     );
     let mut overlay_ui = ui.new_child(
         egui::UiBuilder::new()
@@ -426,21 +434,44 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     if overlay_ui
         .add_enabled(
             has_doc,
-            egui::Button::new("\u{1F504}").min_size(button_size),
+            egui::Button::new(crate::Icon::Refresh.as_str()).min_size(button_size),
         )
         .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
         .clicked()
     {
         *action = AppAction::RefreshDiagrams;
     }
+
+    if state.settings.settings().layout.toc_visible {
+        let toc_bg = if state.show_toc {
+            ui.visuals().selection.bg_fill
+        } else {
+            egui::Color32::TRANSPARENT
+        };
+        if overlay_ui
+            .add_enabled(
+                has_doc,
+                egui::Button::new(crate::Icon::Toc.as_str())
+                    .min_size(button_size)
+                    .fill(toc_bg),
+            )
+            .on_hover_text(crate::i18n::get().action.toggle_toc.clone())
+            .clicked()
+        {
+            *action = AppAction::ToggleToc;
+        }
+    }
 }
 
 /// Tab bar: Displays tabs of open documents side-by-side.
 pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
     const MAX_TAB_WIDTH: f32 = 200.0;
+    const PINNED_TAB_MAX_WIDTH: f32 = 60.0;
 
     let mut close_idx: Option<usize> = None;
     let mut tab_action: Option<AppAction> = None;
+    let mut dragged_source: Option<(usize, egui::Pos2)> = None;
+    let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
 
     let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
     let doc_count = state.open_documents.len();
@@ -461,24 +492,87 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                         let is_active = state.active_doc_idx == Some(idx);
                         let filename = doc.file_name().unwrap_or("untitled").to_string();
                         let dirty_suffix = if doc.is_dirty { " *" } else { "" };
-                        let title = format!("{filename}{dirty_suffix}");
+                        let title = if doc.is_pinned {
+                            format!("📌 {filename}{dirty_suffix}")
+                        } else {
+                            format!("{filename}{dirty_suffix}")
+                        };
                         let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
 
                         let resp = ui
                             .push_id(format!("tab_{idx}"), |ui| {
-                                ui.set_max_width(MAX_TAB_WIDTH);
+                                ui.set_max_width(if doc.is_pinned {
+                                    PINNED_TAB_MAX_WIDTH
+                                } else {
+                                    MAX_TAB_WIDTH
+                                });
                                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-                                ui.selectable_label(is_active, &title)
+                                let inner_resp = ui.selectable_label(is_active, &title);
+                                ui.interact(
+                                    inner_resp.rect,
+                                    inner_resp.id,
+                                    egui::Sense::click_and_drag(),
+                                )
                             })
                             .inner;
 
+                        tab_rects.push((idx, resp.rect));
+                        if resp.drag_stopped() {
+                            if let Some(pos) = ui.input(|i| i.pointer.hover_pos()) {
+                                dragged_source = Some((idx, pos));
+                            }
+                        }
+
                         let clicked = resp.clicked();
-                        resp.on_hover_text(&tooltip_path);
+                        let resp = resp.on_hover_text(&tooltip_path);
+
+                        resp.context_menu(|ui| {
+                            let i18n = crate::i18n::get();
+
+                            if ui.button(&i18n.tab.close).clicked() {
+                                tab_action = Some(AppAction::CloseDocument(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_others).clicked() {
+                                tab_action = Some(AppAction::CloseOtherDocuments(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_all).clicked() {
+                                tab_action = Some(AppAction::CloseAllDocuments);
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_right).clicked() {
+                                tab_action = Some(AppAction::CloseDocumentsToRight(idx));
+                                ui.close();
+                            }
+                            if ui.button(&i18n.tab.close_left).clicked() {
+                                tab_action = Some(AppAction::CloseDocumentsToLeft(idx));
+                                ui.close();
+                            }
+                            ui.separator();
+                            let pin_label = if doc.is_pinned {
+                                &i18n.tab.unpin
+                            } else {
+                                &i18n.tab.pin
+                            };
+                            if ui.button(pin_label).clicked() {
+                                tab_action = Some(AppAction::TogglePinDocument(idx));
+                                ui.close();
+                            }
+                            if !state.recently_closed_tabs.is_empty() {
+                                ui.separator();
+                                if ui.button(&i18n.tab.restore_closed).clicked() {
+                                    tab_action = Some(AppAction::RestoreClosedDocument);
+                                    ui.close();
+                                }
+                            }
+                        });
+
                         if clicked && !is_active {
                             tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
                         }
 
-                        if ui.small_button("x").clicked() {
+                        if ui.small_button(crate::Icon::Close.as_str()).clicked() {
                             close_idx = Some(idx);
                         }
                         ui.add_space(TAB_INTER_ITEM_SPACING);
@@ -490,7 +584,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
 
         let nav_enabled = doc_count > 1;
         if ui
-            .add_enabled(nav_enabled, egui::Button::new("◀").small())
+            .add_enabled(
+                nav_enabled,
+                egui::Button::new(crate::Icon::TriangleLeft.as_str()).small(),
+            )
             .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
         {
@@ -502,7 +599,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             }
         }
         if ui
-            .add_enabled(nav_enabled, egui::Button::new("▶").small())
+            .add_enabled(
+                nav_enabled,
+                egui::Button::new(crate::Icon::TriangleRight.as_str()).small(),
+            )
             .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
         {
@@ -514,6 +614,18 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             }
         }
     });
+
+    if let Some((src_idx, drop_pos)) = dragged_source {
+        for (target_idx, rect) in &tab_rects {
+            if rect.contains(drop_pos) && src_idx != *target_idx {
+                tab_action = Some(AppAction::ReorderDocument {
+                    from: src_idx,
+                    to: *target_idx,
+                });
+                break;
+            }
+        }
+    }
 
     if let Some(action_val) = tab_action {
         *action = action_val;
@@ -644,15 +756,99 @@ pub(crate) fn render_editor_content(
         }
 
         let output = scroll_area.show(ui, |ui| {
-            let response = ui.add(
-                egui::TextEdit::multiline(&mut buffer)
+            ui.horizontal_top(|ui| {
+                const LINE_NUMBER_MARGIN: f32 = 40.0;
+                const LINE_NUMBER_PAD_RIGHT: f32 = 8.0;
+                let left_margin = LINE_NUMBER_MARGIN;
+                let (ln_rect, _) =
+                    ui.allocate_exact_size(egui::vec2(left_margin, 0.0), egui::Sense::hover());
+                let text_output = egui::TextEdit::multiline(&mut buffer)
                     .font(egui::TextStyle::Monospace)
                     .desired_width(f32::INFINITY)
-                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS),
-            );
-            if response.changed() {
-                *action = AppAction::UpdateBuffer(buffer);
-            }
+                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS)
+                    .frame(false)
+                    .show(ui);
+                let response = text_output.response;
+                let galley = text_output.galley;
+
+                // Draw current line background
+                let mut current_cursor_y = None;
+                if let Some(c) = text_output.cursor_range {
+                    let cursor_rect = galley.pos_from_cursor(c.primary);
+                    current_cursor_y = Some(cursor_rect.min.y);
+
+                    let min_y = cursor_rect.min.y;
+                    let max_y = cursor_rect.max.y;
+
+                    let highlight_rect = egui::Rect::from_min_max(
+                        egui::pos2(ln_rect.min.x, response.rect.min.y + min_y),
+                        egui::pos2(response.rect.max.x, response.rect.min.y + max_y),
+                    );
+
+                    const HIGHLIGHT_ALPHA: u8 = 15;
+                    let highlight_color = if ui.visuals().dark_mode {
+                        egui::Color32::from_white_alpha(HIGHLIGHT_ALPHA)
+                    } else {
+                        egui::Color32::from_black_alpha(HIGHLIGHT_ALPHA)
+                    };
+                    ui.painter()
+                        .rect_filled(highlight_rect, 0.0, highlight_color);
+                }
+
+                // Draw line numbers
+                let clip_rect = ui.clip_rect().expand(100.0);
+
+                let mut p = 0;
+                let mut is_start_of_para = true;
+
+                for row in &galley.rows {
+                    let top_y = row.rect().min.y;
+                    let y = response.rect.min.y + top_y;
+
+                    if is_start_of_para
+                        && y <= clip_rect.max.y
+                        && (y + row.rect().height()) >= clip_rect.min.y
+                    {
+                        let is_current = current_cursor_y == Some(top_y);
+                        let text = format!("{}", p + 1);
+                        let color = if is_current {
+                            ui.visuals().text_color()
+                        } else {
+                            ui.visuals().weak_text_color()
+                        };
+                        let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+
+                        let label_rect = egui::Rect::from_min_size(
+                            egui::pos2(ln_rect.min.x, y),
+                            egui::vec2(left_margin - LINE_NUMBER_PAD_RIGHT, row.rect().height()),
+                        );
+                        let mut text_rt = egui::RichText::new(text).color(color).font(font_id);
+                        if is_current {
+                            text_rt = text_rt.strong();
+                        }
+                        let label = egui::Label::new(text_rt).selectable(false);
+                        // align right
+                        let galley_ln = label.layout_in_ui(ui);
+                        let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
+                        ui.put(
+                            label_rect.translate(egui::vec2(offset_x, 0.0)),
+                            egui::Label::new(galley_ln.1),
+                        ); // just use the laid out text or label again
+                    }
+
+                    is_start_of_para = row.ends_with_newline;
+                    if row.ends_with_newline {
+                        p += 1;
+                    }
+                }
+
+                if response.changed() {
+                    *action = AppAction::UpdateBuffer(buffer);
+                }
+
+                response
+            })
+            .inner
         });
 
         if sync_scroll {
@@ -1339,6 +1535,20 @@ impl eframe::App for KatanaApp {
 
         if ctx.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers {
+                    command: true,
+                    shift: true,
+                    ..Default::default()
+                },
+                egui::Key::T,
+            ))
+        }) && !self.state.recently_closed_tabs.is_empty()
+        {
+            self.pending_action = AppAction::RestoreClosedDocument;
+        }
+
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::COMMAND,
                 egui::Key::P,
             ))
@@ -1441,7 +1651,7 @@ impl eframe::App for KatanaApp {
                 .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
                         if ui
-                            .button("›")
+                            .button(crate::Icon::ChevronRight.as_str())
                             .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                             .clicked()
                         {
@@ -1463,7 +1673,9 @@ impl eframe::App for KatanaApp {
                     let segments: Vec<&str> = rel.split('/').collect();
                     for (i, seg) in segments.iter().enumerate() {
                         if i > 0 {
-                            ui.label(egui::RichText::new("›").small());
+                            ui.label(
+                                egui::RichText::new(crate::Icon::ChevronRight.as_str()).small(),
+                            );
                         }
                         ui.label(egui::RichText::new(*seg).small());
                     }
@@ -1475,6 +1687,14 @@ impl eframe::App for KatanaApp {
         let mut download_req: Option<DownloadRequest> = None;
         let current_mode = self.state.active_view_mode();
         let is_split = current_mode == ViewMode::Split;
+
+        if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
+            if let Some(doc) = self.state.active_document() {
+                if let Some(preview) = self.tab_previews.iter_mut().find(|p| p.path == doc.path) {
+                    render_toc_panel(ctx, &mut preview.pane, &self.state);
+                }
+            }
+        }
 
         if is_split {
             let split_dir = self.state.active_split_direction();
@@ -1548,6 +1768,11 @@ impl eframe::App for KatanaApp {
         if !unprocessed_commands.is_empty() {
             ctx.output_mut(|o| o.commands.extend(unprocessed_commands));
         }
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // Persist the open tabs state right before the application process is terminated
+        self.save_workspace_state();
     }
 }
 
@@ -2432,7 +2657,7 @@ fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(label).weak());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.hyperlink_to("↗", url);
+            ui.hyperlink_to(crate::Icon::ExternalLink.as_str(), url);
         });
     });
 }
@@ -2565,4 +2790,82 @@ pub(crate) fn render_search_modal(
     if !is_open {
         state.show_search_modal = false;
     }
+}
+
+const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+const TOC_PANEL_MARGIN: f32 = 8.0;
+const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
+const TOC_INDENT_PER_LEVEL: f32 = 12.0;
+
+pub(crate) fn render_toc_panel(
+    ctx: &egui::Context,
+    preview: &mut crate::preview_pane::PreviewPane,
+    state: &crate::app_state::AppState,
+) {
+    use katana_platform::settings::TocPosition;
+    let position = state.settings.settings().layout.toc_position;
+
+    let panel = match position {
+        TocPosition::Left => egui::SidePanel::left("toc_panel"),
+        TocPosition::Right => egui::SidePanel::right("toc_panel"),
+    };
+
+    let frame = egui::Frame::side_top_panel(&ctx.style()).inner_margin(TOC_PANEL_MARGIN);
+
+    panel
+        .frame(frame)
+        .resizable(true)
+        .default_width(TOC_PANEL_DEFAULT_WIDTH)
+        .show(ctx, |ui| {
+            ui.heading(crate::i18n::get().toc.title.clone());
+            ui.separator();
+
+            // Prevent text from wrapping or pushing the SidePanel width. Text will truncate with `...`
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+
+            egui::ScrollArea::vertical()
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    if preview.outline_items.is_empty() {
+                        ui.label(
+                            egui::RichText::new(crate::i18n::get().toc.empty.clone())
+                                .weak()
+                                .italics(),
+                        );
+                    } else {
+                        let mut active_index = 0;
+                        if let Some(visible_rect) = preview.visible_rect {
+                            let threshold = visible_rect.min.y + TOC_HEADING_VISIBILITY_THRESHOLD;
+                            for (i, rect) in preview.heading_rects.iter().enumerate() {
+                                if rect.min.y <= threshold {
+                                    active_index = i;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        let mut next_scroll = None;
+                        for (i, item) in preview.outline_items.iter().enumerate() {
+                            let indent = (item.level as f32 - 1.0) * TOC_INDENT_PER_LEVEL;
+                            ui.horizontal(|ui| {
+                                ui.add_space(indent);
+                                let is_active = i == active_index;
+                                let mut text = egui::RichText::new(&item.text);
+                                if is_active {
+                                    text = text
+                                        .strong()
+                                        .color(ui.visuals().widgets.active.text_color());
+                                }
+                                if ui.selectable_label(is_active, text).clicked() {
+                                    next_scroll = Some(item.index);
+                                }
+                            });
+                        }
+                        if next_scroll.is_some() {
+                            preview.scroll_request = next_scroll;
+                        }
+                    }
+                });
+        });
 }

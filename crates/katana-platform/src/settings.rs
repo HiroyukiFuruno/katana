@@ -23,6 +23,16 @@ pub enum SplitDirection {
     Vertical,
 }
 
+/// Position of the Table of Contents panel in the workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum TocPosition {
+    /// Left side of the workspace.
+    #[default]
+    Left,
+    /// Right side of the workspace.
+    Right,
+}
+
 /// Pane order within the split view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum PaneOrder {
@@ -117,14 +127,31 @@ impl Default for FontSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutSettings {
     #[serde(default)]
     pub split_direction: SplitDirection,
     #[serde(default)]
     pub pane_order: PaneOrder,
-    #[serde(default)]
+    #[serde(default = "crate::settings::default_true")]
     pub toc_visible: bool,
+    #[serde(default)]
+    pub toc_position: TocPosition,
+}
+
+impl Default for LayoutSettings {
+    fn default() -> Self {
+        Self {
+            split_direction: Default::default(),
+            pane_order: Default::default(),
+            toc_visible: true,
+            toc_position: Default::default(),
+        }
+    }
+}
+
+pub(crate) fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -410,6 +437,13 @@ mod tests {
     use super::*;
     use crate::theme::Rgb;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_layout_settings_default_deserialization() {
+        let json = "{}";
+        let layout: LayoutSettings = serde_json::from_str(json).unwrap();
+        assert!(layout.toc_visible);
+    }
 
     #[test]
     fn test_app_settings_default_values() {

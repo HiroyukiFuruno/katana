@@ -74,12 +74,28 @@ pub enum AppAction {
     ChangeLanguage(String),
     /// Toggle the settings window.
     ToggleSettings,
+    /// Toggle the table of contents panel.
+    ToggleToc,
     /// Change the split view direction (Horizontal / Vertical).
     SetSplitDirection(katana_platform::SplitDirection),
     /// Change the pane order within the split view (EditorFirst / PreviewFirst).
     SetPaneOrder(katana_platform::PaneOrder),
     /// Reload the workspace directory tree from disk.
     RefreshWorkspace,
+    /// Close other tabs besides the target.
+    CloseOtherDocuments(usize),
+    /// Close all tabs.
+    CloseAllDocuments,
+    /// Close tabs to the right of the target.
+    CloseDocumentsToRight(usize),
+    /// Close tabs to the left of the target.
+    CloseDocumentsToLeft(usize),
+    /// Toggle pin state of a tab.
+    TogglePinDocument(usize),
+    /// Restore the most recently closed tab.
+    RestoreClosedDocument,
+    /// Reorder tab from one index to another.
+    ReorderDocument { from: usize, to: usize },
     /// No-op (used internally).
     None,
 }
@@ -111,6 +127,8 @@ pub struct AppState {
     pub filter_cache: Option<(String, std::collections::HashSet<std::path::PathBuf>)>,
     /// Show/hide the settings window.
     pub show_settings: bool,
+    /// Show/hide the table of contents panel.
+    pub show_toc: bool,
     /// Show/hide the search modal.
     pub show_search_modal: bool,
     /// The search query for the file search modal.
@@ -143,6 +161,8 @@ pub struct AppState {
     pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     /// Set of manually expanded directories in the workspace tree.
     pub expanded_directories: std::collections::HashSet<std::path::PathBuf>,
+    /// History of closed tabs to enable restoring (LIFO).
+    pub recently_closed_tabs: std::collections::VecDeque<std::path::PathBuf>,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -179,6 +199,7 @@ impl AppState {
             filter_query: String::new(),
             filter_cache: None,
             show_settings: false,
+            show_toc: false,
             show_search_modal: false,
             search_query: String::new(),
             search_include_pattern: String::new(),
@@ -195,6 +216,7 @@ impl AppState {
             is_loading_workspace: false,
             cache,
             expanded_directories: std::collections::HashSet::new(),
+            recently_closed_tabs: std::collections::VecDeque::new(),
         }
     }
 
@@ -326,6 +348,16 @@ impl AppState {
             });
         }
     }
+
+    pub const MAX_RECENTLY_CLOSED_TABS: usize = 10;
+
+    /// Pushes a file path to the history of recently closed tabs, honoring a 10-item LIFO cap.
+    pub fn push_recently_closed(&mut self, path: std::path::PathBuf) {
+        if self.recently_closed_tabs.len() >= Self::MAX_RECENTLY_CLOSED_TABS {
+            self.recently_closed_tabs.pop_front();
+        }
+        self.recently_closed_tabs.push_back(path);
+    }
 }
 
 #[cfg(test)]
@@ -347,6 +379,7 @@ mod tests {
             buffer: String::new(),
             is_dirty: false,
             is_loaded: true,
+            is_pinned: false,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(0);
@@ -388,6 +421,7 @@ mod tests {
             buffer: String::new(),
             is_dirty: false,
             is_loaded: true,
+            is_pinned: false,
         };
         state.open_documents.push(doc);
         state.active_doc_idx = Some(1);
@@ -418,6 +452,7 @@ mod tests {
             buffer: String::new(),
             is_dirty: false,
             is_loaded: true,
+            is_pinned: false,
         });
         state.active_doc_idx = Some(1);
         state.initialize_tab_split_state("/tmp/b.md");

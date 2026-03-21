@@ -18,6 +18,14 @@ pub struct I18nMessages {
     pub settings: SettingsMessages,
     pub tab: TabMessages,
     pub search: SearchMessages,
+    pub toc: TocMessages,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct TocMessages {
+    pub title: String,
+    pub empty: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,6 +131,8 @@ pub struct ActionMessages {
     pub recursive_expand: String,
     #[serde(default)]
     pub recursive_open_all: String,
+    #[serde(default)]
+    pub toggle_toc: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -196,6 +206,9 @@ pub struct SettingsLayoutMessages {
     pub pane_order: String,
     pub editor_first: String,
     pub preview_first: String,
+    pub toc_position: String,
+    pub left: String,
+    pub right: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -228,6 +241,22 @@ pub struct SettingsColorMessages {
 pub struct TabMessages {
     pub nav_prev: String,
     pub nav_next: String,
+    #[serde(default)]
+    pub close: String,
+    #[serde(default)]
+    pub close_others: String,
+    #[serde(default)]
+    pub close_all: String,
+    #[serde(default)]
+    pub close_right: String,
+    #[serde(default)]
+    pub close_left: String,
+    #[serde(default)]
+    pub pin: String,
+    #[serde(default)]
+    pub unpin: String,
+    #[serde(default)]
+    pub restore_closed: String,
 }
 
 /// Language definition JSON entry.

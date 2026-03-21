@@ -79,8 +79,17 @@ struct DefinitionList {
     is_def_list_def: bool,
 }
 
-pub struct CommonMarkViewerInternal {
+pub(crate) struct CheckboxClickEvent {
+    pub(crate) checked: bool,
+    pub(crate) span: Range<usize>,
+}
+
+pub(crate) struct CommonMarkViewerInternal<'a> {
     curr_table: usize,
+    curr_heading: usize,
+    curr_heading_start_y: Option<f32>,
+    scroll_to_heading_index: Option<usize>,
+    populate_heading_rects: Option<&'a mut Vec<egui::Rect>>,
     text_style: Style,
     pending_inline: Vec<RichText>,
     after_inline_widget: bool,
@@ -88,26 +97,27 @@ pub struct CommonMarkViewerInternal {
     link: Option<Link>,
     image: Option<Image>,
     line: Newline,
-    code_block: Option<CodeBlock>,
-
-    /// Only populated if the html_fn option has been set
-    html_block: String,
     is_list_item: bool,
     def_list: DefinitionList,
+    code_block: Option<CodeBlock>,
+    html_block: String,
     is_table: bool,
     is_blockquote: bool,
     checkbox_events: Vec<CheckboxClickEvent>,
 }
 
-pub(crate) struct CheckboxClickEvent {
-    pub(crate) checked: bool,
-    pub(crate) span: Range<usize>,
-}
-
-impl CommonMarkViewerInternal {
-    pub fn new() -> Self {
+impl<'a> CommonMarkViewerInternal<'a> {
+    pub fn new(
+        scroll_to_heading_index: Option<usize>,
+        populate_heading_rects: Option<&'a mut Vec<egui::Rect>>,
+        heading_offset: usize,
+    ) -> Self {
         Self {
             curr_table: 0,
+            curr_heading: heading_offset,
+            curr_heading_start_y: None,
+            scroll_to_heading_index,
+            populate_heading_rects,
             text_style: Style::default(),
             pending_inline: Vec::new(),
             after_inline_widget: false,
@@ -178,7 +188,7 @@ fn render_blockquote(ui: &mut Ui, accent: egui::Color32, add_contents: impl FnOn
     );
 }
 
-impl CommonMarkViewerInternal {
+impl<'a> CommonMarkViewerInternal<'a> {
     fn flush_pending_inline(&mut self, ui: &mut Ui, max_width: f32) {
         if self.pending_inline.is_empty() {
             return;
@@ -836,6 +846,14 @@ impl CommonMarkViewerInternal {
                 // Headings should always insert a newline even if it is at the start.
                 // Whether this is okay in all scenarios is a different question.
                 newline(ui);
+
+                if let Some(target_idx) = self.scroll_to_heading_index {
+                    if target_idx == self.curr_heading {
+                        ui.scroll_to_cursor(Some(egui::Align::TOP));
+                    }
+                }
+                self.curr_heading_start_y = Some(ui.next_widget_position().y);
+
                 self.text_style.heading = Some(match level {
                     HeadingLevel::H1 => 0,
                     HeadingLevel::H2 => 1,
@@ -854,13 +872,13 @@ impl CommonMarkViewerInternal {
             pulldown_cmark::Tag::CodeBlock(c) => {
                 match c {
                     pulldown_cmark::CodeBlockKind::Fenced(lang) => {
-                        self.code_block = Some(crate::CodeBlock {
+                        self.code_block = Some(CodeBlock {
                             lang: Some(lang.to_string()),
                             content: "".to_string(),
                         });
                     }
                     pulldown_cmark::CodeBlockKind::Indented => {
-                        self.code_block = Some(crate::CodeBlock {
+                        self.code_block = Some(CodeBlock {
                             lang: None,
                             content: "".to_string(),
                         });
@@ -911,13 +929,13 @@ impl CommonMarkViewerInternal {
                 self.text_style.strikethrough = true;
             }
             pulldown_cmark::Tag::Link { dest_url, .. } => {
-                self.link = Some(crate::Link {
+                self.link = Some(Link {
                     destination: dest_url.to_string(),
                     text: Vec::new(),
                 });
             }
             pulldown_cmark::Tag::Image { dest_url, .. } => {
-                self.image = Some(crate::Image::new(&dest_url, options));
+                self.image = Some(Image::new(&dest_url, options));
             }
             pulldown_cmark::Tag::HtmlBlock => {
                 self.line.try_insert_start(ui);
@@ -960,6 +978,17 @@ impl CommonMarkViewerInternal {
             pulldown_cmark::TagEnd::Heading { .. } => {
                 self.line.try_insert_end(ui);
                 self.text_style.heading = None;
+                
+                if let (Some(rects), Some(start_y)) = (&mut self.populate_heading_rects, self.curr_heading_start_y) {
+                    let end_y = ui.next_widget_position().y;
+                    let width = ui.available_width();
+                    let min_x = ui.min_rect().left();
+                    rects.push(egui::Rect::from_min_max(
+                        egui::pos2(min_x, start_y),
+                        egui::pos2(min_x + width, end_y),
+                    ));
+                }
+                self.curr_heading += 1;
             }
             pulldown_cmark::TagEnd::BlockQuote(_) => {}
             pulldown_cmark::TagEnd::CodeBlock => {

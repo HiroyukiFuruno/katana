@@ -446,10 +446,9 @@ fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService
         .unwrap_or_default();
 
     // ── Trigger button (shows current value, opens popup on click) ────────
-    let button_resp = ui.add(
-        egui::Button::new(format!("{current}  ▾"))
-            .min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)),
-    );
+    let button_text = format!("{current}  {}", crate::Icon::TriangleDown.as_str());
+    let button_resp = ui
+        .add(egui::Button::new(button_text).min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)));
     if button_resp.clicked() {
         let new_state = !is_open;
         ui.data_mut(|d| d.insert_temp(open_id, new_state));
@@ -590,23 +589,97 @@ fn render_layout_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) 
     section_header(ui, &title);
     render_toc_toggle(ui, &mut state.settings);
     ui.add_space(SECTION_SPACING);
+    render_toc_position_selector(ui, state);
+    ui.add_space(SECTION_SPACING);
     render_split_direction_selector(ui, state);
     ui.add_space(LAYOUT_SELECTOR_SPACING);
     render_pane_order_selector(ui, state);
 }
 
+fn toggle_ui(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
+    let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
+    let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        *on = !*on;
+        response.mark_changed();
+    }
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), *on, "")
+    });
+
+    if ui.is_rect_visible(rect) {
+        let how_on = ui.ctx().animate_bool(response.id, *on);
+        let visuals = ui.style().interact_selectable(&response, *on);
+        let rect = rect.expand(visuals.expansion);
+        const TOGGLE_RADIUS_RATIO: f32 = 0.5;
+        let radius = TOGGLE_RADIUS_RATIO * rect.height();
+        ui.painter().rect(
+            rect,
+            radius,
+            visuals.bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        let circle_x = egui::lerp((rect.left() + radius)..=(rect.right() - radius), how_on);
+        let center = egui::pos2(circle_x, rect.center().y);
+        const TOGGLE_CIRCLE_RATIO: f32 = 0.75;
+        ui.painter().circle(
+            center,
+            TOGGLE_CIRCLE_RATIO * radius,
+            visuals.bg_fill,
+            visuals.fg_stroke,
+        );
+    }
+
+    response
+}
+
 fn render_toc_toggle(ui: &mut egui::Ui, settings: &mut SettingsService) {
     let mut toc_visible = settings.settings().layout.toc_visible;
-    if ui
-        .checkbox(
-            &mut toc_visible,
-            crate::i18n::get().settings.toc_visible.clone(),
-        )
-        .changed()
-    {
-        settings.settings_mut().layout.toc_visible = toc_visible;
-        let _ = settings.save();
+    ui.horizontal(|ui| {
+        ui.label(crate::i18n::get().settings.toc_visible.clone());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if toggle_ui(ui, &mut toc_visible).changed() {
+                settings.settings_mut().layout.toc_visible = toc_visible;
+                let _ = settings.save();
+            }
+        });
+    });
+}
+
+fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
+    if !state.settings.settings().layout.toc_visible {
+        return;
     }
+
+    use katana_platform::settings::TocPosition;
+
+    ui.label(crate::i18n::get().settings.layout.toc_position.clone());
+    ui.horizontal(|ui| {
+        let current = state.settings.settings().layout.toc_position;
+        if ui
+            .selectable_label(
+                current == TocPosition::Left,
+                crate::i18n::get().settings.layout.left.clone(),
+            )
+            .clicked()
+            && current != TocPosition::Left
+        {
+            state.settings.settings_mut().layout.toc_position = TocPosition::Left;
+            let _ = state.settings.save();
+        }
+        if ui
+            .selectable_label(
+                current == TocPosition::Right,
+                crate::i18n::get().settings.layout.right.clone(),
+            )
+            .clicked()
+            && current != TocPosition::Right
+        {
+            state.settings.settings_mut().layout.toc_position = TocPosition::Right;
+            let _ = state.settings.save();
+        }
+    });
 }
 
 fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
