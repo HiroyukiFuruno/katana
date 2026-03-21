@@ -75,12 +75,12 @@ pub fn format_metadata_tooltip(
     )
 }
 
+pub const SPLASH_FADE_DURATION: f32 = 0.5;
+pub const SPLASH_VISIBLE_DURATION: f32 = 1.0;
+
 /// Calculates the splash screen opacity based on elapsed time.
 /// Returns a value between 0.0 and 1.0.
 pub fn calculate_splash_opacity(elapsed_secs: f32) -> f32 {
-    const SPLASH_FADE_DURATION: f32 = 0.5;
-    const SPLASH_VISIBLE_DURATION: f32 = 1.0;
-
     if elapsed_secs <= SPLASH_VISIBLE_DURATION {
         1.0
     } else if elapsed_secs <= SPLASH_VISIBLE_DURATION + SPLASH_FADE_DURATION {
@@ -88,6 +88,12 @@ pub fn calculate_splash_opacity(elapsed_secs: f32) -> f32 {
     } else {
         0.0
     }
+}
+
+/// Calculates the splash screen progress bar ratio based on elapsed time.
+/// Returns a value between 0.0 and 1.0.
+pub fn calculate_splash_progress(elapsed_secs: f32) -> f32 {
+    (elapsed_secs / SPLASH_VISIBLE_DURATION).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -267,6 +273,14 @@ mod tests {
         // Clamped at 0.0 after 1.5 seconds
         assert_eq!(calculate_splash_opacity(1.5), 0.0);
         assert_eq!(calculate_splash_opacity(2.0), 0.0);
+    }
+
+    #[test]
+    fn test_calculate_splash_progress() {
+        assert_eq!(calculate_splash_progress(0.0), 0.0);
+        assert_eq!(calculate_splash_progress(0.5), 0.5);
+        assert_eq!(calculate_splash_progress(1.0), 1.0);
+        assert_eq!(calculate_splash_progress(1.5), 1.0);
     }
 }
 

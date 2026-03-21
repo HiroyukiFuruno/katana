@@ -1790,6 +1790,16 @@ impl eframe::App for KatanaApp {
                         const SPLASH_HEADING_SIZE: f32 = 32.0;
                         const SPLASH_HEADING_SPACING: f32 = 8.0;
                         const SPLASH_VERSION_SIZE: f32 = 16.0;
+                        const SPLASH_PROGRESS_SPACING: f32 = 24.0;
+                        const SPLASH_PROGRESS_WIDTH: f32 = 240.0;
+                        const SPLASH_PROGRESS_PHASE1: f32 = 0.25;
+                        const SPLASH_PROGRESS_PHASE2: f32 = 0.6;
+                        const SPLASH_PROGRESS_PHASE3: f32 = 0.95;
+                        const SPLASH_PROGRESS_TEXT_SIZE: f32 = 12.0;
+                        const SPLASH_PROGRESS_TEXT_DIM: f32 = 0.7;
+                        const SPLASH_PROGRESS_BAR_MARGIN: f32 = 4.0;
+                        const SPLASH_PROGRESS_BG_LIGHT: u8 = 100;
+                        const SPLASH_PROGRESS_BG_DARK: u8 = 200;
 
                         let is_dark = ctx.style().visuals.dark_mode;
                         let content_rect = ctx.content_rect();
@@ -1837,6 +1847,53 @@ impl eframe::App for KatanaApp {
                                         .size(SPLASH_VERSION_SIZE)
                                         .color(text_color);
                                     ui.label(version);
+
+                                    ui.add_space(SPLASH_PROGRESS_SPACING);
+                                    let progress =
+                                        crate::shell_logic::calculate_splash_progress(elapsed);
+
+                                    let progress_text = if progress < SPLASH_PROGRESS_PHASE1 {
+                                        "Initializing Katana engine..."
+                                    } else if progress < SPLASH_PROGRESS_PHASE2 {
+                                        "Parsing workspace structure..."
+                                    } else if progress < SPLASH_PROGRESS_PHASE3 {
+                                        "Increasing context size... w"
+                                    } else {
+                                        "Ready."
+                                    };
+
+                                    ui.label(
+                                        egui::RichText::new(progress_text)
+                                            .size(SPLASH_PROGRESS_TEXT_SIZE)
+                                            .color(
+                                                text_color.gamma_multiply(SPLASH_PROGRESS_TEXT_DIM),
+                                            ),
+                                    );
+                                    ui.add_space(SPLASH_PROGRESS_BAR_MARGIN);
+                                    let progress_bar = egui::ProgressBar::new(progress)
+                                        .desired_width(SPLASH_PROGRESS_WIDTH)
+                                        .show_percentage();
+
+                                    // Add a little visual flair to the progress bar by tinting it based on the theme
+                                    if !is_dark {
+                                        ui.visuals_mut().selection.bg_fill =
+                                            egui::Color32::from_rgb(
+                                                SPLASH_PROGRESS_BG_LIGHT,
+                                                SPLASH_PROGRESS_BG_LIGHT,
+                                                SPLASH_PROGRESS_BG_LIGHT,
+                                            )
+                                            .gamma_multiply(opacity);
+                                    } else {
+                                        ui.visuals_mut().selection.bg_fill =
+                                            egui::Color32::from_rgb(
+                                                SPLASH_PROGRESS_BG_DARK,
+                                                SPLASH_PROGRESS_BG_DARK,
+                                                SPLASH_PROGRESS_BG_DARK,
+                                            )
+                                            .gamma_multiply(opacity);
+                                    }
+
+                                    ui.add(progress_bar);
                                 });
                             });
                         });
