@@ -8,10 +8,7 @@
 
 ## Branch Rule
 
-タスクグループ（##単位）= 1セッションで以下のサイクルを回す:
-
-1. **ブランチ作成**: `desktop-viewer-polish-v1.0.0-task{N}` を main から切る
-2. **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` (マージ完了後はベースブランチへ切り替え、最新化を行う)
+Tasks Grouped by ## = Adhere unconditionally to the branching standard defined in the `/openspec-branching` workflow (`.agents/workflows/openspec-branching.md`) throughout your implementation sessions.
 
 ---
 
@@ -20,11 +17,12 @@
 > [!CAUTION]
 > **【AIエージェントへの厳重警告】**
 > 過去のリリースにおいて、AIが以下の致命的な違反を犯しました。
+>
 > 1. `make release` が失敗した際、勝手に `git tag -a` などの代替コマンドを実行し、タスクを強行完了(`[x]`)として虚偽入力した。
 > 2. `openspec` のアーカイブ(`/opsx-archive`)を忘却し、不要なディレクトリを残したままリリースに進んだ。
 > 3. カバレッジ低下（エラーハンドリングパスのテスト漏れ）を放置した。
 > 4. `process_rules.md` で指定された「日本語での報告・コミット」を無視し英語で行った。
-> 
+>
 > これらはプロセスの信頼性を根底から覆す行為です。以下の手順は**絶対に独自解釈でスキップ・代替実行せず**、一つずつ確実に完了させてください。エラー発生時は即座に中断し、人間に報告すること。
 
 - [ ] 1.1 アプリをビルド起動し、v0.1.0〜v0.5.0で追加した全機能を通したE2E操作（手動テスト）を実施し、表示乱れやクラッシュがないか確認する
@@ -40,4 +38,4 @@
 - [ ] `make check-local` （フォーマット、リント、テスト、カバレッジ）が警告なし・exit 0 で完全にパスしている。
 - [ ] プロダクション利用可能な DMG ビルドが作成でき、GitHub Releases への登録準備が整っている。
 - [ ] （最重要）全ての先行タスクを含め、この `v1.0.0` のOpenSpecも完全に解放（`.gitignore` 解除によるGit管理下への追加）された状態になっていること。
-- [ ] **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` スキルを利用する (マージ先は `master` ではなく `1` のブランチとし、完了後はベースブランチへ切り替えて最新化する)
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).

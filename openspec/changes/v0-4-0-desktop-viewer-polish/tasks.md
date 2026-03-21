@@ -6,11 +6,7 @@
 
 ## Branch Rule
 
-タスクグループ（##単位）= 1セッションで以下のサイクルを回す:
-
-1. **ベースブランチ作成**: 最初に `desktop-viewer-polish-v0.4.0` を `master` から作成する
-2. **タスクブランチ作成**: 各タスクごとの作業は `1` のブランチから `desktop-viewer-polish-v0.4.0-task{N}` を派生させる
-3. **実装 / PR / セルフレビュー / マージ**: `/opsx-apply` (マージ先は `master` ではなく `1` のブランチとする。マージ完了後は `1` のベースブランチへ切り替え、最新化を行う)
+Tasks Grouped by ## = Adhere unconditionally to the branching standard defined in the `/openspec-branching` workflow (`.agents/workflows/openspec-branching.md`) throughout your implementation sessions.
 
 ---
 
@@ -25,10 +21,7 @@
 - [x] Markdown内の相対パス画像（PNG, JPG, GIF, SVGs）が表示されること。
 - [x] 未ロード中または未発見時には適切なプレースホルダーが表示されること。
 - [x] `make check-local` が exit 0 で全てパスすること。
-- [x] `.agents/skills/self-review/SKILL.md` を利用して自己レビューと品質確認を行うこと。
-- [x] `.agents/skills/commit_and_push/SKILL.md` を利用してコミットとプッシュを行うこと。
-- [x] `.agents/skills/create_pull_request/SKILL.md` を利用してタスクPRを作成すること。
-- [x] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -43,7 +36,7 @@
 - [ ] アプリ起動時に独立したスプラッシュ画面が表示され、その後メインUIに遷移すること。
 - [ ] ユーザーのクリック操作で瞬時にスキップできること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] Execute `.agents/skills/openspec-delivery/SKILL.md` to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -57,7 +50,7 @@
 
 - [ ] OSネイティブのメニューから About, Help の各種ダイアログ（または遷移）が正常に呼び出せること。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] Execute `.agents/skills/openspec-delivery/SKILL.md` to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -72,10 +65,7 @@
 - [ ] Markdown内の画像およびダイアグラム上にコントロールUIが表示され、拡大・縮小などのパン＆ズーム操作が正常に行えること。
 - [ ] モーダルでの別表示機能が正常に動作し、元のプレビュー画面全体のレイアウトに干渉したりアプリがクラッシュしないこと。
 - [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] `.agents/skills/self-review/SKILL.md` を利用して自己レビューと品質確認を行うこと。
-- [ ] `.agents/skills/commit_and_push/SKILL.md` を利用してコミットとプッシュを行うこと。
-- [ ] `.agents/skills/create_pull_request/SKILL.md` を利用してタスクPRを作成すること。
-- [ ] `gh pr merge` 等を利用し、ベースブランチへマージして最新化すること。
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
