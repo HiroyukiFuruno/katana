@@ -18,12 +18,12 @@ fi
 
 VERSION_NUM="${VERSION#v}"
 
-# Token Selection: Use HOMEVREW_KATANA_GIT_TOKEN (local) or HOMEBREW_TAP_TOKEN (CI)
-TOKEN="${HOMEVREW_KATANA_GIT_TOKEN:-${HOMEBREW_TAP_TOKEN:-}}"
+# Token Selection: Use HOMEBREW_KATANA_GIT_TOKEN (local) or HOMEBREW_TAP_TOKEN (CI)
+TOKEN="${HOMEBREW_KATANA_GIT_TOKEN:-${HOMEBREW_TAP_TOKEN:-}}"
 
 if [[ -z "$TOKEN" ]]; then
     echo "Error: Homebrew update token is not set." >&2
-    echo "Please set HOMEVREW_KATANA_GIT_TOKEN (local) or ensure HOMEBREW_TAP_TOKEN is available (CI)." >&2
+    echo "Please set HOMEBREW_KATANA_GIT_TOKEN (local) or ensure HOMEBREW_TAP_TOKEN is available (CI)." >&2
     exit 1
 fi
 
@@ -35,13 +35,13 @@ CURRENT=$(curl -s -H "Authorization: token $TOKEN" \
   "https://api.github.com/repos/$REPO/contents/$CASK_PATH")
 
 # Validate API response
-if ! echo "$CURRENT" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if 'sha' in d else 1)" 2>/dev/null; then
+if ! printf "%s" "$CURRENT" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if 'sha' in d else 1)" 2>/dev/null; then
     echo "Error: Failed to fetch Cask file from $REPO." >&2
     echo "$CURRENT" >&2
     exit 1
 fi
 
-FILE_SHA=$(echo "$CURRENT" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
+FILE_SHA=$(printf "%s" "$CURRENT" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
 
 # Template Generation
 CASK_CONTENT=$(cat <<EOF
