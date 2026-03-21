@@ -12,10 +12,10 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 1. Markdown エクスポート
 
-- [ ] 1.1 プレビュー画面のメニューに「エクスポート」のサブメニュー（HTML / PDF / PNG / JPG）を追加する
-- [ ] 1.2 HTML: comrak による HTML 出力に、現在適用されているCSSスタイル（インラインまたは内部スタイルシート）を埋め込み一時ファイル化し、ブラウザで開く
-- [ ] 1.3 PDF/画像: 出力された HTML を外部ツール（`wkhtmltopdf`, `weasyprint` 等）に渡し、保存先ダイアログ経由で出力する
-- [ ] 1.4 外部ツールが未インストールの場合に、GUI上でエラーメッセージとインストールガイドを表示する
+- [x] 1.1 プレビュー画面のメニューに「エクスポート」のサブメニュー（HTML / PDF / PNG / JPG）を追加する
+- [x] 1.2 HTML: comrak による HTML 出力に、現在適用されているCSSスタイル（インラインまたは内部スタイルシート）を埋め込み一時ファイル化し、ブラウザで開く
+- [x] 1.3 PDF/画像: 出力された HTML を外部ツール（`wkhtmltopdf`, `weasyprint` 等）に渡し、保存先ダイアログ経由で出力する
+- [x] 1.4 外部ツールが未インストールの場合に、GUI上でエラーメッセージとインストールガイドを表示する
 
 ### Definition of Done (DoD)
 

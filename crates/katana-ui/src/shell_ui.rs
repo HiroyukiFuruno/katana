@@ -76,6 +76,40 @@ pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut
         *action = AppAction::SaveDocument;
         ui.close();
     }
+
+    let has_doc = state.active_document().is_some();
+    ui.add_enabled_ui(has_doc, |ui| {
+        ui.menu_button(crate::i18n::get().menu.export.clone(), |ui| {
+            if ui
+                .button(crate::i18n::get().menu.export_html.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_pdf.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_png.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_jpg.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
+                ui.close();
+            }
+        });
+    });
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -426,7 +460,10 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
     let margin = f32::from(PREVIEW_CONTENT_PADDING);
     let spacing = ui.spacing().item_spacing.x;
-    let button_count = 2.0;
+    let mut button_count = 2.0; // Refresh + Export
+    if state.settings.settings().layout.toc_visible {
+        button_count += 1.0;
+    }
     let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
 
     let button_rect = egui::Rect::from_min_size(
@@ -452,6 +489,38 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     {
         *action = AppAction::RefreshDiagrams;
     }
+
+    overlay_ui.menu_button(crate::Icon::Export.as_str(), |ui| {
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+        if ui
+            .button(crate::i18n::get().menu.export_html.clone())
+            .clicked()
+        {
+            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
+            ui.close();
+        }
+        if ui
+            .button(crate::i18n::get().menu.export_pdf.clone())
+            .clicked()
+        {
+            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
+            ui.close();
+        }
+        if ui
+            .button(crate::i18n::get().menu.export_png.clone())
+            .clicked()
+        {
+            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
+            ui.close();
+        }
+        if ui
+            .button(crate::i18n::get().menu.export_jpg.clone())
+            .clicked()
+        {
+            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
+            ui.close();
+        }
+    });
 
     if state.settings.settings().layout.toc_visible {
         let toc_bg = if state.show_toc {
@@ -1668,7 +1737,7 @@ impl eframe::App for KatanaApp {
 
         let action = self.take_action();
         invalidate_preview_image_cache(ctx, &action);
-        self.process_action(action);
+        self.process_action(ctx, action);
 
         // On macOS, the egui menu is hidden because the native menu bar is used.
         #[cfg(not(target_os = "macos"))]
@@ -1815,7 +1884,7 @@ impl eframe::App for KatanaApp {
                             }
                         }
                     }
-                    self.process_action(AppAction::SelectDocument(path));
+                    self.process_action(ctx, AppAction::SelectDocument(path));
                 }
             } else {
                 unprocessed_commands.push(cmd);

@@ -5,6 +5,7 @@ use comrak::{markdown_to_html, ComrakOptions};
 pub mod color_preset;
 pub mod diagram;
 pub mod drawio_renderer;
+pub mod export;
 pub mod mermaid_renderer;
 pub mod outline;
 pub mod plantuml_renderer;
@@ -12,6 +13,7 @@ pub mod svg_rasterize;
 
 pub use diagram::NoOpRenderer;
 use diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
+pub use export::{HtmlExporter, ImageExporter, PdfExporter};
 
 /// Byte length of the fence block start delimiter "```".
 const FENCE_OPEN_LEN: usize = 3;
@@ -49,6 +51,8 @@ pub struct RenderOutput {
 pub enum MarkdownError {
     #[error("Rendering failed: {0}")]
     RenderFailed(String),
+    #[error("Export failed: {0}")]
+    ExportFailed(String),
 }
 
 /// Build default `comrak` options with GFM extensions enabled.

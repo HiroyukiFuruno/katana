@@ -6,13 +6,18 @@
     "open_workspace": "Arbeitsbereich öffnen…",
     "save": "Speichern",
     "open_all": "Alle öffnen",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "Exportieren",
+    "export_html": "HTML-Dokument (.html)",
+    "export_pdf": "PDF-Dokument (.pdf)",
+    "export_png": "PNG-Bild (.png)",
+    "export_jpg": "JPEG-Bild (.jpg)",
+    "about": "Über KatanA",
+    "quit": "KatanA beenden",
+    "hide": "KatanA ausblenden",
+    "hide_others": "Andere ausblenden",
+    "show_all": "Alle anzeigen",
+    "help": "Hilfe",
+    "check_updates": "Nach Updates suchen..."
   },
   "workspace": {
     "no_workspace_open": "Kein Arbeitsbereich geöffnet.",
@@ -27,16 +32,16 @@
     "rendering": "{kind} wird gerendert...",
     "no_preview": "(Keine Vorschau)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "Hoch",
+      "pan_down": "Runter",
+      "pan_left": "Links",
+      "pan_right": "Rechts",
+      "zoom_in": "Vergrößern",
+      "zoom_out": "Verkleinern",
+      "reset": "Zurücksetzen",
+      "fullscreen": "Vollbild",
+      "close": "Schließen",
+      "trackpad_help": "Trackpad: Mit 2 Fingern zum Zoomen, mit 1 Finger zum Bewegen"
     }
   },
   "plantuml": {
@@ -70,15 +75,15 @@
     "cannot_open_file": "Datei konnte nicht geöffnet werden: {error}"
   },
   "action": {
-    "expand_all": "Alle erweitern",
-    "collapse_all": "Alle minimieren",
+    "expand_all": "Alle ausklappen",
+    "collapse_all": "Alle einklappen",
     "collapse_sidebar": "Seitenleiste ausblenden",
     "refresh_workspace": "Arbeitsbereich aktualisieren",
     "toggle_filter": "Filter umschalten",
-    "remove_workspace": "Aus dem Verlauf entfernen",
-    "recursive_expand": "Unterverzeichnisse rekursiv erweitern",
+    "remove_workspace": "Aus Verlauf entfernen",
+    "recursive_expand": "Unterordner rekursiv ausklappen",
     "recursive_open_all": "Alle Dateien rekursiv öffnen",
-    "toggle_toc": "Toggle Table of Contents"
+    "toggle_toc": "Inhaltsverzeichnis umschalten"
   },
   "ai": {
     "ai_unconfigured": "[AI: nicht konfiguriert]"
@@ -110,9 +115,9 @@
       "pane_order": "Reihenfolge der Bereiche",
       "editor_first": "Editor zuerst",
       "preview_first": "Vorschau zuerst",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "Position des Verzeichnisses",
+      "left": "Links",
+      "right": "Rechts"
     },
     "preview": {
       "title": "Vorschau",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "Zum vorherigen Tab wechseln",
     "nav_next": "Zum nächsten Tab wechseln",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "Schließen",
+    "close_others": "Andere schließen",
+    "close_all": "Alle schließen",
+    "close_right": "Rechts schließen",
+    "close_left": "Links schließen",
+    "pin": "Anpinnen",
+    "unpin": "Abpinnen",
+    "restore_closed": "Geschlossenen Tab wiederherstellen"
   },
   "search": {
     "modal_title": "Dateien suchen",
@@ -168,35 +173,43 @@
     "no_results": "Keine Dateien gefunden."
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "Inhaltsverzeichnis",
+    "empty": "Keine Überschriften gefunden"
   },
   "about": {
-    "basic_info": "Basic Info",
+    "basic_info": "Basisinfo",
     "version": "Version",
     "build": "Build",
     "copyright": "Copyright",
     "runtime": "Runtime",
-    "platform": "Platform",
-    "architecture": "Architecture",
+    "platform": "Plattform",
+    "architecture": "Architektur",
     "rust": "Rust",
-    "license": "License",
+    "license": "Lizenz",
     "links": "Links",
-    "source_code": "Source Code",
-    "documentation": "Documentation",
-    "report_issue": "Report Issue",
+    "source_code": "Quellcode",
+    "documentation": "Dokumentation",
+    "report_issue": "Problem melden",
     "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "sponsor": "Sponsoren",
+    "coming_soon": "Demnächst"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "Update verfügbar",
+    "update_available_desc": "Eine neue Version von KatanA ({version}) ist verfügbar. Bitte führen Sie `brew upgrade katana` aus, um zu aktualisieren.",
+    "up_to_date": "Aktuell",
+    "up_to_date_desc": "KatanA ist auf dem neuesten Stand.",
+    "failed_to_check": "Fehler beim Prüfen auf Updates.",
+    "action_close": "OK",
+    "title": "Updates prüfen",
+    "checking_for_updates": "Suche nach Updates..."
+  },
+  "export": {
+    "success": "Exportiert nach {format} unter: {path}",
+    "failed": "{format}-Export fehlgeschlagen: {error}",
+    "tool_missing": "Programm '{tool}' nicht gefunden. Bitte installieren Sie es (z.B. `brew install wkhtmltopdf`), um als {format} zu exportieren.",
+    "temp_file_error": "Fehler beim Erstellen der temporären Datei: {error}",
+    "write_error": "Fehler beim Schreiben des Inhalts: {error}",
+    "persist_error": "Fehler beim Speichern der temporären Datei"
   }
 }

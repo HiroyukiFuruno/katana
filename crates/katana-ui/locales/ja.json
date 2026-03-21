@@ -6,6 +6,11 @@
     "open_workspace": "ワークスペースを開く…",
     "save": "保存",
     "open_all": "全て開く",
+    "export": "エクスポート",
+    "export_html": "HTMLドキュメント (.html)",
+    "export_pdf": "PDFドキュメント (.pdf)",
+    "export_png": "PNG画像 (.png)",
+    "export_jpg": "JPEG画像 (.jpg)",
     "about": "KatanA について",
     "quit": "KatanA を終了",
     "hide": "KatanA を隠す",
@@ -198,5 +203,13 @@
   "toc": {
     "title": "目次",
     "empty": "見出しが見つかりません"
+  },
+  "export": {
+    "success": "{format} へのエクスポートが完了しました: {path}",
+    "failed": "{format} へのエクスポートに失敗しました: {error}",
+    "tool_missing": "ツール '{tool}' が見つかりません。エクスポート（{format}）を行うには、ツールをインストールしてください（例: `brew install wkhtmltopdf`）。",
+    "temp_file_error": "一時ファイルの作成に失敗しました: {error}",
+    "write_error": "内容の書き込みに失敗しました: {error}",
+    "persist_error": "一時ファイルの保持に失敗しました"
   }
 }

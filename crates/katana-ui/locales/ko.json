@@ -6,13 +6,18 @@
     "open_workspace": "워크스페이스 열기…",
     "save": "저장",
     "open_all": "모두 열기",
-    "about": "About KatanA",
-    "quit": "Quit KatanA",
-    "hide": "Hide KatanA",
-    "hide_others": "Hide Others",
-    "show_all": "Show All",
-    "help": "Help",
-    "check_updates": "Check for Updates..."
+    "export": "내보내기",
+    "export_html": "HTML 문서 (.html)",
+    "export_pdf": "PDF 문서 (.pdf)",
+    "export_png": "PNG 이미지 (.png)",
+    "export_jpg": "JPEG 이미지 (.jpg)",
+    "about": "KatanA 정보",
+    "quit": "KatanA 종료",
+    "hide": "KatanA 숨기기",
+    "hide_others": "기타 숨기기",
+    "show_all": "모두 표시",
+    "help": "도움말",
+    "check_updates": "업데이트 확인..."
   },
   "workspace": {
     "no_workspace_open": "열린 워크스페이스가 없습니다.",
@@ -27,16 +32,16 @@
     "rendering": "{kind} 렌더링 중...",
     "no_preview": "(미리보기 없음)",
     "diagram_controller": {
-      "pan_up": "Move up",
-      "pan_down": "Move down",
-      "pan_left": "Move left",
-      "pan_right": "Move right",
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "reset": "Reset position and size",
-      "fullscreen": "Fullscreen",
-      "close": "Close",
-      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
+      "pan_up": "위로",
+      "pan_down": "아래로",
+      "pan_left": "왼쪽으로",
+      "pan_right": "오른쪽으로",
+      "zoom_in": "확대",
+      "zoom_out": "축소",
+      "reset": "위치 및 크기 재설정",
+      "fullscreen": "전체 화면",
+      "close": "닫기",
+      "trackpad_help": "트랙패드: 두 손가락으로 핀치하여 확대/축소, 한 손가락으로 드래그하여 이동"
     }
   },
   "plantuml": {
@@ -70,15 +75,15 @@
     "cannot_open_file": "파일 열기 실패: {error}"
   },
   "action": {
-    "expand_all": "모두 펼치기",
-    "collapse_all": "모두 접기",
+    "expand_all": "모두 확장",
+    "collapse_all": "모두 축소",
     "collapse_sidebar": "사이드바 숨기기",
     "refresh_workspace": "워크스페이스 새로고침",
-    "toggle_filter": "필터 전환",
+    "toggle_filter": "필터 토글",
     "remove_workspace": "기록에서 제거",
-    "recursive_expand": "하위 디렉토리 재귀적 확장",
-    "recursive_open_all": "모든 파일 재귀적으로 열기",
-    "toggle_toc": "Toggle Table of Contents"
+    "recursive_expand": "재귀적 확장",
+    "recursive_open_all": "모든 파일 재귀적 열기",
+    "toggle_toc": "목차 토글"
   },
   "ai": {
     "ai_unconfigured": "[AI: 설정되지 않음]"
@@ -110,9 +115,9 @@
       "pane_order": "패널 순서",
       "editor_first": "에디터 우선",
       "preview_first": "미리보기 우선",
-      "toc_position": "TOC Position",
-      "left": "Left",
-      "right": "Right"
+      "toc_position": "목차 위치",
+      "left": "왼쪽",
+      "right": "오른쪽"
     },
     "preview": {
       "title": "미리보기",
@@ -151,14 +156,14 @@
   "tab": {
     "nav_prev": "이전 탭으로 이동",
     "nav_next": "다음 탭으로 이동",
-    "close": "Close",
-    "close_others": "Close Others",
-    "close_all": "Close All",
-    "close_right": "Close Right",
-    "close_left": "Close Left",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "restore_closed": "Restore Closed Tab"
+    "close": "닫기",
+    "close_others": "다른 탭 닫기",
+    "close_all": "모든 탭 닫기",
+    "close_right": "오른쪽 탭 닫기",
+    "close_left": "왼쪽 탭 닫기",
+    "pin": "고정",
+    "unpin": "고정 해제",
+    "restore_closed": "닫힌 탭 복원"
   },
   "search": {
     "modal_title": "파일 찾기",
@@ -168,35 +173,43 @@
     "no_results": "파일을 찾을 수 없습니다."
   },
   "toc": {
-    "title": "Table of Contents",
-    "empty": "No headings found."
+    "title": "목차",
+    "empty": "제목을 찾을 수 없습니다."
   },
   "about": {
-    "basic_info": "Basic Info",
-    "version": "Version",
-    "build": "Build",
-    "copyright": "Copyright",
-    "runtime": "Runtime",
-    "platform": "Platform",
-    "architecture": "Architecture",
+    "basic_info": "기본 정보",
+    "version": "버전",
+    "build": "빌드",
+    "copyright": "저작권",
+    "runtime": "런타임",
+    "platform": "플랫폼",
+    "architecture": "아키텍처",
     "rust": "Rust",
-    "license": "License",
-    "links": "Links",
-    "source_code": "Source Code",
-    "documentation": "Documentation",
-    "report_issue": "Report Issue",
-    "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "license": "라이선스",
+    "links": "링크",
+    "source_code": "소스 코드",
+    "documentation": "문서",
+    "report_issue": "문제 보고",
+    "support": "지원",
+    "sponsor": "후원",
+    "coming_soon": "출시 예정"
   },
   "update": {
-    "update_available": "Update Available",
-    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
-    "up_to_date": "Up to Date",
-    "up_to_date_desc": "You are using the latest version of KatanA.",
-    "failed_to_check": "Failed to check for updates.",
-    "action_close": "Close",
-    "title": "Check for Updates",
-    "checking_for_updates": "Checking for updates..."
+    "update_available": "업데이트 가능",
+    "update_available_desc": "KatanA의 새 버전({version})을 사용할 수 있습니다. `brew upgrade katana`를 실행하여 업데이트하십시오.",
+    "up_to_date": "최신 버전",
+    "up_to_date_desc": "최신 버전의 KatanA를 사용하고 있습니다.",
+    "failed_to_check": "업데이트 확인 실패.",
+    "action_close": "확인",
+    "title": "업데이트 확인",
+    "checking_for_updates": "업데이트 확인 중..."
+  },
+  "export": {
+    "success": "{format} 내보내기 성공: {path}",
+    "failed": "{format} 내보내기 실패: {error}",
+    "tool_missing": "'{tool}' 도구를 찾을 수 없습니다. {format}(으)로 내보내려면 설치(예: `brew install wkhtmltopdf`)가 필요합니다.",
+    "temp_file_error": "임시 파일 생성 실패: {error}",
+    "write_error": "내용 쓰기 실패: {error}",
+    "persist_error": "임시 파일 저장 실패"
   }
 }

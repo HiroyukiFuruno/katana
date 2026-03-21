@@ -25,6 +25,7 @@ pub enum Icon {
     Fullscreen,
     CloseModal,
     Info,
+    Export,
 }
 
 impl Icon {
@@ -54,6 +55,7 @@ impl Icon {
             Self::Fullscreen => "⛶",
             Self::CloseModal => "✗",
             Self::Info => "ℹ",
+            Self::Export => "📤",
         }
     }
 }

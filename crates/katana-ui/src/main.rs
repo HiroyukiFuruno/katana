@@ -15,13 +15,24 @@ use katana_ui::shell::KatanaApp;
 use katana_ui::shell_ui;
 
 #[cfg(not(test))]
+const INITIAL_WIDTH: f32 = 1280.0;
+#[cfg(not(test))]
+const INITIAL_HEIGHT: f32 = 800.0;
+#[cfg(not(test))]
+const MIN_WIDTH: f32 = 800.0;
+#[cfg(not(test))]
+const MIN_HEIGHT: f32 = 500.0;
+#[cfg(not(test))]
+const LOCALE_BUF_SIZE: usize = 32;
+
+#[cfg(not(test))]
 fn initial_window_size() -> egui::Vec2 {
-    egui::vec2(1280.0, 800.0)
+    egui::vec2(INITIAL_WIDTH, INITIAL_HEIGHT)
 }
 
 #[cfg(not(test))]
 fn min_window_size() -> egui::Vec2 {
-    egui::vec2(800.0, 500.0)
+    egui::vec2(MIN_WIDTH, MIN_HEIGHT)
 }
 
 #[cfg(not(test))]
@@ -81,7 +92,7 @@ fn detect_initial_language() -> Option<String> {
         extern "C" {
             fn katana_get_mac_locale(buf: *mut std::ffi::c_char, max_len: usize);
         }
-        let mut buf = [0u8; 32];
+        let mut buf = [0u8; LOCALE_BUF_SIZE];
         unsafe { katana_get_mac_locale(buf.as_mut_ptr() as _, buf.len()) };
         let c_str = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as _) };
         let locale = c_str.to_string_lossy().to_string();
