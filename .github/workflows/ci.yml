@@ -102,17 +102,17 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@480db559a14342288b67e54bd959dd52dc3ee68f # v3
+        uses: github/codeql-action/init@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3 # v3
         with:
           languages: rust
           # Use GitHub's default CodeQL query suite.
           queries: security-extended
 
       - name: Auto-build
-        uses: github/codeql-action/autobuild@480db559a14342288b67e54bd959dd52dc3ee68f # v3
+        uses: github/codeql-action/autobuild@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3 # v3
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@480db559a14342288b67e54bd959dd52dc3ee68f # v3
+        uses: github/codeql-action/analyze@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3 # v3
 
   coverage:
     name: Coverage
