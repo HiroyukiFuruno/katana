@@ -46,10 +46,10 @@ impl SystemFontLoader {
 
         // Add primary fonts mapped to their corresponding families
         if let Some(name) = &prop_name {
-            Self::append_fallback(&mut fonts, FontFamily::Proportional, name);
+            Self::prepend_primary(&mut fonts, FontFamily::Proportional, name);
         }
         if let Some(name) = &mono_name {
-            Self::append_fallback(&mut fonts, FontFamily::Monospace, name);
+            Self::prepend_primary(&mut fonts, FontFamily::Monospace, name);
         }
 
         // Cross-fallbacks for comprehensive CJK coverage in code blocks, and vice versa
@@ -248,5 +248,74 @@ mod tests {
             !monospace.contains(&APPLE_COLOR_EMOJI_FONT_NAME.to_string()),
             "UI symbol glyphs should keep using egui/built-in fallback fonts"
         );
+    }
+    // --- TDD: Font Jitter (ガタツキ) Reproduction Tests ---
+
+    fn assert_font_jitter(context_name: &str, font_size: f32) {
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            &preset.proportional_font_candidates,
+            &preset.monospace_font_candidates,
+            &preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let ctx = Context::default();
+        ctx.set_fonts(fonts);
+
+        let text = format!("Katana — {} Lambdaアップデート手順.md", context_name);
+        let mut eng_glyph = None;
+        let mut jpn_glyph = None;
+
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let galley = ui.painter().layout_no_wrap(
+                    text.clone(),
+                    FontId::proportional(font_size),
+                    Color32::WHITE,
+                );
+                eng_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'L').copied();
+                jpn_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'ア').copied();
+            });
+        });
+
+        let eng_glyph = eng_glyph.expect("English char not found");
+        let jpn_glyph = jpn_glyph.expect("Japanese char not found");
+
+        assert_eq!(
+            eng_glyph.pos.y, jpn_glyph.pos.y,
+            "ガタツキ (Jitter) in {}: English 'L' y={} vs Japanese 'ア' y={}",
+            context_name, eng_glyph.pos.y, jpn_glyph.pos.y
+        );
+    }
+
+    #[test]
+    fn test_font_jitter_1_app_title() {
+        // App title uses Heading (usually 20.0 or larger)
+        assert_font_jitter("App Title", 20.0);
+    }
+
+    #[test]
+    fn test_font_jitter_2_workspace_dir() {
+        // Workspace directory uses Body (14.0)
+        assert_font_jitter("Workspace Dir", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_3_workspace_file() {
+        // Workspace file uses Body (14.0)
+        assert_font_jitter("Workspace File", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_4_toc_heading() {
+        // TOC heading uses Body/Button (14.0)
+        assert_font_jitter("TOC Heading", 14.0);
+    }
+
+    #[test]
+    fn test_font_jitter_5_tab_name() {
+        // Tab name uses Button (14.0)
+        assert_font_jitter("Tab Name", 14.0);
     }
 }
