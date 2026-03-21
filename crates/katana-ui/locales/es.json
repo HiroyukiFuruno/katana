@@ -18,7 +18,18 @@
     "preview_title": "Vista Previa",
     "refresh_diagrams": "Actualizar diagramas",
     "rendering": "Renderizando {kind}...",
-    "no_preview": "(Sin vista previa)"
+    "no_preview": "(Sin vista previa)",
+    "diagram_controller": {
+      "pan_up": "Move up",
+      "pan_down": "Move down",
+      "pan_left": "Move left",
+      "pan_right": "Move right",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "reset": "Reset position and size",
+      "fullscreen": "Fullscreen",
+      "close": "Close"
+    }
   },
   "plantuml": {
     "downloading_plantuml": "⬇ Descargando PlantUML JAR...",

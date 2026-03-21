@@ -11,17 +11,25 @@ This workflow automates the "delivery routine" (from verification to branch comp
 When a task implementation is complete and this workflow is invoked, execute all of the following steps **in order**. If any step encounters an error (test failure, conflict, etc.), immediately pause the process and report to the user.
 
 ### Step 1: Self-Review & Quality Assurance
-Read `.agents/skills/self-review/SKILL.md` and execute self-review for code quality, test coverage (ensure `make check-local` or similar returns exit code 0), and project requirements.
+
+Read and execute `.agents/skills/self-review/SKILL.md`.
 
 ### Step 2: Commit & Push
-Read `.agents/skills/commit_and_push/SKILL.md`. Separate current changes logically by concern, create appropriate Japanese commit messages per project rules, and push them to the remote repository.
+
+Read and execute `.agents/skills/commit_and_push/SKILL.md`.
 
 ### Step 3: Create Task Pull Request
-Read `.agents/skills/create_pull_request/SKILL.md`. Use the GitHub CLI (`gh` command) to create a Pull Request against the base branch.
 
-### Step 4: Merge PR & Finalize Synchronization
-Using the created PR, execute `gh pr merge` to merge it into the base branch. (Use `--admin` option if required, and handle local checkout if git performs a fast-forward).
+Read and execute `.agents/skills/create_pull_request/SKILL.md`.
+
+The skill determines the correct `--base` branch automatically. Do not override it.
+
+### Step 4: Merge PR & Synchronization
+
+Execute `gh pr merge` (use `--admin` if required). Then switch to the Base Feature Branch and pull.
 
 ---
-**Strict Instruction for AI Agents**: 
-When this routine is specified in `tasks.md`, the AI must NEVER skip or abbreviate the process just because it is condensed into a single checkbox. You must sequentially digest and execute each internal skill phase reliably.
+
+**Strict Instruction for AI Agents**:
+- NEVER skip or abbreviate steps just because this workflow is condensed into a single checkbox in `tasks.md`.
+- This workflow orchestrates skills. All implementation logic lives in the skills, not here.

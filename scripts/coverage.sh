@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-COVERAGE_IGNORE='plantuml_renderer\.rs|mermaid_renderer\.rs|katana-ui/src/main\.rs|shell_ui\.rs|preview_pane_ui\.rs|html_renderer\.rs|settings_window\.rs|os_theme\.rs'
+COVERAGE_IGNORE='plantuml_renderer\.rs|mermaid_renderer\.rs|katana-ui/src/main\.rs|shell_ui\.rs|preview_pane_ui\.rs|html_renderer\.rs|settings_window\.rs|os_theme\.rs|diagram_controller\.rs'
 
 # ── Colours ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'

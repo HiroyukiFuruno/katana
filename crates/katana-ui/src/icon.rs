@@ -14,6 +14,16 @@ pub enum Icon {
     Plus,
     Minus,
     Toc,
+    // Viewer overlay controls
+    PanUp,
+    PanDown,
+    PanLeft,
+    PanRight,
+    ZoomIn,
+    ZoomOut,
+    ResetView,
+    Fullscreen,
+    CloseModal,
 }
 
 impl Icon {
@@ -33,6 +43,15 @@ impl Icon {
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Toc => "☰",
+            Self::PanUp => "∧",
+            Self::PanDown => "∨",
+            Self::PanLeft => "<",
+            Self::PanRight => ">",
+            Self::ZoomIn => "⊕",
+            Self::ZoomOut => "⊖",
+            Self::ResetView => "↻",
+            Self::Fullscreen => "⛶",
+            Self::CloseModal => "✗",
         }
     }
 }
@@ -57,5 +76,14 @@ mod tests {
         assert_eq!(Icon::Plus.as_str(), "+");
         assert_eq!(Icon::Minus.as_str(), "-");
         assert_eq!(Icon::Toc.as_str(), "☰");
+        assert_eq!(Icon::PanUp.as_str(), "∧");
+        assert_eq!(Icon::PanDown.as_str(), "∨");
+        assert_eq!(Icon::PanLeft.as_str(), "<");
+        assert_eq!(Icon::PanRight.as_str(), ">");
+        assert_eq!(Icon::ZoomIn.as_str(), "⊕");
+        assert_eq!(Icon::ZoomOut.as_str(), "⊖");
+        assert_eq!(Icon::ResetView.as_str(), "↻");
+        assert_eq!(Icon::Fullscreen.as_str(), "⛶");
+        assert_eq!(Icon::CloseModal.as_str(), "✗");
     }
 }

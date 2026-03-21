@@ -1790,6 +1790,16 @@ impl eframe::App for KatanaApp {
                         const SPLASH_HEADING_SIZE: f32 = 32.0;
                         const SPLASH_HEADING_SPACING: f32 = 8.0;
                         const SPLASH_VERSION_SIZE: f32 = 16.0;
+                        const SPLASH_PROGRESS_SPACING: f32 = 24.0;
+                        const SPLASH_PROGRESS_WIDTH: f32 = 240.0;
+                        const SPLASH_PROGRESS_PHASE1: f32 = 0.25;
+                        const SPLASH_PROGRESS_PHASE2: f32 = 0.6;
+                        const SPLASH_PROGRESS_PHASE3: f32 = 0.95;
+                        const SPLASH_PROGRESS_TEXT_SIZE: f32 = 12.0;
+                        const SPLASH_PROGRESS_TEXT_DIM: f32 = 0.7;
+                        const SPLASH_PROGRESS_BAR_MARGIN: f32 = 4.0;
+                        const SPLASH_PROGRESS_BG_LIGHT: u8 = 100;
+                        const SPLASH_PROGRESS_BG_DARK: u8 = 200;
 
                         let is_dark = ctx.style().visuals.dark_mode;
                         let content_rect = ctx.content_rect();
@@ -1812,32 +1822,89 @@ impl eframe::App for KatanaApp {
                         }
                         .gamma_multiply(opacity);
 
-                        ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
-                            ui.centered_and_justified(|ui| {
-                                ui.vertical_centered(|ui| {
-                                    if let Some(tex) = &self.about_icon {
-                                        ui.image(egui::load::SizedTexture::new(
-                                            tex.id(),
-                                            egui::vec2(SPLASH_ICON_SIZE, SPLASH_ICON_SIZE),
-                                        ));
-                                        ui.add_space(SPLASH_ICON_SPACING);
-                                    }
-                                    let heading =
-                                        egui::RichText::new(crate::about_info::APP_DISPLAY_NAME)
-                                            .strong()
-                                            .size(SPLASH_HEADING_SIZE)
-                                            .color(text_color);
-                                    ui.label(heading);
+                        // Calculate total content height to vertically center the splash content
+                        const SPLASH_CONTENT_HEIGHT: f32 = SPLASH_ICON_SIZE
+                            + SPLASH_ICON_SPACING
+                            + SPLASH_HEADING_SIZE
+                            + SPLASH_HEADING_SPACING
+                            + SPLASH_VERSION_SIZE
+                            + SPLASH_PROGRESS_SPACING
+                            + SPLASH_PROGRESS_TEXT_SIZE
+                            + SPLASH_PROGRESS_BAR_MARGIN
+                            + SPLASH_PROGRESS_SPACING; // approximate total height
 
-                                    ui.add_space(SPLASH_HEADING_SPACING);
+                        let center = content_rect.center();
+                        let centered_rect = egui::Rect::from_center_size(
+                            center,
+                            egui::vec2(content_rect.width(), SPLASH_CONTENT_HEIGHT),
+                        );
 
-                                    let version_str =
-                                        format!("Version {}", env!("CARGO_PKG_VERSION"));
-                                    let version = egui::RichText::new(version_str)
-                                        .size(SPLASH_VERSION_SIZE)
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(centered_rect), |ui| {
+                            ui.vertical_centered(|ui| {
+                                if let Some(tex) = &self.about_icon {
+                                    ui.image(egui::load::SizedTexture::new(
+                                        tex.id(),
+                                        egui::vec2(SPLASH_ICON_SIZE, SPLASH_ICON_SIZE),
+                                    ));
+                                    ui.add_space(SPLASH_ICON_SPACING);
+                                }
+                                let heading =
+                                    egui::RichText::new(crate::about_info::APP_DISPLAY_NAME)
+                                        .strong()
+                                        .size(SPLASH_HEADING_SIZE)
                                         .color(text_color);
-                                    ui.label(version);
-                                });
+                                ui.label(heading);
+
+                                ui.add_space(SPLASH_HEADING_SPACING);
+
+                                let version_str = format!("Version {}", env!("CARGO_PKG_VERSION"));
+                                let version = egui::RichText::new(version_str)
+                                    .size(SPLASH_VERSION_SIZE)
+                                    .color(text_color);
+                                ui.label(version);
+
+                                ui.add_space(SPLASH_PROGRESS_SPACING);
+                                let progress =
+                                    crate::shell_logic::calculate_splash_progress(elapsed);
+
+                                let progress_text = if progress < SPLASH_PROGRESS_PHASE1 {
+                                    "Initializing Katana engine..."
+                                } else if progress < SPLASH_PROGRESS_PHASE2 {
+                                    "Parsing workspace structure..."
+                                } else if progress < SPLASH_PROGRESS_PHASE3 {
+                                    "Increasing context size... w"
+                                } else {
+                                    "Ready."
+                                };
+
+                                ui.label(
+                                    egui::RichText::new(progress_text)
+                                        .size(SPLASH_PROGRESS_TEXT_SIZE)
+                                        .color(text_color.gamma_multiply(SPLASH_PROGRESS_TEXT_DIM)),
+                                );
+                                ui.add_space(SPLASH_PROGRESS_BAR_MARGIN);
+                                let progress_bar = egui::ProgressBar::new(progress)
+                                    .desired_width(SPLASH_PROGRESS_WIDTH)
+                                    .show_percentage();
+
+                                // Add a little visual flair to the progress bar by tinting it based on the theme
+                                if !is_dark {
+                                    ui.visuals_mut().selection.bg_fill = egui::Color32::from_rgb(
+                                        SPLASH_PROGRESS_BG_LIGHT,
+                                        SPLASH_PROGRESS_BG_LIGHT,
+                                        SPLASH_PROGRESS_BG_LIGHT,
+                                    )
+                                    .gamma_multiply(opacity);
+                                } else {
+                                    ui.visuals_mut().selection.bg_fill = egui::Color32::from_rgb(
+                                        SPLASH_PROGRESS_BG_DARK,
+                                        SPLASH_PROGRESS_BG_DARK,
+                                        SPLASH_PROGRESS_BG_DARK,
+                                    )
+                                    .gamma_multiply(opacity);
+                                }
+
+                                ui.add(progress_bar);
                             });
                         });
                     });

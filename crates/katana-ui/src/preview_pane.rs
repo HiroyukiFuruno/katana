@@ -39,6 +39,11 @@ pub enum RenderedSection {
         svg_data: RasterizedSvg,
         alt: String,
     },
+    /// A standalone local image handled by Katana (with viewer controls).
+    LocalImage {
+        path: std::path::PathBuf,
+        alt: String,
+    },
     /// Rendering error (holds source and message).
     Error {
         kind: String,
@@ -68,6 +73,92 @@ pub struct DownloadRequest {
     pub dest: std::path::PathBuf,
 }
 
+// ─────────────────────────────────────────────
+// Viewer Controls — State management for pan/zoom on images and diagrams
+// ─────────────────────────────────────────────
+
+/// Zoom increment per button click.
+const VIEWER_ZOOM_STEP: f32 = 0.25;
+/// Minimum zoom level (25%).
+const VIEWER_ZOOM_MIN: f32 = 0.25;
+/// Maximum zoom level (400%).
+const VIEWER_ZOOM_MAX: f32 = 4.0;
+/// Pan offset (in logical pixels) per button click.
+const VIEWER_PAN_STEP: f32 = 50.0;
+
+/// Per-image/diagram viewer state (zoom level and pan offset).
+#[derive(Clone, PartialEq)]
+pub struct ViewerState {
+    /// Current zoom factor (1.0 = 100%).
+    pub zoom: f32,
+    /// Current pan offset in logical pixels.
+    pub pan: egui::Vec2,
+    /// Cached texture handle to avoid re-uploading the image to the GPU every frame.
+    pub texture: Option<egui::TextureHandle>,
+}
+
+impl std::fmt::Debug for ViewerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ViewerState")
+            .field("zoom", &self.zoom)
+            .field("pan", &self.pan)
+            .field("texture", &self.texture.as_ref().map(|t| t.id()))
+            .finish()
+    }
+}
+
+impl Default for ViewerState {
+    fn default() -> Self {
+        Self {
+            zoom: 1.0,
+            pan: egui::Vec2::ZERO,
+            texture: None,
+        }
+    }
+}
+
+impl ViewerState {
+    /// Zoom in by one step, clamped to `VIEWER_ZOOM_MAX`.
+    pub fn zoom_in(&mut self) {
+        self.zoom = (self.zoom + VIEWER_ZOOM_STEP).min(VIEWER_ZOOM_MAX);
+    }
+
+    /// Zoom out by one step, clamped to `VIEWER_ZOOM_MIN`.
+    pub fn zoom_out(&mut self) {
+        self.zoom = (self.zoom - VIEWER_ZOOM_STEP).max(VIEWER_ZOOM_MIN);
+    }
+
+    /// Pan by the given delta (in logical pixels).
+    pub fn pan_by(&mut self, delta: egui::Vec2) {
+        self.pan += delta;
+    }
+
+    /// Pan up by one step.
+    pub fn pan_up(&mut self) {
+        self.pan_by(egui::vec2(0.0, -VIEWER_PAN_STEP));
+    }
+
+    /// Pan down by one step.
+    pub fn pan_down(&mut self) {
+        self.pan_by(egui::vec2(0.0, VIEWER_PAN_STEP));
+    }
+
+    /// Pan left by one step.
+    pub fn pan_left(&mut self) {
+        self.pan_by(egui::vec2(-VIEWER_PAN_STEP, 0.0));
+    }
+
+    /// Pan right by one step.
+    pub fn pan_right(&mut self) {
+        self.pan_by(egui::vec2(VIEWER_PAN_STEP, 0.0));
+    }
+
+    /// Reset zoom and pan to defaults.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
 #[derive(Default)]
 pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
@@ -86,6 +177,14 @@ pub struct PreviewPane {
     pub image_preload_queue: Vec<std::path::PathBuf>,
     /// Cache tracking which local images have been requested to egui's background loader.
     pub image_cache: std::collections::HashSet<std::path::PathBuf>,
+    /// Per-image/diagram zoom and pan state, indexed by section index.
+    pub viewer_states: Vec<ViewerState>,
+    /// Index of the section currently displayed in fullscreen modal, if any.
+    pub fullscreen_image: Option<usize>,
+    /// Independent viewer state for fullscreen modal (not synced with preview).
+    pub fullscreen_viewer_state: ViewerState,
+    /// Tracks whether the OS was already in fullscreen mode before opening the modal.
+    pub was_os_fullscreen_before_modal: bool,
 }
 
 struct RenderJob {
@@ -141,6 +240,13 @@ impl PreviewPane {
                             });
                     new_sections.push(reused);
                 }
+                PreviewSection::LocalImage { path, alt } => {
+                    let path_buf = std::path::PathBuf::from(path.trim_start_matches("file://"));
+                    new_sections.push(RenderedSection::LocalImage {
+                        path: path_buf,
+                        alt: alt.clone(),
+                    });
+                }
             }
         }
         self.sections = new_sections;
@@ -194,6 +300,13 @@ impl PreviewPane {
                         path: self.md_file_path.clone(),
                         cache: cache.clone(),
                         force,
+                    });
+                }
+                PreviewSection::LocalImage { path, alt } => {
+                    let path_buf = std::path::PathBuf::from(path.trim_start_matches("file://"));
+                    sections.push(RenderedSection::LocalImage {
+                        path: path_buf,
+                        alt: alt.clone(),
                     });
                 }
             }
@@ -301,6 +414,7 @@ impl PreviewPane {
                     },
                 );
             });
+        self.render_fullscreen_modal(ui.ctx());
         request
     }
 
@@ -308,7 +422,9 @@ impl PreviewPane {
     /// Used when you want to control the outer ScrollArea (e.g. for scroll sync).
     pub fn show_content(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
         self.poll_renders(ui.ctx());
-        self.render_sections(ui)
+        let request = self.render_sections(ui);
+        self.render_fullscreen_modal(ui.ctx());
+        request
     }
 
     /// Internal method to sequentially render sections.
@@ -316,6 +432,7 @@ impl PreviewPane {
     fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
         self.visible_rect = Some(ui.clip_rect());
         self.heading_rects.clear();
+        let mut fullscreen_request: Option<usize> = None;
         let request = crate::preview_pane_ui::render_sections(
             ui,
             &mut self.commonmark_cache,
@@ -323,9 +440,70 @@ impl PreviewPane {
             &self.md_file_path,
             self.scroll_request,
             Some(&mut self.heading_rects),
+            Some(&mut self.viewer_states),
+            Some(&mut fullscreen_request),
         );
         self.scroll_request = None;
+
+        // Apply fullscreen state transitions (testable without UI context).
+        let ctx = ui.ctx().clone();
+        self.handle_fullscreen_request(fullscreen_request, Some(&ctx));
+
         request
+    }
+
+    /// Renders the fullscreen modal overlay (requires egui Context).
+    /// Delegates to preview_pane_ui which is coverage-excluded.
+    fn render_fullscreen_modal(&mut self, ctx: &egui::Context) {
+        let result = crate::preview_pane_ui::render_fullscreen_if_active(
+            ctx,
+            &self.sections,
+            self.fullscreen_image,
+            &mut self.fullscreen_viewer_state,
+        );
+        self.apply_fullscreen_result(result, Some(ctx));
+    }
+
+    /// Applies the result of the fullscreen modal to state.
+    /// Extracted for testability of state transitions.
+    fn apply_fullscreen_result(&mut self, result: Option<usize>, ctx: Option<&egui::Context>) {
+        if result.is_none() && self.fullscreen_image.is_some() {
+            // Fullscreen was closed — reset state and restore OS native fullscreen if needed.
+            self.fullscreen_viewer_state.reset();
+            if let Some(ctx) = ctx {
+                if !self.was_os_fullscreen_before_modal {
+                    // It wasn't fullscreen before we opened the modal, so restore it.
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
+                }
+            }
+        }
+        self.fullscreen_image = result;
+    }
+
+    /// Handles fullscreen request and validates index against current sections.
+    /// Separated from `render_sections` for testability.
+    fn handle_fullscreen_request(&mut self, request: Option<usize>, ctx: Option<&egui::Context>) {
+        // Apply new fullscreen request.
+        if let Some(idx) = request {
+            if self.fullscreen_image.is_none() {
+                // We are opening it. Track the previous OS fullscreen state.
+                if let Some(ctx) = ctx {
+                    let is_native_fs = ctx.input(|i| i.viewport().fullscreen).unwrap_or(false);
+                    self.was_os_fullscreen_before_modal = is_native_fs;
+                    if !is_native_fs {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+                    }
+                }
+            }
+            self.fullscreen_image = Some(idx);
+        }
+        // Clear fullscreen if the section no longer exists or is not an Image.
+        if let Some(idx) = self.fullscreen_image {
+            match self.sections.get(idx) {
+                Some(RenderedSection::Image { .. }) => {} // valid, keep open
+                _ => self.fullscreen_image = None,
+            }
+        }
     }
 
     /// Polls for background rendering completion and updates sections with received results.
@@ -1108,5 +1286,258 @@ mod tests {
 
         assert!(pane.image_preload_queue.is_empty());
         assert!(pane.image_cache.contains(&path));
+    }
+
+    // ── ViewerState tests ──
+
+    #[test]
+    fn viewer_state_default_is_zoom_1_pan_zero() {
+        let state = ViewerState::default();
+        assert_eq!(state.zoom, 1.0);
+        assert_eq!(state.pan, egui::Vec2::ZERO);
+    }
+
+    #[test]
+    fn viewer_state_zoom_in_increases_by_step() {
+        let mut state = ViewerState::default();
+        state.zoom_in();
+        assert_eq!(state.zoom, 1.25);
+    }
+
+    #[test]
+    fn viewer_state_zoom_out_decreases_by_step() {
+        let mut state = ViewerState::default();
+        state.zoom_out();
+        assert_eq!(state.zoom, 0.75);
+    }
+
+    #[test]
+    fn viewer_state_zoom_in_clamps_at_max() {
+        let mut state = ViewerState::default();
+        for _ in 0..20 {
+            state.zoom_in();
+        }
+        assert_eq!(state.zoom, 4.0);
+    }
+
+    #[test]
+    fn viewer_state_zoom_out_clamps_at_min() {
+        let mut state = ViewerState::default();
+        for _ in 0..20 {
+            state.zoom_out();
+        }
+        assert_eq!(state.zoom, 0.25);
+    }
+
+    #[test]
+    fn viewer_state_pan_up() {
+        let mut state = ViewerState::default();
+        state.pan_up();
+        assert_eq!(state.pan, egui::vec2(0.0, -50.0));
+    }
+
+    #[test]
+    fn viewer_state_pan_down() {
+        let mut state = ViewerState::default();
+        state.pan_down();
+        assert_eq!(state.pan, egui::vec2(0.0, 50.0));
+    }
+
+    #[test]
+    fn viewer_state_pan_left() {
+        let mut state = ViewerState::default();
+        state.pan_left();
+        assert_eq!(state.pan, egui::vec2(-50.0, 0.0));
+    }
+
+    #[test]
+    fn viewer_state_pan_right() {
+        let mut state = ViewerState::default();
+        state.pan_right();
+        assert_eq!(state.pan, egui::vec2(50.0, 0.0));
+    }
+
+    #[test]
+    fn viewer_state_pan_by_accumulates() {
+        let mut state = ViewerState::default();
+        state.pan_by(egui::vec2(10.0, 20.0));
+        state.pan_by(egui::vec2(5.0, -10.0));
+        assert_eq!(state.pan, egui::vec2(15.0, 10.0));
+    }
+
+    #[test]
+    fn viewer_state_reset_restores_defaults() {
+        let mut state = ViewerState::default();
+        state.zoom_in();
+        state.zoom_in();
+        state.pan_right();
+        state.pan_down();
+        state.reset();
+        assert_eq!(state, ViewerState::default());
+    }
+
+    #[test]
+    fn preview_pane_viewer_states_default_empty() {
+        let pane = PreviewPane::default();
+        assert!(pane.viewer_states.is_empty());
+        assert!(pane.fullscreen_image.is_none());
+    }
+
+    #[test]
+    fn handle_fullscreen_request_sets_index_for_valid_image() {
+        let mut pane = PreviewPane::default();
+        pane.sections.push(RenderedSection::Image {
+            svg_data: katana_core::markdown::svg_rasterize::RasterizedSvg {
+                width: 1,
+                height: 1,
+                rgba: vec![0; 4],
+            },
+            alt: String::new(),
+        });
+        pane.handle_fullscreen_request(Some(0), None);
+        assert_eq!(pane.fullscreen_image, Some(0));
+    }
+
+    #[test]
+    fn handle_fullscreen_request_clears_for_out_of_bounds_index() {
+        let mut pane = PreviewPane::default();
+        pane.handle_fullscreen_request(Some(99), None);
+        assert!(pane.fullscreen_image.is_none());
+    }
+
+    #[test]
+    fn handle_fullscreen_request_clears_for_non_image_section() {
+        let mut pane = PreviewPane::default();
+        pane.sections
+            .push(RenderedSection::Markdown("# Hello".to_string()));
+        pane.handle_fullscreen_request(Some(0), None);
+        assert!(pane.fullscreen_image.is_none());
+    }
+
+    #[test]
+    fn handle_fullscreen_request_noop_on_none() {
+        let mut pane = PreviewPane::default();
+        pane.handle_fullscreen_request(None, None);
+        assert!(pane.fullscreen_image.is_none());
+    }
+
+    #[test]
+    fn handle_fullscreen_request_clears_stale_index() {
+        let mut pane = PreviewPane::default();
+        pane.sections.push(RenderedSection::Image {
+            svg_data: katana_core::markdown::svg_rasterize::RasterizedSvg {
+                width: 1,
+                height: 1,
+                rgba: vec![0; 4],
+            },
+            alt: String::new(),
+        });
+        pane.fullscreen_image = Some(0);
+        // Remove section, then validate state.
+        pane.sections.clear();
+        pane.handle_fullscreen_request(None, None);
+        assert!(pane.fullscreen_image.is_none());
+    }
+
+    #[test]
+    fn fullscreen_viewer_state_is_independent() {
+        let mut pane = PreviewPane::default();
+        // Modify main viewer state.
+        pane.viewer_states.push(ViewerState::default());
+        pane.viewer_states[0].zoom_in();
+        // Fullscreen state should remain at defaults.
+        assert!((pane.fullscreen_viewer_state.zoom - 1.0).abs() < f32::EPSILON);
+        assert_eq!(pane.fullscreen_viewer_state.pan, egui::Vec2::ZERO);
+    }
+
+    #[test]
+    fn fullscreen_viewer_state_resets_on_close() {
+        let mut pane = PreviewPane::default();
+        // Simulate zoom in fullscreen.
+        pane.fullscreen_viewer_state.zoom_in();
+        pane.fullscreen_viewer_state.pan_right();
+        assert!(pane.fullscreen_viewer_state.zoom > 1.0);
+        // Close fullscreen should reset state.
+        pane.fullscreen_viewer_state.reset();
+        assert!((pane.fullscreen_viewer_state.zoom - 1.0).abs() < f32::EPSILON);
+        assert_eq!(pane.fullscreen_viewer_state.pan, egui::Vec2::ZERO);
+    }
+
+    #[test]
+    fn i18n_diagram_controller_fields_exist() {
+        use crate::i18n;
+        i18n::set_language("en");
+        let msgs = i18n::get();
+        let dc = &msgs.preview.diagram_controller;
+        assert!(!dc.pan_up.is_empty());
+        assert!(!dc.pan_down.is_empty());
+        assert!(!dc.pan_left.is_empty());
+        assert!(!dc.pan_right.is_empty());
+        assert!(!dc.zoom_in.is_empty());
+        assert!(!dc.zoom_out.is_empty());
+        assert!(!dc.reset.is_empty());
+        assert!(!dc.fullscreen.is_empty());
+        assert!(!dc.close.is_empty());
+    }
+
+    #[test]
+    fn i18n_diagram_controller_ja() {
+        use crate::i18n;
+        i18n::set_language("ja");
+        let msgs = i18n::get();
+        let dc = &msgs.preview.diagram_controller;
+        assert_eq!(dc.pan_up, "上へ移動");
+        assert_eq!(dc.reset, "初期位置・サイズにリセット");
+        assert_eq!(dc.fullscreen, "全画面表示");
+        // Restore default language.
+        i18n::set_language("en");
+    }
+
+    #[test]
+    fn test_fullscreen_viewer_state_apply_result() {
+        let mut pane = PreviewPane::default();
+        let ctx = egui::Context::default();
+        pane.fullscreen_image = Some(0);
+        pane.fullscreen_viewer_state.zoom_in();
+        assert_ne!(pane.fullscreen_viewer_state.zoom, 1.0);
+
+        // Simulate closing modal.
+        pane.apply_fullscreen_result(None, Some(&ctx));
+        assert_eq!(pane.fullscreen_image, None);
+        assert_eq!(pane.fullscreen_viewer_state.zoom, 1.0); // Resets.
+
+        // Simulate keeping modal open.
+        pane.fullscreen_image = Some(0);
+        pane.fullscreen_viewer_state.zoom_in();
+        pane.apply_fullscreen_result(Some(0), Some(&ctx));
+        assert_eq!(pane.fullscreen_image, Some(0));
+        assert_ne!(pane.fullscreen_viewer_state.zoom, 1.0); // Does NOT reset.
+    }
+
+    #[test]
+    fn test_handle_fullscreen_request_context_logic() {
+        let mut pane = PreviewPane::default();
+        let ctx = egui::Context::default();
+
+        pane.sections.push(RenderedSection::Image {
+            svg_data: RasterizedSvg {
+                width: 10,
+                height: 10,
+                rgba: vec![],
+            },
+            alt: String::new(),
+        });
+
+        // Simulating opening modal when it was None
+        pane.handle_fullscreen_request(Some(0), Some(&ctx));
+        assert_eq!(pane.fullscreen_image, Some(0));
+        assert_eq!(pane.was_os_fullscreen_before_modal, false); // context default is window mode
+    }
+
+    #[test]
+    fn test_viewer_state_debug() {
+        let state = ViewerState::default();
+        let debug_str = format!("{:?}", state);
+        assert!(debug_str.contains("ViewerState"));
     }
 }

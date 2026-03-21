@@ -506,7 +506,7 @@ fn image_path_resolved_in_rendered_markdown_section() {
     std::fs::write(assets_dir.join("logo.png"), b"fake-png").unwrap();
 
     let md_path = docs_dir.join("readme.md");
-    let source = "# Title\n\n![logo](../assets/logo.png)\n\nAfter image.";
+    let source = "# Title\n\nInline image: ![logo](../assets/logo.png)\n\nAfter image.";
 
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections(source, &md_path);
@@ -528,7 +528,7 @@ fn image_path_resolved_in_rendered_markdown_section() {
 
 #[test]
 fn http_image_url_preserved_in_rendered_markdown_section() {
-    let source = "# Title\n\n![logo](https://example.com/logo.png)\n";
+    let source = "# Title\n\nInline: ![logo](https://example.com/logo.png)\n";
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections(source, std::path::Path::new("/tmp/test.md"));
 
@@ -549,7 +549,7 @@ fn multiple_images_all_resolved_in_single_section() {
     std::fs::write(img_dir.join("b.png"), b"png-b").unwrap();
 
     let md_path = dir.path().join("doc.md");
-    let source = "![A](img/a.png)\n\n![B](img/b.png)\n";
+    let source = "Inline: ![A](img/a.png) ![B](img/b.png)\n";
 
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections(source, &md_path);
@@ -561,6 +561,23 @@ fn multiple_images_all_resolved_in_single_section() {
         resolved_count, 2,
         "Both images should be resolved, found {resolved_count} file:// URIs"
     );
+}
+
+#[test]
+fn standalone_local_image_is_split_into_local_image_section() {
+    let source = "# Title\n\n![Logo](file:///path/to/logo.png)\n\nText";
+    let mut pane = PreviewPane::default();
+    pane.update_markdown_sections(source, std::path::Path::new("/tmp/test.md"));
+
+    assert_eq!(pane.sections.len(), 3);
+    assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
+    if let RenderedSection::LocalImage { path, alt } = &pane.sections[1] {
+        assert_eq!(path.to_string_lossy(), "/path/to/logo.png");
+        assert_eq!(alt, "Logo");
+    } else {
+        panic!("Expected LocalImage section at index 1");
+    }
+    assert!(matches!(pane.sections[2], RenderedSection::Markdown(_)));
 }
 
 // ── Preset Color Application via egui_kittest ──

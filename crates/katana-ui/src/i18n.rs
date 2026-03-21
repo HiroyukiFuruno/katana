@@ -66,11 +66,41 @@ fn default_metadata_tooltip() -> String {
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
+pub struct DiagramControllerMessages {
+    pub pan_up: String,
+    pub pan_down: String,
+    pub pan_left: String,
+    pub pan_right: String,
+    pub zoom_in: String,
+    pub zoom_out: String,
+    pub reset: String,
+    pub fullscreen: String,
+    pub close: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct PreviewMessages {
     pub preview_title: String,
     pub refresh_diagrams: String,
     pub rendering: String,
     pub no_preview: String,
+    #[serde(default = "default_diagram_controller")]
+    pub diagram_controller: DiagramControllerMessages,
+}
+
+fn default_diagram_controller() -> DiagramControllerMessages {
+    DiagramControllerMessages {
+        pan_up: "Move up".to_string(),
+        pan_down: "Move down".to_string(),
+        pan_left: "Move left".to_string(),
+        pan_right: "Move right".to_string(),
+        zoom_in: "Zoom in".to_string(),
+        zoom_out: "Zoom out".to_string(),
+        reset: "Reset position and size".to_string(),
+        fullscreen: "Fullscreen".to_string(),
+        close: "Close".to_string(),
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -421,5 +451,13 @@ mod tests {
         }
 
         assert_eq!(read_guard(&lock).as_str(), "en");
+    }
+
+    #[test]
+    fn test_default_diagram_controller() {
+        let dc = super::default_diagram_controller();
+        assert_eq!(dc.pan_up, "Move up");
+        assert_eq!(dc.zoom_in, "Zoom in");
+        assert_eq!(dc.close, "Close");
     }
 }

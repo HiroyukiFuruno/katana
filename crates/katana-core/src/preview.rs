@@ -194,6 +194,8 @@ pub enum PreviewSection {
     Markdown(String),
     /// A diagram fence block.
     Diagram { kind: DiagramKind, source: String },
+    /// A standalone local image.
+    LocalImage { path: String, alt: String },
 }
 
 /// Splits the source text into a list of `PreviewSection`s.
@@ -201,7 +203,7 @@ pub enum PreviewSection {
 /// Detects diagram fences (` ```mermaid` / ` ```plantuml` / ` ```drawio` ),
 /// and groups the rest as Markdown sections.
 pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
-    let mut sections = Vec::new();
+    let mut initial_sections = Vec::new();
     let mut markdown_acc = String::new();
     let mut remaining = source;
 
@@ -220,8 +222,12 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
         remaining = &remaining[offset..];
         match try_parse_diagram_fence(remaining) {
             Some((kind, fence_source, after)) => {
-                flush_markdown(&mut sections, &mut markdown_acc);
-                sections.push(PreviewSection::Diagram {
+                // Do not wrap here, we will wrap in the final merge pass
+                if !markdown_acc.is_empty() {
+                    initial_sections
+                        .push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
+                }
+                initial_sections.push(PreviewSection::Diagram {
                     kind,
                     source: fence_source,
                 });
@@ -236,27 +242,66 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     }
 
     markdown_acc.push_str(remaining);
-    flush_markdown(&mut sections, &mut markdown_acc);
-    sections
-}
-
-/// If the accumulated Markdown text is not empty, add it to the sections.
-///
-/// HTML blocks within the text are handled by pulldown-cmark (via egui_commonmark's
-/// `render_html_fn` callback). However, pulldown-cmark only recognises certain tags
-/// as block-level HTML starters (p, div, h1-h6, table, etc. per CommonMark spec §4.6).
-/// Standalone `<a>` and `<img>` tags are NOT in that list, so they would be treated
-/// as inline HTML and rendered as plain text.
-///
-/// To handle this, we wrap standalone lines that consist entirely of an `<a>` or `<img>`
-/// tag in a `<div>` wrapper, converting them into block-level HTML for pulldown-cmark.
-fn flush_markdown(sections: &mut Vec<PreviewSection>, acc: &mut String) {
-    if acc.is_empty() {
-        return;
+    if !markdown_acc.is_empty() {
+        initial_sections.push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
     }
-    let text = std::mem::take(acc);
-    let processed = wrap_standalone_inline_html(&text);
-    sections.push(PreviewSection::Markdown(processed));
+
+    // Extract standalone images from the markdown blocks
+    let img_re = Regex::new(r"(?m)^[ \t]*!\[([^\]]*)\]\(([^\)]+)\)[ \t]*$").unwrap();
+    let mut temp = Vec::new();
+
+    for sec in initial_sections {
+        match sec {
+            PreviewSection::Markdown(text) => {
+                let mut last_end = 0;
+                for cap in img_re.captures_iter(&text) {
+                    let m = cap.get(0).unwrap();
+                    let alt = cap.get(1).unwrap().as_str().to_string();
+                    let url = cap.get(2).unwrap().as_str().to_string();
+
+                    let before = &text[last_end..m.start()];
+                    if !before.trim().is_empty() {
+                        temp.push(PreviewSection::Markdown(before.to_string()));
+                    }
+
+                    temp.push(PreviewSection::LocalImage { path: url, alt });
+                    last_end = m.end();
+                }
+
+                let after = &text[last_end..];
+                if !after.trim().is_empty() {
+                    temp.push(PreviewSection::Markdown(after.to_string()));
+                }
+            }
+            other => temp.push(other),
+        }
+    }
+
+    // Merge adjacent text sections and apply HTML wrapper
+    let mut merged = Vec::new();
+    let mut md_acc = String::new();
+    for sec in temp {
+        match sec {
+            PreviewSection::Markdown(t) => {
+                md_acc.push_str(&t);
+                md_acc.push('\n');
+            }
+            other => {
+                if !md_acc.is_empty() {
+                    let processed = wrap_standalone_inline_html(&md_acc);
+                    merged.push(PreviewSection::Markdown(processed));
+                    md_acc.clear();
+                }
+                merged.push(other);
+            }
+        }
+    }
+    if !md_acc.is_empty() {
+        let processed = wrap_standalone_inline_html(&md_acc);
+        merged.push(PreviewSection::Markdown(processed));
+    }
+
+    merged
 }
 
 /// Wraps standalone lines containing only `<a>` or `<img>` tags in `<div>` blocks.
@@ -347,5 +392,26 @@ mod sourcepos_tests {
                 assert_eq!(extracted, "![alt](test.png)");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::*;
+
+    #[test]
+    fn test_split_with_mixed_diagram_and_image() {
+        let md = "```mermaid\ngraph TD\nA-->B\n```\n![alt](url)\nText";
+        let sections = split_into_sections(md);
+        assert_eq!(sections.len(), 3);
+        assert!(matches!(
+            sections[0],
+            PreviewSection::Diagram {
+                kind: crate::preview::DiagramKind::Mermaid,
+                ..
+            }
+        ));
+        assert!(matches!(sections[1], PreviewSection::LocalImage { .. }));
+        assert!(matches!(sections[2], PreviewSection::Markdown(_)));
     }
 }

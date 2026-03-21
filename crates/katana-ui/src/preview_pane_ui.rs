@@ -14,7 +14,8 @@ use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 use katana_core::markdown::color_preset::DiagramColorPreset;
 use katana_core::markdown::svg_rasterize::RasterizedSvg;
 
-use crate::preview_pane::{DownloadRequest, RenderedSection};
+use crate::icon::Icon;
+use crate::preview_pane::{DownloadRequest, RenderedSection, ViewerState};
 
 /// Text color for the tool not installed warning (orange).
 const WARNING_TEXT_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 165, 0);
@@ -75,7 +76,11 @@ pub(crate) fn show_section(
             None
         }
         RenderedSection::Image { svg_data, alt } => {
-            show_rasterized(ui, svg_data, alt, id);
+            show_rasterized(ui, svg_data, alt, id, None, None);
+            None
+        }
+        RenderedSection::LocalImage { path, alt } => {
+            show_local_image(ui, path, alt, id, None, None);
             None
         }
         RenderedSection::Error {
@@ -223,32 +228,119 @@ pub(crate) fn show_not_installed(
 }
 
 /// Displays rasterized SVG as an egui texture.
-pub(crate) fn show_rasterized(ui: &mut egui::Ui, img: &RasterizedSvg, _alt: &str, id: usize) {
-    let color_img = egui::ColorImage::from_rgba_unmultiplied(
-        std::array::from_fn(|i| {
-            if i == 0 {
-                img.width as usize
-            } else {
-                img.height as usize
-            }
-        }),
-        &img.rgba,
-    );
-    let texture = ui.ctx().load_texture(
-        format!("diagram_{id}"),
-        color_img,
-        egui::TextureOptions::LINEAR,
-    );
+/// Padding around fullscreen image.
+const FULLSCREEN_PADDING: f32 = 40.0;
+/// Size of the fullscreen close button.
+const FULLSCREEN_CLOSE_SIZE: f32 = 32.0;
+/// Margin for close button from screen edge.
+const FULLSCREEN_CLOSE_MARGIN: f32 = 16.0;
+/// Font size for close button icon.
+const FULLSCREEN_CLOSE_ICON_SIZE: f32 = 20.0;
+/// Fill color channel value for close button background.
+const FULLSCREEN_CLOSE_FILL_CHANNEL: u8 = 80;
+/// Fill alpha for close button background.
+const FULLSCREEN_CLOSE_FILL_ALPHA: u8 = 220;
+/// Border stroke gray value for close button.
+const FULLSCREEN_CLOSE_STROKE_GRAY: u8 = 160;
+
+pub(crate) fn show_rasterized(
+    ui: &mut egui::Ui,
+    img: &RasterizedSvg,
+    _alt: &str,
+    id: usize,
+    mut viewer_state: Option<&mut ViewerState>,
+    fullscreen_request: Option<&mut Option<usize>>,
+) {
     let max_w = ui.available_width();
-    let scale = (max_w / img.width as f32).min(1.0);
-    let size = Vec2::new(img.width as f32 * scale, img.height as f32 * scale);
-    ui.add(egui::Image::new((texture.id(), size)));
+    let base_scale = (max_w / img.width as f32).min(1.0);
+
+    // Apply viewer zoom/pan if state is provided.
+    let zoom = viewer_state.as_ref().map_or(1.0, |s| s.zoom);
+    let pan = viewer_state.as_ref().map_or(egui::Vec2::ZERO, |s| s.pan);
+
+    // The base display size (zoom = 1.0)
+    let base_size = Vec2::new(
+        img.width as f32 * base_scale,
+        img.height as f32 * base_scale,
+    );
+
+    // Zoomed image size
+    let zoomed_size = base_size * zoom;
+
+    // Reserve space for the image container (invariant to zoom!).
+    let (container_rect, _response) =
+        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::hover());
+
+    let texture_handle = if let Some(state) = viewer_state.as_mut() {
+        if state.texture.is_none() {
+            let color_img = egui::ColorImage::from_rgba_unmultiplied(
+                std::array::from_fn(|i| {
+                    if i == 0 {
+                        img.width as usize
+                    } else {
+                        img.height as usize
+                    }
+                }),
+                &img.rgba,
+            );
+            state.texture = Some(ui.ctx().load_texture(
+                format!("diagram_{id}"),
+                color_img,
+                egui::TextureOptions::LINEAR,
+            ));
+        }
+        state.texture.clone().unwrap()
+    } else {
+        let color_img = egui::ColorImage::from_rgba_unmultiplied(
+            std::array::from_fn(|i| {
+                if i == 0 {
+                    img.width as usize
+                } else {
+                    img.height as usize
+                }
+            }),
+            &img.rgba,
+        );
+        ui.ctx().load_texture(
+            format!("diagram_{id}"),
+            color_img,
+            egui::TextureOptions::LINEAR,
+        )
+    };
+
+    // Paint the image with pan offset, clipped to the fixed container.
+    // Center the base image horizontally if it's smaller than max_w.
+    let x_offset = (max_w - base_size.x).max(0.0) / 2.0;
+
+    let image_pos = container_rect.min + egui::vec2(x_offset, 0.0) + pan;
+    let image_rect = egui::Rect::from_min_size(image_pos, zoomed_size);
+    ui.painter().with_clip_rect(container_rect).image(
+        texture_handle.id(),
+        image_rect,
+        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
+
+    // Draw overlay controls only when viewer_state is provided.
+    if let Some(state) = viewer_state {
+        // Fullscreen button (top-right).
+        if crate::diagram_controller::draw_fullscreen_button(ui, container_rect) {
+            if let Some(req) = fullscreen_request {
+                *req = Some(id);
+            }
+        }
+
+        // Control grid (bottom-right).
+        crate::diagram_controller::draw_controls(ui, state, container_rect);
+    }
 }
 
 /// Renders the section list sequentially and returns a download request if any.
 ///
 /// No automatic separators are inserted between sections.
 /// Horizontal rules (`---`) are rendered by CommonMarkViewer as part of the markdown content.
+/// Extended version of `render_sections` with viewer state support.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_sections(
     ui: &mut egui::Ui,
     cache: &mut CommonMarkCache,
@@ -256,6 +348,8 @@ pub(crate) fn render_sections(
     md_file_path: &std::path::Path,
     scroll_to_heading_index: Option<usize>,
     mut populate_heading_rects: Option<&mut Vec<egui::Rect>>,
+    mut viewer_states: Option<&mut Vec<ViewerState>>,
+    mut fullscreen_request: Option<&mut Option<usize>>,
 ) -> Option<DownloadRequest> {
     let mut request: Option<DownloadRequest> = None;
     let mut current_heading_offset = 0;
@@ -267,17 +361,47 @@ pub(crate) fn render_sections(
                 offset = current_heading_offset;
                 current_heading_offset += katana_core::markdown::outline::extract_outline(md).len();
             }
-            if let Some(req) = show_section(
-                ui,
-                cache,
-                section,
-                i,
-                md_file_path,
-                scroll_to_heading_index,
-                populate_heading_rects.as_deref_mut(),
-                offset,
-            ) {
-                request = Some(req);
+            match section {
+                RenderedSection::Image { svg_data, alt } => {
+                    // Auto-extend viewer_states Vec if needed and take a mutable reference.
+                    let state = viewer_states.as_mut().map(|vs| {
+                        if vs.len() <= i {
+                            vs.resize_with(i + 1, ViewerState::default);
+                        }
+                        &mut vs[i]
+                    });
+                    show_rasterized(
+                        ui,
+                        svg_data,
+                        alt,
+                        i,
+                        state,
+                        fullscreen_request.as_deref_mut(),
+                    );
+                }
+                RenderedSection::LocalImage { path, alt } => {
+                    let state = viewer_states.as_mut().map(|vs| {
+                        if vs.len() <= i {
+                            vs.resize_with(i + 1, ViewerState::default);
+                        }
+                        &mut vs[i]
+                    });
+                    show_local_image(ui, path, alt, i, state, fullscreen_request.as_deref_mut());
+                }
+                _ => {
+                    if let Some(req) = show_section(
+                        ui,
+                        cache,
+                        section,
+                        i,
+                        md_file_path,
+                        scroll_to_heading_index,
+                        populate_heading_rects.as_deref_mut(),
+                        offset,
+                    ) {
+                        request = Some(req);
+                    }
+                }
             }
         });
     }
@@ -285,6 +409,343 @@ pub(crate) fn render_sections(
         ui.label(egui::RichText::new(crate::i18n::get().preview.no_preview.clone()).weak());
     }
     request
+}
+
+/// Renders the fullscreen modal overlay if `fullscreen_image` is `Some`.
+/// Returns the updated fullscreen state: `None` if closed, otherwise unchanged.
+pub(crate) fn render_fullscreen_if_active(
+    ctx: &egui::Context,
+    sections: &[RenderedSection],
+    fullscreen_image: Option<usize>,
+    fullscreen_state: &mut ViewerState,
+) -> Option<usize> {
+    let idx = fullscreen_image?;
+    if let Some(RenderedSection::Image { svg_data, alt }) = sections.get(idx) {
+        if show_fullscreen_modal(ctx, svg_data, alt, fullscreen_state, idx) {
+            Some(idx) // keep open
+        } else {
+            None // user closed
+        }
+    } else if let Some(RenderedSection::LocalImage { path, alt }) = sections.get(idx) {
+        if show_fullscreen_local_image(ctx, path, alt, fullscreen_state, idx) {
+            Some(idx) // keep open
+        } else {
+            None // user closed
+        }
+    } else {
+        None // section gone
+    }
+}
+
+/// Renders a fullscreen modal overlay displaying a single image with controls.
+/// Returns `true` if the modal should remain open, `false` if closed.
+pub(crate) fn show_fullscreen_modal(
+    ctx: &egui::Context,
+    img: &RasterizedSvg,
+    _alt: &str,
+    viewer_state: &mut ViewerState,
+    idx: usize,
+) -> bool {
+    let msgs = crate::i18n::get();
+    let dc = &msgs.preview.diagram_controller;
+
+    // Close on Escape.
+    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        return false;
+    }
+
+    let screen = ctx.content_rect();
+
+    // Input blocker — consume all clicks/drags on the backdrop so nothing behind is interactive.
+    let mut keep_open = true;
+    egui::Area::new(egui::Id::new("fs_input_blocker"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(screen.min)
+        .show(ctx, |ui| {
+            let (blocker_rect, _) =
+                ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
+
+            // Fully opaque backdrop — blocks all visual content behind the modal.
+            let bg_color = ctx.style().visuals.panel_fill;
+            ui.painter().rect_filled(blocker_rect, 0.0, bg_color);
+
+            // Fit image to screen with padding, applying viewer zoom/pan.
+            let avail = Vec2::new(
+                screen.width() - FULLSCREEN_PADDING * 2.0,
+                screen.height() - FULLSCREEN_PADDING * 2.0,
+            );
+            let scale_x = avail.x / img.width as f32;
+            let scale_y = avail.y / img.height as f32;
+            let base_scale = scale_x.min(scale_y).min(1.0);
+            let zoom = viewer_state.zoom;
+            let pan = viewer_state.pan;
+            let size = Vec2::new(
+                img.width as f32 * base_scale * zoom,
+                img.height as f32 * base_scale * zoom,
+            );
+            let texture_handle = if viewer_state.texture.is_none() {
+                let color_img = egui::ColorImage::from_rgba_unmultiplied(
+                    std::array::from_fn(|i| {
+                        if i == 0 {
+                            img.width as usize
+                        } else {
+                            img.height as usize
+                        }
+                    }),
+                    &img.rgba,
+                );
+                let th = ctx.load_texture(
+                    format!("diagram_fs_{idx}"),
+                    color_img,
+                    egui::TextureOptions::LINEAR,
+                );
+                viewer_state.texture = Some(th.clone());
+                th
+            } else {
+                viewer_state.texture.clone().unwrap()
+            };
+
+            // Center the image with pan offset.
+            let img_pos = screen.center() - size / 2.0 + pan;
+            let img_rect = egui::Rect::from_min_size(img_pos, size);
+            ui.painter().with_clip_rect(blocker_rect).image(
+                texture_handle.id(),
+                img_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                egui::Color32::WHITE,
+            );
+
+            // Overlay controls (bottom-right of screen).
+            crate::diagram_controller::draw_controls(ui, viewer_state, blocker_rect);
+
+            // Close button [✕] (top-right).
+            let close_btn_size = Vec2::splat(FULLSCREEN_CLOSE_SIZE);
+            let close_btn_rect = egui::Rect::from_min_size(
+                egui::pos2(
+                    blocker_rect.right() - close_btn_size.x - FULLSCREEN_CLOSE_MARGIN,
+                    blocker_rect.top() + FULLSCREEN_CLOSE_MARGIN,
+                ),
+                close_btn_size,
+            );
+            let close_resp = ui.put(
+                close_btn_rect,
+                egui::Button::new(
+                    egui::RichText::new(Icon::CloseModal.as_str())
+                        .size(FULLSCREEN_CLOSE_ICON_SIZE)
+                        .color(egui::Color32::WHITE),
+                )
+                .fill(egui::Color32::from_rgba_premultiplied(
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_ALPHA,
+                ))
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    egui::Color32::from_gray(FULLSCREEN_CLOSE_STROKE_GRAY),
+                )),
+            );
+            if close_resp.on_hover_text(&dc.close).clicked() {
+                keep_open = false;
+            }
+        });
+
+    keep_open
+}
+
+pub(crate) fn show_local_image(
+    ui: &mut egui::Ui,
+    path: &std::path::Path,
+    _alt: &str,
+    id: usize,
+    mut viewer_state: Option<&mut ViewerState>,
+    fullscreen_request: Option<&mut Option<usize>>,
+) {
+    let texture_handle = if let Some(state) = viewer_state.as_mut() {
+        if state.texture.is_none() {
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Ok(dyn_img) = image::load_from_memory(&bytes) {
+                    let rgba = dyn_img.into_rgba8();
+                    let size = std::array::from_fn(|i| {
+                        if i == 0 {
+                            rgba.width() as usize
+                        } else {
+                            rgba.height() as usize
+                        }
+                    });
+                    let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
+                    state.texture = Some(ui.ctx().load_texture(
+                        format!("local_image_{id}"),
+                        color_img,
+                        egui::TextureOptions::LINEAR,
+                    ));
+                }
+            }
+        }
+        state.texture.clone()
+    } else {
+        None
+    };
+
+    let (texture_handle, width, height) = match texture_handle {
+        Some(t) => {
+            let size = t.size();
+            (t, size[0], size[1])
+        }
+        None => return, // Could not load image
+    };
+
+    let max_w = ui.available_width();
+    let base_scale = (max_w / width as f32).min(1.0);
+
+    let zoom = viewer_state.as_ref().map_or(1.0, |s| s.zoom);
+    let pan = viewer_state.as_ref().map_or(egui::Vec2::ZERO, |s| s.pan);
+
+    let base_size = Vec2::new(width as f32 * base_scale, height as f32 * base_scale);
+    let zoomed_size = base_size * zoom;
+
+    let (container_rect, _response) =
+        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::hover());
+
+    let x_offset = (max_w - base_size.x).max(0.0) / 2.0;
+    let image_pos = container_rect.min + egui::vec2(x_offset, 0.0) + pan;
+    let image_rect = egui::Rect::from_min_size(image_pos, zoomed_size);
+
+    ui.painter().with_clip_rect(container_rect).image(
+        texture_handle.id(),
+        image_rect,
+        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
+
+    if let Some(state) = viewer_state {
+        if crate::diagram_controller::draw_fullscreen_button(ui, container_rect) {
+            if let Some(req) = fullscreen_request {
+                *req = Some(id);
+            }
+        }
+        crate::diagram_controller::draw_controls(ui, state, container_rect);
+    }
+}
+
+pub(crate) fn show_fullscreen_local_image(
+    ctx: &egui::Context,
+    path: &std::path::Path,
+    _alt: &str,
+    viewer_state: &mut ViewerState,
+    idx: usize,
+) -> bool {
+    let msgs = crate::i18n::get();
+    let dc = &msgs.preview.diagram_controller;
+
+    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        return false;
+    }
+
+    let screen = ctx.content_rect();
+    let mut keep_open = true;
+
+    egui::Area::new(egui::Id::new("fs_input_blocker"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(screen.min)
+        .show(ctx, |ui| {
+            let (blocker_rect, _) =
+                ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
+
+            let bg_color = ctx.style().visuals.panel_fill;
+            ui.painter().rect_filled(blocker_rect, 0.0, bg_color);
+
+            let texture_handle = if viewer_state.texture.is_none() {
+                if let Ok(bytes) = std::fs::read(path) {
+                    if let Ok(dyn_img) = image::load_from_memory(&bytes) {
+                        let rgba = dyn_img.into_rgba8();
+                        let size = std::array::from_fn(|i| {
+                            if i == 0 {
+                                rgba.width() as usize
+                            } else {
+                                rgba.height() as usize
+                            }
+                        });
+                        let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
+                        viewer_state.texture = Some(ui.ctx().load_texture(
+                            format!("local_image_fs_{idx}"),
+                            color_img,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                    }
+                }
+                viewer_state.texture.clone()
+            } else {
+                viewer_state.texture.clone()
+            };
+
+            let (texture_handle, width, height) = match texture_handle {
+                Some(t) => {
+                    let size = t.size();
+                    (t, size[0], size[1])
+                }
+                None => return,
+            };
+
+            let avail = Vec2::new(
+                screen.width() - FULLSCREEN_PADDING * 2.0,
+                screen.height() - FULLSCREEN_PADDING * 2.0,
+            );
+            let scale_x = avail.x / width as f32;
+            let scale_y = avail.y / height as f32;
+            let base_scale = scale_x.min(scale_y).min(1.0);
+
+            let zoom = viewer_state.zoom;
+            let pan = viewer_state.pan;
+            let size = Vec2::new(
+                width as f32 * base_scale * zoom,
+                height as f32 * base_scale * zoom,
+            );
+
+            let img_pos = screen.center() - size / 2.0 + pan;
+            let img_rect = egui::Rect::from_min_size(img_pos, size);
+            ui.painter().with_clip_rect(blocker_rect).image(
+                texture_handle.id(),
+                img_rect,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                egui::Color32::WHITE,
+            );
+
+            crate::diagram_controller::draw_controls(ui, viewer_state, blocker_rect);
+
+            let close_btn_size = Vec2::splat(FULLSCREEN_CLOSE_SIZE);
+            let close_btn_rect = egui::Rect::from_min_size(
+                egui::pos2(
+                    blocker_rect.right() - close_btn_size.x - FULLSCREEN_CLOSE_MARGIN,
+                    blocker_rect.top() + FULLSCREEN_CLOSE_MARGIN,
+                ),
+                close_btn_size,
+            );
+
+            let close_resp = ui.put(
+                close_btn_rect,
+                egui::Button::new(
+                    egui::RichText::new(crate::icon::Icon::CloseModal.as_str())
+                        .size(FULLSCREEN_CLOSE_ICON_SIZE)
+                        .color(egui::Color32::WHITE),
+                )
+                .fill(egui::Color32::from_rgba_premultiplied(
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_CHANNEL,
+                    FULLSCREEN_CLOSE_FILL_ALPHA,
+                ))
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    egui::Color32::from_gray(FULLSCREEN_CLOSE_STROKE_GRAY),
+                )),
+            );
+            if close_resp.on_hover_text(&dc.close).clicked() {
+                keep_open = false;
+            }
+        });
+
+    keep_open
 }
 
 /// Renders an HTML block using our HtmlParser + HtmlRenderer pipeline.

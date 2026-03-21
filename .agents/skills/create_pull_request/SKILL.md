@@ -14,6 +14,23 @@ Standard workflow for creating a PR. Prioritize repository-specific templates if
 
 ## Workflow
 
+### 0. Determine Base Branch (MANDATORY)
+
+> [!CAUTION]
+> **NEVER hardcode `master`, `main`, or `develop` as the base branch.** Always derive it from context.
+
+Determine the correct `--base` value:
+
+1. If the current branch matches `<feature>-task<N>` pattern → base is `<feature>` (the Base Feature Branch per `/openspec-branching`).
+2. If the current branch matches `<feature>-task<N>-<suffix>` pattern → base is still `<feature>`.
+3. If the caller explicitly specifies a base branch, use that.
+4. **If none of the above apply, ask the user.** Do not guess.
+
+Verify the base branch exists:
+```bash
+git branch -a | grep {base_branch}
+```
+
 ### 1. Verify Template Existence
 
 Check if a template file exists within the repository.
@@ -30,8 +47,8 @@ Read the contents of the template file and create the PR based on it.
 # Check template content
 cat .github/PULL_REQUEST_TEMPLATE.md
 
-# Create PR (Fill template content into body and open in editor, or replace content and specify via CLI)
-gh pr create --base develop --head {branch_name} --title "{commit_message}" --body-file .github/PULL_REQUEST_TEMPLATE.md
+# Create PR — ALWAYS specify --base
+gh pr create --base {base_branch} --head {branch_name} --title "{commit_message}" --body-file .github/PULL_REQUEST_TEMPLATE.md
 ```
 *Tip: `--body-file` is convenient during `gh pr create`. Edit the contents appropriately.*
 
@@ -57,22 +74,11 @@ Use the following standard template.
 
 Command execution example:
 ```bash
-gh pr create --base develop --head {branch_name} --title "{commit_message}" --body "<!-- I want to review in Japanese. -->
-
-## 概要
-<!-- Describe the overview or specify the JIRA ticket. -->
-
-## 対応内容
-<!-- Provide a bulleted list of implementation details. -->
-
-## 影響範囲
-<!-- Provide a bulleted list of affected areas. -->
-
-## 動作確認結果
-<!-- Describe the verification results or attach screenshots. -->"
+gh pr create --base {base_branch} --head {branch_name} --title "{commit_message}" --body "..."
 ```
 
 ## Important Notes
 
+- **`--base` is mandatory.** Every `gh pr create` call must include it. Omitting `--base` causes GitHub CLI to default to the repository's default branch, which is almost always wrong for task branches.
 - Ensure the title is clear and concise, referencing the commit message where appropriate.
 - Include `<!-- I want to review in Japanese. -->` to explicitly request a Japanese language review.

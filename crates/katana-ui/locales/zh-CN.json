@@ -18,7 +18,18 @@
     "preview_title": "预览",
     "refresh_diagrams": "刷新图表",
     "rendering": "{kind} 渲染中...",
-    "no_preview": "(无预览)"
+    "no_preview": "(无预览)",
+    "diagram_controller": {
+      "pan_up": "Move up",
+      "pan_down": "Move down",
+      "pan_left": "Move left",
+      "pan_right": "Move right",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "reset": "Reset position and size",
+      "fullscreen": "Fullscreen",
+      "close": "Close"
+    }
   },
   "plantuml": {
     "downloading_plantuml": "⬇ 正在下载 PlantUML JAR...",

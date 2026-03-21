@@ -18,7 +18,18 @@
     "preview_title": "プレビュー",
     "refresh_diagrams": "ダイアグラムを更新",
     "rendering": "{kind} レンダリング中…",
-    "no_preview": "（プレビューなし）"
+    "no_preview": "（プレビューなし）",
+    "diagram_controller": {
+      "pan_up": "上へ移動",
+      "pan_down": "下へ移動",
+      "pan_left": "左へ移動",
+      "pan_right": "右へ移動",
+      "zoom_in": "拡大",
+      "zoom_out": "縮小",
+      "reset": "初期位置・サイズにリセット",
+      "fullscreen": "全画面表示",
+      "close": "閉じる"
+    }
   },
   "plantuml": {
     "downloading_plantuml": "⬇ PlantUML JAR をダウンロード中…",

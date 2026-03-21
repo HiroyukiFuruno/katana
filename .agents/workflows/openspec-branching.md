@@ -4,26 +4,45 @@ description: Standard branching strategy for implementing OpenSpec changes
 
 # OpenSpec Branch Operations Workflow
 
-This workflow ensures standard operational derivation of base and task-specific branches when starting or continuing an OpenSpec implementation session.
+This workflow defines the branching **strategy** (what branches to create and where to merge). The mechanics of PR creation, base branch determination, and merging are handled by the skills this workflow depends on.
 
-## Workflow Rules
+## Dependencies
 
-All task operations should adhere to the following branch strategy for a single implementation session:
+- `.agents/skills/create_pull_request/SKILL.md` — owns base branch determination and PR creation
+- `.agents/skills/commit_and_push/SKILL.md` — owns commit and push mechanics
+
+## Workflow Steps
 
 ### Step 1: Base Branch Creation (Initial)
-Before starting any tasks, create the Base Feature Branch from `master` named exactly after the change directory (e.g., `desktop-viewer-polish-v0.4.0`).
-Command: `git switch -c <Change-Directory-Name> master`
+
+Before starting any tasks, create the Base Feature Branch from `master` named exactly after the change directory.
+
+```bash
+git switch -c <Change-Directory-Name> master
+```
 
 ### Step 2: Task Branch Creation (Per Task)
-For each individual task mapped in `tasks.md`, derive a new task branch from the Base Feature Branch created in Step 1.
-Command: `git switch -c <Change-Directory-Name>-task<N> <Change-Directory-Name>`
 
-### Step 3: Implementation and Integration
-Perform the task implementation using designated OpenSpec workflow mechanisms (like `/opsx-apply`). Once the task is completed and verified, the Task Branch MUST be merged back into the **Base Feature Branch** (NOT `master`), leveraging the `openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`).
+For each task in `tasks.md`, derive a task branch from the Base Feature Branch.
+
+```bash
+git switch -c <Change-Directory-Name>-task<N> <Change-Directory-Name>
+```
+
+### Step 3: Implementation and Delivery
+
+Implement the task, then execute the `/openspec-delivery` workflow to deliver.
+
+The delivery workflow calls `create_pull_request` skill, which automatically determines that the `--base` is the Base Feature Branch (by stripping `-task<N>` from the current branch name). This ensures task PRs never target `master`.
 
 ### Step 4: Synchronization
-After successfully merging, switch back to the Base Feature Branch and ensure it is mathematically up-to-date with your remote changes before starting the next Task Branch.
-Command: `git switch <Change-Directory-Name> && git pull`
+
+After merge, return to the Base Feature Branch and sync before starting the next task.
+
+```bash
+git switch <Change-Directory-Name> && git pull
+```
 
 ---
-**Strict Instruction for AI Agents**: Always execute this branching strategy naturally before checking out code or running `/opsx-apply` on an OpenSpec change. Never commit feature development directly to `master`.
+
+**Strict Instruction for AI Agents**: Always execute this branching strategy before starting task implementation. Never commit feature work directly to `master`.
