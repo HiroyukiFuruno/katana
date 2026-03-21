@@ -9,53 +9,81 @@ use regex::Regex;
 /// like `![alt](../assets/image.png)` to `![alt](file:///absolute/path/assets/image.png)`.
 ///
 /// Already-absolute paths, URLs (`http://`, `https://`), and `file://` URIs are left unchanged.
-pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> String {
+pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> (String, Vec<std::path::PathBuf>) {
+    use comrak::nodes::NodeValue;
+    use comrak::{parse_document, Arena, Options};
+
+    let arena = Arena::new();
+    let root = parse_document(&arena, source, &Options::default());
+
+    let mut line_offsets = vec![0];
+    for (i, c) in source.char_indices() {
+        if c == '\n' {
+            line_offsets.push(i + 1);
+        }
+    }
+
+    // Collect all Image AST nodes' source positions
+    let mut replacements = Vec::new();
+    for node in root.descendants() {
+        if let NodeValue::Image(ref img) = node.data.borrow().value {
+            let pos = node.data.borrow().sourcepos;
+            let start_line_idx = pos.start.line.saturating_sub(1);
+            let start_col_offset = pos.start.column.saturating_sub(1);
+            let end_line_idx = pos.end.line.saturating_sub(1);
+            let end_col_offset = pos.end.column.saturating_sub(1);
+
+            let start_byte = line_offsets.get(start_line_idx).unwrap_or(&0) + start_col_offset;
+            let end_byte = line_offsets.get(end_line_idx).unwrap_or(&0) + end_col_offset;
+
+            if start_byte < source.len() && end_byte <= source.len() && start_byte <= end_byte {
+                let node_str = &source[start_byte..end_byte];
+                // We know node_str is something like `![alt](url)` or `![alt][ref]`
+                // Let's find the URL portion. This is complex if `alt` texts contain parens.
+                // However, we know `img.url` is exactly the URL string from the AST.
+                let url_str = &img.url;
+                if !url_str.is_empty() {
+                    // Find the exact occurrence of `url_str` inside `node_str` searching from the end
+                    if let Some(url_idx) = node_str.rfind(url_str.as_str()) {
+                        replacements.push((
+                            start_byte + url_idx,
+                            start_byte + url_idx + url_str.len(),
+                            url_str.to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort replacements by start byte in reverse order to safely perform string replacements from the end
+    replacements.sort_by_key(|&(start, _, _)| std::cmp::Reverse(start));
+
     let base_dir = md_file_path.parent().unwrap_or(Path::new("."));
-    let mut result = String::with_capacity(source.len());
-    let mut remaining = source;
+    let mut result = source.to_string();
 
-    while let Some(img_start) = remaining.find("![") {
-        result.push_str(&remaining[..img_start]);
-        remaining = &remaining[img_start..];
+    let mut extracted_paths = Vec::new();
 
-        // Find the closing `]` of the alt text.
-        let Some(alt_end) = remaining.find("](") else {
-            result.push_str("![");
-            remaining = &remaining["![".len()..];
-            continue;
-        };
-        let alt_part = &remaining[..alt_end + "](".len()]; // "![alt]("
-        let after_paren = &remaining[alt_end + "](".len()..];
-
-        // Find the closing `)`.
-        let Some(close) = after_paren.find(')') else {
-            result.push_str(alt_part);
-            remaining = after_paren;
-            continue;
-        };
-        let raw_path = &after_paren[..close];
-
-        // Skip already-absolute or URL paths.
+    for (start, end, raw_path) in replacements {
         if raw_path.starts_with("http://")
             || raw_path.starts_with("https://")
             || raw_path.starts_with("file://")
+            || raw_path.starts_with("data:")
             || raw_path.starts_with('/')
         {
-            result.push_str(alt_part);
-            result.push_str(raw_path);
-            result.push(')');
-        } else {
-            let resolved = base_dir.join(raw_path);
-            let canonical = resolved.canonicalize().unwrap_or(resolved);
-            result.push_str(alt_part);
-            result.push_str("file://");
-            result.push_str(&canonical.display().to_string());
-            result.push(')');
+            continue;
         }
-        remaining = &after_paren[close + 1..];
+
+        let resolved = base_dir.join(&raw_path);
+        let canonical = resolved.canonicalize().unwrap_or(resolved);
+        let absolute_url = format!("file://{}", canonical.display());
+
+        extracted_paths.push(canonical);
+
+        result.replace_range(start..end, &absolute_url);
     }
-    result.push_str(remaining);
-    result
+
+    (result, extracted_paths)
 }
 
 /// Resolves relative `src` attributes in HTML `<img>` tags to absolute `file://` URIs.
@@ -294,4 +322,30 @@ fn try_parse_diagram_fence(s: &str) -> Option<(DiagramKind, String, &str)> {
         .strip_prefix('\n')
         .unwrap_or(&after_info[rest_start..]);
     Some((kind, source, after))
+}
+
+#[cfg(test)]
+mod sourcepos_tests {
+    use comrak::nodes::NodeValue;
+    use comrak::{parse_document, Arena, Options};
+
+    #[test]
+    fn test_sourcepos_bytes() {
+        let arena = Arena::new();
+        //                   0         1         2
+        //                   0123456789012345678901234567
+        let src = "Hello\nThis is an ![alt](test.png) text\n";
+        let doc = parse_document(&arena, src, &Options::default());
+        for node in doc.descendants() {
+            if let NodeValue::Image(_) = node.data.borrow().value {
+                let pos = node.data.borrow().sourcepos;
+                println!("Pos: {:?}", pos);
+                let lines: Vec<&str> = src.lines().collect();
+                let line = lines[pos.start.line - 1];
+                let extracted = &line[pos.start.column - 1..pos.end.column];
+                println!("Text: {}", extracted);
+                assert_eq!(extracted, "![alt](test.png)");
+            }
+        }
+    }
 }

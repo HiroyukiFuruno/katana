@@ -117,51 +117,52 @@ fn resolve_image_paths_converts_relative_to_absolute() {
     std::fs::write(img_dir.join("logo.png"), b"png").unwrap();
 
     let source = "![logo](../assets/logo.png)";
-    let result = resolve_image_paths(source, &md_path);
+    let (result, paths) = resolve_image_paths(source, &md_path);
     assert!(result.starts_with("![logo](file://"));
     assert!(result.contains("assets/logo.png"));
     assert!(!result.contains(".."));
+    assert_eq!(paths.len(), 1);
 }
 
 #[test]
 fn resolve_image_paths_preserves_http_urls() {
     let source = "![img](https://example.com/image.png)";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
 
 #[test]
 fn resolve_image_paths_preserves_absolute_paths() {
     let source = "![img](/absolute/path/image.png)";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
 
 #[test]
 fn resolve_image_paths_preserves_file_uris() {
     let source = "![img](file:///some/image.png)";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
 
 #[test]
 fn resolve_image_paths_handles_no_closing_paren() {
     let source = "![alt](path/without/close";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert!(result.contains("![alt]("));
 }
 
 #[test]
 fn resolve_image_paths_handles_no_alt_close_bracket() {
     let source = "![alt without close bracket";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
 
 #[test]
 fn resolve_image_paths_passes_through_non_image_text() {
     let source = "# Hello\n\nSome text without images.";
-    let result = resolve_image_paths(source, Path::new("/tmp/test.md"));
+    let (result, _) = resolve_image_paths(source, Path::new("/tmp/test.md"));
     assert_eq!(result, source);
 }
 
