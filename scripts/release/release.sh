@@ -112,7 +112,14 @@ check_gpg() {
 }
 check_gpg
 
-# ── 2. Update version files ───────────────────────────────────────────────────
+# ── 2. Quality Gates ──────────────────────────────────────────────────────────
+info "Running quality gates (make check)..."
+if ! make check; then
+    error "Quality gate failed. Please fix errors before releasing."
+    exit 1
+fi
+
+# ── 3. Update version files ───────────────────────────────────────────────────
 info "Updating version in Cargo.toml..."
 sed -i '' 's/^version = ".*"/version = "'"${VERSION}"'"/' Cargo.toml
 
@@ -121,13 +128,6 @@ cargo check --workspace >/dev/null 2>&1 || true
 
 info "Updating version in Info.plist..."
 perl -i -0pe 's/(<key>CFBundleShortVersionString<\/key>\s*<string>).*?(<\/string>)/$1v'"${VERSION}"'$2/' crates/katana-ui/Info.plist
-
-# ── 3. Quality Gates ──────────────────────────────────────────────────────────
-info "Running quality gates (make check)..."
-if ! make check; then
-    error "Quality gate failed. Please fix errors before releasing."
-    exit 1
-fi
 
 # ── 4. Commit and Tag ─────────────────────────────────────────────────────────
 info "Staging release changes..."
