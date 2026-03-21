@@ -74,8 +74,12 @@ pub enum AppAction {
     ChangeLanguage(String),
     /// Toggle the settings window.
     ToggleSettings,
+    /// Toggle the About window.
+    ToggleAbout,
     /// Toggle the table of contents panel.
     ToggleToc,
+    /// Trigger an update check.
+    CheckForUpdates,
     /// Change the split view direction (Horizontal / Vertical).
     SetSplitDirection(katana_platform::SplitDirection),
     /// Change the pane order within the split view (EditorFirst / PreviewFirst).
@@ -157,6 +161,14 @@ pub struct AppState {
     pub settings: SettingsService,
     /// Indicates if a workspace is currently being loaded asynchronously in the background.
     pub is_loading_workspace: bool,
+    /// If an update is available on GitHub, contains the latest version string
+    pub update_available: Option<String>,
+    /// Flags whether an update check is currently running
+    pub checking_for_updates: bool,
+    /// Stores any error encountered during update checking
+    pub update_check_error: Option<String>,
+    /// Global UI scale factor.
+    pub scale_override: f32,
     /// Facade for memory and persistent cache storage.
     pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     /// Set of manually expanded directories in the workspace tree.
@@ -214,6 +226,10 @@ impl AppState {
             preview_max_scroll: 0.0,
             settings,
             is_loading_workspace: false,
+            update_available: None,
+            checking_for_updates: false,
+            update_check_error: None,
+            scale_override: 1.0,
             cache,
             expanded_directories: std::collections::HashSet::new(),
             recently_closed_tabs: std::collections::VecDeque::new(),

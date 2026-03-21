@@ -102,9 +102,15 @@ pub struct KatanaApp {
     pub(crate) download_rx: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
     /// Receiver for background workspace loading.
     pub(crate) workspace_rx: Option<std::sync::mpsc::Receiver<WorkspaceLoadMessage>>,
+    /// Receiver for background update checks.
+    pub(crate) update_rx: Option<std::sync::mpsc::Receiver<Result<String, String>>>,
 
     /// Whether the About dialog is currently visible.
     pub(crate) show_about: bool,
+    /// Whether the Update dialog is currently visible.
+    pub(crate) show_update_dialog: bool,
+    /// Tracks if we have already automatically shown the update dialog on startup.
+    pub(crate) update_notified: bool,
     /// App icon texture for the About dialog.
     /// Public because it is set from the binary crate (main.rs) during initialization.
     pub about_icon: Option<egui::TextureHandle>,
@@ -122,14 +128,17 @@ pub struct KatanaApp {
 
 impl KatanaApp {
     pub fn new(state: AppState) -> Self {
-        Self {
+        let mut app = Self {
             state,
             fs: FilesystemService::new(),
             pending_action: AppAction::None,
             tab_previews: Vec::new(),
             download_rx: None,
             workspace_rx: None,
+            update_rx: None,
             show_about: false,
+            show_update_dialog: false,
+            update_notified: false,
             about_icon: None,
             cached_theme: None,
             cached_font_size: None,
@@ -140,7 +149,9 @@ impl KatanaApp {
             } else {
                 Some(std::time::Instant::now())
             },
-        }
+        };
+        app.start_update_check(false);
+        app
     }
 
     /// Explicitly skips the splash screen. Useful for integration testing.
@@ -613,6 +624,9 @@ impl KatanaApp {
             AppAction::ToggleSettings => {
                 self.state.show_settings = !self.state.show_settings;
             }
+            AppAction::ToggleAbout => {
+                self.show_about = !self.show_about;
+            }
             AppAction::ToggleToc => {
                 self.state.show_toc = !self.state.show_toc;
             }
@@ -732,6 +746,9 @@ impl KatanaApp {
                 }
                 self.save_workspace_state();
             }
+            AppAction::CheckForUpdates => {
+                self.start_update_check(true);
+            }
             AppAction::None => {}
         }
     }
@@ -780,6 +797,71 @@ impl KatanaApp {
         };
         if done {
             self.download_rx = None;
+        }
+    }
+
+    /// Triggers a background check for the latest KatanA release on GitHub.
+    pub(crate) fn start_update_check(&mut self, is_manual: bool) {
+        if self.state.checking_for_updates {
+            if is_manual {
+                // Already checking, just show the dialog to let the user see the progress
+                self.show_update_dialog = true;
+            }
+            return;
+        }
+        self.state.checking_for_updates = true;
+        self.state.update_check_error = None;
+        self.state.update_available = None;
+
+        if is_manual {
+            self.show_update_dialog = true;
+            self.update_notified = true; // Pretend we've notified them so it doesn't pop up AGAIN
+        }
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.update_rx = Some(rx);
+
+        crate::updater::check_for_updates(move |result| {
+            let _ = tx.send(result);
+        });
+    }
+
+    /// Polls for update check completion.
+    pub(crate) fn poll_update_check(&mut self, _ctx: &egui::Context) {
+        if let Some(rx) = &self.update_rx {
+            match rx.try_recv() {
+                Ok(Ok(latest_version)) => {
+                    self.state.checking_for_updates = false;
+                    self.update_rx = None;
+                    if crate::updater::is_newer_version(env!("CARGO_PKG_VERSION"), &latest_version)
+                    {
+                        self.state.update_available = Some(latest_version);
+                        if !self.update_notified {
+                            self.show_update_dialog = true;
+                            self.update_notified = true;
+                        }
+                    } else {
+                        // Already up-to-date
+                        self.state.update_available = None;
+                        if !self.update_notified {
+                            // Don't interrupt them if it's a background startup check and it's up to date.
+                            self.update_notified = true;
+                        }
+                    }
+                }
+                Ok(Err(err)) => {
+                    self.state.checking_for_updates = false;
+                    self.state.update_check_error = Some(err);
+                    self.update_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    // Update still in progress.
+                }
+                Err(_) => {
+                    self.state.checking_for_updates = false;
+                    self.update_rx = None;
+                }
+            }
         }
     }
 
@@ -1651,5 +1733,135 @@ mod tests_extra {
         // Ensure they are not loaded
         assert!(!app.state.open_documents[0].is_loaded);
         assert!(!app.state.open_documents[1].is_loaded);
+    }
+
+    // Removed redundant AiProviderRegistry and PluginRegistry imports
+    use crate::app_state::AppState;
+    use crate::preview_pane::PreviewPane;
+    use katana_platform::FilesystemService;
+
+    fn setup_test_app() -> KatanaApp {
+        let state = AppState::new(
+            AiProviderRegistry::new(),
+            PluginRegistry::new(),
+            katana_platform::SettingsService::default(),
+            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
+        );
+        KatanaApp {
+            state,
+            fs: FilesystemService::new(),
+            pending_action: AppAction::None,
+            tab_previews: Vec::new(),
+            download_rx: None,
+            workspace_rx: None,
+            update_rx: None,
+            show_about: false,
+            show_update_dialog: false,
+            update_notified: false,
+            about_icon: None,
+            cached_theme: None,
+            cached_font_size: None,
+            cached_font_family: None,
+            settings_preview: PreviewPane::default(),
+            splash_start: None,
+        }
+    }
+
+    #[test]
+    fn test_toggle_about_action() {
+        let mut app = setup_test_app();
+        assert!(!app.show_about);
+
+        app.process_action(AppAction::ToggleAbout);
+        assert!(app.show_about);
+
+        app.process_action(AppAction::ToggleAbout);
+        assert!(!app.show_about);
+    }
+
+    #[test]
+    fn test_check_for_updates_manual_trigger() {
+        let mut app = setup_test_app();
+        app.state.checking_for_updates = true;
+        // manually trigger again while already checking
+        app.start_update_check(true);
+        // should have skipped spawning another one but set dialog=true
+        assert!(app.show_update_dialog);
+    }
+
+    #[test]
+    fn test_check_for_updates_action() {
+        let mut app = setup_test_app();
+        assert!(!app.show_update_dialog);
+        assert!(!app.state.checking_for_updates);
+
+        // trigger manual update check
+        app.process_action(AppAction::CheckForUpdates);
+
+        // it should immediately set show_update_dialog = true for manual checks
+        assert!(app.show_update_dialog);
+        assert!(app.state.checking_for_updates);
+
+        // Emulate an update channel response
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(Ok("100.0.0".to_string())).unwrap();
+        app.update_rx = Some(rx);
+
+        let ctx = eframe::egui::Context::default();
+        app.poll_update_check(&ctx);
+
+        assert!(app.state.update_available.is_some());
+        assert_eq!(app.state.update_available.unwrap(), "100.0.0");
+        assert!(app.update_rx.is_none());
+        assert!(app.update_notified);
+    }
+
+    #[test]
+    fn test_update_check_error_action() {
+        let mut app = setup_test_app();
+        app.state.checking_for_updates = true;
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(Err("Network failure".to_string())).unwrap();
+        app.update_rx = Some(rx);
+
+        let ctx = eframe::egui::Context::default();
+        app.poll_update_check(&ctx);
+
+        assert_eq!(app.state.update_check_error.unwrap(), "Network failure");
+        assert!(app.update_rx.is_none());
+    }
+
+    #[test]
+    fn test_update_check_channel_closed() {
+        let mut app = setup_test_app();
+        app.state.checking_for_updates = true;
+        let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
+        drop(tx); // cause Err(RecvError) or Disconnected
+        app.update_rx = Some(rx);
+
+        let ctx = eframe::egui::Context::default();
+        app.poll_update_check(&ctx);
+
+        assert!(!app.state.checking_for_updates);
+        assert!(app.update_rx.is_none());
+    }
+
+    #[test]
+    fn test_background_update_check_shows_dialog_only_once() {
+        let mut app = setup_test_app();
+        app.start_update_check(false); // background check
+        assert!(!app.show_update_dialog); // should be hidden during check
+        assert!(!app.update_notified);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(Ok("100.0.0".to_string())).unwrap();
+        app.update_rx = Some(rx);
+
+        let ctx = eframe::egui::Context::default();
+        app.poll_update_check(&ctx);
+
+        // Now since it's newer and we weren't notified, it should pop up
+        assert!(app.show_update_dialog);
+        assert!(app.update_notified);
     }
 }

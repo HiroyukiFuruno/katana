@@ -18,6 +18,8 @@ pub struct I18nMessages {
     pub settings: SettingsMessages,
     pub tab: TabMessages,
     pub search: SearchMessages,
+    pub about: AboutMessages,
+    pub update: UpdateMessages,
     pub toc: TocMessages,
 }
 
@@ -40,6 +42,40 @@ pub struct SearchMessages {
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
+pub struct AboutMessages {
+    pub basic_info: String,
+    pub version: String,
+    pub build: String,
+    pub copyright: String,
+    pub runtime: String,
+    pub platform: String,
+    pub architecture: String,
+    pub rust: String,
+    pub license: String,
+    pub links: String,
+    pub source_code: String,
+    pub documentation: String,
+    pub report_issue: String,
+    pub support: String,
+    pub sponsor: String,
+    pub coming_soon: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct UpdateMessages {
+    pub title: String,
+    pub checking_for_updates: String,
+    pub update_available: String,
+    pub update_available_desc: String,
+    pub up_to_date: String,
+    pub up_to_date_desc: String,
+    pub failed_to_check: String,
+    pub action_close: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct MenuMessages {
     pub file: String,
     pub settings: String,
@@ -47,6 +83,13 @@ pub struct MenuMessages {
     pub open_workspace: String,
     pub save: String,
     pub open_all: String,
+    pub about: String,
+    pub quit: String,
+    pub hide: String,
+    pub hide_others: String,
+    pub show_all: String,
+    pub help: String,
+    pub check_updates: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,6 +119,12 @@ pub struct DiagramControllerMessages {
     pub reset: String,
     pub fullscreen: String,
     pub close: String,
+    #[serde(default = "default_trackpad_help")]
+    pub trackpad_help: String,
+}
+
+fn default_trackpad_help() -> String {
+    "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -100,6 +149,7 @@ fn default_diagram_controller() -> DiagramControllerMessages {
         reset: "Reset position and size".to_string(),
         fullscreen: "Fullscreen".to_string(),
         close: "Close".to_string(),
+        trackpad_help: default_trackpad_help(),
     }
 }
 

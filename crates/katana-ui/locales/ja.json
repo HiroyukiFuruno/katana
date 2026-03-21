@@ -5,7 +5,42 @@
     "language": "言語 (Language)",
     "open_workspace": "ワークスペースを開く…",
     "save": "保存",
-    "open_all": "全て開く"
+    "open_all": "全て開く",
+    "about": "KatanA について",
+    "quit": "KatanA を終了",
+    "hide": "KatanA を隠す",
+    "hide_others": "他を隠す",
+    "show_all": "すべて表示",
+    "help": "ヘルプ",
+    "check_updates": "更新を確認..."
+  },
+  "about": {
+    "basic_info": "基本情報",
+    "version": "バージョン",
+    "build": "ビルド",
+    "copyright": "コピーライト",
+    "runtime": "ランタイム",
+    "platform": "プラットフォーム",
+    "architecture": "アーキテクチャ",
+    "rust": "Rust コンパイラ",
+    "license": "ライセンス",
+    "links": "リンク",
+    "source_code": "ソースコード",
+    "documentation": "ドキュメント",
+    "report_issue": "不具合を報告",
+    "support": "サポート",
+    "sponsor": "スポンサー",
+    "coming_soon": "準備中"
+  },
+  "update": {
+    "title": "更新の確認",
+    "checking_for_updates": "更新を確認中...",
+    "update_available": "アップデートが利用可能です",
+    "update_available_desc": "新しいバージョンの KatanA ({version}) がリリースされています。\n`brew upgrade katana` を実行して更新してください。",
+    "up_to_date": "最新版です",
+    "up_to_date_desc": "お使いの KatanA は最新バージョンです。",
+    "failed_to_check": "更新の確認に失敗しました。",
+    "action_close": "OK"
   },
   "workspace": {
     "no_workspace_open": "ワークスペースが開かれていません。",
@@ -28,7 +63,8 @@
       "zoom_out": "縮小",
       "reset": "初期位置・サイズにリセット",
       "fullscreen": "全画面表示",
-      "close": "閉じる"
+      "close": "閉じる",
+      "trackpad_help": "トラックパッド: 2本指ピンチでのズーム、1本指ドラッグでの移動"
     }
   },
   "plantuml": {

@@ -243,6 +243,11 @@ const FULLSCREEN_CLOSE_FILL_ALPHA: u8 = 220;
 /// Border stroke gray value for close button.
 const FULLSCREEN_CLOSE_STROKE_GRAY: u8 = 160;
 
+/// Minimum zoom limit for trackpad pinches.
+const MIN_ZOOM: f32 = 0.1;
+/// Maximum zoom limit for trackpad pinches.
+const MAX_ZOOM: f32 = 10.0;
+
 pub(crate) fn show_rasterized(
     ui: &mut egui::Ui,
     img: &RasterizedSvg,
@@ -268,8 +273,20 @@ pub(crate) fn show_rasterized(
     let zoomed_size = base_size * zoom;
 
     // Reserve space for the image container (invariant to zoom!).
-    let (container_rect, _response) =
-        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::hover());
+    let (container_rect, response) =
+        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::click_and_drag());
+
+    if let Some(state) = viewer_state.as_mut() {
+        if response.hovered() {
+            let zoom_delta = ui.input(|i| i.zoom_delta());
+            if zoom_delta != 1.0 {
+                state.zoom = (state.zoom * zoom_delta).clamp(MIN_ZOOM, MAX_ZOOM);
+            }
+            if response.dragged() {
+                state.pan += response.drag_delta();
+            }
+        }
+    }
 
     let texture_handle = if let Some(state) = viewer_state.as_mut() {
         if state.texture.is_none() {
@@ -462,8 +479,20 @@ pub(crate) fn show_fullscreen_modal(
         .order(egui::Order::Foreground)
         .fixed_pos(screen.min)
         .show(ctx, |ui| {
-            let (blocker_rect, _) =
+            let (blocker_rect, response) =
                 ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
+
+            if response.hovered() {
+                let zoom_delta = ui.input(|i| i.zoom_delta());
+                if zoom_delta != 1.0 {
+                    viewer_state.zoom = (viewer_state.zoom * zoom_delta).clamp(MIN_ZOOM, MAX_ZOOM);
+                }
+                if response.dragged() {
+                    viewer_state.pan += response.drag_delta();
+                } else {
+                    viewer_state.pan += ui.input(|i| i.smooth_scroll_delta);
+                }
+            }
 
             // Fully opaque backdrop — blocks all visual content behind the modal.
             let bg_color = ctx.style().visuals.panel_fill;
@@ -604,8 +633,20 @@ pub(crate) fn show_local_image(
     let base_size = Vec2::new(width as f32 * base_scale, height as f32 * base_scale);
     let zoomed_size = base_size * zoom;
 
-    let (container_rect, _response) =
-        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::hover());
+    let (container_rect, response) =
+        ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::click_and_drag());
+
+    if let Some(state) = viewer_state.as_mut() {
+        if response.hovered() {
+            let zoom_delta = ui.input(|i| i.zoom_delta());
+            if zoom_delta != 1.0 {
+                state.zoom = (state.zoom * zoom_delta).clamp(MIN_ZOOM, MAX_ZOOM);
+            }
+            if response.dragged() {
+                state.pan += response.drag_delta();
+            }
+        }
+    }
 
     let x_offset = (max_w - base_size.x).max(0.0) / 2.0;
     let image_pos = container_rect.min + egui::vec2(x_offset, 0.0) + pan;
@@ -649,8 +690,20 @@ pub(crate) fn show_fullscreen_local_image(
         .order(egui::Order::Foreground)
         .fixed_pos(screen.min)
         .show(ctx, |ui| {
-            let (blocker_rect, _) =
+            let (blocker_rect, response) =
                 ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
+
+            if response.hovered() {
+                let zoom_delta = ui.input(|i| i.zoom_delta());
+                if zoom_delta != 1.0 {
+                    viewer_state.zoom = (viewer_state.zoom * zoom_delta).clamp(MIN_ZOOM, MAX_ZOOM);
+                }
+                if response.dragged() {
+                    viewer_state.pan += response.drag_delta();
+                } else {
+                    viewer_state.pan += ui.input(|i| i.smooth_scroll_delta);
+                }
+            }
 
             let bg_color = ctx.style().visuals.panel_fill;
             ui.painter().rect_filled(blocker_rect, 0.0, bg_color);

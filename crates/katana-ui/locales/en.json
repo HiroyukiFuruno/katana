@@ -5,7 +5,42 @@
     "language": "Language",
     "open_workspace": "Open Workspace…",
     "save": "Save",
-    "open_all": "Open All"
+    "open_all": "Open All",
+    "about": "About KatanA",
+    "quit": "Quit KatanA",
+    "hide": "Hide KatanA",
+    "hide_others": "Hide Others",
+    "show_all": "Show All",
+    "help": "Help",
+    "check_updates": "Check for Updates..."
+  },
+  "about": {
+    "basic_info": "Basic Info",
+    "version": "Version",
+    "build": "Build",
+    "copyright": "Copyright",
+    "runtime": "Runtime",
+    "platform": "Platform",
+    "architecture": "Architecture",
+    "rust": "Rust",
+    "license": "License",
+    "links": "Links",
+    "source_code": "Source Code",
+    "documentation": "Documentation",
+    "report_issue": "Report Issue",
+    "support": "Support",
+    "sponsor": "Sponsor",
+    "coming_soon": "Coming Soon"
+  },
+  "update": {
+    "title": "Check for Updates",
+    "checking_for_updates": "Checking for updates...",
+    "update_available": "Update Available",
+    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
+    "up_to_date": "Up to Date",
+    "up_to_date_desc": "KatanA is up to date.",
+    "failed_to_check": "Failed to check for updates.",
+    "action_close": "OK"
   },
   "workspace": {
     "no_workspace_open": "No workspace open.",
@@ -28,7 +63,8 @@
       "zoom_out": "Zoom out",
       "reset": "Reset position and size",
       "fullscreen": "Fullscreen",
-      "close": "Close"
+      "close": "Close",
+      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
     }
   },
   "plantuml": {

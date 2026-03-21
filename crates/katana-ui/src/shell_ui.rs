@@ -38,9 +38,20 @@ pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action:
             ui.menu_button(crate::i18n::get().menu.settings.clone(), |ui| {
                 render_settings_menu(ui, state, action);
             });
+            ui.menu_button(crate::i18n::get().menu.help.clone(), |ui| {
+                render_help_menu(ui, action);
+            });
             render_header_right(ui, state);
         });
     });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn render_help_menu(ui: &mut egui::Ui, action: &mut AppAction) {
+    if ui.button(crate::i18n::get().menu.about.clone()).clicked() {
+        *action = AppAction::ToggleAbout;
+        ui.close_menu();
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -1382,6 +1393,7 @@ mod native_menu {
     pub const TAG_LANG_DE: i32 = 12;
     pub const TAG_LANG_ES: i32 = 13;
     pub const TAG_LANG_IT: i32 = 14;
+    pub const TAG_CHECK_UPDATES: i32 = 15;
 
     // These FFI symbols are linked from Objective-C (macos_menu.m) and called
     // only at runtime; the Rust compiler cannot see the call sites.
@@ -1391,6 +1403,7 @@ mod native_menu {
         pub fn katana_poll_menu_action() -> i32;
         pub fn katana_set_app_icon_png(png_data: *const u8, png_len: std::ffi::c_ulong);
         pub fn katana_set_process_name();
+        pub fn native_free_menu_actions();
         pub fn katana_update_menu_strings(
             file: *const std::ffi::c_char,
             open_workspace: *const std::ffi::c_char,
@@ -1398,6 +1411,13 @@ mod native_menu {
             settings: *const std::ffi::c_char,
             preferences: *const std::ffi::c_char,
             language: *const std::ffi::c_char,
+            about: *const std::ffi::c_char,
+            quit: *const std::ffi::c_char,
+            hide: *const std::ffi::c_char,
+            hide_others: *const std::ffi::c_char,
+            show_all: *const std::ffi::c_char,
+            check_updates: *const std::ffi::c_char,
+            help: *const std::ffi::c_char,
         );
     }
 }
@@ -1433,6 +1453,7 @@ pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
 }
 
 #[cfg(all(target_os = "macos", not(test)))]
+#[allow(clippy::too_many_arguments)]
 unsafe fn native_update_menu_strings(
     file: &str,
     open_workspace: &str,
@@ -1440,6 +1461,13 @@ unsafe fn native_update_menu_strings(
     settings: &str,
     preferences: &str,
     language: &str,
+    about: &str,
+    quit: &str,
+    hide: &str,
+    hide_others: &str,
+    show_all: &str,
+    check_updates: &str,
+    help: &str,
 ) {
     let f = std::ffi::CString::new(file).unwrap_or_default();
     let ow = std::ffi::CString::new(open_workspace).unwrap_or_default();
@@ -1447,6 +1475,13 @@ unsafe fn native_update_menu_strings(
     let st = std::ffi::CString::new(settings).unwrap_or_default();
     let p = std::ffi::CString::new(preferences).unwrap_or_default();
     let l = std::ffi::CString::new(language).unwrap_or_default();
+    let a = std::ffi::CString::new(about).unwrap_or_default();
+    let q = std::ffi::CString::new(quit).unwrap_or_default();
+    let h = std::ffi::CString::new(hide).unwrap_or_default();
+    let ho = std::ffi::CString::new(hide_others).unwrap_or_default();
+    let sa = std::ffi::CString::new(show_all).unwrap_or_default();
+    let cu = std::ffi::CString::new(check_updates).unwrap_or_default();
+    let hlp = std::ffi::CString::new(help).unwrap_or_default();
     native_menu::katana_update_menu_strings(
         f.as_ptr(),
         ow.as_ptr(),
@@ -1454,6 +1489,13 @@ unsafe fn native_update_menu_strings(
         st.as_ptr(),
         p.as_ptr(),
         l.as_ptr(),
+        a.as_ptr(),
+        q.as_ptr(),
+        h.as_ptr(),
+        ho.as_ptr(),
+        sa.as_ptr(),
+        cu.as_ptr(),
+        hlp.as_ptr(),
     );
 }
 
@@ -1469,6 +1511,13 @@ pub fn update_native_menu_strings_from_i18n() {
             &msgs.menu.settings,
             &preferences,
             &msgs.menu.language,
+            &msgs.menu.about,
+            &msgs.menu.quit,
+            &msgs.menu.hide,
+            &msgs.menu.hide_others,
+            &msgs.menu.show_all,
+            &msgs.menu.check_updates,
+            &msgs.menu.help,
         );
     }
 }
@@ -1559,6 +1608,7 @@ impl eframe::App for KatanaApp {
 
         self.poll_download(ctx);
         self.poll_workspace_load(ctx);
+        self.poll_update_check(ctx);
 
         // macOS: Poll actions from the native menu.
         #[cfg(target_os = "macos")]
@@ -1605,6 +1655,9 @@ impl eframe::App for KatanaApp {
                 }
                 native_menu::TAG_ABOUT => {
                     self.show_about = !self.show_about;
+                }
+                native_menu::TAG_CHECK_UPDATES => {
+                    self.pending_action = AppAction::CheckForUpdates;
                 }
                 native_menu::TAG_SETTINGS => {
                     self.pending_action = AppAction::ToggleSettings;
@@ -1732,6 +1785,11 @@ impl eframe::App for KatanaApp {
         // About dialog
         if self.show_about {
             render_about_window(ctx, &mut self.show_about, self.about_icon.as_ref());
+        }
+
+        // Update notification dialog
+        if self.show_update_dialog {
+            render_update_window(ctx, &mut self.show_update_dialog, &self.state);
         }
 
         // Intercept all URL opening requests globally
@@ -2741,38 +2799,65 @@ fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui:
                 ui.add_space(HEADING_SPACING);
             });
 
+            let i18n_about = &crate::i18n::get().about;
+
             // ── 1. Basic Info ──
-            about_section_header(ui, "Basic Info", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
-            about_row(ui, "Version", &format!("v{}", info.version));
-            about_row(ui, "Build", info.build);
-            about_row(ui, "Copyright", info.copyright);
+            about_section_header(
+                ui,
+                &i18n_about.basic_info,
+                SECTION_HEADER_SIZE,
+                SECTION_HEADER_BOTTOM,
+            );
+            about_row(ui, &i18n_about.version, &format!("v{}", info.version));
+            about_row(ui, &i18n_about.build, info.build);
+            about_row(ui, &i18n_about.copyright, info.copyright);
             ui.add_space(SECTION_SPACING);
 
             // ── 2. Runtime ──
-            about_section_header(ui, "Runtime", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
-            about_row(ui, "Platform", &info.system.os);
-            about_row(ui, "Architecture", &info.system.arch);
-            about_row(ui, "Rust", &info.system.rustc_version);
+            about_section_header(
+                ui,
+                &i18n_about.runtime,
+                SECTION_HEADER_SIZE,
+                SECTION_HEADER_BOTTOM,
+            );
+            about_row(ui, &i18n_about.platform, &info.system.os);
+            about_row(ui, &i18n_about.architecture, &info.system.arch);
+            about_row(ui, &i18n_about.rust, &info.system.rustc_version);
             ui.add_space(SECTION_SPACING);
 
             // ── 3. License ──
-            about_section_header(ui, "License", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
-            about_row(ui, "License", info.license);
+            about_section_header(
+                ui,
+                &i18n_about.license,
+                SECTION_HEADER_SIZE,
+                SECTION_HEADER_BOTTOM,
+            );
+            about_row(ui, &i18n_about.license, info.license);
             ui.add_space(SECTION_SPACING);
 
             // ── 4-6. Links ──
-            about_section_header(ui, "Links", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
-            about_link_row(ui, "Source Code", info.repository);
-            about_link_row(ui, "Documentation", info.docs_url);
-            about_link_row(ui, "Report Issue", info.issues_url);
+            about_section_header(
+                ui,
+                &i18n_about.links,
+                SECTION_HEADER_SIZE,
+                SECTION_HEADER_BOTTOM,
+            );
+            about_link_row(ui, &i18n_about.source_code, info.repository);
+            about_link_row(ui, &i18n_about.documentation, info.docs_url);
+            about_link_row(ui, &i18n_about.report_issue, info.issues_url);
             ui.add_space(SECTION_SPACING);
 
             // ── 7. Support / Sponsor ──
-            about_section_header(ui, "Support", SECTION_HEADER_SIZE, SECTION_HEADER_BOTTOM);
+            about_section_header(
+                ui,
+                &i18n_about.support,
+                SECTION_HEADER_SIZE,
+                SECTION_HEADER_BOTTOM,
+            );
             if info.sponsor_url.is_empty() {
-                about_row(ui, "Sponsor", "Coming Soon");
+                about_row(ui, &i18n_about.sponsor, &i18n_about.coming_soon);
             } else {
-                about_link_row(ui, "Sponsor", info.sponsor_url);
+                about_link_row(ui, &i18n_about.sponsor, info.sponsor_url);
             }
             ui.add_space(SECTION_SPACING);
         });
@@ -3011,4 +3096,67 @@ pub(crate) fn render_toc_panel(
                     }
                 });
         });
+}
+
+fn render_update_window(ctx: &egui::Context, open: &mut bool, state: &AppState) {
+    const DEFAULT_WIDTH: f32 = 320.0;
+    const SPACING_SMALL: f32 = 4.0;
+    const SPACING_MEDIUM: f32 = 8.0;
+    const SPACING_LARGE: f32 = 12.0;
+    const SPACING_XLARGE: f32 = 16.0;
+
+    let msgs = &crate::i18n::get().update;
+    let mut force_close = false;
+    egui::Window::new(msgs.title.clone())
+        .id(egui::Id::new("katana_update_dialog_v5"))
+        .open(open)
+        .collapsible(false)
+        .resizable(false)
+        .default_width(DEFAULT_WIDTH)
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(SPACING_LARGE);
+                if state.checking_for_updates {
+                    ui.add(egui::Spinner::new());
+                    ui.add_space(SPACING_MEDIUM);
+                    ui.label(msgs.checking_for_updates.clone());
+                } else if let Some(err) = &state.update_check_error {
+                    ui.colored_label(egui::Color32::RED, msgs.failed_to_check.clone());
+                    ui.add_space(SPACING_SMALL);
+                    ui.label(err);
+                } else if let Some(latest) = &state.update_available {
+                    // Accent heading for new version
+                    ui.label(
+                        egui::RichText::new(msgs.update_available.clone())
+                            .heading()
+                            .color(ui.visuals().widgets.active.text_color()),
+                    );
+                    ui.add_space(SPACING_MEDIUM);
+                    let desc = msgs
+                        .update_available_desc
+                        .replace("{version}", latest.as_str());
+                    ui.label(desc);
+                } else {
+                    ui.heading(msgs.up_to_date.clone());
+                    ui.add_space(SPACING_SMALL);
+                    ui.label(msgs.up_to_date_desc.clone());
+                }
+                ui.add_space(SPACING_XLARGE);
+            });
+
+            if !state.checking_for_updates {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                    if ui.button(msgs.action_close.clone()).clicked() {
+                        force_close = true;
+                    }
+                });
+            }
+
+            ui.add_space(SPACING_SMALL);
+        });
+
+    if force_close {
+        *open = false;
+    }
 }

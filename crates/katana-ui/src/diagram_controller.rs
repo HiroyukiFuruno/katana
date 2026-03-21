@@ -115,7 +115,13 @@ pub(crate) fn draw_controls(
         state.pan_right();
     }
 
-    // Row 2: (empty), PanDown, ZoomOut
+    // Row 2: Info (trackpad help), PanDown, ZoomOut
+    ui.put(
+        btn_rect(0.0, 2.0),
+        egui::Button::new(Icon::Info.as_str()).fill(BG),
+    )
+    .on_hover_text(&dc.trackpad_help);
+
     if ui
         .put(
             btn_rect(1.0, 2.0),

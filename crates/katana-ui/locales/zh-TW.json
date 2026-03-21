@@ -5,7 +5,14 @@
     "language": "語言 (Language)",
     "open_workspace": "開啟工作區…",
     "save": "儲存",
-    "open_all": "全部開啟"
+    "open_all": "全部開啟",
+    "about": "About KatanA",
+    "quit": "Quit KatanA",
+    "hide": "Hide KatanA",
+    "hide_others": "Hide Others",
+    "show_all": "Show All",
+    "help": "Help",
+    "check_updates": "Check for Updates..."
   },
   "workspace": {
     "no_workspace_open": "未開啟工作區。",
@@ -28,7 +35,8 @@
       "zoom_out": "Zoom out",
       "reset": "Reset position and size",
       "fullscreen": "Fullscreen",
-      "close": "Close"
+      "close": "Close",
+      "trackpad_help": "Trackpad: 2-finger pinch to zoom, 1-finger drag to pan"
     }
   },
   "plantuml": {
@@ -162,5 +170,33 @@
   "toc": {
     "title": "Table of Contents",
     "empty": "No headings found."
+  },
+  "about": {
+    "basic_info": "Basic Info",
+    "version": "Version",
+    "build": "Build",
+    "copyright": "Copyright",
+    "runtime": "Runtime",
+    "platform": "Platform",
+    "architecture": "Architecture",
+    "rust": "Rust",
+    "license": "License",
+    "links": "Links",
+    "source_code": "Source Code",
+    "documentation": "Documentation",
+    "report_issue": "Report Issue",
+    "support": "Support",
+    "sponsor": "Sponsor",
+    "coming_soon": "Coming Soon"
+  },
+  "update": {
+    "update_available": "Update Available",
+    "update_available_desc": "A new version of KatanA ({version}) is available. Please run `brew upgrade katana` to update.",
+    "up_to_date": "Up to Date",
+    "up_to_date_desc": "You are using the latest version of KatanA.",
+    "failed_to_check": "Failed to check for updates.",
+    "action_close": "Close",
+    "title": "Check for Updates",
+    "checking_for_updates": "Checking for updates..."
   }
 }

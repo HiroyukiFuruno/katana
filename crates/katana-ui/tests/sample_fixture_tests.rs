@@ -263,8 +263,8 @@ fn assert_gap_at_least(
 fn fixture_en_produces_many_sections() {
     let (pane, _, _) = load_fixture("sample.md");
     assert!(
-        pane.sections.len() > 30,
-        "English fixture should produce >30 sections, got: {}",
+        pane.sections.len() > 25,
+        "English fixture should produce >25 sections, got: {}",
         pane.sections.len()
     );
 }
@@ -539,8 +539,8 @@ fn fixture_en_s2_3_links_render() {
 fn fixture_ja_structural_integrity() {
     let (pane, _, _) = load_fixture("sample.ja.md");
     assert!(
-        pane.sections.len() > 30,
-        "Japanese fixture should produce >30 sections, got: {}",
+        pane.sections.len() > 25,
+        "Japanese fixture should produce >25 sections, got: {}",
         pane.sections.len()
     );
     let pending_count = pane

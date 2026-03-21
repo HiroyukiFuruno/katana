@@ -17,6 +17,7 @@ enum {
     TAG_LANG_DE        = 12,
     TAG_LANG_ES        = 13,
     TAG_LANG_IT        = 14,
+    TAG_CHECK_UPDATES  = 15,
 };
 
 // Global: Tag of the last selected menu action.
@@ -42,6 +43,13 @@ static NSMenuItem *g_save_item = nil;
 static NSMenu *g_settings_menu = nil;
 static NSMenuItem *g_preferences_item = nil;
 static NSMenu *g_language_menu = nil;
+static NSMenuItem *g_about_item = nil;
+static NSMenuItem *g_check_updates_item = nil;
+static NSMenuItem *g_hide_item = nil;
+static NSMenuItem *g_hide_others_item = nil;
+static NSMenuItem *g_show_all_item = nil;
+static NSMenuItem *g_quit_item = nil;
+static NSMenu *g_help_menu = nil;
 
 /// Called from Rust at the very start of main(), before eframe creates the window.
 /// Must be called before the window server registers the process to ensure
@@ -65,6 +73,16 @@ void katana_setup_native_menu(void) {
     [aboutItem setTarget:g_target];
     [aboutItem setTag:TAG_ABOUT];
     [appMenu addItem:aboutItem];
+    g_about_item = aboutItem;
+
+    NSMenuItem *checkUpdatesItem = [[NSMenuItem alloc]
+        initWithTitle:@"Check for Updates…"
+        action:action
+        keyEquivalent:@""];
+    [checkUpdatesItem setTarget:g_target];
+    [checkUpdatesItem setTag:TAG_CHECK_UPDATES];
+    [appMenu addItem:checkUpdatesItem];
+    g_check_updates_item = checkUpdatesItem;
 
     [appMenu addItem:[NSMenuItem separatorItem]];
 
@@ -73,6 +91,7 @@ void katana_setup_native_menu(void) {
         action:@selector(hide:)
         keyEquivalent:@"h"];
     [appMenu addItem:hideItem];
+    g_hide_item = hideItem;
 
     NSMenuItem *hideOthersItem = [[NSMenuItem alloc]
         initWithTitle:@"Hide Others"
@@ -80,12 +99,14 @@ void katana_setup_native_menu(void) {
         keyEquivalent:@"h"];
     [hideOthersItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
     [appMenu addItem:hideOthersItem];
+    g_hide_others_item = hideOthersItem;
 
     NSMenuItem *showAllItem = [[NSMenuItem alloc]
         initWithTitle:@"Show All"
         action:@selector(unhideAllApplications:)
         keyEquivalent:@""];
     [appMenu addItem:showAllItem];
+    g_show_all_item = showAllItem;
 
     [appMenu addItem:[NSMenuItem separatorItem]];
 
@@ -94,6 +115,7 @@ void katana_setup_native_menu(void) {
         action:@selector(terminate:)
         keyEquivalent:@"q"];
     [appMenu addItem:quitItem];
+    g_quit_item = quitItem;
 
     NSMenuItem *appMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [appMenuItem setSubmenu:appMenu];
@@ -206,12 +228,23 @@ void katana_setup_native_menu(void) {
     NSMenuItem *settingsMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [settingsMenuItem setSubmenu:settingsMenu];
 
+    // --- Help Menu ---
+    NSMenu *helpMenu = [[NSMenu alloc] initWithTitle:@"Help"];
+    g_help_menu = helpMenu;
+    
+    NSMenuItem *comingSoonItem = [[NSMenuItem alloc] initWithTitle:@"Coming soon!!" action:nil keyEquivalent:@""];
+    [helpMenu addItem:comingSoonItem];
+
+    NSMenuItem *helpMenuItem = [[NSMenuItem alloc] initWithTitle:@"Help" action:nil keyEquivalent:@""];
+    [helpMenuItem setSubmenu:helpMenu];
+
     // --- Build Main Menu ---
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
     [NSApp setMainMenu:mainMenu];
     [mainMenu addItem:appMenuItem];
     [mainMenu addItem:fileMenuItem];
     [mainMenu addItem:settingsMenuItem];
+    [mainMenu addItem:helpMenuItem];
 }
 
 /// Called from Rust: Gets and resets the last menu action.
@@ -229,7 +262,14 @@ void katana_update_menu_strings(
     const char* save, 
     const char* settings, 
     const char* preferences, 
-    const char* language
+    const char* language,
+    const char* about,
+    const char* quit,
+    const char* hide,
+    const char* hide_others,
+    const char* show_all,
+    const char* check_updates,
+    const char* help
 ) {
     @autoreleasepool {
         if (g_file_menu && file) {
@@ -249,6 +289,27 @@ void katana_update_menu_strings(
         }
         if (g_language_menu && language) {
             [g_language_menu setTitle:[NSString stringWithUTF8String:language]];
+        }
+        if (g_about_item && about) {
+            [g_about_item setTitle:[NSString stringWithUTF8String:about]];
+        }
+        if (g_check_updates_item && check_updates) {
+            [g_check_updates_item setTitle:[NSString stringWithUTF8String:check_updates]];
+        }
+        if (g_quit_item && quit) {
+            [g_quit_item setTitle:[NSString stringWithUTF8String:quit]];
+        }
+        if (g_hide_item && hide) {
+            [g_hide_item setTitle:[NSString stringWithUTF8String:hide]];
+        }
+        if (g_hide_others_item && hide_others) {
+            [g_hide_others_item setTitle:[NSString stringWithUTF8String:hide_others]];
+        }
+        if (g_show_all_item && show_all) {
+            [g_show_all_item setTitle:[NSString stringWithUTF8String:show_all]];
+        }
+        if (g_help_menu && help) {
+            [g_help_menu setTitle:[NSString stringWithUTF8String:help]];
         }
     }
 }

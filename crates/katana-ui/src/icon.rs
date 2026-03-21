@@ -24,6 +24,7 @@ pub enum Icon {
     ResetView,
     Fullscreen,
     CloseModal,
+    Info,
 }
 
 impl Icon {
@@ -52,6 +53,7 @@ impl Icon {
             Self::ResetView => "↻",
             Self::Fullscreen => "⛶",
             Self::CloseModal => "✗",
+            Self::Info => "ℹ",
         }
     }
 }
