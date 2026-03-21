@@ -12,7 +12,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 1. Markdown エクスポート
 
-- [ ] 1.1 メニューに「エクスポート」のサブメニュー（HTML / PDF / PNG / JPG）を追加する
+- [ ] 1.1 プレビュー画面のメニューに「エクスポート」のサブメニュー（HTML / PDF / PNG / JPG）を追加する
 - [ ] 1.2 HTML: comrak による HTML 出力に、現在適用されているCSSスタイル（インラインまたは内部スタイルシート）を埋め込み一時ファイル化し、ブラウザで開く
 - [ ] 1.3 PDF/画像: 出力された HTML を外部ツール（`wkhtmltopdf`, `weasyprint` 等）に渡し、保存先ダイアログ経由で出力する
 - [ ] 1.4 外部ツールが未インストールの場合に、GUI上でエラーメッセージとインストールガイドを表示する
@@ -28,11 +28,11 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 2. 規約同意画面
 
-- [ ] 2.1 EULA（エンドユーザー使用許諾契約）同意画面を構築し、未同意時のブロック機能を追加するi18nリソース（英語/日本語）として組み込む
+- [ ] 2.1 EULA（エンドユーザー使用許諾契約）同意画面を構築し、未同意時のブロック機能を追加するi18nリソースとして組み込む
 - [ ] 2.2 起動時（スプラッシュ表示後、メインUI表示前）に全画面モーダルとして規約同意UIを表示する
 - [ ] 2.3 日本語・英語の切り替えプルダウンを配置する
 - [ ] 2.4 「同意する」ボタンにて `AppSettings` の `terms_accepted_version` を更新・永続化する。不同意の場合はアプリを終了する
-- [ ] 2.5 バージョンが上がった際に再同意を要求するロジックを実装する
+- [ ] 2.5 バージョンが上がった際に再同意を要求するロジックを実装する ※但し規約に変更がない場合は必要がないため、永続化する規約への同意の記憶はversionを含めた形で保存できる形式で実装すること。
 
 ### Definition of Done (DoD)
 
@@ -45,20 +45,20 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 3. 検索・フィルターUIの改善 (Search Modal Options & Sidebar)
 
-- [ ] 3.1 ワークスペースサイドバーから検索モーダル（Cmd+P）を開く検索（🔍）ボタンを配置し、フィルターボタンのアイコンを漏斗（Y字）型に変更する
-- [ ] 3.2 検索オプション用に `AppState` へ `search_include_pattern`, `search_exclude_pattern` (String) を追加する
-- [ ] 3.3 検索モーダル内に含める/除外するディレクトリ・ファイルの入力欄を追加し、カンマ区切り正規表現でパースして結果をフィルタするロジックを実装する
-- [ ] 3.4 検索機能のITテストでTDD（REDフェーズ）を実施後、テストを通過（GREEN）させる
-- [ ] 3.5 新UI要素に対するi18nキー（日・英）を追加する
+- [x] 3.1 ワークスペースサイドバーから検索モーダル（Cmd+P）を開く検索（🔍）ボタンを配置し、フィルターボタンのアイコンを漏斗（Y字）型に変更する
+- [x] 3.2 検索オプション用に `AppState` へ `search_include_pattern`, `search_exclude_pattern` (String) を追加する
+- [x] 3.3 検索モーダル内に含める/除外するディレクトリ・ファイルの入力欄を追加し、カンマ区切り正規表現でパースして結果をフィルタするロジックを実装する
+- [x] 3.4 検索機能のITテストでTDD（REDフェーズ）を実施後、テストを通過（GREEN）させる
+- [x] 3.5 新UI要素に対するi18nキー（日・英）を追加する
 
 ### Definition of Done (DoD)
 
-- [ ] TDDの原則に従い、検索オプション（Include/Exclude）に対するテストが実装・パスしていること。
-- [ ] 検索モーダルにInclude/Excludeオプションが存在し、カンマ区切りの正規表現で想定通りに絞り込み・除外が行えること。
-- [ ] ワークスペースサイドバーに検索ボタンと新しいフィルターアイコンが配置されていること。
-- [ ] 追加されたテキスト群が日・英のi18n対応を行っていること。
-- [ ] `make check-local` が exit 0 で全てパスすること。
-- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] TDDの原則に従い、検索オプション（Include/Exclude）に対するテストが実装・パスしていること。
+- [x] 検索モーダルにInclude/Excludeオプションが存在し、カンマ区切りの正規表現で想定通りに絞り込み・除外が行えること。
+- [x] ワークスペースサイドバーに検索ボタンと新しいフィルターアイコンが配置されていること。
+- [x] 追加されたテキスト群が日・英のi18n対応を行っていること。
+- [x] `make check-local` が exit 0 で全てパスすること。
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
