@@ -194,6 +194,8 @@ pub enum PreviewSection {
     Markdown(String),
     /// A diagram fence block.
     Diagram { kind: DiagramKind, source: String },
+    /// A standalone local image.
+    LocalImage { path: String, alt: String },
 }
 
 /// Splits the source text into a list of `PreviewSection`s.
@@ -236,7 +238,66 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     }
 
     markdown_acc.push_str(remaining);
-    flush_markdown(&mut sections, &mut markdown_acc);
+
+    // Extract standalone images from the final markdown blocks
+    let mut final_sections = Vec::new();
+    let img_re = Regex::new(r"(?m)^[ \t]*!\[([^\]]*)\]\(([^\)]+)\)[ \t]*$").unwrap();
+
+    // Re-split the markdown sections to isolate standalone images
+    flush_markdown(&mut final_sections, &mut markdown_acc);
+
+    let mut temp = Vec::new();
+    for sec in final_sections {
+        match sec {
+            PreviewSection::Markdown(text) => {
+                let mut last_end = 0;
+                for cap in img_re.captures_iter(&text) {
+                    let m = cap.get(0).unwrap();
+                    let alt = cap.get(1).unwrap().as_str().to_string();
+                    let url = cap.get(2).unwrap().as_str().to_string();
+
+                    let before = &text[last_end..m.start()];
+                    if !before.trim().is_empty() {
+                        temp.push(PreviewSection::Markdown(wrap_standalone_inline_html(
+                            before,
+                        )));
+                    }
+
+                    temp.push(PreviewSection::LocalImage { path: url, alt });
+                    last_end = m.end();
+                }
+
+                let after = &text[last_end..];
+                if !after.trim().is_empty() {
+                    temp.push(PreviewSection::Markdown(wrap_standalone_inline_html(after)));
+                }
+            }
+            other => temp.push(other),
+        }
+    }
+
+    // Merge adjacent text sections
+    let mut merged = Vec::new();
+    let mut md_acc = String::new();
+    for sec in temp {
+        match sec {
+            PreviewSection::Markdown(t) => {
+                md_acc.push_str(&t);
+                md_acc.push('\n');
+            }
+            other => {
+                if !md_acc.is_empty() {
+                    merged.push(PreviewSection::Markdown(std::mem::take(&mut md_acc)));
+                }
+                merged.push(other);
+            }
+        }
+    }
+    if !md_acc.is_empty() {
+        merged.push(PreviewSection::Markdown(md_acc));
+    }
+
+    sections.extend(merged);
     sections
 }
 
