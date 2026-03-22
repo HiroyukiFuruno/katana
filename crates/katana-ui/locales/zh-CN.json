@@ -159,6 +159,14 @@
       {
         "key": "workspace",
         "name": "工作区"
+      },
+      {
+        "key": "group_appearance",
+        "name": "外观"
+      },
+      {
+        "key": "group_system",
+        "name": "系统"
       }
     ]
   },

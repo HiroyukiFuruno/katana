@@ -2,6 +2,18 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.6.0] - 2026-03-22 21:52:53 (UTC)
+
+### 🚀 Features
+
+- **OpenSpec Workflow**: Introduce OpenSpec CLI integration (`openspec instructions`) to standardize and automate proposal, design, tasks, and specs tracking.
+
+### 🐛 Bug Fixes
+
+- **Heavy CPU Load**: Fix 100% idle CPU utilization and spinner UI freeze by optimizing rendering and SVG load logic (P0 critical).
+- **Integration Test Stability**: Skip splash screen natively in test harness context without causing false positives (P1).
+- **Missing SVG Icons**: Introduce `bytes://` and `data:` URI support in SVG loader with Base64/percent-encode handling, preventing unhandled loading failures (P4).
+
 ## [0.5.2] - 2026-03-22 12:44:52 (UTC)
 
 ### 🚀 Features

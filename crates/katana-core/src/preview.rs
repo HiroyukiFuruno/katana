@@ -107,6 +107,7 @@ pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
         if src.starts_with("http://")
             || src.starts_with("https://")
             || src.starts_with("file://")
+            || src.starts_with("data:")
             || src.starts_with('/')
         {
             format!("{prefix}{src}{suffix}")

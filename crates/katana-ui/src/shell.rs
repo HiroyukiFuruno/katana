@@ -134,6 +134,8 @@ pub struct KatanaApp {
     pub(crate) cached_font_family: Option<String>,
     /// Dedicated PreviewPane for the settings window live preview.
     pub(crate) settings_preview: PreviewPane,
+    /// Whether the splash screen needs to start on the first frame.
+    pub(crate) needs_splash: bool,
     /// Tracks the startup time for the splash screen fade animation.
     pub(crate) splash_start: Option<std::time::Instant>,
 }
@@ -157,11 +159,8 @@ impl KatanaApp {
             cached_font_size: None,
             cached_font_family: None,
             settings_preview: PreviewPane::default(),
-            splash_start: if cfg!(test) {
-                None
-            } else {
-                Some(std::time::Instant::now())
-            },
+            needs_splash: !cfg!(test),
+            splash_start: None,
         };
         app.start_update_check(false);
         app
@@ -169,6 +168,7 @@ impl KatanaApp {
 
     /// Explicitly skips the splash screen. Useful for integration testing.
     pub fn skip_splash(&mut self) {
+        self.needs_splash = false;
         self.splash_start = None;
     }
 
@@ -208,6 +208,17 @@ impl KatanaApp {
     ) {
         let h = hash_str(source);
         let path_buf = path.to_path_buf();
+        let current_hash = self
+            .tab_previews
+            .iter()
+            .find(|t| t.path == path_buf)
+            .map(|t| t.hash)
+            .unwrap_or(0);
+
+        if !force && current_hash != 0 && current_hash == h {
+            return;
+        }
+
         let pane = Self::get_preview_pane(&mut self.tab_previews, path_buf.clone());
         pane.full_render(source, path, self.state.cache.clone(), force, concurrency);
 
@@ -664,6 +675,11 @@ impl KatanaApp {
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
+                // Clear all egui texture caches (e.g. diagrams, network images)
+                ctx.forget_all_images();
+                // Reinstall UI icon SVGs so they aren't lost to the cache clear
+                crate::icon::IconRegistry::install(ctx);
+
                 // Invalidate hashes so non-active tabs re-render on next switch
                 for tab in &mut self.tab_previews {
                     tab.hash = 0;
@@ -2182,6 +2198,7 @@ mod tests_extra {
             cached_font_size: None,
             cached_font_family: None,
             settings_preview: PreviewPane::default(),
+            needs_splash: false,
             splash_start: None,
         }
     }

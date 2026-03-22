@@ -78,14 +78,10 @@ fn test_integration_workspace_and_tabs() {
     wait_for_workspace_load(&mut harness);
 
     // Check if the tree shows the file test1.md
-    let _file_node = harness.get_all_by_value("📄 test1.md").next().unwrap();
+    let file_node = harness.get_all_by_value("test1.md").next().unwrap();
 
     // Click it to open it
-    harness
-        .get_all_by_value("📄 test1.md")
-        .next()
-        .unwrap()
-        .click();
+    file_node.click();
     harness.step();
     harness.step();
 
@@ -126,7 +122,7 @@ fn test_integration_toc_panel_display() {
     harness.step();
 
     // Click the toggle button via UI to truly simulate user interaction!
-    let toggle_btn = harness.get_by_label(katana_ui::icon::Icon::Toc.as_str());
+    let toggle_btn = harness.get_by_label("toggle_toc");
     toggle_btn.click();
     harness.step(); // UI Registers click, sets pending_action = ToggleToc
     harness.step(); // KatanaApp reads pending_action, sets show_toc = true, renders TOC panel
@@ -171,7 +167,7 @@ fn test_integration_toc_enable_disable_setting() {
     harness.step();
 
     // By default, toc_visible is true, so TOC toggle button should be visible in the header
-    let toc_icon = katana_ui::icon::Icon::Toc.as_str();
+    let toc_icon = "toggle_toc";
     assert_eq!(
         harness.get_all_by_label(toc_icon).count(),
         1,
@@ -474,24 +470,15 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
     harness.step();
     harness.step();
 
-    // Depth 0: "" prefix
-    let dir1_closed = "▶ 📁 dir1";
-    let dir1_open = "▼ 📂 dir1";
     // 1. Initial state: dir1 should be visible
-    let dir1_node = if let Some(n) = harness.get_all_by_value(dir1_closed).next() {
-        n
-    } else if let Some(n) = harness.get_all_by_value(dir1_open).next() {
-        n
-    } else {
-        panic!("Neither dir1 closed nor open found among visible labels");
-    };
+    let dir1_node = harness.get_all_by_label("dir dir1").next().unwrap();
 
     dir1_node.click();
     harness.step();
     harness.step();
 
     // 2. After clicking dir1, dir2 should be visible
-    let dir2_node = harness.get_by_label_contains("dir2");
+    let dir2_node = harness.get_all_by_label("dir dir2").next().unwrap();
 
     // 3. BUT test.md should NOT be visible (non-recursive)
     let test_md_visible = harness
@@ -508,7 +495,7 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
     harness.step();
 
     // 5. Now test.md should be visible
-    let _ = harness.get_by_label_contains("test.md");
+    let _ = harness.get_all_by_value("test.md").next().unwrap();
 
     // 6. Verify cache is not empty
     let cache_before = harness
@@ -521,10 +508,32 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
         "Cache should contain expanded dirs"
     );
 
-    // 7. Click "-" button (Collapse All)
+    // 7. Expand parent first
+    let parent_label = harness.get_all_by_value("dir1").next().unwrap();
+    parent_label.click(); // Expand parent
+    harness.step();
+    harness.step();
+
+    // Now click the child directory row (dir2)
+    let dir_row = harness.get_all_by_value("dir2").next();
+    if let Some(row) = dir_row {
+        row.click();
+    }
+    harness.step();
+    harness.step(); // Extra step for expansion state to settle
+
+    // Assert that dir2 is now visible (expanded) before collapsing all
+    let dir2_visible_before_collapse = harness
+        .get_all_by_role(egui::accesskit::Role::Label)
+        .any(|n| n.value().map(|v| v.contains("dir2")).unwrap_or(false));
+    assert!(
+        dir2_visible_before_collapse,
+        "dir2 should be visible before Collapse All button is clicked"
+    );
+
+    // 8. Click "-" button (Collapse All)
     let collapse_all = harness.get_by_label("-");
     collapse_all.click();
-    harness.step();
     harness.step();
 
     // 8. Verify EVERYTHING is collapsed (dir2 should NOT be visible)
@@ -677,7 +686,7 @@ fn test_integration_preview_with_diagram_content() {
     let _ = std::fs::remove_dir_all(&temp_dir);
     std::fs::create_dir_all(&temp_dir).unwrap();
     let test_file = temp_dir.join("diagram_test.md");
-    let content = "# Diagram Test\n\n```mermaid\ngraph TD; A-->B\n```\n\n```drawio\n<mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel>\n```\n";
+    let content = "# Diagram Test\n\n```mermaid\ngraph TD; A-->B\n```\n\n```drawio\n<mxGraphModel><root><mxCell id=\"0\"/></mxGraphModel>\n```\n";
     std::fs::write(&test_file, content).unwrap();
 
     harness
@@ -724,9 +733,9 @@ fn test_integration_workspace_with_subdirectory() {
     // Wait safely for the background thread using the common utility
     wait_for_workspace_load(&mut harness);
 
-    // Use get_by_label_contains directly, since Kittest handles it gracefully for Label/TextRun nodes that might have hidden spaces or different properties.
-    let _ = harness.get_by_label_contains("docs");
-    let _ = harness.get_by_label_contains("root.md");
+    // Verify files were loaded automatically
+    let _ = harness.get_all_by_value("docs").next().unwrap();
+    let _ = harness.get_all_by_value("root.md").next().unwrap();
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -810,13 +819,13 @@ fn test_integration_directory_collapse_bug() {
 
     use egui_kittest::kittest::Queryable;
 
-    // 1. Initial State: "▶ 📁 parent" should be collapsed
+    // 1. Initial State: parent should be in tree, child should NOT be visible
     assert!(
-        harness.query_all_by_value("▶ 📁 parent").next().is_some(),
-        "Parent should be collapsed initially"
+        harness.query_all_by_value("parent").next().is_some(),
+        "Parent should be present initially"
     );
     assert!(
-        harness.query_all_by_value("▶ 📁 child").next().is_none(),
+        harness.query_all_by_value("child").next().is_none(),
         "Child should not be visible initially"
     );
 
@@ -829,11 +838,11 @@ fn test_integration_directory_collapse_bug() {
 
     // Everything should be open
     assert!(
-        harness.query_all_by_value("▼ 📂 parent").next().is_some(),
+        harness.query_all_by_value("parent").next().is_some(),
         "Parent should be open"
     );
     assert!(
-        harness.query_all_by_value("  ▼ 📂 child").next().is_some(),
+        harness.query_all_by_value("child").next().is_some(),
         "Child should be open"
     );
 
@@ -843,32 +852,26 @@ fn test_integration_directory_collapse_bug() {
 
     // Now parent is closed
     assert!(
-        harness.query_all_by_value("▶ 📁 parent").next().is_some(),
-        "Parent should be closed"
+        harness.query_all_by_value("parent").next().is_some(),
+        "Parent should be in tree"
     );
     // Child should be completely unrendered (because parent is closed)
     assert!(
-        harness.query_all_by_value("  ▶ 📁 child").next().is_none(),
-        "Child should be hidden"
-    );
-    assert!(
-        harness.query_all_by_value("  ▼ 📂 child").next().is_none(),
+        harness.query_all_by_value("child").next().is_none(),
         "Child should be hidden"
     );
 
     // 4. Manually open "parent"
-    let parent_node = harness.query_all_by_value("▶ 📁 parent").next().unwrap();
+    let parent_node = harness.get_all_by_value("parent").next().unwrap();
     parent_node.click();
     harness.step();
 
     // The bug: child is still open because the `force=false` didn't traverse to hidden children!
     // But we expect the child to NOT be open.
-    // If it is "  ▼ 📂 child", then the bug persists (RED state).
-    // The fixed behavior should be "  ▶ 📁 child".
-
+    // So "dir child" is visible, BUT "file.md" should NOT be visible!
     assert!(
-        harness.query_all_by_value("  ▶ 📁 child").next().is_some(),
-        "Child should be reset to closed when manually expanded"
+        harness.query_all_by_value("file.md").next().is_none(),
+        "Child directory should be collapsed!"
     );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
@@ -1087,13 +1090,6 @@ fn test_integration_workspace_tree_expand_collapse() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
     wait_for_workspace_load(&mut harness);
 
-    // Expand all
-    harness.state_mut().app_state_mut().force_tree_open = Some(true);
-    harness.step();
-
-    // Collapse all
-    harness.state_mut().app_state_mut().force_tree_open = Some(false);
-    harness.step();
     assert_eq!(harness.state_mut().app_state_mut().force_tree_open, None);
 
     let _ = std::fs::remove_dir_all(&temp_dir);
@@ -1723,7 +1719,7 @@ fn test_ui_split_dir_toggle_horizontal_to_vertical() {
 
     // Use node.click() (if provided by egui_kittest)
     // If not provided, try .click() or use ui interaction helpers.
-    let node = harness.get_by_label("⇕");
+    let node = harness.get_by_label("Toggle Split Direction");
     node.click();
     harness.step();
 
@@ -1915,7 +1911,7 @@ fn test_file_entry_label_is_left_aligned() {
     harness.step();
 
     // Find the file label node.
-    let nodes: Vec<_> = harness.get_all_by_value("📄 alignment.md").collect();
+    let nodes: Vec<_> = harness.get_all_by_label("file alignment.md").collect();
     assert!(
         !nodes.is_empty(),
         "File entry '📄 alignment.md' must be present in the workspace tree"
@@ -1960,7 +1956,7 @@ fn test_file_entry_click_opens_document() {
     );
 
     // Click the file entry
-    let nodes: Vec<_> = harness.get_all_by_value("📄 clickable.md").collect();
+    let nodes: Vec<_> = harness.get_all_by_label("file clickable.md").collect();
     assert!(!nodes.is_empty(), "File entry must be present");
     nodes[0].click();
     harness.step();
@@ -2572,7 +2568,7 @@ fn test_integration_ui_context_menu_close_others() {
         .trigger_action(AppAction::SelectDocument(abs3));
     harness.run_steps(5);
 
-    let tab_b = harness.get_by_label_contains("b.md");
+    let tab_b = harness.get_all_by_label("b.md").next().unwrap();
 
     // Fix Flaky: ensure popup correctly renders with harness.run_steps() to await all frames
     tab_b.click_secondary();

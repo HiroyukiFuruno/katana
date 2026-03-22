@@ -628,6 +628,7 @@ fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
 
 /// Generates a cache key based on the file path, diagram kind, and source text.
 pub fn get_cache_key(md_file_path: &std::path::Path, kind: &DiagramKind, source: &str) -> String {
+    use katana_core::markdown::color_preset::DiagramColorPreset;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -635,6 +636,7 @@ pub fn get_cache_key(md_file_path: &std::path::Path, kind: &DiagramKind, source:
     md_file_path.hash(&mut hasher);
     kind.display_name().hash(&mut hasher);
     source.hash(&mut hasher);
+    DiagramColorPreset::is_dark_mode().hash(&mut hasher);
     format!("diagram_{:x}", hasher.finish())
 }
 
@@ -1292,6 +1294,31 @@ mod tests {
             1,
         );
         pane.wait_for_renders();
+    }
+
+    #[test]
+    fn cache_key_differs_by_theme() {
+        use katana_core::markdown::color_preset::DiagramColorPreset;
+
+        let path = std::path::Path::new("/tmp/test.md");
+        let kind = DiagramKind::Mermaid;
+        let source = "graph TD; A-->B";
+
+        // Generate key in dark mode
+        DiagramColorPreset::set_dark_mode(true);
+        let key_dark = get_cache_key(path, &kind, source);
+
+        // Generate key in light mode
+        DiagramColorPreset::set_dark_mode(false);
+        let key_light = get_cache_key(path, &kind, source);
+
+        // Restore default
+        DiagramColorPreset::set_dark_mode(true);
+
+        assert_ne!(
+            key_dark, key_light,
+            "Cache key must differ between dark and light themes"
+        );
     }
 
     #[test]

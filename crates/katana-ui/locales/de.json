@@ -154,6 +154,14 @@
       {
         "key": "workspace",
         "name": "Arbeitsbereich"
+      },
+      {
+        "key": "group_appearance",
+        "name": "Erscheinungsbild"
+      },
+      {
+        "key": "group_system",
+        "name": "System (de)"
       }
     ],
     "workspace": {

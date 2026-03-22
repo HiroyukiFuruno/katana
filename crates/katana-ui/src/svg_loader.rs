@@ -15,6 +15,9 @@ use resvg::{
     usvg::{Transform, Tree},
 };
 
+const HEX_RADIX: u32 = 16;
+const PERCENT_ENCODE_LEN: usize = 3;
+
 struct Entry {
     last_used: AtomicU64,
     result: Result<Arc<ColorImage>, String>,
@@ -43,6 +46,15 @@ impl KatanaSvgLoader {
 pub fn install_image_loaders(ctx: &Context) {
     egui_extras::install_image_loaders(ctx);
 
+    ctx.include_bytes(
+        "bytes://icon/copy.svg",
+        include_bytes!("../../../vendor/egui_commonmark_backend/src/copy.svg"),
+    );
+    ctx.include_bytes(
+        "bytes://icon/success.svg",
+        include_bytes!("../../../vendor/egui_commonmark_backend/src/check.svg"),
+    );
+
     if !ctx.is_loader_installed(crate::http_cache_loader::PersistentHttpLoader::ID) {
         ctx.add_bytes_loader(Arc::new(
             crate::http_cache_loader::PersistentHttpLoader::default(),
@@ -55,6 +67,9 @@ pub fn install_image_loaders(ctx: &Context) {
 }
 
 fn is_supported(uri: &str) -> bool {
+    if uri.starts_with("data:image/svg+xml") {
+        return true;
+    }
     let path = uri
         .split_once('?')
         .map_or(uri, |(before_query, _)| before_query);
@@ -162,10 +177,59 @@ impl ImageLoader for KatanaSvgLoader {
                 .store(self.pass_index.load(Relaxed), Relaxed);
             match entry.result.clone() {
                 Ok(image) => Ok(ImagePoll::Ready { image }),
-                Err(err) => Err(LoadError::Loading(err)),
+                Err(_) => Err(LoadError::NotSupported),
             }
         } else {
-            match ctx.try_load_bytes(uri) {
+            let bytes_load_result = if let Some(data) = uri.strip_prefix("data:") {
+                if let Some((meta, content)) = data.split_once(',') {
+                    if meta.ends_with(";base64") {
+                        use base64::{engine::general_purpose, Engine as _};
+                        match general_purpose::STANDARD.decode(content.trim()) {
+                            Ok(bytes) => Ok(BytesPoll::Ready {
+                                size: None,
+                                bytes: egui::load::Bytes::Shared(std::sync::Arc::from(bytes)),
+                                mime: None,
+                            }),
+                            Err(e) => {
+                                Err(LoadError::Loading(format!("Base64 decode error: {}", e)))
+                            }
+                        }
+                    } else {
+                        // Decode percent-encoded data URI content manually
+                        let bytes = content.as_bytes();
+                        let mut decoded = Vec::with_capacity(bytes.len());
+                        let mut i = 0;
+                        while i < bytes.len() {
+                            if bytes[i] == b'%' && i + 2 < bytes.len() {
+                                if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..=i + 2]) {
+                                    if let Ok(byte) = u8::from_str_radix(hex, HEX_RADIX) {
+                                        decoded.push(byte);
+                                        i += PERCENT_ENCODE_LEN;
+                                        continue;
+                                    }
+                                }
+                            }
+                            decoded.push(bytes[i]);
+                            i += 1;
+                        }
+                        let decoded_str = String::from_utf8_lossy(&decoded).into_owned();
+
+                        Ok(BytesPoll::Ready {
+                            size: None,
+                            bytes: egui::load::Bytes::Shared(std::sync::Arc::from(
+                                decoded_str.into_bytes(),
+                            )),
+                            mime: None,
+                        })
+                    }
+                } else {
+                    Err(LoadError::Loading("Invalid data URI format".into()))
+                }
+            } else {
+                ctx.try_load_bytes(uri)
+            };
+
+            match bytes_load_result {
                 Ok(BytesPoll::Ready { bytes, .. }) => {
                     let result = preprocess_svg_bytes(&bytes)
                         .and_then(|svg| {
@@ -183,7 +247,7 @@ impl ImageLoader for KatanaSvgLoader {
 
                     match result {
                         Ok(image) => Ok(ImagePoll::Ready { image }),
-                        Err(err) => Err(LoadError::Loading(err)),
+                        Err(_) => Err(LoadError::NotSupported),
                     }
                 }
                 Ok(BytesPoll::Pending { size }) => Ok(ImagePoll::Pending { size }),
@@ -276,6 +340,47 @@ mod tests {
         let processed = preprocess_svg_bytes(svg.as_bytes()).expect("svg text");
 
         assert!(processed.contains(r#"font-family="Apple Color Emoji, Verdana""#));
+    }
+
+    #[test]
+    fn test_svg_loader_invalid_base64() {
+        use egui::load::ImageLoader;
+        let loader = KatanaSvgLoader::default();
+        let ctx = egui::Context::default();
+        let res = loader.load(
+            &ctx,
+            "data:image/svg+xml;base64,!!!",
+            egui::load::SizeHint::default(),
+        );
+        let Err(egui::load::LoadError::Loading(s)) = res else {
+            panic!("expected loading error");
+        };
+        assert!(s.contains("Base64 decode error"));
+    }
+
+    #[test]
+    fn test_svg_loader_utf8_fallback() {
+        use egui::load::ImageLoader;
+        let loader = KatanaSvgLoader::default();
+        let ctx = egui::Context::default();
+        let res = loader.load(
+            &ctx,
+            "data:image/svg+xml;utf8,<svg width=\"100\" height=\"100\"></svg>",
+            egui::load::SizeHint::default(),
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_svg_loader_invalid_data_uri() {
+        use egui::load::ImageLoader;
+        let loader = KatanaSvgLoader::default();
+        let ctx = egui::Context::default();
+        let res = loader.load(&ctx, "data:image/svg+xml", egui::load::SizeHint::default());
+        let Err(egui::load::LoadError::Loading(s)) = res else {
+            panic!("expected loading error");
+        };
+        assert!(s.contains("Invalid data URI format"));
     }
 
     #[test]
@@ -626,5 +731,23 @@ mod tests {
         // ctx.try_load_bytes("...svg") returns Err(NotSupported) → line 166
         let result = loader.load(&ctx, "https://example.com/image.svg", SizeHint::default());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_data_uri_base64() {
+        let loader = KatanaSvgLoader::default();
+        let ctx = Context::default();
+        let uri = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjwvc3ZnPg==";
+        let result = loader.load(&ctx, uri, SizeHint::default());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_load_data_uri_percent_encoded() {
+        let loader = KatanaSvgLoader::default();
+        let ctx = Context::default();
+        let uri = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221%22%20height%3D%221%22%3E%3C%2Fsvg%3E";
+        let result = loader.load(&ctx, uri, SizeHint::default());
+        assert!(result.is_ok());
     }
 }

@@ -161,6 +161,9 @@ fn main() -> eframe::Result<()> {
             setup_fonts(&cc.egui_ctx);
             // Install lazy, parallel image loaders for file:// URIs in preview.
             katana_ui::svg_loader::install_image_loaders(&cc.egui_ctx);
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            // Register all SVG icon bytes so the image loader can resolve them.
+            katana_ui::icon::IconRegistry::install(&cc.egui_ctx);
 
             // macOS: Construct the native menu bar and set app icon.
             #[cfg(target_os = "macos")]

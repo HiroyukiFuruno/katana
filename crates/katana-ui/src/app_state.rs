@@ -39,6 +39,16 @@ pub struct TabSplitState {
     pub state: SplitViewState,
 }
 
+/// Top-level section within the settings window.
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
+pub enum SettingsSection {
+    /// Theme, Font, Layout — visual appearance controls.
+    #[default]
+    Appearance,
+    /// Workspace scanning, etc. — functional behaviour controls.
+    Behavior,
+}
+
 /// Tab within the settings window.
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum SettingsTab {
@@ -51,6 +61,26 @@ pub enum SettingsTab {
     Layout,
     /// Workspace scanning options (max depth, excluded dirs).
     Workspace,
+}
+
+impl SettingsTab {
+    /// Returns the section this tab belongs to.
+    pub const fn section(&self) -> SettingsSection {
+        match self {
+            Self::Theme | Self::Font | Self::Layout => SettingsSection::Appearance,
+            Self::Workspace => SettingsSection::Behavior,
+        }
+    }
+}
+
+impl SettingsSection {
+    /// Returns the tabs that belong to this section.
+    pub const fn tabs(&self) -> &[SettingsTab] {
+        match self {
+            Self::Appearance => &[SettingsTab::Theme, SettingsTab::Font, SettingsTab::Layout],
+            Self::Behavior => &[SettingsTab::Workspace],
+        }
+    }
 }
 
 /// User-visible actions dispatched from UI components to the core update loop.
@@ -171,6 +201,10 @@ pub struct AppState {
     pub search_results: Vec<std::path::PathBuf>,
     /// Currently active tab in the settings window.
     pub active_settings_tab: SettingsTab,
+    /// Override flag to force all collapsible setting tree nodes to open or close
+    pub settings_tree_force_open: Option<bool>,
+    /// Currently active section in the settings window (left sidebar).
+    pub active_settings_section: SettingsSection,
     /// Trigger to expand/collapse the entire workspace tree. Some(true)=expand all, Some(false)=collapse all.
     pub force_tree_open: Option<bool>,
     /// Split mode scroll sync: Normalized scroll position (0.0–1.0).
@@ -247,6 +281,8 @@ impl AppState {
             last_search_params: None,
             search_results: Vec::new(),
             active_settings_tab: SettingsTab::default(),
+            settings_tree_force_open: None,
+            active_settings_section: SettingsSection::default(),
             force_tree_open: None,
             scroll_fraction: 0.0,
             scroll_source: ScrollSource::Neither,
@@ -414,6 +450,20 @@ mod tests {
     use katana_core::workspace::TreeEntry;
     use katana_platform::{PaneOrder, SplitDirection};
     use std::path::PathBuf;
+
+    #[test]
+    fn test_settings_section_and_tabs_mapping() {
+        assert_eq!(SettingsTab::Theme.section(), SettingsSection::Appearance);
+        assert_eq!(SettingsTab::Font.section(), SettingsSection::Appearance);
+        assert_eq!(SettingsTab::Layout.section(), SettingsSection::Appearance);
+        assert_eq!(SettingsTab::Workspace.section(), SettingsSection::Behavior);
+
+        assert_eq!(
+            SettingsSection::Appearance.tabs(),
+            &[SettingsTab::Theme, SettingsTab::Font, SettingsTab::Layout]
+        );
+        assert_eq!(SettingsSection::Behavior.tabs(), &[SettingsTab::Workspace]);
+    }
 
     fn make_state_with_doc(path: &str) -> AppState {
         let mut state = AppState::new(

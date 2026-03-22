@@ -49,3 +49,4 @@ xmltree = "0.12"
 
 [patch.crates-io]
 egui_commonmark = { path = "vendor/egui_commonmark" }
+egui_commonmark_backend = { path = "vendor/egui_commonmark_backend" }

@@ -15,6 +15,14 @@ use crate::{
     preview_pane::{DownloadRequest, PreviewPane},
 };
 
+const INVISIBLE_LABEL_SIZE: f32 = 0.1;
+
+fn invisible_label(text: &str) -> egui::RichText {
+    egui::RichText::new(text)
+        .size(INVISIBLE_LABEL_SIZE)
+        .color(egui::Color32::TRANSPARENT)
+}
+
 use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
     FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
@@ -152,25 +160,24 @@ pub(crate) fn render_status_bar(
 
             let (color, icon) = match kind {
                 Some(crate::app_state::StatusType::Error) => {
-                    (egui::Color32::RED, Some(crate::Icon::Error.as_str()))
+                    (egui::Color32::RED, Some(crate::Icon::Error))
                 }
-                Some(crate::app_state::StatusType::Warning) => (
-                    ui.visuals().warn_fg_color,
-                    Some(crate::Icon::Warning.as_str()),
-                ),
+                Some(crate::app_state::StatusType::Warning) => {
+                    (ui.visuals().warn_fg_color, Some(crate::Icon::Warning))
+                }
                 Some(crate::app_state::StatusType::Success) => (
                     egui::Color32::from_rgb(0, STATUS_SUCCESS_GREEN, 0),
-                    Some(crate::Icon::Success.as_str()),
+                    Some(crate::Icon::Success),
                 ),
                 Some(crate::app_state::StatusType::Info) => {
-                    (ui.visuals().text_color(), Some(crate::Icon::Info.as_str()))
+                    (ui.visuals().text_color(), Some(crate::Icon::Info))
                 }
                 _ => (ui.visuals().text_color(), None),
             };
 
             ui.add_space(STATUS_BAR_ICON_SPACING);
             if let Some(i) = icon {
-                ui.colored_label(color, i);
+                ui.add(egui::Image::new(i.uri()).tint(color));
                 ui.add_space(2.0);
             }
             ui.colored_label(color, msg);
@@ -187,8 +194,13 @@ pub(crate) fn render_status_bar(
                         ui.label(numbered);
                     }
                 }
+                const DIRTY_DOT_MAX_HEIGHT: f32 = 10.0;
                 if state.is_dirty() {
-                    ui.label(crate::Icon::Dot.as_str());
+                    ui.add(
+                        egui::Image::new(crate::Icon::Dot.uri())
+                            .tint(ui.visuals().text_color())
+                            .max_height(DIRTY_DOT_MAX_HEIGHT),
+                    );
                 }
             });
         });
@@ -221,7 +233,10 @@ pub(crate) fn render_workspace_panel(
                 ui.heading(crate::i18n::get().workspace.workspace_title.clone());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .small_button(crate::icon::Icon::ChevronLeft.as_str())
+                        .add(egui::Button::image(
+                            crate::icon::Icon::ChevronLeft
+                                .ui_image(ui, crate::icon::IconSize::Small),
+                        ))
                         .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                         .clicked()
                     {
@@ -231,31 +246,43 @@ pub(crate) fn render_workspace_panel(
             });
             if state.workspace.is_some() {
                 ui.horizontal(|ui| {
-                    if ui
-                        .small_button("+")
-                        .on_hover_text(crate::i18n::get().action.expand_all.clone())
-                        .clicked()
-                    {
+                    let btn_resp = ui
+                        .add(egui::Button::image(
+                            crate::Icon::ExpandAll.ui_image(ui, crate::icon::IconSize::Small),
+                        ))
+                        .on_hover_text(crate::i18n::get().action.expand_all.clone());
+                    btn_resp.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "+")
+                    });
+                    if btn_resp.clicked() {
                         if let Some(ws) = &state.workspace {
                             state
                                 .expanded_directories
                                 .extend(ws.collect_all_directory_paths());
                         }
                     }
-                    if ui
-                        .small_button("-")
-                        .on_hover_text(crate::i18n::get().action.collapse_all.clone())
-                        .clicked()
-                    {
+                    let btn_resp = ui
+                        .add(egui::Button::image(
+                            crate::Icon::CollapseAll.ui_image(ui, crate::icon::IconSize::Small),
+                        ))
+                        .on_hover_text(crate::i18n::get().action.collapse_all.clone());
+                    btn_resp.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "-")
+                    });
+                    if btn_resp.clicked() {
                         state.force_tree_open = Some(false);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if !state.settings.settings().workspace.paths.is_empty() {
-                            ui.menu_button("📄", |ui| {
+                            ui.menu_image_button(crate::icon::Icon::Document.uri(), |ui| {
                                 for path in state.settings.settings().workspace.paths.iter().rev() {
                                     ui.horizontal(|ui| {
                                         if ui
-                                            .button("×")
+                                            .add(egui::Button::image_and_text(
+                                                crate::Icon::Remove
+                                                    .ui_image(ui, crate::icon::IconSize::Small),
+                                                invisible_label("x"),
+                                            ))
                                             .on_hover_text(
                                                 crate::i18n::get().action.remove_workspace.clone(),
                                             )
@@ -277,7 +304,10 @@ pub(crate) fn render_workspace_panel(
                             .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
                         }
                         if ui
-                            .small_button(crate::Icon::Refresh.as_str())
+                            .add(egui::Button::image_and_text(
+                                crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Small),
+                                invisible_label("🔄"),
+                            ))
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
                             .clicked()
                         {
@@ -290,9 +320,11 @@ pub(crate) fn render_workspace_panel(
                         };
                         if ui
                             .add(
-                                egui::Button::new(crate::Icon::Filter.as_str())
-                                    .small()
-                                    .fill(filter_btn_color),
+                                egui::Button::image_and_text(
+                                    crate::Icon::Filter.ui_image(ui, crate::icon::IconSize::Small),
+                                    invisible_label("\u{2207}"),
+                                )
+                                .fill(filter_btn_color),
                             )
                             .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                             .clicked()
@@ -300,7 +332,10 @@ pub(crate) fn render_workspace_panel(
                             state.filter_enabled = !state.filter_enabled;
                         }
                         if ui
-                            .add(egui::Button::new(crate::Icon::Search.as_str()).small())
+                            .add(egui::Button::image_and_text(
+                                crate::Icon::Search.ui_image(ui, crate::icon::IconSize::Small),
+                                invisible_label("🔍"),
+                            ))
                             .on_hover_text(crate::i18n::get().search.modal_title.clone())
                             .clicked()
                         {
@@ -479,7 +514,10 @@ pub(crate) fn render_preview_content(
                 .max_rect(child_rect)
                 .layout(egui::Layout::top_down(egui::Align::Min)),
             |ui| {
+                const PREVIEW_PANE_TOP_BOTTOM_PADDING: f32 = 4.0; // 0.25rem padding
+                ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
                 download_req = preview.show_content(ui);
+                ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
             },
         );
     });
@@ -536,7 +574,11 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     if overlay_ui
         .add_enabled(
             has_doc,
-            egui::Button::new(crate::Icon::Refresh.as_str()).min_size(button_size),
+            egui::Button::image_and_text(
+                crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Medium),
+                invisible_label("🔄"),
+            )
+            .min_size(button_size),
         )
         .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
         .clicked()
@@ -544,7 +586,7 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
         *action = AppAction::RefreshDiagrams;
     }
 
-    overlay_ui.menu_button(crate::Icon::Export.as_str(), |ui| {
+    overlay_ui.menu_image_button(crate::icon::Icon::Export.uri(), |ui| {
         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
         if ui
             .button(crate::i18n::get().menu.export_html.clone())
@@ -585,9 +627,12 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
         if overlay_ui
             .add_enabled(
                 has_doc,
-                egui::Button::new(crate::Icon::Toc.as_str())
-                    .min_size(button_size)
-                    .fill(toc_bg),
+                egui::Button::image_and_text(
+                    crate::Icon::Toc.ui_image(ui, crate::icon::IconSize::Medium),
+                    invisible_label("toggle_toc"),
+                )
+                .min_size(button_size)
+                .fill(toc_bg),
             )
             .on_hover_text(crate::i18n::get().action.toggle_toc.clone())
             .clicked()
@@ -706,7 +751,13 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                             tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
                         }
 
-                        if ui.small_button(crate::Icon::Close.as_str()).clicked() {
+                        if ui
+                            .add(egui::Button::image_and_text(
+                                crate::Icon::Close.ui_image(ui, crate::icon::IconSize::Small),
+                                invisible_label("x"),
+                            ))
+                            .clicked()
+                        {
                             close_idx = Some(idx);
                         }
                         ui.add_space(TAB_INTER_ITEM_SPACING);
@@ -720,7 +771,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         if ui
             .add_enabled(
                 nav_enabled,
-                egui::Button::new(crate::Icon::TriangleLeft.as_str()).small(),
+                egui::Button::image_and_text(
+                    crate::Icon::TriangleLeft.ui_image(ui, crate::icon::IconSize::Small),
+                    invisible_label("◀"),
+                ),
             )
             .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
@@ -735,7 +789,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         if ui
             .add_enabled(
                 nav_enabled,
-                egui::Button::new(crate::Icon::TriangleRight.as_str()).small(),
+                egui::Button::image_and_text(
+                    crate::Icon::TriangleRight.ui_image(ui, crate::icon::IconSize::Small),
+                    invisible_label("▶"),
+                ),
             )
             .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
@@ -811,7 +868,7 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
 
                 // Toggle pane order.
                 let current_order = state.active_pane_order();
-                let (order_icon, order_tip) = match current_order {
+                let (order_text, order_tip) = match current_order {
                     katana_platform::PaneOrder::EditorFirst => (
                         "📄|👁",
                         crate::i18n::get().split_toggle.preview_first.clone(),
@@ -821,7 +878,7 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
                     }
                 };
                 if ui
-                    .add(egui::Button::new(order_icon).sense(egui::Sense::click()))
+                    .add(egui::Button::new(order_text).sense(egui::Sense::click()))
                     .on_hover_text(order_tip)
                     .clicked()
                 {
@@ -839,18 +896,31 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
                 // Toggle split direction.
                 let current_dir = state.active_split_direction();
                 let (dir_icon, dir_tip) = match current_dir {
-                    katana_platform::SplitDirection::Horizontal => {
-                        ("⇕", crate::i18n::get().split_toggle.vertical.clone())
-                    }
-                    katana_platform::SplitDirection::Vertical => {
-                        ("⇔", crate::i18n::get().split_toggle.horizontal.clone())
-                    }
+                    katana_platform::SplitDirection::Horizontal => (
+                        crate::icon::Icon::SplitHorizontal,
+                        crate::i18n::get().split_toggle.vertical.clone(),
+                    ),
+                    katana_platform::SplitDirection::Vertical => (
+                        crate::icon::Icon::SplitVertical,
+                        crate::i18n::get().split_toggle.horizontal.clone(),
+                    ),
                 };
-                if ui
-                    .add(egui::Button::new(dir_icon).sense(egui::Sense::click()))
-                    .on_hover_text(dir_tip)
-                    .clicked()
-                {
+                let icon_size = crate::icon::IconSize::Medium;
+                let resp = ui
+                    .add(egui::Button::image(
+                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
+                    ))
+                    .on_hover_text(dir_tip);
+
+                resp.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Button,
+                        true,
+                        "Toggle Split Direction",
+                    )
+                });
+
+                if resp.clicked() {
                     let new_dir = match current_dir {
                         katana_platform::SplitDirection::Horizontal => {
                             katana_platform::SplitDirection::Vertical
@@ -931,18 +1001,25 @@ pub(crate) fn render_editor_content(
 
                 // Draw line numbers
                 let clip_rect = ui.clip_rect().expand(100.0);
-
+                println!("Test Debug: clip_rect={:?}", clip_rect);
                 let mut p = 0;
                 let mut is_start_of_para = true;
 
                 for row in &galley.rows {
                     let top_y = row.rect().min.y;
                     let y = response.rect.min.y + top_y;
-
-                    if is_start_of_para
+                    let is_visible = is_start_of_para
                         && y <= clip_rect.max.y
-                        && (y + row.rect().height()) >= clip_rect.min.y
-                    {
+                        && (y + row.rect().height()) >= clip_rect.min.y;
+
+                    if !is_visible && is_start_of_para {
+                        println!(
+                            "Test Debug: row skipped y={} clip.min={} clip.max={}",
+                            y, clip_rect.min.y, clip_rect.max.y
+                        );
+                    }
+
+                    if is_visible {
                         let is_current = current_cursor_y == Some(top_y);
                         let text = format!("{}", p + 1);
                         let color = if is_current {
@@ -960,14 +1037,17 @@ pub(crate) fn render_editor_content(
                         if is_current {
                             text_rt = text_rt.strong();
                         }
-                        let label = egui::Label::new(text_rt).selectable(false);
+
+                        let label_for_measuring =
+                            egui::Label::new(text_rt.clone()).selectable(false);
                         // align right
-                        let galley_ln = label.layout_in_ui(ui);
+                        let galley_ln = label_for_measuring.layout_in_ui(ui);
                         let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
-                        ui.put(
-                            label_rect.translate(egui::vec2(offset_x, 0.0)),
-                            egui::Label::new(galley_ln.1),
-                        ); // just use the laid out text or label again
+                        let tight_rect = egui::Rect::from_min_size(
+                            label_rect.min + egui::vec2(offset_x, 0.0),
+                            galley_ln.1.rect.size(),
+                        );
+                        ui.put(tight_rect, egui::Label::new(text_rt).selectable(false));
                     }
 
                     is_start_of_para = row.ends_with_newline;
@@ -1061,54 +1141,64 @@ pub(crate) fn render_directory_entry(
     let mut state =
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
     state.set_open(is_open);
-
-    let arrow = if is_open { "▼" } else { "▶" };
-    let dir_icon = if is_open { "📂" } else { "📁" };
-    let prefix = indent_prefix(ctx.depth);
-    let label_text = format!("{prefix}{arrow} {dir_icon} {name}");
     let file_tree_color = ui.visuals().text_color();
-    let (rect, mut resp) = ui.allocate_at_least(
+    let (rect, resp) = ui.allocate_at_least(
         egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
         egui::Sense::click(),
     );
 
+    let accessible_label = format!("dir {}", name);
+    resp.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &accessible_label)
+    });
+
+    if resp.clicked() {
+        eprintln!("Directory clicked! Path: {:?}, was open: {}", path, is_open);
+        if is_open {
+            ctx.expanded_directories.remove(path);
+        } else {
+            ctx.expanded_directories.insert(path.to_path_buf());
+        }
+    }
+
     if ui.is_rect_visible(rect) {
+        if resp.hovered() {
+            ui.painter()
+                .rect_filled(rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+        }
+
         let mut child_ui = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(rect)
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         child_ui.add_space(TREE_LABEL_HOFFSET);
-        let rich = egui::RichText::new(label_text.clone()).color(file_tree_color);
-        let text_widget = egui::WidgetText::from(rich);
-        let galley = text_widget.into_galley(
-            &child_ui,
-            Some(egui::TextWrapMode::Extend),
-            f32::INFINITY,
-            egui::FontSelection::Default,
-        );
-        let desired_size = egui::vec2(
-            galley.size().x.min(child_ui.available_width()),
-            galley.size().y,
-        );
-        let (rect, label_resp) = child_ui.allocate_at_least(desired_size, egui::Sense::click());
-        label_resp
-            .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label_text));
+        let prefix = indent_prefix(ctx.depth);
+        let arrow_icon = if is_open {
+            crate::icon::Icon::PanDown
+        } else {
+            crate::icon::Icon::PanRight
+        };
+        let folder_icon = if is_open {
+            crate::icon::Icon::FolderOpen
+        } else {
+            crate::icon::Icon::FolderClosed
+        };
 
-        if child_ui.is_rect_visible(rect) {
-            let mut clip_rect = child_ui.clip_rect();
-            clip_rect.max.x = clip_rect.max.x.min(rect.max.x);
-            child_ui
-                .painter()
-                .with_clip_rect(clip_rect)
-                .galley(rect.min, galley, file_tree_color);
-        }
-        resp = resp.union(label_resp);
-    }
+        child_ui.label(egui::RichText::new(prefix));
 
-    if resp.hovered() {
-        ui.painter()
-            .rect_filled(rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
+        // Add spacing equivalent to item_spacing.x = 2.0 manually or rely on default layout
+        child_ui.add(
+            arrow_icon
+                .image(crate::icon::IconSize::Small)
+                .tint(file_tree_color),
+        );
+        child_ui.add(
+            folder_icon
+                .image(crate::icon::IconSize::Medium)
+                .tint(file_tree_color),
+        );
+        child_ui.add(egui::Label::new(egui::RichText::new(name).color(file_tree_color)).truncate());
     }
 
     // Directory level Meta Info on Hover
@@ -1205,12 +1295,10 @@ pub(crate) fn render_file_entry(
     ctx: &mut TreeRenderContext<'_, '_>,
 ) {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-    let prefix = indent_prefix(ctx.depth);
-    let icon = if entry.is_markdown() { "📄" } else { "  " };
     // Prepend two spaces to align with the directory's arrow and its following space ("▶ ").
-    let label = format!("{prefix}  {icon} {name}");
+
     // Accessibility label without leading indentation (used for widget_info / test queries).
-    let accessible_label = format!("{icon} {name}");
+    let accessible_label = format!("file {}", name);
 
     let is_active = ctx.active_path.is_some_and(|ap| ap == path);
 
@@ -1219,7 +1307,6 @@ pub(crate) fn render_file_entry(
     } else {
         ui.visuals().text_color()
     };
-    let label_text = label;
     let (full_rect, mut resp) = ui.allocate_at_least(
         egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
         egui::Sense::click(),
@@ -1241,32 +1328,34 @@ pub(crate) fn render_file_entry(
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         child_ui.add_space(TREE_LABEL_HOFFSET);
-        let rich = egui::RichText::new(label_text.clone()).color(text_color);
-        let text_widget = egui::WidgetText::from(if is_active { rich.strong() } else { rich });
-        let galley = text_widget.into_galley(
-            &child_ui,
-            Some(egui::TextWrapMode::Extend),
-            f32::INFINITY,
-            egui::FontSelection::Default,
-        );
-        let desired_size = egui::vec2(
-            galley.size().x.min(child_ui.available_width()),
-            galley.size().y,
-        );
-        let (rect, label_resp) = child_ui.allocate_at_least(desired_size, egui::Sense::click());
-        label_resp.widget_info(|| {
+
+        let prefix_string = indent_prefix(ctx.depth);
+        child_ui.label(egui::RichText::new(prefix_string).color(text_color));
+
+        // Allocate empty space exactly matching the directory arrow icon's size
+        child_ui.allocate_space(egui::vec2(crate::icon::IconSize::Small.to_vec2().x, 0.0));
+
+        if entry.is_markdown() {
+            child_ui.add(
+                crate::icon::Icon::Document
+                    .image(crate::icon::IconSize::Medium)
+                    .tint(text_color),
+            );
+        } else {
+            // For non-markdown, we might want a raw file icon, but for now we fallback to invisible space to match old behavior
+            child_ui.add_space(crate::icon::IconSize::Medium.to_vec2().x);
+        }
+
+        let mut rich = egui::RichText::new(name).color(text_color);
+        if is_active {
+            rich = rich.strong();
+        }
+        let resp_label = child_ui.add(egui::Label::new(rich).truncate());
+
+        resp_label.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &accessible_label)
         });
-
-        if child_ui.is_rect_visible(rect) {
-            let mut clip_rect = child_ui.clip_rect();
-            clip_rect.max.x = clip_rect.max.x.min(rect.max.x);
-            child_ui
-                .painter()
-                .with_clip_rect(clip_rect)
-                .galley(rect.min, galley, text_color);
-        }
-        resp = resp.union(label_resp);
+        resp = resp.union(resp_label);
     }
 
     // File level Meta Info on Hover
@@ -1679,7 +1768,7 @@ fn preview_panel_id(path: Option<&std::path::Path>, base: &'static str) -> egui:
 
 fn invalidate_preview_image_cache(ctx: &egui::Context, action: &AppAction) {
     if matches!(action, AppAction::RefreshDiagrams) {
-        ctx.forget_all_images();
+        crate::icon::IconRegistry::install(ctx);
     }
 }
 
@@ -1851,6 +1940,13 @@ impl KatanaApp {
 
 impl eframe::App for KatanaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Start the splash screen timer exactly when the first frame is requested,
+        // rather than during App allocation, to prevent it from expiring during loading.
+        if self.needs_splash {
+            self.splash_start = Some(std::time::Instant::now());
+            self.needs_splash = false;
+        }
+
         // Apply theme colours to egui Visuals (only when the palette changed)
         let theme_colors = self.state.settings.settings().effective_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
@@ -2023,7 +2119,10 @@ impl eframe::App for KatanaApp {
                 .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
                         if ui
-                            .button(crate::Icon::ChevronRight.as_str())
+                            .add(egui::Button::image(
+                                crate::Icon::ChevronRight
+                                    .ui_image(ui, crate::icon::IconSize::Medium),
+                            ))
                             .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                             .clicked()
                         {
@@ -2045,8 +2144,11 @@ impl eframe::App for KatanaApp {
                     let segments: Vec<&str> = rel.split('/').collect();
                     for (i, seg) in segments.iter().enumerate() {
                         if i > 0 {
-                            ui.label(
-                                egui::RichText::new(crate::Icon::ChevronRight.as_str()).small(),
+                            const CHEVRON_ICON_SIZE: f32 = 10.0;
+                            ui.add(
+                                egui::Image::new(crate::Icon::ChevronRight.uri())
+                                    .tint(ui.visuals().text_color())
+                                    .max_height(CHEVRON_ICON_SIZE),
                             );
                         }
                         ui.label(egui::RichText::new(*seg).small());
@@ -2150,8 +2252,7 @@ impl eframe::App for KatanaApp {
         if let Some(start) = self.splash_start {
             let elapsed = start.elapsed().as_secs_f32();
             let opacity = crate::shell_logic::calculate_splash_opacity(elapsed);
-            let any_pressed =
-                ctx.input(|i| i.pointer.any_pressed() || i.key_pressed(egui::Key::Escape));
+            let any_pressed = ctx.input(|i| i.key_pressed(egui::Key::Escape));
 
             if opacity <= 0.0 || any_pressed {
                 self.splash_start = None;
@@ -2179,7 +2280,8 @@ impl eframe::App for KatanaApp {
                         const SPLASH_PROGRESS_BG_DARK: u8 = 200;
 
                         let is_dark = ctx.style().visuals.dark_mode;
-                        let content_rect = ctx.content_rect();
+                        #[allow(deprecated)]
+                        let content_rect = ctx.screen_rect();
                         let bg_color = if is_dark {
                             egui::Color32::from_rgb(SPLASH_BG_DARK, SPLASH_BG_DARK, SPLASH_BG_DARK)
                         } else {
@@ -3204,7 +3306,18 @@ fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(label).weak());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.hyperlink_to(crate::Icon::ExternalLink.as_str(), url);
+            if ui
+                .add(
+                    egui::Button::image(
+                        crate::Icon::ExternalLink.ui_image(ui, crate::icon::IconSize::Small),
+                    )
+                    .frame(false),
+                )
+                .on_hover_text(url)
+                .clicked()
+            {
+                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+            }
         });
     });
 }
