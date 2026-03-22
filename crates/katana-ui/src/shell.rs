@@ -241,9 +241,25 @@ impl KatanaApp {
         self.workspace_rx = Some(rx);
         let path_clone = path.clone();
 
+        // 1. Cancel any existing workspace scan
+        if let Some(token) = &self.state.workspace_cancel_token {
+            token.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        // 2. Create a new cancellation token for this scan
+        let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.state.workspace_cancel_token = Some(new_token.clone());
+
+        let settings = self.state.settings.settings().workspace.clone();
+
         std::thread::spawn(move || {
             let fs = katana_platform::FilesystemService::new();
-            let result = fs.open_workspace(&path_clone);
+            let result = fs.open_workspace(
+                &path_clone,
+                &settings.ignored_directories,
+                settings.max_depth,
+                new_token,
+            );
             let _ = tx.send((WorkspaceLoadType::Open, path_clone, result));
         });
     }
@@ -310,10 +326,10 @@ impl KatanaApp {
         {
             let settings = self.state.settings.settings_mut();
             settings.workspace.last_workspace = Some(path_str.clone());
-            if !settings.workspace.paths.contains(&path_str) {
-                settings.workspace.paths.push(path_str);
-            }
-            // We no longer clear here because we manage state via CacheFacade now
+
+            // Move to end of history (most recent)
+            settings.workspace.paths.retain(|p| p != &path_str);
+            settings.workspace.paths.push(path_str);
         }
 
         // Restore tabs for the opened workspace
@@ -374,9 +390,25 @@ impl KatanaApp {
         let (tx, rx) = std::sync::mpsc::channel();
         self.workspace_rx = Some(rx);
 
+        // 1. Cancel any existing workspace scan
+        if let Some(token) = &self.state.workspace_cancel_token {
+            token.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        // 2. Create a new cancellation token for this scan
+        let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.state.workspace_cancel_token = Some(new_token.clone());
+
+        let settings = self.state.settings.settings().workspace.clone();
+
         std::thread::spawn(move || {
             let fs = katana_platform::FilesystemService::new();
-            let result = fs.open_workspace(&root);
+            let result = fs.open_workspace(
+                &root,
+                &settings.ignored_directories,
+                settings.max_depth,
+                new_token,
+            );
             let _ = tx.send((WorkspaceLoadType::Refresh, root, result));
         });
     }
@@ -409,12 +441,14 @@ impl KatanaApp {
                     true
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    tracing::debug!("[CPU_LEAK] shell.rs Workspace load polling requested repaint");
                     ctx.request_repaint_after(std::time::Duration::from_millis(
                         WORKSPACE_LOAD_POLL_INTERVAL_MS,
                     ));
                     false
                 }
                 Err(_) => {
+                    tracing::debug!("[CPU_LEAK] shell.rs workspace_rx disconnected (err)");
                     self.state.is_loading_workspace = false;
                     true
                 }
@@ -506,8 +540,11 @@ impl KatanaApp {
     fn handle_remove_workspace(&mut self, path: String) {
         let settings = self.state.settings.settings_mut();
         settings.workspace.paths.retain(|p| p != &path);
-        // If the removed workspace matches the last_workspace, we don't necessarily clear last_workspace
-        // because it's still the active one, but it won't appear in the history list anymore.
+
+        if settings.workspace.last_workspace.as_deref() == Some(path.as_str()) {
+            settings.workspace.last_workspace = None;
+        }
+
         if let Err(e) = self.state.settings.save() {
             tracing::warn!("Failed to save settings after removing workspace: {e}");
         }

@@ -49,6 +49,8 @@ pub enum SettingsTab {
     Font,
     /// Editor / preview layout options.
     Layout,
+    /// Workspace scanning options (max depth, excluded dirs).
+    Workspace,
 }
 
 /// User-visible actions dispatched from UI components to the core update loop.
@@ -181,6 +183,8 @@ pub struct AppState {
     pub preview_max_scroll: f32,
     /// Settings persistence service.
     pub settings: SettingsService,
+    /// Token used to cancel an ongoing background workspace scan.
+    pub workspace_cancel_token: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Indicates if a workspace is currently being loaded asynchronously in the background.
     pub is_loading_workspace: bool,
     /// If an update is available on GitHub, contains the latest version string
@@ -197,6 +201,8 @@ pub struct AppState {
     pub expanded_directories: std::collections::HashSet<std::path::PathBuf>,
     /// History of closed tabs to enable restoring (LIFO).
     pub recently_closed_tabs: std::collections::VecDeque<std::path::PathBuf>,
+    /// Cache for the last window title set to prevent redundant viewport commands.
+    pub last_window_title: String,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -247,6 +253,7 @@ impl AppState {
             editor_max_scroll: 0.0,
             preview_max_scroll: 0.0,
             settings,
+            workspace_cancel_token: None,
             is_loading_workspace: false,
             update_available: None,
             checking_for_updates: false,
@@ -254,7 +261,10 @@ impl AppState {
             scale_override: 1.0,
             cache,
             expanded_directories: std::collections::HashSet::new(),
-            recently_closed_tabs: std::collections::VecDeque::new(),
+            recently_closed_tabs: std::collections::VecDeque::with_capacity(
+                Self::MAX_RECENTLY_CLOSED_TABS,
+            ),
+            last_window_title: String::new(),
         }
     }
 

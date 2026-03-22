@@ -121,7 +121,7 @@ pub(crate) fn show_section(
             download_url,
             install_path,
         } => show_not_installed(ui, kind, download_url, install_path),
-        RenderedSection::Pending { kind } => {
+        RenderedSection::Pending { kind, .. } => {
             ui.horizontal(|ui| {
                 ui.spinner();
                 ui.label(

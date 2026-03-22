@@ -4,7 +4,8 @@ use katana_linter::rules::i18n::lint_icon_facade;
 use katana_linter::rules::locales::lint_locale_files;
 use katana_linter::rules::markdown::lint_markdown_heading_pairs;
 use katana_linter::rules::rust::{
-    lint_font_normalization, lint_lazy_code, lint_magic_numbers, lint_prohibited_types,
+    lint_font_normalization, lint_lazy_code, lint_magic_numbers, lint_performance,
+    lint_prohibited_types,
 };
 use katana_linter::run_ast_lint;
 use katana_linter::utils::{panic_with_violations, workspace_root};
@@ -127,5 +128,16 @@ fn ast_linter_font_normalization() {
             root.join("crates/katana-ui/src"),
         ],
         lint_font_normalization,
+    );
+}
+
+#[test]
+fn ast_linter_no_unoptimized_performance() {
+    let root = workspace_root();
+    run_ast_lint(
+        "performance",
+        "Fix: Avoid unconditional `request_repaint()` or `set_title()` calls in UI loops.",
+        &[root.join("crates/katana-ui/src")],
+        lint_performance,
     );
 }

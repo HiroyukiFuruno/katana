@@ -96,6 +96,94 @@ pub fn calculate_splash_progress(elapsed_secs: f32) -> f32 {
     (elapsed_secs / SPLASH_VISIBLE_DURATION).clamp(0.0, 1.0)
 }
 
+/// Helper function to format the full tooltip for a file tree entry.
+/// This currently embodies the buggy behavior where `Path` is swallowed.
+pub fn format_tree_tooltip(name: &str, path: &std::path::Path) -> String {
+    let absolute_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let path_str = absolute_path.display().to_string();
+    format!(
+        "{name}\n{}: {path_str}\n{}",
+        crate::i18n::tf("Path", &[]),
+        if let Ok(metadata) = std::fs::metadata(path) {
+            format_metadata_tooltip(
+                metadata.len(),
+                metadata.modified().ok(),
+                &crate::i18n::get().workspace.metadata_tooltip,
+            )
+        } else {
+            "Metadata unavailable".to_string()
+        }
+    )
+}
+
+/// Recursively collects up to 100 matching files from the workspace tree.
+pub fn collect_matches(
+    entries: &[katana_core::workspace::TreeEntry],
+    query: &str,
+    include_regexes: &[regex::Regex],
+    exclude_regexes: &[regex::Regex],
+    ws_root: &std::path::Path,
+    results: &mut Vec<std::path::PathBuf>,
+) {
+    if results.len() >= 100 {
+        return;
+    }
+    for entry in entries {
+        match entry {
+            katana_core::workspace::TreeEntry::File { path } => {
+                let rel = relative_full_path(path, Some(ws_root));
+
+                // 1. Exclude check (priority)
+                let mut is_excluded = false;
+                for re in exclude_regexes {
+                    if re.is_match(&rel) {
+                        is_excluded = true;
+                        break;
+                    }
+                }
+                if is_excluded {
+                    continue;
+                }
+
+                // 2. Query check
+                let mut matches_query = true;
+                if !query.is_empty() {
+                    matches_query = rel.to_lowercase().contains(query);
+                }
+
+                // 3. Include check
+                let mut matches_include = true;
+                if !include_regexes.is_empty() {
+                    matches_include = false;
+                    for re in include_regexes {
+                        if re.is_match(&rel) {
+                            matches_include = true;
+                            break;
+                        }
+                    }
+                }
+
+                if matches_query && matches_include {
+                    results.push(path.clone());
+                    if results.len() >= 100 {
+                        return;
+                    }
+                }
+            }
+            katana_core::workspace::TreeEntry::Directory { children, .. } => {
+                collect_matches(
+                    children,
+                    query,
+                    include_regexes,
+                    exclude_regexes,
+                    ws_root,
+                    results,
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,93 +369,5 @@ mod tests {
         assert_eq!(calculate_splash_progress(0.5), 0.5);
         assert_eq!(calculate_splash_progress(1.0), 1.0);
         assert_eq!(calculate_splash_progress(1.5), 1.0);
-    }
-}
-
-/// Helper function to format the full tooltip for a file tree entry.
-/// This currently embodies the buggy behavior where `Path` is swallowed.
-pub fn format_tree_tooltip(name: &str, path: &std::path::Path) -> String {
-    let absolute_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let path_str = absolute_path.display().to_string();
-    format!(
-        "{name}\n{}: {path_str}\n{}",
-        crate::i18n::tf("Path", &[]),
-        if let Ok(metadata) = std::fs::metadata(path) {
-            format_metadata_tooltip(
-                metadata.len(),
-                metadata.modified().ok(),
-                &crate::i18n::get().workspace.metadata_tooltip,
-            )
-        } else {
-            "Metadata unavailable".to_string()
-        }
-    )
-}
-
-/// Recursively collects up to 100 matching files from the workspace tree.
-pub fn collect_matches(
-    entries: &[katana_core::workspace::TreeEntry],
-    query: &str,
-    include_regexes: &[regex::Regex],
-    exclude_regexes: &[regex::Regex],
-    ws_root: &std::path::Path,
-    results: &mut Vec<std::path::PathBuf>,
-) {
-    if results.len() >= 100 {
-        return;
-    }
-    for entry in entries {
-        match entry {
-            katana_core::workspace::TreeEntry::File { path } => {
-                let rel = relative_full_path(path, Some(ws_root));
-
-                // 1. Exclude check (priority)
-                let mut is_excluded = false;
-                for re in exclude_regexes {
-                    if re.is_match(&rel) {
-                        is_excluded = true;
-                        break;
-                    }
-                }
-                if is_excluded {
-                    continue;
-                }
-
-                // 2. Query check
-                let mut matches_query = true;
-                if !query.is_empty() {
-                    matches_query = rel.to_lowercase().contains(query);
-                }
-
-                // 3. Include check
-                let mut matches_include = true;
-                if !include_regexes.is_empty() {
-                    matches_include = false;
-                    for re in include_regexes {
-                        if re.is_match(&rel) {
-                            matches_include = true;
-                            break;
-                        }
-                    }
-                }
-
-                if matches_query && matches_include {
-                    results.push(path.clone());
-                    if results.len() >= 100 {
-                        return;
-                    }
-                }
-            }
-            katana_core::workspace::TreeEntry::Directory { children, .. } => {
-                collect_matches(
-                    children,
-                    query,
-                    include_regexes,
-                    exclude_regexes,
-                    ws_root,
-                    results,
-                );
-            }
-        }
     }
 }

@@ -41,6 +41,8 @@ const FONT_DROPDOWN_MAX_HEIGHT: f32 = 200.0;
 const SLIDER_RAIL_OPACITY: u8 = 80;
 /// Border width for the slider handle and rail for visibility on all themes.
 const SLIDER_BORDER_WIDTH: f32 = 1.0;
+/// Font size for hint text in the settings window.
+const HINT_FONT_SIZE: f32 = 10.0;
 
 // ── Sample markdown for settings preview ─────────────────────────────
 
@@ -124,6 +126,7 @@ pub(crate) fn render_settings_window(
                                     SettingsTab::Theme => render_theme_tab(ui, &mut state.settings),
                                     SettingsTab::Font => render_font_tab(ui, &mut state.settings),
                                     SettingsTab::Layout => render_layout_tab(ui, state),
+                                    SettingsTab::Workspace => render_workspace_tab(ui, state),
                                 });
                         });
                 });
@@ -159,6 +162,10 @@ fn render_tab_bar(ui: &mut egui::Ui, active_tab: &mut SettingsTab) {
         (
             SettingsTab::Layout,
             crate::i18n::get().settings.tab_name("layout"),
+        ),
+        (
+            SettingsTab::Workspace,
+            crate::i18n::get().settings.tab_name("workspace"),
         ),
     ];
 
@@ -738,4 +745,37 @@ fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::A
             let _ = state.settings.save();
         }
     });
+}
+
+// ── Workspace tab ───────────────────────────────────────────────────
+
+fn render_workspace_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
+    let workspace_msgs = &crate::i18n::get().settings.workspace;
+    let settings = &mut state.settings;
+
+    section_header(ui, &workspace_msgs.max_depth);
+    let mut max_depth = settings.settings().workspace.max_depth;
+    if ui.add(egui::Slider::new(&mut max_depth, 1..=100)).changed() {
+        settings.settings_mut().workspace.max_depth = max_depth;
+        let _ = settings.save();
+    }
+
+    ui.add_space(SECTION_SPACING);
+
+    section_header(ui, &workspace_msgs.ignored_directories);
+    let mut ignored = settings.settings().workspace.ignored_directories.join(", ");
+    if ui.text_edit_singleline(&mut ignored).changed() {
+        let list: Vec<String> = ignored
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        settings.settings_mut().workspace.ignored_directories = list;
+        let _ = settings.save();
+    }
+    ui.label(
+        egui::RichText::new(&workspace_msgs.ignored_directories_hint)
+            .weak()
+            .size(HINT_FONT_SIZE),
+    );
 }

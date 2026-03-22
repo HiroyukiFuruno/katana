@@ -364,10 +364,17 @@ pub(crate) fn render_workspace_content(
 
         let ws_root = ws.root.clone();
         if state.filter_enabled && !state.filter_query.is_empty() {
-            if let Ok(regex) = regex::Regex::new(&state.filter_query) {
+            let is_negated = state.filter_query.starts_with('!');
+            let query_str = if is_negated {
+                &state.filter_query[1..]
+            } else {
+                &state.filter_query
+            };
+
+            if let Ok(regex) = regex::Regex::new(query_str) {
                 if state.filter_cache.as_ref().map(|(q, _)| q) != Some(&state.filter_query) {
                     let mut visible = std::collections::HashSet::new();
-                    gather_visible_paths(&entries, &regex, &ws_root, &mut visible);
+                    gather_visible_paths(&entries, &regex, is_negated, &ws_root, &mut visible);
                     state.filter_cache = Some((state.filter_query.clone(), visible));
                 }
             } else {
@@ -1105,8 +1112,8 @@ pub(crate) fn render_directory_entry(
     }
 
     // Directory level Meta Info on Hover
-    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
     let resp = resp.on_hover_ui(|ui| {
+        let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
         ui.label(meta_text);
     });
 
@@ -1163,6 +1170,7 @@ pub(crate) fn render_directory_entry(
 fn gather_visible_paths(
     entries: &[katana_core::workspace::TreeEntry],
     regex: &regex::Regex,
+    is_negated: bool,
     ws_root: &std::path::Path,
     visible: &mut std::collections::HashSet<std::path::PathBuf>,
 ) -> bool {
@@ -1171,13 +1179,16 @@ fn gather_visible_paths(
         match entry {
             katana_core::workspace::TreeEntry::File { path } => {
                 let rel = crate::shell_logic::relative_full_path(path, Some(ws_root));
-                if regex.is_match(&rel) {
+                let is_match = regex.is_match(&rel);
+                let should_show = if is_negated { !is_match } else { is_match };
+
+                if should_show {
                     visible.insert(path.clone());
                     any_visible = true;
                 }
             }
             katana_core::workspace::TreeEntry::Directory { path, children } => {
-                if gather_visible_paths(children, regex, ws_root, visible) {
+                if gather_visible_paths(children, regex, is_negated, ws_root, visible) {
                     visible.insert(path.clone());
                     any_visible = true;
                 }
@@ -1259,8 +1270,8 @@ pub(crate) fn render_file_entry(
     }
 
     // File level Meta Info on Hover
-    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
     let resp = resp.on_hover_ui(|ui| {
+        let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
         ui.label(meta_text);
     });
 
@@ -1989,7 +2000,10 @@ impl eframe::App for KatanaApp {
             }
             None => "KatanA".to_string(),
         };
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
+        if self.state.last_window_title != title_text {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
+            self.state.last_window_title = title_text.clone();
+        }
 
         // In-app title bar
         egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
@@ -2266,11 +2280,11 @@ impl eframe::App for KatanaApp {
                                     )
                                     .gamma_multiply(opacity);
                                 }
-
                                 ui.add(progress_bar);
                             });
                         });
                     });
+
                 ctx.request_repaint();
             }
         }

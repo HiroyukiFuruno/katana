@@ -63,7 +63,7 @@ pub enum RenderedSection {
         install_path: std::path::PathBuf,
     },
     /// Placeholder during background rendering.
-    Pending { kind: String },
+    Pending { kind: String, source: String },
 }
 
 /// Download request returned by the preview pane.
@@ -188,7 +188,6 @@ pub struct PreviewPane {
 }
 
 struct RenderJob {
-    index: usize,
     kind: DiagramKind,
     src: String,
     path: std::path::PathBuf,
@@ -197,7 +196,11 @@ struct RenderJob {
 }
 
 pub enum RenderMessage {
-    Section(usize, RenderedSection),
+    Section {
+        kind: String,
+        source: String,
+        section: RenderedSection,
+    },
     ReduceConcurrency,
 }
 
@@ -284,7 +287,7 @@ impl PreviewPane {
         let mut sections = Vec::with_capacity(raw.len());
         let mut jobs: Vec<RenderJob> = Vec::new();
 
-        for (i, section) in raw.iter().enumerate() {
+        for section in raw.iter() {
             match section {
                 PreviewSection::Markdown(md) => {
                     sections.push(RenderedSection::Markdown(md.clone()));
@@ -292,9 +295,9 @@ impl PreviewPane {
                 PreviewSection::Diagram { kind, source: src } => {
                     sections.push(RenderedSection::Pending {
                         kind: format!("{kind:?}", kind = kind),
+                        source: src.clone(),
                     });
                     jobs.push(RenderJob {
-                        index: i,
                         kind: kind.clone(),
                         src: src.clone(),
                         path: self.md_file_path.clone(),
@@ -381,7 +384,12 @@ impl PreviewPane {
                 };
 
                 let section = map_diagram_result(&job.kind, &job.src, result);
-                if tx.send(RenderMessage::Section(job.index, section)).is_err() {
+                let msg = RenderMessage::Section {
+                    kind: format!("{:?}", job.kind),
+                    source: job.src.clone(),
+                    section,
+                };
+                if tx.send(msg).is_err() {
                     break; // Receiver was dropped.
                 }
             });
@@ -521,10 +529,22 @@ impl PreviewPane {
             let mut updated = false;
             while let Ok(msg) = rx.try_recv() {
                 match msg {
-                    RenderMessage::Section(idx, section) => {
-                        if let Some(slot) = self.sections.get_mut(idx) {
-                            *slot = section;
-                            updated = true;
+                    RenderMessage::Section {
+                        kind,
+                        source,
+                        section,
+                    } => {
+                        for slot in &mut self.sections {
+                            if let RenderedSection::Pending {
+                                kind: p_kind,
+                                source: p_source,
+                            } = slot
+                            {
+                                if p_kind == &kind && p_source == &source {
+                                    *slot = section.clone();
+                                    updated = true;
+                                }
+                            }
                         }
                     }
                     RenderMessage::ReduceConcurrency => {
@@ -533,6 +553,7 @@ impl PreviewPane {
                 }
             }
             if updated {
+                tracing::debug!("[CPU_LEAK] preview_pane requesting repaint because of render_rx update (updated=true)");
                 ctx.request_repaint();
             }
             self.sections
@@ -542,6 +563,9 @@ impl PreviewPane {
             false
         };
         if still_pending {
+            tracing::debug!(
+                "[CPU_LEAK] preview_pane still_pending=true, requesting repaint after 100ms"
+            );
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         } else {
             self.render_rx = None;
@@ -554,9 +578,21 @@ impl PreviewPane {
         while let Some(rx) = &self.render_rx {
             while let Ok(msg) = rx.try_recv() {
                 match msg {
-                    RenderMessage::Section(idx, section) => {
-                        if let Some(slot) = self.sections.get_mut(idx) {
-                            *slot = section;
+                    RenderMessage::Section {
+                        kind,
+                        source,
+                        section,
+                    } => {
+                        for slot in &mut self.sections {
+                            if let RenderedSection::Pending {
+                                kind: p_kind,
+                                source: p_source,
+                            } = slot
+                            {
+                                if p_kind == &kind && p_source == &source {
+                                    *slot = section.clone();
+                                }
+                            }
                         }
                     }
                     RenderMessage::ReduceConcurrency => {
@@ -958,6 +994,7 @@ mod tests {
         // Set Pending section
         pane.sections = vec![RenderedSection::Pending {
             kind: "DrawIo".to_string(),
+            source: "src".to_string(),
         }];
 
         // Create an mpsc channel and set it to render_rx
@@ -965,10 +1002,11 @@ mod tests {
         pane.render_rx = Some(rx);
 
         // Send a result from the background thread
-        tx.send(RenderMessage::Section(
-            0,
-            RenderedSection::Markdown("# Result".to_string()),
-        ))
+        tx.send(RenderMessage::Section {
+            kind: "DrawIo".to_string(),
+            source: "src".to_string(),
+            section: RenderedSection::Markdown("# Result".to_string()),
+        })
         .unwrap();
         // Drop tx so the receiver becomes Disconnected
         drop(tx);
@@ -991,6 +1029,7 @@ mod tests {
 
         pane.sections = vec![RenderedSection::Pending {
             kind: "DrawIo".to_string(),
+            source: "src".to_string(),
         }];
 
         let (tx, rx) = mpsc::channel();
@@ -999,10 +1038,11 @@ mod tests {
         // Send in another thread
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(10));
-            let _ = tx.send(RenderMessage::Section(
-                0,
-                RenderedSection::Markdown("# Done".to_string()),
-            ));
+            let _ = tx.send(RenderMessage::Section {
+                kind: "DrawIo".to_string(),
+                source: "src".to_string(),
+                section: RenderedSection::Markdown("# Done".to_string()),
+            });
         });
 
         pane.wait_for_renders();
@@ -1531,7 +1571,7 @@ mod tests {
         // Simulating opening modal when it was None
         pane.handle_fullscreen_request(Some(0), Some(&ctx));
         assert_eq!(pane.fullscreen_image, Some(0));
-        assert_eq!(pane.was_os_fullscreen_before_modal, false); // context default is window mode
+        assert!(!pane.was_os_fullscreen_before_modal); // context default is window mode
     }
 
     #[test]
