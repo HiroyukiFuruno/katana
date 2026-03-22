@@ -1,0 +1,20 @@
+## Why
+
+v0.6.0 でのクリティカルなバグ修正に際して、工数や技術的ハードルの高さから当面見送られた（Deferred）UI 改善要件を明文化し、v0.6.1 へスケジュールするため。
+
+## What Changes
+
+- [P3] インラインコードのアラインメント修正の適用（`Align::Center` への完全移行と、旧仕様前提テストの修正対応）
+- [Feature] テーブル描画のリファクタリングの実装（現在の `egui::Grid::new` から `egui_extras::TableBuilder` への大規模置換と罫線の厳密な描画コントロール）
+
+## Capabilities
+
+### New Capabilities
+
+- `desktop-viewer`: 表現力を向上させるテーブル描画プラグインの刷新
+
+### Modified Capabilities
+
+## Impact
+
+Markdown パーサーモジュール（`egui_commonmark`）の実装全体の再構築に近い影響を及ぼし、レイアウト計算のほぼすべてのユニットテストが書き換えを要求される可能性があります。
