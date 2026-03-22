@@ -24,6 +24,10 @@ on:
       - 'Makefile'
       - 'scripts'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Restrict default GITHUB_TOKEN permissions (Task 7.3 hardening).
 permissions:
   contents: read

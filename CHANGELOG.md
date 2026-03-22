@@ -5,41 +5,51 @@ All notable changes to KatanA Desktop will be documented in this file.
 ## [0.5.2] - 2026-03-22 12:44:52 (UTC)
 
 ### 🚀 Features
+
 - **Project Scan Settings**: Add "Workspace" settings tab to configure `max_depth` and `ignored_directories` for directory scanning.
 
 ### ⚡ Performance
+
 - **Idle CPU Optimization**: Significant reduction in idle CPU usage (from 75%+ to <5%) by optimizing window title updates, splash screen repaints, and font rebuilding logic.
 - **Background Thread Stabilization**: Ensure rendering engine resources are properly released on workspace switch to prevent thread proliferation.
 
 ### 🐛 Bug Fixes
+
 - **Workspace History**: Fix persistence and ordering of recently opened workspaces.
 - **Rendering Crash Recovery**: Fix infinite spinner loop caused by unhandled rendering thread panic.
 
 ### 🔧 Miscellaneous
+
 - **Linter Guardrails**: Add `ast_linter` rule to prevent future performance regressions (e.g., unconditional repaints).
 - **Quality**: Fix borrow checker errors, synchronize all i18n locale files, and achieve 100% test coverage gate.
+- **CI/CD**: Add concurrency control to GitHub Actions workflow
 
 ## [0.5.1] - 2026-03-22 09:41:24 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Fix GitHub release creation by pushing the tag before creating the release
 
 ### 🔧 Miscellaneous
+
 - Update Rust dependencies and resolve Linux lint errors
 
 ## [0.5.0] - 2026-03-22 09:16:29 (UTC)
 
 ### 🚀 Features
+
 - Add Terms of Service agreement with version tracking
 - Implement Markdown export (HTML, PDF, PNG, JPG)
 
 ### 🎨 UI/UX
+
 - Polish Terms modal with language ComboBox and better centering
 - Workspace sidebar filter icon changed to ∇ (Nabla) for better semantics
 
 ## [0.4.0] - 2026-03-21 13:05:00 (UTC)
 
 ### 🚀 Features
+
 - Add App Branding (Icon & Splash Screen)
 - Implement Check For Updates functionality
 - Add native menus for Checking for Updates, Help, and Donations
@@ -47,6 +57,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Add Trackpad support (Pan and Zoom) to Preview and Full-screen Viewers
 
 ### 🐛 Bug Fixes
+
 - Fix Native Fullscreen on macOS displaying black background
 - Support relative image resolution in Markdown
 - Fix integration TOC bugs
@@ -54,54 +65,66 @@ All notable changes to KatanA Desktop will be documented in this file.
 ## [0.3.1] - 2026-03-21 04:32:00 (UTC)
 
 ### 🚀 Features
+
 - Add `FORCE=1` option to `make release` to skip all interactive confirmation prompts
 - Implement `USE_GITHUB_WORKFLOW` flag to conditionally trigger GitHub Actions release
 
 ### ♻️ Refactoring
+
 - Modularize release logic into independent scripts under `scripts/release/`
 - Move main release control script to `scripts/release/release.sh`
 
 ### 🔧 Miscellaneous
+
 - Skip Git hooks (`--no-verify`) during release push as quality checks are pre-verified
 - Enable full local release flow (DMG build, GitHub publication, Homebrew update) as default
 
 ## [0.3.0] - 2026-03-21 03:52:24 (UTC)
 
 ### 🚀 Features
+
 - Implement Tab Context Menu (Close, Close Others, Close All) and Tab Restoration actions
 - Support automatic restoration of previously opened workspace tabs on startup
 - Add Editor Table of Contents (TOC) side panel with setting persistence and i18n support
 - Enable Editor Line Numbers and Current Line Highlighting features
 
 ### 🐛 Bug Fixes
+
 - Resolve Japanese CJK font baseline jitter (ガタツキ) in UI components
 - Prevent TOC side panel auto-expansion and ignore YAML frontmatter in outline
 - Allow dead_code for macOS specific emoji rendering constants on Linux CI
 
 ### 📚 Documentation
+
 - Add implementation plan workflow and exclude related artifacts
 - Enforce prohibition rule against deleting flaky tests in coding rules
 
 ### 👷 CI/CD
+
 - Fix missing tool argument for cargo-llvm-cov in install-action
 
 ### 🔧 Miscellaneous
+
 - Restore signed tag generation config after GPG environment setup
 - Update dependencies (rustls-webpki)
 
 ## [0.2.1] - 2026-03-21 00:53:02 (UTC)
 
 ### 🚀 Features
+
 - Make init command implementation and release automatic push for development environment and flow enhancement
 
 ### ♻️ Refactoring
+
 - Rename repository to KatanA, reorganize documents, and support English translation
 
 ### 🧪 Testing
+
 - Specify language in settings window integration test to stabilize test
 - Collect_matches logic extraction and partial setting screen integration test addition for coverage improvement
 
 ### 🔧 Miscellaneous
+
 - Update Rust dependencies and GitHub Actions plugins
 - Fix coverage gap in preview_pane and codify release bypass rules
 - Resolve V0.2.0 archive omission and add AI warning block to next tasks
@@ -110,20 +133,25 @@ All notable changes to KatanA Desktop will be documented in this file.
 ## [0.2.0] - 2026-03-20 19:16:37 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Enforce strict lazy loading and restrict folder auto-expand on Open All
 - Abolish redundant filename tooltip and fix ast linter coverage
 - Restore missing absolute path in metadata tooltip and apply TDD
 
 ### 👷 CI/CD
+
 - Automatically generate and attach SHA256 hashes (checksums.txt) for DMG
 
 ### 📚 Documentation
+
 - Add release notes for v0.1.6 to CHANGELOG.ja.md and include in Makefile release target
 
 ### 🔧 Miscellaneous
+
 - Refactor RwLock usage and fix external image caching on force reload
 
 ### 🚀 Features
+
 - Add workspace persistence and tab restoration logic (Task 1)
 - Implement CacheFacade and stabilize all integration tests
 - Implement recursive expansion of workspaces and "Open All", and improve usability (Task 3, 5)
@@ -132,73 +160,90 @@ All notable changes to KatanA Desktop will be documented in this file.
 ## [0.1.6] - 2026-03-19 23:57:28 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Automatically inject version into Info.plist during DMG build
 - Automatically sync Cargo.lock when running make release
 
 ### 📚 Documentation
+
 - Add project-specific skill "release_workflow"
 
 ### 🔧 Miscellaneous
+
 - Prepare for v0.1.7 release
 - Update Cargo.lock (follow v0.1.7)
 - Prepare for v0.1.6 release
 
 ### 🚀 Features
+
 - Implement workspace search and filter functionality
 - Add internationalized text for search modal Include/Exclude options
 - Add inclusion/exclusion filter functionality to search modal and place search button in UI
 
 ### 🧪 Testing
+
 - Add integration tests for Include/Exclude options in search filter
 
 ## [0.1.5] - 2026-03-19 21:12:34 (UTC)
 
 ### ♻️ Refactoring
+
 - Unify HashMap and fixed-length arrays into Vec, and apply collectively including AST rules and migration functionality
 
 ### 🔧 Miscellaneous
+
 - Bump version to 0.1.4
 
 ### 🚀 Features
+
 - Apply v0.1.5 changes and bump version to 0.1.5
 
 ### 🧪 Testing
+
 - Fix tests broken by workspace methods renaming
 - Add missing tests to meet 100% coverage gate
 
 ## [0.1.4] - 2026-03-19 21:03:35 (UTC)
 
 ### 🧪 Testing
+
 - Completely abolish UI image snapshot tests that were causing repository bloat and CI failures, and migrate to semantic assertions
 
 ## [0.1.3] - 2026-03-19 19:59:23 (UTC)
 
 ### ♻️ Refactoring
+
 - Hierarchize settings.json structure (ThemeSettings/FontSettings/LayoutSettings) and add migration mechanism
 - Fix coverage gate and improve code quality
 
 ### 🐛 Bug Fixes
+
 - Recovery of missed v0.1.3 version update
 - Fix flaky tests where curl failed to start due to environment variable pollution during parallel test execution
 
 ### 📚 Documentation
+
 - Migrate markdownlint settings to .vscode management and add v0.1.3 release notes
 
 ### 🔧 Miscellaneous
+
 - Exclude snapshot tests and redundant integration test executions from make check
 
 ### 🚀 Features
+
 - Expand theme presets from 10 to 30 (added OneDark/TokyoNight/CatppuccinMocha etc.)
 - Migrate i18n to type-safe structs (I18nMessages) and add 8 languages (zh-CN/zh-TW/ko/pt/fr/de/es/it)
 - Add 8 language tags to macOS native menu and dynamically translate menu strings according to language switching
 - Update entire UI for i18n/settings hierarchization, and implement OS language detection, theme expansion, and Show more/less toggle in settings screen
 
 ### 🧪 Testing
+
 - Update tests according to i18n type-safety, settings hierarchization, and theme expansion (integration/i18n/theme/diagram_rendering tests)
 
 ## [0.1.2] - 2026-03-19 16:54:57 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Fix left alignment of workspace file entries
 - Fix issue where font size slider becomes invisible in light theme
 - Add selection color border to slider to ensure visibility in all themes
@@ -206,51 +251,62 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Fix bugs in table layout and vertical split scroll
 
 ### 📚 Documentation
+
 - Add diagram display guide and brew update instructions to README
 - Add snapshot prohibition (NG) rule to coding-rules and self-review
 - Add brew update instructions to README
 
 ### 🔧 Miscellaneous
+
 - Prepare for v0.1.2 release
 - Fix flaky view mode integration test by adding ui stabilization steps
 - Turn warnings into errors and remove unused code
 - Prepare for v0.1.2 release
 
 ### 🚀 Features
+
 - Add i18n tooltips to tab navigation and slider
 
 ### 🧪 Testing
+
 - Add TDD verification tests for UI bugs and update snapshots
 
 ## [0.1.1] - 2026-03-19 10:54:34 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Add error handling to Homebrew Cask update step
 - Prevent contamination of cached old DMG files
 - Add cfg guards to macOS-specific code in emoji.rs (fix Linux CI Lint)
 
 ### 🚀 Features
+
 - Support hidden directory display in workspace tree and add directory refresh button
 
 ## [0.1.0] - 2026-03-19 09:33:46 (UTC)
 
 ### ⏪ Reverted
+
 - Revert release.yml and README to v0.0.3 state
 - Undo v0.0.4 changes and revert to v0.0.3 state
 
 ### ♻️ Refactoring
+
 - Rename make ci -> make check and create new make check-light
 - Move inline tests in os_fonts.rs to tests/ and translate Japanese comments to English
 
 ### 🎨 Styling
+
 - Add reason comments to #[allow] attributes (compliant with coding-rules section 10)
 
 ### 🐛 Bug Fixes
+
 - Improve .app signing (abolish --deep, specify runtime/timestamp, DMG remains unsigned)
 - Fix regression where workspace is not restored on startup
 - Apply emoji support patch to vendored egui_commonmark
 
 ### 📚 Documentation
+
 - Define versioning policy and refine CI triggers
 - Unify indentation of make check command with other commands
 - Update coding rules and self-review criteria
@@ -258,6 +314,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Append CHANGELOG v0.1.0-dev and fix synchronization for README.ja.md
 
 ### 🔧 Miscellaneous
+
 - Add glob filters to pre-push hook and skip CI execution for pushes without code changes
 - Prepare for v0.0.4 release
 - Exclude fixture tests from make check-light
@@ -266,6 +323,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Prepare for v0.1.0 release (update version number)
 
 ### 🚀 Features
+
 - Add Homebrew Cask support
 - Implement 10 theme presets and ThemeColors foundation (Task 1) (#23)
 - Implement foundation for font size and family settings (Task 2)
@@ -280,15 +338,18 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Add lazy code detection tests and #[cfg(test)] module exclusion to AST Linter
 
 ### 🧪 Testing
+
 - Add tests for coverage improvement
 
 ## [0.0.3] - 2026-03-18 02:50:23 (UTC)
 
 ### ♻️ Refactoring
+
 - Constantize magic numbers and expand AST linter tests
 - Unify Ignore tags to limited_local
 
 ### 🐛 Bug Fixes
+
 - Unify Coverage job with local make coverage
 - Improve DrawIo diagram text visibility in dark theme
 - Expand mmdc resolution from .app bundle to 6-layer fallback
@@ -297,14 +358,17 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Add margins above and below HTML blocks to resolve layout tightness
 
 ### 📚 Documentation
+
 - Change version fixed section in README to dynamic status notation
 
 ### 🔧 Miscellaneous
+
 - Update coverage exclusion reasons to accurate technical grounds
 - Prepare for v0.0.3 release
 - Change release notes to be extracted from CHANGELOG.md
 
 ### 🧪 Testing
+
 - Fix CI environment dependent errors in snapshot tests
 - Fix global state conflict errors in multiple i18n tests
 - Add integration tests for diagram rendering and sample fixtures
@@ -312,29 +376,35 @@ All notable changes to KatanA Desktop will be documented in this file.
 ## [0.0.2] - 2026-03-17 09:20:28 (UTC)
 
 ### 🐛 Bug Fixes
+
 - Resolve linux cross-compilation errors for github actions
 - Resolve markdown rendering, i18n label update, and CI coverage flakiness
 - Support CenteredMarkdown for raw HTML alignment reproduction
 - Fix CenteredMarkdown alignment, image path resolution, and badge display
 
 ### 📚 Documentation
+
 - Restore xattr command procedure for initial startup
 
 ### 🔧 Miscellaneous
+
 - Kick ci to retry integration tests
 - Release v0.0.2
 - Include Cargo.lock and CHANGELOG.ja.md in release v0.0.2
 
 ### 🧪 Testing
+
 - Update integration test snapshot
 - Increase snapshot tolerance to 4000 to absorb CI/local macOS text rendering differences
 
 ## [0.0.1] - 2026-03-16 23:16:22 (UTC)
 
 ### ⏪ Reverted
+
 - Retract sccache, maintain only cache path optimization
 
 ### ♻️ Refactoring
+
 - Fix clippy warnings in drawio_renderer
 - Migrate tests from src/ to tests/ directory and tighten Clippy
 - Refactor katana-ui into lib/binary structure and extract logic
@@ -346,9 +416,11 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Improve UI layout and add linter module
 
 ### ⚡ Performance
+
 - Introduce sccache and cache optimization into CI/CD
 
 ### 🐛 Bug Fixes
+
 - Fix Clippy warnings, formatting, and 30-line limit
 - Fix issues confirmed via screenshots
 - Stabilize tests by making PLANTUML_JAR an exclusive override
@@ -363,6 +435,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Disable RUSTC_WRAPPER in CI Lint job (clippy compatibility)
 
 ### 📚 Documentation
+
 - Mark test compilation, tab UI, and plantuml macos bug as done
 - Add i18n conventions (Section 11) to coding-rules
 - Add README and document templates, change .obsidian to gitignored
@@ -377,6 +450,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Append origin of "A" as Agent in KatanA
 
 ### 🔧 Miscellaneous
+
 - Bootstrap katana repository
 - Remove opsx prompt files
 - Align gitignore with official templates
@@ -393,6 +467,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Prepare for v0.0.1 release
 
 ### 🚀 Features
+
 - Bootstrap Katana macOS MVP — implementation of Rust project foundation and all core modules
 - Task 3.2 — native Markdown preview pane implementation
 - I18n support, language setting, appAction expansion, bin rename
@@ -414,6 +489,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 - Add GitHub Sponsors URL settings and Japanese version of README
 
 ### 🧪 Testing
+
 - Task 6.2 — add preview synchronization tests
 - Add app state unit tests and fix java headless mode for plantuml
 - Add unit tests for preview synchronization (Task 3.2 completed)
