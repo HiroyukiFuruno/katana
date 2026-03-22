@@ -138,6 +138,11 @@
       "code_background": "代码背景",
       "preview_background": "预览背景"
     },
+    "workspace": {
+      "max_depth": "最大扫描深度",
+      "ignored_directories": "忽略的目录",
+      "ignored_directories_hint": "要从扫描中排除的目录列表（以逗号分隔，如 .git, node_modules, .terraform）"
+    },
     "tabs": [
       {
         "key": "theme",
@@ -150,6 +155,10 @@
       {
         "key": "layout",
         "name": "布局"
+      },
+      {
+        "key": "workspace",
+        "name": "工作区"
       }
     ]
   },

@@ -166,6 +166,11 @@
       "code_background": "Code Background",
       "preview_background": "Preview Background"
     },
+    "workspace": {
+      "max_depth": "Max Scan Depth",
+      "ignored_directories": "Ignored Directories",
+      "ignored_directories_hint": "Comma-separated list of directories to exclude from scanning (e.g., .git, node_modules, .terraform)"
+    },
     "tabs": [
       {
         "key": "theme",
@@ -178,6 +183,10 @@
       {
         "key": "layout",
         "name": "Layout"
+      },
+      {
+        "key": "workspace",
+        "name": "Workspace"
       }
     ]
   },

@@ -150,8 +150,17 @@
       {
         "key": "layout",
         "name": "Layout"
+      },
+      {
+        "key": "workspace",
+        "name": "Arbeitsbereich"
       }
-    ]
+    ],
+    "workspace": {
+      "max_depth": "Max. Scantiefe",
+      "ignored_directories": "Ignorierte Verzeichnisse",
+      "ignored_directories_hint": "Kommagetrennte Liste von Verzeichnissen, die ausgeschlossen werden sollen (z. B. .git, node_modules, .terraform)"
+    }
   },
   "tab": {
     "nav_prev": "Zum vorherigen Tab wechseln",

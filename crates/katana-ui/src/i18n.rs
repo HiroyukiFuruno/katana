@@ -274,6 +274,7 @@ pub struct SettingsMessages {
     pub theme: SettingsThemeMessages,
     pub font: SettingsFontMessages,
     pub layout: SettingsLayoutMessages,
+    pub workspace: SettingsWorkspaceMessages,
     pub preview: SettingsPreviewMessages,
     pub color: SettingsColorMessages,
 }
@@ -325,6 +326,14 @@ pub struct SettingsLayoutMessages {
     pub toc_position: String,
     pub left: String,
     pub right: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct SettingsWorkspaceMessages {
+    pub max_depth: String,
+    pub ignored_directories: String,
+    pub ignored_directories_hint: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

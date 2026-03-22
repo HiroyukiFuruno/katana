@@ -166,6 +166,11 @@
       "code_background": "コード背景",
       "preview_background": "プレビュー背景"
     },
+    "workspace": {
+      "max_depth": "最大スキャン階層",
+      "ignored_directories": "除外ディレクトリ",
+      "ignored_directories_hint": "スキャンから除外するディレクトリのカンマ区切りリスト（例: .git, node_modules, .terraform）"
+    },
     "tabs": [
       {
         "key": "theme",
@@ -178,6 +183,10 @@
       {
         "key": "layout",
         "name": "レイアウト"
+      },
+      {
+        "key": "workspace",
+        "name": "ワークスペース"
       }
     ]
   },

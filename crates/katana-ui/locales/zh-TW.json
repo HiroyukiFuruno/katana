@@ -150,8 +150,17 @@
       {
         "key": "layout",
         "name": "配置"
+      },
+      {
+        "key": "workspace",
+        "name": "工作區"
       }
-    ]
+    ],
+    "workspace": {
+      "max_depth": "最大掃描深度",
+      "ignored_directories": "忽略的目錄",
+      "ignored_directories_hint": "以逗號分隔的目錄清單（例如 .git, node_modules, .terraform）"
+    }
   },
   "tab": {
     "nav_prev": "移至上一個標籤頁",

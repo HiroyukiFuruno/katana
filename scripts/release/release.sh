@@ -129,6 +129,20 @@ cargo check --workspace >/dev/null 2>&1 || true
 info "Updating version in Info.plist..."
 perl -i -0pe 's/(<key>CFBundleShortVersionString<\/key>\s*<string>).*?(<\/string>)/$1v'"${VERSION}"'$2/' crates/katana-ui/Info.plist
 
+# ── 3.5. Validate CHANGELOG via AST Linter ────────────────────────────────────
+info "Validating CHANGELOG.md using AST Linter..."
+if ! cargo test -p katana-linter --test ast_linter ast_linter_changelog_contains_current_workspace_version -q >/dev/null 2>&1; then
+    error "AST Linter failed: Version v${VERSION} not found in CHANGELOG.md."
+    error "Please update CHANGELOG.md (and CHANGELOG.ja.md) with the new release notes and run 'make release' again."
+    # Discard version bumps to keep repository clean for the retry
+    git checkout Cargo.toml Cargo.lock crates/*/Cargo.toml crates/katana-ui/Info.plist 2>/dev/null || true
+    exit 1
+fi
+
+if ! grep -q "^## \[${VERSION}\]" CHANGELOG.ja.md; then
+    warn "Version v${VERSION} not found in CHANGELOG.ja.md. You may want to update the Japanese changelog."
+fi
+
 # ── 4. Commit and Tag ─────────────────────────────────────────────────────────
 info "Staging release changes..."
 git add Cargo.toml Cargo.lock crates/*/Cargo.toml crates/katana-ui/Info.plist CHANGELOG.md CHANGELOG.ja.md

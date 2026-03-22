@@ -150,8 +150,17 @@
       {
         "key": "layout",
         "name": "Layout"
+      },
+      {
+        "key": "workspace",
+        "name": "Espaço de trabalho"
       }
-    ]
+    ],
+    "workspace": {
+      "max_depth": "Profundidade máx. de digitalização",
+      "ignored_directories": "Diretórios ignorados",
+      "ignored_directories_hint": "Lista de diretórios a excluir, separados por vírgulas (ex: .git, node_modules, .terraform)"
+    }
   },
   "tab": {
     "nav_prev": "Ir para a aba anterior",

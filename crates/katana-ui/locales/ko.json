@@ -150,8 +150,17 @@
       {
         "key": "layout",
         "name": "레이아웃"
+      },
+      {
+        "key": "workspace",
+        "name": "워크스페이스"
       }
-    ]
+    ],
+    "workspace": {
+      "max_depth": "최대 스캔 깊이",
+      "ignored_directories": "무시할 디렉토리",
+      "ignored_directories_hint": "쉼표로 구분된 디렉토리 목록 (예: .git, node_modules, .terraform)"
+    }
   },
   "tab": {
     "nav_prev": "이전 탭으로 이동",

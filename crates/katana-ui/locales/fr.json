@@ -150,8 +150,17 @@
       {
         "key": "layout",
         "name": "Disposition"
+      },
+      {
+        "key": "workspace",
+        "name": "Espace de travail"
       }
-    ]
+    ],
+    "workspace": {
+      "max_depth": "Profondeur de scan max",
+      "ignored_directories": "Répertoires ignorés",
+      "ignored_directories_hint": "Liste de répertoires à exclure, séparés par des virgules (ex: .git, node_modules, .terraform)"
+    }
   },
   "tab": {
     "nav_prev": "Passer à l'onglet précédent",
