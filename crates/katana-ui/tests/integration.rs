@@ -3006,7 +3006,7 @@ fn test_integration_ui_terms_modal_visibility() {
 
     harness.get_by_label("Terms of Service");
 
-    harness.get_by_label_contains("Version: 0.5.0");
+    harness.get_by_label_contains(&format!("Version: {}", env!("CARGO_PKG_VERSION")));
     harness.get_by_label("Accept").click();
     harness.step();
     harness.run_steps(5);

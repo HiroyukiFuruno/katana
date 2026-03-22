@@ -378,6 +378,7 @@ fn show_section_pending_variant_renders() {
     let mut pane = PreviewPane::default();
     pane.sections = vec![RenderedSection::Pending {
         kind: "Mermaid".to_string(),
+        source: "".to_string(),
     }];
 
     let mut harness = Harness::new_ui(move |ui| {

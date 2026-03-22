@@ -361,9 +361,11 @@ fn snapshot_diagram_pending_spinner() {
         RenderedSection::Markdown("# Rendering in progress\n".to_string()),
         RenderedSection::Pending {
             kind: "Mermaid".to_string(),
+            source: "".to_string(),
         },
         RenderedSection::Pending {
             kind: "PlantUML".to_string(),
+            source: "".to_string(),
         },
         RenderedSection::Markdown("## Waiting...\n".to_string()),
     ];
