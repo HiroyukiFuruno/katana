@@ -304,6 +304,102 @@ pub fn lint_lazy_code(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     visitor.violations
 }
 
+// ─────────────────────────────────────────────
+// Font Normalization Enforcement Visitor
+// ─────────────────────────────────────────────
+
+/// Detects direct usage of `FontDefinitions::default()` or `FontDefinitions::empty()`
+/// outside of `font_loader.rs`. All font setup must go through `NormalizeFonts`
+/// to ensure consistent CJK baseline alignment.
+struct FontNormalizationVisitor {
+    file: PathBuf,
+    violations: Vec<Violation>,
+}
+
+impl FontNormalizationVisitor {
+    fn new(file: PathBuf) -> Self {
+        Self {
+            file,
+            violations: Vec::new(),
+        }
+    }
+
+    fn is_font_loader_file(&self) -> bool {
+        self.file
+            .to_str()
+            .is_some_and(|p| p.contains("font_loader"))
+    }
+}
+
+impl<'ast> Visit<'ast> for FontNormalizationVisitor {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        if has_cfg_test_attr(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_item_mod(self, node);
+    }
+
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        if has_cfg_test_attr(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_item_fn(self, node);
+    }
+
+    fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
+        if has_cfg_test_attr(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_impl_item_fn(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+        if self.is_font_loader_file() {
+            syn::visit::visit_expr_call(self, node);
+            return;
+        }
+
+        // Detect FontDefinitions::default() or FontDefinitions::empty()
+        if let syn::Expr::Path(path_expr) = &*node.func {
+            let segments: Vec<_> = path_expr
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect();
+
+            if segments.len() >= 2 {
+                let type_name = &segments[segments.len() - 2];
+                let method_name = &segments[segments.len() - 1];
+
+                if type_name == "FontDefinitions"
+                    && (method_name == "default" || method_name == "empty")
+                {
+                    use syn::spanned::Spanned;
+                    let (line, column) = span_location(node.span());
+                    self.violations.push(Violation {
+                        file: self.file.clone(),
+                        line,
+                        column,
+                        message: format!(
+                            "Direct `FontDefinitions::{method_name}()` detected. \
+                             Use `NormalizeFonts` from `font_loader` module instead \
+                             to ensure consistent CJK baseline alignment."
+                        ),
+                    });
+                }
+            }
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+}
+
+pub fn lint_font_normalization(path: &Path, syntax: &syn::File) -> Vec<Violation> {
+    let mut visitor = FontNormalizationVisitor::new(path.to_path_buf());
+    visitor.visit_file(syntax);
+    visitor.violations
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,5 +569,42 @@ mod tests {
         assert!(violations
             .iter()
             .any(|v| v.message.contains("Array literal")));
+    }
+
+    #[test]
+    fn lint_font_normalization_detects_raw_font_definitions_default() {
+        let code = r#"fn setup() { let f = FontDefinitions::default(); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_font_normalization(&PathBuf::from("shell.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("NormalizeFonts"));
+    }
+
+    #[test]
+    fn lint_font_normalization_detects_raw_font_definitions_empty() {
+        let code = r#"fn setup() { let f = FontDefinitions::empty(); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_font_normalization(&PathBuf::from("shell.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("NormalizeFonts"));
+    }
+
+    #[test]
+    fn lint_font_normalization_allows_in_font_loader() {
+        let code = r#"fn build() { let f = FontDefinitions::default(); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_font_normalization(&PathBuf::from("font_loader.rs"), &syntax);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn lint_font_normalization_skips_test_code() {
+        let code = r#"
+            #[cfg(test)]
+            fn test_foo() { let f = FontDefinitions::default(); }
+        "#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_font_normalization(&PathBuf::from("shell.rs"), &syntax);
+        assert!(violations.is_empty());
     }
 }

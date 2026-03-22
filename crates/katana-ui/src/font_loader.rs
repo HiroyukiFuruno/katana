@@ -2,6 +2,117 @@ use egui::{Context, FontData, FontDefinitions, FontFamily};
 use katana_core::markdown::color_preset::DiagramColorPreset;
 use std::fs;
 
+/// Y-offset factor for CJK fallback fonts in monospace context.
+/// Aligns CJK baseline with the primary Latin monospace font (e.g. Menlo).
+const MONO_FALLBACK_Y_OFFSET_FACTOR: f32 = 0.40;
+
+/// Y-offset factor for Proportional primary font to align its baseline
+/// with Monospace (inline code) baseline. Without this, inline code
+/// (`backtick`) text appears shifted vertically relative to body text.
+const PROP_PRIMARY_Y_OFFSET_FACTOR: f32 = 0.55;
+/// Font wrapper that tracks normalization state for consistent baseline
+/// alignment across mixed-language text (JP/EN) and across font families
+/// (Proportional ↔ Monospace).
+///
+/// Normalization ensures:
+/// 1. CJK fallback fonts are correctly positioned in the Monospace family
+///    chain with appropriate `y_offset_factor` to prevent visual jitter.
+/// 2. Monospace primary font baseline is aligned with Proportional baseline
+///    to prevent jitter in inline code within body text.
+///
+/// The `is_normalized` flag prevents double-correction.
+///
+/// All font setup MUST go through this type (enforced by `ast_linter`).
+pub struct NormalizeFonts {
+    fonts: FontDefinitions,
+    is_normalized: bool,
+}
+
+impl NormalizeFonts {
+    /// Wrap raw `FontDefinitions` (not yet normalized).
+    pub fn new(fonts: FontDefinitions) -> Self {
+        Self {
+            fonts,
+            is_normalized: false,
+        }
+    }
+
+    /// Apply all baseline normalizations.
+    /// No-op if already normalized (prevents double-correction).
+    ///
+    /// Corrections applied:
+    /// 1. **CJK fallback**: Insert Proportional CJK font into Monospace chain
+    ///    at position 1 with `y_offset_factor` for baseline alignment.
+    /// 2. **Cross-family**: Adjust Monospace primary font's `y_offset_factor`
+    ///    so inline code shares baseline with surrounding Proportional text.
+    pub fn normalize(mut self, proportional_candidates: &[&str]) -> Self {
+        if self.is_normalized {
+            return self;
+        }
+
+        self.normalize_cjk_baseline(proportional_candidates);
+        self.normalize_cross_family_baseline();
+
+        self.is_normalized = true;
+        self
+    }
+
+    /// CJK baseline normalization: Insert tweaked CJK fallback into Monospace.
+    fn normalize_cjk_baseline(&mut self, proportional_candidates: &[&str]) {
+        let tweaked_fallback = egui::FontTweak {
+            scale: 1.0,
+            y_offset_factor: MONO_FALLBACK_Y_OFFSET_FACTOR,
+            y_offset: 0.0,
+        };
+        let mono_fallback_name = SystemFontLoader::load_first_valid(
+            &mut self.fonts,
+            proportional_candidates,
+            Some(tweaked_fallback),
+            "_mono_fallback",
+        );
+
+        if let Some(name) = &mono_fallback_name {
+            SystemFontLoader::insert_after_primary(&mut self.fonts, FontFamily::Monospace, name);
+        }
+    }
+
+    /// Cross-family baseline normalization: Adjust Proportional primary y_offset
+    /// to match Monospace baseline. Without this, inline code (backtick text)
+    /// appears shifted vertically relative to surrounding body text.
+    fn normalize_cross_family_baseline(&mut self) {
+        // Find the Proportional primary font name
+        let prop_primary = self
+            .fonts
+            .families
+            .get(&FontFamily::Proportional)
+            .and_then(|list| list.first())
+            .cloned();
+
+        if let Some(name) = prop_primary {
+            if let Some(font_data) = self.fonts.font_data.get_mut(&name) {
+                let mut data = (**font_data).clone();
+                data.tweak.y_offset_factor = PROP_PRIMARY_Y_OFFSET_FACTOR;
+                *font_data = std::sync::Arc::new(data);
+            }
+        }
+    }
+
+    /// Whether baseline normalization has been applied.
+    pub fn is_normalized(&self) -> bool {
+        self.is_normalized
+    }
+
+    /// Read access to the underlying `FontDefinitions`.
+    pub fn fonts(&self) -> &FontDefinitions {
+        &self.fonts
+    }
+
+    /// Consume and return the underlying `FontDefinitions`.
+    pub fn into_inner(self) -> FontDefinitions {
+        self.fonts
+    }
+}
+
 /// Responsible for dynamically loading and registering system fonts with egui.
 pub struct SystemFontLoader;
 
@@ -13,14 +124,14 @@ impl SystemFontLoader {
         custom_font_path: Option<&str>,
         custom_font_name: Option<&str>,
     ) {
-        let fonts = Self::build_font_definitions(
+        let normalized = Self::build_font_definitions(
             &preset.proportional_font_candidates,
             &preset.monospace_font_candidates,
             &preset.emoji_font_candidates,
             custom_font_path,
             custom_font_name,
         );
-        ctx.set_fonts(fonts);
+        ctx.set_fonts(normalized.into_inner());
 
         #[cfg(debug_assertions)]
         ctx.style_mut(|style| {
@@ -31,14 +142,16 @@ impl SystemFontLoader {
         });
     }
 
-    /// Builds `FontDefinitions` pulling in system fonts and fallback chains.
+    /// Builds `NormalizeFonts` pulling in system fonts and fallback chains.
+    /// CJK fallback is inserted at position 1 (right after primary mono font)
+    /// with `y_offset_factor` correction to ensure consistent baseline alignment.
     pub fn build_font_definitions(
         proportional_candidates: &[&str],
         monospace_candidates: &[&str],
         _emoji_candidates: &[&str],
         custom_font_path: Option<&str>,
         custom_font_name: Option<&str>,
-    ) -> FontDefinitions {
+    ) -> NormalizeFonts {
         let mut fonts = FontDefinitions::default();
 
         let prop_name = Self::load_first_valid(&mut fonts, proportional_candidates, None, "");
@@ -52,24 +165,6 @@ impl SystemFontLoader {
             Self::prepend_primary(&mut fonts, FontFamily::Monospace, name);
         }
 
-        // Cross-fallbacks for comprehensive CJK coverage in code blocks
-        // We apply a positive `y_offset_factor` to align the CJK fallback's baseline with the Menlo primary font
-        const MONO_FALLBACK_Y_OFFSET_FACTOR: f32 = 0.50;
-        let tweaked_fallback = egui::FontTweak {
-            scale: 1.0,
-            y_offset_factor: MONO_FALLBACK_Y_OFFSET_FACTOR,
-            y_offset: 0.0,
-        };
-        let mono_fallback_name = Self::load_first_valid(
-            &mut fonts,
-            proportional_candidates,
-            Some(tweaked_fallback),
-            "_mono_fallback",
-        );
-
-        if let Some(name) = &mono_fallback_name {
-            Self::append_fallback(&mut fonts, FontFamily::Monospace, name);
-        }
         // Mono to Prop fallback (usually English Monaco fallback for Proportional CJK)
         if let Some(name) = &mono_name {
             Self::append_fallback(&mut fonts, FontFamily::Proportional, name);
@@ -79,7 +174,8 @@ impl SystemFontLoader {
             Self::inject_custom_font(&mut fonts, path, name);
         }
 
-        fonts
+        // Wrap in NormalizeFonts and apply CJK baseline normalization
+        NormalizeFonts::new(fonts).normalize(proportional_candidates)
     }
 
     fn load_first_valid(
@@ -123,6 +219,15 @@ impl SystemFontLoader {
         }
     }
 
+    /// Insert a font right after the primary (position 1) in the family chain.
+    /// This ensures our tweaked CJK fallback is used before any egui defaults.
+    fn insert_after_primary(fonts: &mut FontDefinitions, family: FontFamily, name: &str) {
+        if let Some(list) = fonts.families.get_mut(&family) {
+            let pos = 1.min(list.len());
+            list.insert(pos, name.to_string());
+        }
+    }
+
     fn inject_custom_font(fonts: &mut FontDefinitions, path: &str, name: &str) {
         let Ok(data) = fs::read(path) else { return };
         fonts.font_data.insert(
@@ -144,8 +249,26 @@ mod tests {
     const APPLE_COLOR_EMOJI_FONT_NAME: &str = "Apple Color Emoji";
 
     #[test]
+    fn test_normalize_fonts_is_normalized_state() {
+        let raw = NormalizeFonts::new(FontDefinitions::default());
+        assert!(!raw.is_normalized());
+        let normalized = raw.normalize(&[]);
+        assert!(normalized.is_normalized());
+    }
+
+    #[test]
+    fn test_normalize_fonts_double_normalize_is_noop() {
+        let fonts = NormalizeFonts::new(FontDefinitions::default()).normalize(&[]);
+        let family_before = fonts.fonts().families.clone();
+        // Second call should be a no-op
+        let fonts = fonts.normalize(&[]);
+        assert_eq!(fonts.fonts().families, family_before);
+    }
+
+    #[test]
     fn test_build_font_definitions_no_candidates() {
-        let fonts = SystemFontLoader::build_font_definitions(&[], &[], &[], None, None);
+        let fonts =
+            SystemFontLoader::build_font_definitions(&[], &[], &[], None, None).into_inner();
         // egui's FontDefinitions::default() is not empty. We just ensure no custom names were added.
         assert!(!fonts.font_data.contains_key("cjk_font"));
         assert!(!fonts.font_data.contains_key("MyCustomFont"));
@@ -158,7 +281,8 @@ mod tests {
         fs::write(&font_path, "").unwrap();
         let path_str = font_path.to_str().unwrap();
 
-        let fonts = SystemFontLoader::build_font_definitions(&[], &[], &[path_str], None, None);
+        let fonts = SystemFontLoader::build_font_definitions(&[], &[], &[path_str], None, None)
+            .into_inner();
 
         let emoji_name = "emoji";
         assert!(
@@ -186,8 +310,12 @@ mod tests {
             Some("MyCustomFont"),
         );
 
-        assert!(fonts.font_data.contains_key("MyCustomFont"));
-        let prop_list = fonts.families.get(&FontFamily::Proportional).unwrap();
+        assert!(fonts.fonts().font_data.contains_key("MyCustomFont"));
+        let prop_list = fonts
+            .fonts()
+            .families
+            .get(&FontFamily::Proportional)
+            .unwrap();
         assert_eq!(prop_list.first().unwrap(), "MyCustomFont");
     }
 
@@ -202,7 +330,7 @@ mod tests {
         );
 
         // Returns early without doing anything
-        assert!(!fonts.font_data.contains_key("MyCustomFont"));
+        assert!(!fonts.fonts().font_data.contains_key("MyCustomFont"));
     }
 
     #[test]
@@ -258,6 +386,7 @@ mod tests {
             None,
         );
         let proportional = fonts
+            .fonts()
             .families
             .get(&FontFamily::Proportional)
             .expect("proportional family");
@@ -267,6 +396,7 @@ mod tests {
         );
 
         let monospace = fonts
+            .fonts()
             .families
             .get(&FontFamily::Monospace)
             .expect("monospace family");
@@ -287,7 +417,7 @@ mod tests {
             None,
         );
         let ctx = Context::default();
-        ctx.set_fonts(fonts);
+        ctx.set_fonts(fonts.into_inner());
 
         let text = format!("Katana — {} Lambdaアップデート手順.md", context_name);
         let mut eng_glyph = None;
@@ -360,7 +490,7 @@ mod tests {
             None,
         );
         let ctx = Context::default();
-        ctx.set_fonts(fonts);
+        ctx.set_fonts(fonts.into_inner());
 
         let text = "cd infrastructures/tools/crypt-decrypt の復号化".to_string();
         let mut eng_glyph = None;
@@ -418,6 +548,206 @@ mod tests {
             diff <= 1.5,
             "ガタツキ (Jitter) in Monospace visual mesh: English 'c' y={} vs Japanese '復' y={} (Diff: {})",
             eng_min_y, jpn_min_y, diff
+        );
+    }
+
+    /// TDD RED→GREEN: Reproduce the actual egui_commonmark CodeBlock rendering path.
+    ///
+    /// Uses `LayoutJob` + `TextFormat::simple(TextStyle::Monospace)` +
+    /// `fonts_mut(|f| f.layout_job(job))` — the exact same path as
+    /// `egui_commonmark_backend::misc::CodeBlock::end`.
+    ///
+    /// Measures VISUAL jitter via tessellated mesh vertices (not logical glyph.pos),
+    /// since `y_offset_factor` is applied during tessellation only.
+    #[test]
+    fn test_font_jitter_7_codeblock_layoutjob() {
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            &preset.proportional_font_candidates,
+            &preset.monospace_font_candidates,
+            &preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let ctx = Context::default();
+        ctx.set_fonts(fonts.into_inner());
+
+        // Simulate a code block comment with mixed JP/EN,
+        // exactly as seen in the user's app.
+        let code_text = "# 全件実行";
+
+        let mut hash_glyph = None;
+        let mut jp_glyph = None;
+        let mut primitives = vec![];
+
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                // Build LayoutJob the same way CodeBlock::end does
+                let mut job = egui::text::LayoutJob::default();
+                job.append(
+                    code_text,
+                    0.0,
+                    egui::TextFormat::simple(
+                        egui::TextStyle::Monospace.resolve(ui.style()),
+                        Color32::WHITE,
+                    ),
+                );
+                job.wrap.max_width = 800.0;
+
+                let galley = ui.fonts_mut(|f| f.layout_job(job));
+
+                // Capture glyph logical rects for mesh vertex lookup
+                if let Some(row) = galley.rows.first() {
+                    for g in &row.glyphs {
+                        if g.chr == '#' {
+                            hash_glyph = Some(*g);
+                        }
+                        if g.chr == '全' {
+                            jp_glyph = Some(*g);
+                        }
+                    }
+                }
+
+                let shapes = vec![egui::epaint::ClippedShape {
+                    clip_rect: egui::Rect::EVERYTHING,
+                    shape: egui::epaint::Shape::galley(egui::Pos2::ZERO, galley, Color32::WHITE),
+                }];
+                primitives = ctx.tessellate(shapes, 1.0);
+            });
+        });
+
+        let hash_glyph = hash_glyph.expect("'#' glyph not found");
+        let jp_glyph = jp_glyph.expect("'全' glyph not found");
+
+        // Find visual min y from tessellated mesh (actual pixel positions)
+        let mut hash_min_y = f32::INFINITY;
+        let mut jp_min_y = f32::INFINITY;
+
+        if let egui::epaint::Primitive::Mesh(mesh) = &primitives[0].primitive {
+            for v in &mesh.vertices {
+                if v.pos.x >= hash_glyph.logical_rect().min.x
+                    && v.pos.x <= hash_glyph.logical_rect().max.x
+                {
+                    hash_min_y = hash_min_y.min(v.pos.y);
+                }
+                if v.pos.x >= jp_glyph.logical_rect().min.x
+                    && v.pos.x <= jp_glyph.logical_rect().max.x
+                {
+                    jp_min_y = jp_min_y.min(v.pos.y);
+                }
+            }
+        }
+
+        let diff = (hash_min_y - jp_min_y).abs();
+        assert!(
+            diff <= 1.5,
+            "ガタツキ (Jitter) in CodeBlock LayoutJob visual mesh: '#' y={} vs '全' y={} (Diff: {}). \
+             Mixed JP/EN text must share a common baseline.",
+            hash_min_y, jp_min_y, diff
+        );
+    }
+
+    /// RED test: Cross-family (Monospace + Proportional) inline code jitter.
+    /// Simulates backtick-wrapped text (`mmdc`) within body text.
+    /// This is the exact rendering path that causes visible jitter in tables
+    /// and paragraphs where inline code appears.
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_font_jitter_8_inline_code_cross_family() {
+        use egui::text::{LayoutJob, TextFormat};
+        use egui::TextStyle;
+
+        let preset = DiagramColorPreset::current();
+        let fonts = SystemFontLoader::build_font_definitions(
+            &preset.proportional_font_candidates,
+            &preset.monospace_font_candidates,
+            &preset.emoji_font_candidates,
+            None,
+            None,
+        );
+        let ctx = Context::default();
+        ctx.set_fonts(fonts.into_inner());
+
+        let mut prop_min_y = f32::INFINITY;
+        let mut mono_min_y = f32::INFINITY;
+
+        let mut primitives = vec![];
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                // Build a LayoutJob with mixed Proportional and Monospace sections,
+                // exactly like inline code in body text:
+                // "インストール後、`mmdc` は自動的に検出されます"
+                let mut job = LayoutJob::default();
+
+                let prop_format = TextFormat {
+                    font_id: TextStyle::Body.resolve(ui.style()),
+                    ..Default::default()
+                };
+                let mono_format = TextFormat {
+                    font_id: TextStyle::Monospace.resolve(ui.style()),
+                    ..Default::default()
+                };
+
+                // Proportional section
+                job.append("インストール後、", 0.0, prop_format.clone());
+                // Monospace section (inline code)
+                job.append("mmdc", 0.0, mono_format);
+                // Proportional section
+                job.append(" は自動的に検出されます", 0.0, prop_format);
+
+                let galley = ui.fonts_mut(|f| f.layout_job(job));
+
+                // Find glyphs: 'イ' from Proportional, 'm' from Monospace
+                let prop_glyph = galley.rows[0]
+                    .glyphs
+                    .iter()
+                    .find(|g| g.chr == 'イ')
+                    .copied();
+                let mono_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'm').copied();
+
+                if let (Some(pg), Some(mg)) = (prop_glyph, mono_glyph) {
+                    // Tessellate to get actual visual positions
+                    let shapes = vec![egui::epaint::ClippedShape {
+                        clip_rect: egui::Rect::EVERYTHING,
+                        shape: egui::epaint::Shape::galley(
+                            egui::Pos2::ZERO,
+                            galley,
+                            Color32::WHITE,
+                        ),
+                    }];
+                    primitives = ctx.tessellate(shapes, 1.0);
+
+                    if let Some(egui::epaint::Primitive::Mesh(mesh)) =
+                        primitives.first().map(|p| &p.primitive)
+                    {
+                        for v in &mesh.vertices {
+                            if v.pos.x >= pg.logical_rect().min.x
+                                && v.pos.x <= pg.logical_rect().max.x
+                            {
+                                prop_min_y = prop_min_y.min(v.pos.y);
+                            }
+                            if v.pos.x >= mg.logical_rect().min.x
+                                && v.pos.x <= mg.logical_rect().max.x
+                            {
+                                mono_min_y = mono_min_y.min(v.pos.y);
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        assert!(
+            prop_min_y.is_finite() && mono_min_y.is_finite(),
+            "Both glyphs must be found in mesh"
+        );
+
+        let diff = (prop_min_y - mono_min_y).abs();
+        assert!(
+            diff <= 1.5,
+            "ガタツキ (Jitter) in inline code: Proportional 'イ' y={} vs Monospace 'm' y={} (Diff: {}). \
+             Inline code must share baseline with surrounding body text.",
+            prop_min_y, mono_min_y, diff
         );
     }
 }

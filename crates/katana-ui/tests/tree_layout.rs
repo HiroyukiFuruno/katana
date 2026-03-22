@@ -23,7 +23,8 @@ mod tests {
                 std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
             );
             // Pre-accept terms for testing
-            state.settings.settings_mut().terms_accepted_version = Some("v1.0.0".to_string());
+            state.settings.settings_mut().terms_accepted_version =
+                Some(katana_ui::about_info::APP_VERSION.to_string());
             katana_ui::i18n::set_language("en");
             KatanaApp::new(state)
         })
@@ -51,11 +52,14 @@ mod tests {
             .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
 
         // Wait for load
-        for _ in 0..10 {
+        for _ in 0..100 {
             harness.step();
-            if !harness.state_mut().app_state_mut().is_loading_workspace {
+            if !harness.state_mut().app_state_mut().is_loading_workspace
+                && harness.state_mut().app_state_mut().workspace.is_some()
+            {
                 break;
             }
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
         harness.step();
 

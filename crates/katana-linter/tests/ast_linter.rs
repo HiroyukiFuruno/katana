@@ -3,7 +3,9 @@ use katana_linter::rules::i18n::lint_i18n;
 use katana_linter::rules::i18n::lint_icon_facade;
 use katana_linter::rules::locales::lint_locale_files;
 use katana_linter::rules::markdown::lint_markdown_heading_pairs;
-use katana_linter::rules::rust::{lint_lazy_code, lint_magic_numbers, lint_prohibited_types};
+use katana_linter::rules::rust::{
+    lint_font_normalization, lint_lazy_code, lint_magic_numbers, lint_prohibited_types,
+};
 use katana_linter::run_ast_lint;
 use katana_linter::utils::{panic_with_violations, workspace_root};
 
@@ -110,5 +112,20 @@ fn ast_linter_changelog_contains_current_workspace_version() {
         "changelog-version-sync",
         "Fix: Add a `## [x.y.z]` release heading to CHANGELOG.md that matches workspace.package.version in Cargo.toml.",
         &all_violations,
+    );
+}
+
+#[test]
+fn ast_linter_font_normalization() {
+    let root = workspace_root();
+    run_ast_lint(
+        "font-normalization",
+        "Fix: Use `NormalizeFonts` from `font_loader` instead of raw `FontDefinitions::default()`/`::empty()`.",
+        &[
+            root.join("crates/katana-core/src"),
+            root.join("crates/katana-platform/src"),
+            root.join("crates/katana-ui/src"),
+        ],
+        lint_font_normalization,
     );
 }

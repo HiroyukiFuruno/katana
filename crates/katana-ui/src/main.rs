@@ -226,8 +226,8 @@ pub fn setup_fonts_from_preset(
 /// Receives a list of font candidates and sets the fonts. Testable.
 /// Kept for backward compatibility with existing tests.
 pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
-    let fonts = build_font_definitions(candidates, &vec![], &vec![]);
-    ctx.set_fonts(fonts);
+    let normalized = build_font_definitions(candidates, &vec![], &vec![]);
+    ctx.set_fonts(normalized.into_inner());
 
     #[cfg(debug_assertions)]
     ctx.style_mut(|style| {
@@ -252,7 +252,7 @@ pub fn build_font_definitions(
     proportional_candidates: &[&str],
     monospace_candidates: &[&str],
     emoji_candidates: &[&str],
-) -> egui::FontDefinitions {
+) -> katana_ui::font_loader::NormalizeFonts {
     katana_ui::font_loader::SystemFontLoader::build_font_definitions(
         proportional_candidates,
         monospace_candidates,
@@ -398,6 +398,7 @@ mod tests {
         }
         let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let proportional = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Proportional)
             .expect("Proportional family missing");
@@ -417,6 +418,7 @@ mod tests {
         }
         let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let monospace = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Monospace)
             .expect("Monospace family missing");
@@ -437,6 +439,7 @@ mod tests {
         }
         let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, &[]);
         let monospace = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Monospace)
             .expect("Monospace family missing");
@@ -463,6 +466,7 @@ mod tests {
         init_tracing();
         let fonts = build_font_definitions(&["/nonexistent/font.ttc"], &[], &[]);
         let proportional = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Proportional)
             .expect("Proportional family missing");
@@ -545,6 +549,7 @@ mod tests {
         }
         let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, EMOJI_CANDIDATES);
         let proportional = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Proportional)
             .expect("Proportional family missing");
@@ -563,6 +568,7 @@ mod tests {
         }
         let fonts = build_font_definitions(PROP_CANDIDATES, MONO_CANDIDATES, EMOJI_CANDIDATES);
         let monospace = fonts
+            .fonts()
             .families
             .get(&egui::FontFamily::Monospace)
             .expect("Monospace family missing");
