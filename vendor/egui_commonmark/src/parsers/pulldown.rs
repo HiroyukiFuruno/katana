@@ -215,6 +215,17 @@ impl<'a> CommonMarkViewerInternal<'a> {
             );
         }
 
+        // Task 1.3: Shift inline code and strikethrough text upward.
+        // Monospace (code) and strikethrough sections appear ~5px too low
+        // when using Align::Center. Use Align::TOP for a raised-text effect.
+        for section in &mut layout_job.sections {
+            if section.format.font_id.family == egui::FontFamily::Monospace
+                || section.format.strikethrough != egui::Stroke::NONE
+            {
+                section.format.valign = egui::Align::TOP;
+            }
+        }
+
         ui.add(egui::Label::new(layout_job).wrap().halign(egui::Align::LEFT));
     }
 
