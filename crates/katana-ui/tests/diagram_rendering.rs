@@ -164,7 +164,7 @@ fn mermaid_both_states_render_semantically() {
             assert!(svg_data.height > 0, "Mermaid image height should be > 0");
             assert!(alt.contains("Mermaid"), "Alt should mention Mermaid");
         }
-        let harness = build_harness(pane.sections, 600.0, 400.0);
+        let harness = build_harness(pane.sections.clone(), 600.0, 400.0);
         assert_standard_diagram_markdown_visible(&harness);
     } else {
         eprintln!("SKIP Phase 2: mmdc not installed — Mermaid rendering semantic UI check skipped");
@@ -230,7 +230,7 @@ fn plantuml_both_states_render_semantically() {
             assert!(svg_data.height > 0, "PlantUML image height should be > 0");
             assert!(alt.contains("PlantUml"), "Alt should mention PlantUml");
         }
-        let harness = build_harness(pane.sections, 600.0, 400.0);
+        let harness = build_harness(pane.sections.clone(), 600.0, 400.0);
         assert_standard_diagram_markdown_visible(&harness);
     } else {
         eprintln!(

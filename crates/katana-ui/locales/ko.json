@@ -154,6 +154,14 @@
       {
         "key": "workspace",
         "name": "워크스페이스"
+      },
+      {
+        "key": "group_appearance",
+        "name": "모양"
+      },
+      {
+        "key": "group_system",
+        "name": "시스템"
       }
     ],
     "workspace": {

@@ -293,6 +293,17 @@ impl<'ast> Visit<'ast> for LazyCodeVisitor {
                     ident
                 ),
             });
+        } else if ident == "println" || ident == "eprintln" {
+            let (line, column) = span_location(segment.ident.span());
+            self.violations.push(Violation {
+                file: self.file.clone(),
+                line,
+                column,
+                message: format!(
+                    "Debug output macro `{}!()` detected. Use `tracing::debug!` or `tracing::info!` instead.",
+                    ident
+                ),
+            });
         }
         syn::visit::visit_macro(self, mac);
     }
@@ -614,10 +625,28 @@ mod tests {
 
     #[test]
     fn lint_lazy_code_allows_normal_macros() {
-        let code = r#"fn foo() { println!("ok"); }"#;
+        let code = r#"fn foo() { vec![1, 2, 3]; }"#;
         let syntax = syn::parse_file(code).unwrap();
         let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn lint_lazy_code_detects_println_macro() {
+        let code = r#"fn foo() { println!("debug"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("println!()"));
+    }
+
+    #[test]
+    fn lint_lazy_code_detects_eprintln_macro() {
+        let code = r#"fn foo() { eprintln!("error debug"); }"#;
+        let syntax = syn::parse_file(code).unwrap();
+        let violations = lint_lazy_code(&PathBuf::from("fake.rs"), &syntax);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].message.contains("eprintln!()"));
     }
 
     #[test]

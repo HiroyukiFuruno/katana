@@ -1231,8 +1231,6 @@ dependencies = [
 [[package]]
 name = "egui_commonmark_backend"
 version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3cff846279556f57af8ea606f2e4ceaf83e60b81db014c126dfb926fa06c75b"
 dependencies = [
  "egui",
  "egui_extras",
@@ -2371,6 +2369,7 @@ name = "katana-ui"
 version = "0.5.2"
 dependencies = [
  "anyhow",
+ "base64",
  "cc",
  "chrono",
  "dirs",

@@ -13,11 +13,15 @@ use katana_platform::{PaneOrder, SplitDirection};
 
 // ── Window layout constants ──────────────────────────────────────────
 
-const SETTINGS_WINDOW_DEFAULT_WIDTH: f32 = 720.0;
-const SETTINGS_WINDOW_DEFAULT_HEIGHT: f32 = 520.0;
+const SETTINGS_WINDOW_DEFAULT_WIDTH: f32 = 900.0;
+const SETTINGS_WINDOW_DEFAULT_HEIGHT: f32 = 500.0;
 
-/// Fraction of the window width allocated to the settings (left) pane.
-const SETTINGS_PANE_RATIO: f32 = 0.45;
+const SETTINGS_SIDE_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+
+const SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH: f32 = 350.0;
+
+const SETTINGS_HEADER_FONT_SIZE: f32 = 14.0;
+const SETTINGS_GROUP_SPACING: f32 = 8.0;
 
 // ── Spacing & sizing constants ───────────────────────────────────────
 
@@ -26,10 +30,8 @@ const SUBSECTION_SPACING: f32 = 6.0;
 const INNER_MARGIN: f32 = 12.0;
 const COLOUR_CHANNEL_MAX: f32 = 255.0;
 const FONT_SIZE_STEP: f64 = 1.0;
-const TAB_UNDERLINE_HEIGHT: f32 = 2.0;
 /// Spacing between layout selectors (split direction / pane order) within the Layout tab.
 const LAYOUT_SELECTOR_SPACING: f32 = 4.0;
-const TAB_BUTTON_PADDING_X: f32 = 16.0;
 const PRESET_SWATCH_SIZE: f32 = 14.0;
 const COLOR_GRID_LABEL_WIDTH: f32 = 130.0;
 const SECTION_HEADER_SIZE: f32 = 14.0;
@@ -96,126 +98,205 @@ pub(crate) fn render_settings_window(
     let mut open = state.show_settings;
     egui::Window::new(crate::i18n::get().settings.title.clone())
         .open(&mut open)
-        .default_size(egui::vec2(
+        .fixed_size(egui::vec2(
             SETTINGS_WINDOW_DEFAULT_WIDTH,
             SETTINGS_WINDOW_DEFAULT_HEIGHT,
         ))
         .collapsible(false)
-        .resizable(true)
+        .resizable(false)
         .show(ctx, |ui| {
-            let total_width = ui.available_width();
-            let left_width = total_width * SETTINGS_PANE_RATIO;
-            let available_height = ui.available_height();
-
-            ui.horizontal(|ui| {
-                // ── Left pane: settings controls ──
-                ui.vertical(|ui| {
-                    ui.set_width(left_width);
-                    ui.set_min_height(available_height);
-
-                    render_tab_bar(ui, &mut state.active_settings_tab);
-                    ui.add_space(SUBSECTION_SPACING);
+            egui::SidePanel::left("settings_left_panel")
+                .resizable(false)
+                .min_width(SETTINGS_SIDE_PANEL_DEFAULT_WIDTH)
+                .max_width(SETTINGS_SIDE_PANEL_DEFAULT_WIDTH)
+                .show_inside(ui, |ui| {
+                    // Expand All / Collapse All toolbar
+                    ui.horizontal(|ui| {
+                        const TAB_SPACING: f32 = 4.0;
+                        ui.add_space(TAB_SPACING);
+                        if ui
+                            .add(egui::Button::image_and_text(
+                                crate::Icon::ExpandAll.ui_image(ui, crate::icon::IconSize::Small),
+                                "",
+                            ))
+                            .on_hover_text(crate::i18n::get().action.expand_all.clone())
+                            .clicked()
+                        {
+                            state.settings_tree_force_open = Some(true);
+                        }
+                        if ui
+                            .add(egui::Button::image_and_text(
+                                crate::Icon::CollapseAll.ui_image(ui, crate::icon::IconSize::Small),
+                                "",
+                            ))
+                            .on_hover_text(crate::i18n::get().action.collapse_all.clone())
+                            .clicked()
+                        {
+                            state.settings_tree_force_open = Some(false);
+                        }
+                    });
+                    const TAB_SPACING: f32 = 4.0;
+                    ui.add_space(TAB_SPACING);
+                    ui.separator();
 
                     egui::ScrollArea::vertical()
-                        .id_salt("settings_left_scroll")
+                        .id_salt("settings_nav_scroll")
                         .auto_shrink(false)
                         .show(ui, |ui| {
-                            egui::Frame::NONE
-                                .inner_margin(INNER_MARGIN)
-                                .show(ui, |ui| match state.active_settings_tab {
-                                    SettingsTab::Theme => render_theme_tab(ui, &mut state.settings),
-                                    SettingsTab::Font => render_font_tab(ui, &mut state.settings),
-                                    SettingsTab::Layout => render_layout_tab(ui, state),
-                                    SettingsTab::Workspace => render_workspace_tab(ui, state),
-                                });
+                            render_settings_tree(ui, state);
                         });
                 });
 
-                // ── Vertical divider ──
-                ui.add(egui::Separator::default().vertical());
-
-                // ── Right pane: live markdown preview ──
-                ui.vertical(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.set_min_height(available_height);
-
+            egui::SidePanel::right("settings_right_panel")
+                .resizable(false)
+                .min_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
+                .max_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
+                .show_inside(ui, |ui| {
                     section_header(ui, &crate::i18n::get().settings.preview.title);
                     preview_pane.show(ui);
                 });
+
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                let tab_messages = &crate::i18n::get().settings.tabs;
+                let title = match state.active_settings_tab {
+                    SettingsTab::Theme => tab_messages
+                        .iter()
+                        .find(|t| t.key == "theme")
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Theme"),
+                    SettingsTab::Font => tab_messages
+                        .iter()
+                        .find(|t| t.key == "font")
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Font"),
+                    SettingsTab::Layout => tab_messages
+                        .iter()
+                        .find(|t| t.key == "layout")
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Layout"),
+                    SettingsTab::Workspace => tab_messages
+                        .iter()
+                        .find(|t| t.key == "workspace")
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Workspace"),
+                };
+
+                section_header(ui, title);
+                ui.add_space(SUBSECTION_SPACING);
+
+                egui::ScrollArea::vertical()
+                    .id_salt("settings_form_scroll")
+                    .auto_shrink(false)
+                    .show(ui, |ui| {
+                        egui::Frame::NONE.inner_margin(INNER_MARGIN).show(ui, |ui| {
+                            match state.active_settings_tab {
+                                SettingsTab::Theme => render_theme_tab(ui, &mut state.settings),
+                                SettingsTab::Font => render_font_tab(ui, &mut state.settings),
+                                SettingsTab::Layout => render_layout_tab(ui, state),
+                                SettingsTab::Workspace => render_workspace_tab(ui, state),
+                            }
+                        });
+                    });
             });
+
+            // Clear the force open flag after rendering the tree once
+            if state.settings_tree_force_open.is_some() {
+                state.settings_tree_force_open = None;
+            }
         });
     state.show_settings = open;
 }
 
-// ── Tab bar (styled underline tabs) ──────────────────────────────────
+// ── Tree Navigation ──────────────────────────────────────────────────
 
-fn render_tab_bar(ui: &mut egui::Ui, active_tab: &mut SettingsTab) {
-    let tabs = vec![
-        (
-            SettingsTab::Theme,
-            crate::i18n::get().settings.tab_name("theme"),
-        ),
-        (
-            SettingsTab::Font,
-            crate::i18n::get().settings.tab_name("font"),
-        ),
-        (
-            SettingsTab::Layout,
-            crate::i18n::get().settings.tab_name("layout"),
-        ),
-        (
-            SettingsTab::Workspace,
-            crate::i18n::get().settings.tab_name("workspace"),
-        ),
-    ];
+fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
+    let settings_msgs = &crate::i18n::get().settings;
 
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        let tab_width = ui.available_width() / tabs.len() as f32;
+    // Group 1: Appearance (Theme, Font, Layout)
+    let appearance_key = "group_appearance";
+    // Fallback to English if "group_appearance" key is not found
+    let title = settings_msgs
+        .tabs
+        .iter()
+        .find(|t| t.key == appearance_key)
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| "外観".to_string());
 
-        for (tab, label) in &tabs {
-            let is_active = *active_tab == *tab;
+    let mut appearance_header = egui::CollapsingHeader::new(
+        egui::RichText::new(title)
+            .strong()
+            .size(SETTINGS_HEADER_FONT_SIZE),
+    )
+    .default_open(true)
+    .id_salt("settings_grp_appearance");
 
-            let text = if is_active {
-                egui::RichText::new(label.as_str()).strong()
-            } else {
-                egui::RichText::new(label.as_str())
-            };
+    if let Some(force_open) = state.settings_tree_force_open {
+        appearance_header = appearance_header.open(Some(force_open));
+    }
 
-            let button = egui::Button::new(text).frame(false);
-            let tab_height = ui.text_style_height(&egui::TextStyle::Body) + SUBSECTION_SPACING;
-            let resp = ui.add_sized(egui::vec2(tab_width, tab_height), button);
+    appearance_header.show(ui, |ui| {
+        let theme_selected = state.active_settings_tab == SettingsTab::Theme;
+        if ui
+            .selectable_label(theme_selected, settings_msgs.tab_name("theme"))
+            .clicked()
+        {
+            state.active_settings_tab = SettingsTab::Theme;
+        }
 
-            // Active tab underline
-            if is_active {
-                let rect = resp.rect;
-                let accent = ui.visuals().selection.bg_fill;
-                ui.painter().rect_filled(
-                    egui::Rect::from_min_size(
-                        egui::pos2(
-                            rect.min.x + TAB_BUTTON_PADDING_X,
-                            rect.max.y - TAB_UNDERLINE_HEIGHT,
-                        ),
-                        egui::vec2(
-                            rect.width() - TAB_BUTTON_PADDING_X * 2.0,
-                            TAB_UNDERLINE_HEIGHT,
-                        ),
-                    ),
-                    TAB_UNDERLINE_HEIGHT / 2.0,
-                    accent,
-                );
-            }
+        let font_selected = state.active_settings_tab == SettingsTab::Font;
+        if ui
+            .selectable_label(font_selected, settings_msgs.tab_name("font"))
+            .clicked()
+        {
+            state.active_settings_tab = SettingsTab::Font;
+        }
 
-            if resp.clicked() {
-                *active_tab = *tab;
-            }
+        let layout_selected = state.active_settings_tab == SettingsTab::Layout;
+        if ui
+            .selectable_label(layout_selected, settings_msgs.tab_name("layout"))
+            .clicked()
+        {
+            state.active_settings_tab = SettingsTab::Layout;
+        }
+    });
+
+    ui.add_space(SETTINGS_GROUP_SPACING);
+
+    // Group 2: System/Behavior (Workspace)
+    let system_key = "group_system";
+    let title = settings_msgs
+        .tabs
+        .iter()
+        .find(|t| t.key == system_key)
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| "システム".to_string());
+
+    let mut system_header = egui::CollapsingHeader::new(
+        egui::RichText::new(title)
+            .strong()
+            .size(SETTINGS_HEADER_FONT_SIZE),
+    )
+    .default_open(true)
+    .id_salt("settings_grp_system");
+
+    if let Some(force_open) = state.settings_tree_force_open {
+        system_header = system_header.open(Some(force_open));
+    }
+
+    system_header.show(ui, |ui| {
+        let workspace_selected = state.active_settings_tab == SettingsTab::Workspace;
+        if ui
+            .selectable_label(workspace_selected, settings_msgs.tab_name("workspace"))
+            .clicked()
+        {
+            state.active_settings_tab = SettingsTab::Workspace;
         }
     });
 }
 
 // ── Section header helper ────────────────────────────────────────────
 
-fn section_header(ui: &mut egui::Ui, text: &String) {
+fn section_header(ui: &mut egui::Ui, text: &str) {
     ui.label(egui::RichText::new(text).strong().size(SECTION_HEADER_SIZE));
     ui.add_space(SUBSECTION_SPACING);
 }
@@ -453,9 +534,8 @@ fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService
         .unwrap_or_default();
 
     // ── Trigger button (shows current value, opens popup on click) ────────
-    let button_text = format!("{current}  {}", crate::Icon::TriangleDown.as_str());
-    let button_resp = ui
-        .add(egui::Button::new(button_text).min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)));
+    let button_resp =
+        ui.add(egui::Button::new(&current).min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)));
     if button_resp.clicked() {
         let new_state = !is_open;
         ui.data_mut(|d| d.insert_temp(open_id, new_state));
@@ -529,24 +609,9 @@ fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut SettingsService
         });
 }
 
-// ── Font tab ─────────────────────────────────────────────────────────
+// ── Common UI Components ─────────────────────────────────────────────
 
-fn render_font_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    section_header(ui, &crate::i18n::get().settings.font.size);
-    render_font_size_slider(ui, settings);
-    ui.add_space(SECTION_SPACING);
-    section_header(ui, &crate::i18n::get().settings.font.family);
-    render_font_family_selector(ui, settings);
-}
-
-fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
-    let mut size = settings.settings().clamped_font_size();
-    let slider = egui::Slider::new(&mut size, MIN_FONT_SIZE..=MAX_FONT_SIZE)
-        .step_by(FONT_SIZE_STEP)
-        .suffix(" px");
-
-    // Improve slider visibility by applying selection/accent color to the rail.
-    // Uses selection.bg_fill which is theme-aware (works on both light and dark themes).
+pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>) -> egui::Response {
     let selection_color = ui.visuals().selection.bg_fill;
     let saved_active_bg = ui.visuals().widgets.active.bg_fill;
     let saved_hovered_bg = ui.visuals().widgets.hovered.bg_fill;
@@ -571,14 +636,7 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
     ui.visuals_mut().widgets.hovered.bg_stroke = border_stroke;
     ui.visuals_mut().widgets.inactive.bg_stroke = border_stroke;
 
-    if ui
-        .add(slider)
-        .on_hover_text(crate::i18n::get().settings.font.size_slider_hint.clone())
-        .changed()
-    {
-        settings.settings_mut().set_font_size(size);
-        let _ = settings.save();
-    }
+    let response = ui.add(slider);
 
     // Restore original visuals.
     ui.visuals_mut().widgets.active.bg_fill = saved_active_bg;
@@ -587,6 +645,33 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
     ui.visuals_mut().widgets.active.bg_stroke = saved_active_stroke;
     ui.visuals_mut().widgets.hovered.bg_stroke = saved_hovered_stroke;
     ui.visuals_mut().widgets.inactive.bg_stroke = saved_inactive_stroke;
+
+    response
+}
+
+// ── Font tab ─────────────────────────────────────────────────────────
+
+fn render_font_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
+    section_header(ui, &crate::i18n::get().settings.font.size);
+    render_font_size_slider(ui, settings);
+    ui.add_space(SECTION_SPACING);
+    section_header(ui, &crate::i18n::get().settings.font.family);
+    render_font_family_selector(ui, settings);
+}
+
+fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
+    let mut size = settings.settings().clamped_font_size();
+    let slider = egui::Slider::new(&mut size, MIN_FONT_SIZE..=MAX_FONT_SIZE)
+        .step_by(FONT_SIZE_STEP)
+        .suffix(" px");
+
+    if add_styled_slider(ui, slider)
+        .on_hover_text(crate::i18n::get().settings.font.size_slider_hint.clone())
+        .changed()
+    {
+        settings.settings_mut().set_font_size(size);
+        let _ = settings.save();
+    }
 }
 
 // ── Layout tab ───────────────────────────────────────────────────────
@@ -755,7 +840,8 @@ fn render_workspace_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
 
     section_header(ui, &workspace_msgs.max_depth);
     let mut max_depth = settings.settings().workspace.max_depth;
-    if ui.add(egui::Slider::new(&mut max_depth, 1..=100)).changed() {
+    let slider = egui::Slider::new(&mut max_depth, 1..=100);
+    if add_styled_slider(ui, slider).changed() {
         settings.settings_mut().workspace.max_depth = max_depth;
         let _ = settings.save();
     }

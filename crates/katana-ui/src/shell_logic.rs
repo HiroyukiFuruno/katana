@@ -75,8 +75,8 @@ pub fn format_metadata_tooltip(
     )
 }
 
+pub const SPLASH_VISIBLE_DURATION: f32 = 1.5;
 pub const SPLASH_FADE_DURATION: f32 = 0.5;
-pub const SPLASH_VISIBLE_DURATION: f32 = 1.0;
 
 /// Calculates the splash screen opacity based on elapsed time.
 /// Returns a value between 0.0 and 1.0.
@@ -350,24 +350,24 @@ mod tests {
 
     #[test]
     fn test_calculate_splash_opacity() {
-        // Must stay 1.0 up to 1.0 seconds
+        // Must stay 1.0 up to 1.5 seconds
         assert_eq!(calculate_splash_opacity(0.0), 1.0);
-        assert_eq!(calculate_splash_opacity(0.5), 1.0);
         assert_eq!(calculate_splash_opacity(1.0), 1.0);
+        assert_eq!(calculate_splash_opacity(1.5), 1.0);
 
-        // Fades out between 1.0 and 1.5 seconds
-        assert_eq!(calculate_splash_opacity(1.25), 0.5);
+        // Fades out between 1.5 and 2.0 seconds
+        assert_eq!(calculate_splash_opacity(1.75), 0.5);
 
-        // Clamped at 0.0 after 1.5 seconds
-        assert_eq!(calculate_splash_opacity(1.5), 0.0);
+        // Clamped at 0.0 after 2.0 seconds
         assert_eq!(calculate_splash_opacity(2.0), 0.0);
+        assert_eq!(calculate_splash_opacity(2.5), 0.0);
     }
 
     #[test]
     fn test_calculate_splash_progress() {
         assert_eq!(calculate_splash_progress(0.0), 0.0);
-        assert_eq!(calculate_splash_progress(0.5), 0.5);
-        assert_eq!(calculate_splash_progress(1.0), 1.0);
+        assert_eq!(calculate_splash_progress(0.75), 0.5);
         assert_eq!(calculate_splash_progress(1.5), 1.0);
+        assert_eq!(calculate_splash_progress(2.0), 1.0);
     }
 }

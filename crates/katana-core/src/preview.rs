@@ -107,6 +107,7 @@ pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
         if src.starts_with("http://")
             || src.starts_with("https://")
             || src.starts_with("file://")
+            || src.starts_with("data:")
             || src.starts_with('/')
         {
             format!("{prefix}{src}{suffix}")
@@ -384,11 +385,9 @@ mod sourcepos_tests {
         for node in doc.descendants() {
             if let NodeValue::Image(_) = node.data.borrow().value {
                 let pos = node.data.borrow().sourcepos;
-                println!("Pos: {:?}", pos);
                 let lines: Vec<&str> = src.lines().collect();
                 let line = lines[pos.start.line - 1];
                 let extracted = &line[pos.start.column - 1..pos.end.column];
-                println!("Text: {}", extracted);
                 assert_eq!(extracted, "![alt](test.png)");
             }
         }

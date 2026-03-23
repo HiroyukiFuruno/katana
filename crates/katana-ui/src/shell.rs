@@ -134,6 +134,8 @@ pub struct KatanaApp {
     pub(crate) cached_font_family: Option<String>,
     /// Dedicated PreviewPane for the settings window live preview.
     pub(crate) settings_preview: PreviewPane,
+    /// Whether the splash screen needs to start on the first frame.
+    pub(crate) needs_splash: bool,
     /// Tracks the startup time for the splash screen fade animation.
     pub(crate) splash_start: Option<std::time::Instant>,
 }
@@ -157,11 +159,8 @@ impl KatanaApp {
             cached_font_size: None,
             cached_font_family: None,
             settings_preview: PreviewPane::default(),
-            splash_start: if cfg!(test) {
-                None
-            } else {
-                Some(std::time::Instant::now())
-            },
+            needs_splash: !cfg!(test),
+            splash_start: None,
         };
         app.start_update_check(false);
         app
@@ -169,6 +168,7 @@ impl KatanaApp {
 
     /// Explicitly skips the splash screen. Useful for integration testing.
     pub fn skip_splash(&mut self) {
+        self.needs_splash = false;
         self.splash_start = None;
     }
 
@@ -194,9 +194,26 @@ impl KatanaApp {
 
     /// Reflects only text changes (keeps existing images for diagrams).
     fn refresh_preview(&mut self, path: &std::path::Path, source: &str) {
+        let h = hash_str(source);
         let path_buf = path.to_path_buf();
-        Self::get_preview_pane(&mut self.tab_previews, path_buf)
+
+        let current_hash = self
+            .tab_previews
+            .iter()
+            .find(|t| t.path == path_buf)
+            .map(|t| t.hash)
+            .unwrap_or(0);
+
+        if current_hash != 0 && current_hash == h {
+            return;
+        }
+
+        Self::get_preview_pane(&mut self.tab_previews, path_buf.clone())
             .update_markdown_sections(source, path);
+
+        if let Some(tab) = self.tab_previews.iter_mut().find(|t| t.path == path_buf) {
+            tab.hash = h;
+        }
     }
 
     fn full_refresh_preview(
@@ -208,6 +225,25 @@ impl KatanaApp {
     ) {
         let h = hash_str(source);
         let path_buf = path.to_path_buf();
+        let current_hash = self
+            .tab_previews
+            .iter()
+            .find(|t| t.path == path_buf)
+            .map(|t| t.hash)
+            .unwrap_or(0);
+
+        if !force && current_hash != 0 && current_hash == h {
+            return;
+        }
+
+        tracing::debug!(
+            "[DEBUG-HASH] MISMATCH or FORCE. Running full_render for path: {:?}. force={}, current_hash={}, new_hash={}",
+            path_buf,
+            force,
+            current_hash,
+            h
+        );
+
         let pane = Self::get_preview_pane(&mut self.tab_previews, path_buf.clone());
         pane.full_render(source, path, self.state.cache.clone(), force, concurrency);
 
@@ -625,6 +661,23 @@ impl KatanaApp {
             }
         }
     }
+    /// Drops `PreviewPane` caches for tabs that are no longer open.
+    pub(crate) fn cleanup_closed_tab_previews(&mut self) {
+        let open_paths: std::collections::HashSet<_> =
+            self.state.open_documents.iter().map(|d| &d.path).collect();
+        self.tab_previews.retain(|t| open_paths.contains(&t.path));
+    }
+
+    /// Aborts background rendering jobs for all tabs EXCEPT the currently active one.
+    /// This prevents \"zombie\" threads from pegging the CPU when rapidly switching tabs.
+    pub(crate) fn cancel_inactive_renders(&mut self) {
+        let active_path = self.state.active_document().map(|d| d.path.clone());
+        for pane in &mut self.tab_previews {
+            if Some(&pane.path) != active_path.as_ref() {
+                pane.pane.abort_renders();
+            }
+        }
+    }
 
     pub(crate) fn process_action(&mut self, ctx: &egui::Context, action: AppAction) {
         match action {
@@ -660,10 +713,16 @@ impl KatanaApp {
                     };
                 }
                 self.save_workspace_state();
+                self.cleanup_closed_tab_previews();
             }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
+                // Clear all egui texture caches (e.g. diagrams, network images)
+                ctx.forget_all_images();
+                // Reinstall UI icon SVGs so they aren't lost to the cache clear
+                crate::icon::IconRegistry::install(ctx);
+
                 // Invalidate hashes so non-active tabs re-render on next switch
                 for tab in &mut self.tab_previews {
                     tab.hash = 0;
@@ -729,6 +788,7 @@ impl KatanaApp {
                 }
                 self.state.active_doc_idx = None;
                 self.save_workspace_state();
+                self.cleanup_closed_tab_previews();
             }
             AppAction::CloseDocumentsToRight(idx) => {
                 let mut keep = Vec::new();
@@ -747,6 +807,7 @@ impl KatanaApp {
                     }
                 }
                 self.save_workspace_state();
+                self.cleanup_closed_tab_previews();
             }
             AppAction::CloseDocumentsToLeft(idx) => {
                 let mut keep = Vec::new();
@@ -768,6 +829,7 @@ impl KatanaApp {
                     }
                 }
                 self.save_workspace_state();
+                self.cleanup_closed_tab_previews();
             }
             AppAction::TogglePinDocument(idx) => {
                 if idx < self.state.open_documents.len() {
@@ -831,6 +893,12 @@ impl KatanaApp {
             }
             AppAction::None => {}
         }
+
+        // Clean up resources whenever an action completes.
+        // Specifically, ensure inactive tabs give up their background CPU,
+        // and closed tabs drop their previews entirely.
+        self.cleanup_closed_tab_previews();
+        self.cancel_inactive_renders();
     }
 
     fn handle_export_document(&mut self, ctx: &egui::Context, fmt: crate::app_state::ExportFormat) {
@@ -1764,6 +1832,43 @@ mod tests_extra {
         assert!(app.tab_previews.iter().any(|t| t.path == path));
     }
 
+    #[test]
+    fn full_refresh_preview_replaces_when_is_loading() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        let path = dir.path().join("test.md");
+
+        // 1. Initial render -> tab preview created
+        app.full_refresh_preview(&path, "# Initial", false, 4);
+        let initial_hash = app
+            .tab_previews
+            .iter()
+            .find(|t| t.path == path)
+            .unwrap()
+            .hash;
+
+        // 2. Force is_loading to true (simulating an in-progress render)
+        let pane = super::KatanaApp::get_preview_pane(&mut app.tab_previews, path.clone());
+        pane.is_loading = true;
+
+        // 3. Force refresh with new content.
+        //    PreviewPane::full_render handles cancellation of the old render internally
+        //    via cancel_token, so full_refresh_preview should NOT skip.
+        app.full_refresh_preview(&path, "# Updated", true, 4);
+
+        // 4. Assert that the hash WAS updated (new content applied)
+        let final_hash = app
+            .tab_previews
+            .iter()
+            .find(|t| t.path == path)
+            .unwrap()
+            .hash;
+        assert_ne!(
+            initial_hash, final_hash,
+            "full_refresh_preview should update hash even when is_loading was true (PreviewPane handles cancellation)"
+        );
+    }
+
     // refresh_preview: Existing entry is updated (L131-137)
     #[test]
     fn refresh_preview_updates_existing_pane() {
@@ -2182,6 +2287,7 @@ mod tests_extra {
             cached_font_size: None,
             cached_font_family: None,
             settings_preview: PreviewPane::default(),
+            needs_splash: false,
             splash_start: None,
         }
     }

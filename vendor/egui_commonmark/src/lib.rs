@@ -381,10 +381,12 @@ impl List {
         self.items.len() == 1
     }
 
-    pub fn start_item(&mut self, ui: &mut egui::Ui, options: &CommonMarkOptions) {
+    pub fn start_item(&mut self, ui: &mut egui::Ui, options: &CommonMarkOptions, inside_blockquote: bool) {
         // To ensure that newlines are only inserted within the list and not before it
         if self.has_list_begun {
-            newline(ui);
+            if !inside_blockquote {
+                newline(ui);
+            }
         } else {
             self.has_list_begun = true;
         }

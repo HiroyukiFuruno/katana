@@ -103,6 +103,9 @@ pub(crate) struct CommonMarkViewerInternal<'a> {
     html_block: String,
     is_table: bool,
     is_blockquote: bool,
+    /// True while processing events inside a blockquote. Used to suppress
+    /// paragraph-level newlines that would otherwise create large vertical gaps.
+    inside_blockquote: bool,
     checkbox_events: Vec<CheckboxClickEvent>,
 }
 
@@ -131,6 +134,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
             html_block: String::new(),
             is_table: false,
             is_blockquote: false,
+            inside_blockquote: false,
             checkbox_events: Vec::new(),
         }
     }
@@ -145,13 +149,13 @@ fn parser_options_math(is_math_enabled: bool) -> pulldown_cmark::Options {
 }
 
 const BLOCKQUOTE_LEFT_INSET: i8 = 10;
-const BLOCKQUOTE_LINE_PADDING: f32 = 5.0;
+
 const BLOCKQUOTE_LINE_WIDTH: f32 = 3.0;
 
 fn render_blockquote(ui: &mut Ui, accent: egui::Color32, add_contents: impl FnOnce(&mut Ui)) {
     let content_width = (ui.available_width() - f32::from(BLOCKQUOTE_LEFT_INSET)).max(0.0);
     let start = ui.painter().add(egui::Shape::Noop);
-    let response = egui::Frame::new()
+    let response = egui::Frame::NONE
         .inner_margin(egui::Margin {
             left: BLOCKQUOTE_LEFT_INSET,
             ..Default::default()
@@ -175,12 +179,12 @@ fn render_blockquote(ui: &mut Ui, accent: egui::Color32, add_contents: impl FnOn
         egui::epaint::Shape::line_segment(
             [
                 egui::pos2(
-                    response.rect.left_top().x,
-                    response.rect.left_top().y + BLOCKQUOTE_LINE_PADDING,
+                    response.rect.left(),
+                    response.rect.top(),
                 ),
                 egui::pos2(
-                    response.rect.left_bottom().x,
-                    response.rect.left_bottom().y - BLOCKQUOTE_LINE_PADDING,
+                    response.rect.left(),
+                    response.rect.bottom(),
                 ),
             ],
             egui::Stroke::new(BLOCKQUOTE_LINE_WIDTH, accent),
@@ -576,6 +580,12 @@ impl<'a> CommonMarkViewerInternal<'a> {
             // Required to ensure that the content of the list item is aligned with
             // the * or - when wrapping
             ui.horizontal_wrapped(|ui| {
+                // Inside blockquotes, the bullet was NOT added by start_tag(Item) because
+                // that would place it in a separate top_down row.  Draw it here so that
+                // bullet and text share the same horizontal_wrapped row.
+                if self.inside_blockquote {
+                    self.list.start_item(ui, options, true);
+                }
                 while let Some((_, (e, src_span))) = events_iter.next() {
                     self.process_event(
                         ui,
@@ -603,34 +613,56 @@ impl<'a> CommonMarkViewerInternal<'a> {
             let mut collected_events = delayed_events(events, |tag| {
                 matches!(tag, pulldown_cmark::TagEnd::BlockQuote(_))
             });
-            self.line.try_insert_start(ui);
 
-            // Currently the blockquotes are made in such a way that they need a newline at the end
-            // and the start so when this is the first element in the markdown the newline must be
-            // manually enabled
-            self.line.should_not_start_newline_forced = false;
+            // MUST reset before the loop. Otherwise process_event -> blockquote()
+            // would re-enter here because is_blockquote is still true.
+            self.is_blockquote = false;
+
+            // Set the flag to suppress paragraph-level newlines inside the blockquote.
+            let was_inside = self.inside_blockquote;
+            self.inside_blockquote = true;
+
             if let Some(alert) = parse_alerts(&options.alerts, &mut collected_events) {
                 egui_commonmark_backend::alert_ui(alert, ui, |ui| {
-                    for (event, src_span) in collected_events {
-                        self.event(ui, event, src_span, cache, options, max_width);
+                    let mut events_iter = collected_events.into_iter().enumerate().peekable();
+                    while let Some((_, (e, src_span))) = events_iter.next() {
+                        self.process_event(
+                            ui,
+                            &mut events_iter,
+                            e,
+                            src_span,
+                            cache,
+                            options,
+                            max_width,
+                        );
                     }
                 })
             } else {
                 render_blockquote(ui, ui.visuals().weak_text_color(), |ui| {
+                    // Reduce vertical spacing between inner elements for a compact look.
+                    ui.spacing_mut().item_spacing.y = 2.0;
                     self.text_style.quote = true;
-                    for (event, src_span) in collected_events {
-                        self.event(ui, event, src_span, cache, options, max_width);
+                    let mut events_iter = collected_events.into_iter().enumerate().peekable();
+                    while let Some((_, (e, src_span))) = events_iter.next() {
+                        self.process_event(
+                            ui,
+                            &mut events_iter,
+                            e,
+                            src_span,
+                            cache,
+                            options,
+                            max_width,
+                        );
                     }
                     self.text_style.quote = false;
                 });
             }
 
-            if events.peek().is_none() {
-                self.line.should_end_newline_forced = false;
+            self.inside_blockquote = was_inside;
+            // Insert spacing after the blockquote so the next element does not glue to it.
+            if !was_inside {
+                newline(ui);
             }
-
-            self.line.try_insert_end(ui);
-            self.is_blockquote = false;
         }
     }
 
@@ -840,7 +872,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
     fn start_tag(&mut self, ui: &mut Ui, tag: pulldown_cmark::Tag, options: &CommonMarkOptions) {
         match tag {
             pulldown_cmark::Tag::Paragraph => {
-                self.line.try_insert_start(ui);
+                if !self.inside_blockquote {
+                    self.line.try_insert_start(ui);
+                }
             }
             pulldown_cmark::Tag::Heading { level, .. } => {
                 // Headings should always insert a newline even if it is at the start.
@@ -884,11 +918,13 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         });
                     }
                 }
-                self.line.try_insert_start(ui);
+                if !self.inside_blockquote {
+                    self.line.try_insert_start(ui);
+                }
             }
 
             pulldown_cmark::Tag::List(point) => {
-                if !self.list.is_inside_a_list() && self.line.can_insert_start() {
+                if !self.inside_blockquote && !self.list.is_inside_a_list() && self.line.can_insert_start() {
                     newline(ui);
                 }
 
@@ -903,7 +939,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
 
             pulldown_cmark::Tag::Item => {
                 self.is_list_item = true;
-                self.list.start_item(ui, options);
+                if !self.inside_blockquote {
+                    self.list.start_item(ui, options, false);
+                }
             }
 
             pulldown_cmark::Tag::FootnoteDefinition(note) => {
@@ -973,12 +1011,14 @@ impl<'a> CommonMarkViewerInternal<'a> {
     ) {
         match tag {
             pulldown_cmark::TagEnd::Paragraph => {
-                self.line.try_insert_end(ui);
+                if !self.inside_blockquote {
+                    self.line.try_insert_end(ui);
+                }
             }
             pulldown_cmark::TagEnd::Heading { .. } => {
                 self.line.try_insert_end(ui);
                 self.text_style.heading = None;
-                
+
                 if let (Some(rects), Some(start_y)) = (&mut self.populate_heading_rects, self.curr_heading_start_y) {
                     let end_y = ui.next_widget_position().y;
                     let width = ui.available_width();
@@ -1001,7 +1041,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
                     self.line.should_end_newline = true;
                 }
 
-                self.list.end_level(ui, self.line.can_insert_end());
+                let insert_nl = !self.inside_blockquote && self.line.can_insert_end();
+                self.list.end_level(ui, insert_nl);
 
                 if !self.list.is_inside_a_list() {
                     // Reset all the state and make it ready for the next list that occurs
@@ -1067,7 +1108,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
     ) {
         if let Some(block) = self.code_block.take() {
             block.end(ui, cache, options, max_width);
-            self.line.try_insert_end(ui);
+            if !self.inside_blockquote {
+                self.line.try_insert_end(ui);
+            }
         }
     }
 }

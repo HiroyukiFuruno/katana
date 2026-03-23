@@ -26,7 +26,9 @@ mod tests {
             state.settings.settings_mut().terms_accepted_version =
                 Some(katana_ui::about_info::APP_VERSION.to_string());
             katana_ui::i18n::set_language("en");
-            KatanaApp::new(state)
+            let mut app = KatanaApp::new(state);
+            app.skip_splash();
+            app
         })
     }
 
@@ -36,6 +38,7 @@ mod tests {
 
         // Create a temporary directory and file at level 0
         let temp_dir = std::env::temp_dir().join("katana_layout_repro");
+        let temp_dir = temp_dir.canonicalize().unwrap_or(temp_dir);
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).unwrap();
 
@@ -51,7 +54,6 @@ mod tests {
             .state_mut()
             .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
 
-        // Wait for load
         for _ in 0..100 {
             harness.step();
             if !harness.state_mut().app_state_mut().is_loading_workspace
@@ -64,7 +66,16 @@ mod tests {
         harness.step();
 
         // Verify nodes exist
-        let dir_node = harness.get_by_label_contains("aa_dir");
+        // For aa_dir, find the exact inner Label node (which has value="aa_dir") to get its X bounds.
+        let all_labels: Vec<_> = harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .collect();
+        let dir_node = all_labels
+            .iter()
+            .find(|n| n.value().as_deref() == Some("aa_dir"))
+            .expect("should find aa_dir label");
+
+        // zz_file.md is a SelectableLabel which is typically a single Button node, so this matches perfectly.
         let file_node = harness.get_by_label_contains("zz_file.md");
 
         let dir_rect = dir_node.rect();

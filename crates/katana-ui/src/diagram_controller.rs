@@ -4,7 +4,7 @@
 //! that can be rendered on top of any image/diagram container.
 
 use crate::i18n;
-use crate::icon::Icon;
+use crate::icon::{Icon, IconSize};
 use crate::preview_pane::ViewerState;
 use egui::Vec2;
 
@@ -65,7 +65,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(1.0, 0.0),
-            egui::Button::new(Icon::PanUp.as_str()).fill(BG),
+            egui::Button::image(Icon::PanUp.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.pan_up)
         .clicked()
@@ -75,7 +75,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(2.0, 0.0),
-            egui::Button::new(Icon::ZoomIn.as_str()).fill(BG),
+            egui::Button::image(Icon::ZoomIn.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.zoom_in)
         .clicked()
@@ -87,7 +87,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(0.0, 1.0),
-            egui::Button::new(Icon::PanLeft.as_str()).fill(BG),
+            egui::Button::image(Icon::PanLeft.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.pan_left)
         .clicked()
@@ -97,7 +97,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(1.0, 1.0),
-            egui::Button::new(Icon::ResetView.as_str()).fill(BG),
+            egui::Button::image(Icon::ResetView.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.reset)
         .clicked()
@@ -107,7 +107,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(2.0, 1.0),
-            egui::Button::new(Icon::PanRight.as_str()).fill(BG),
+            egui::Button::image(Icon::PanRight.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.pan_right)
         .clicked()
@@ -118,14 +118,14 @@ pub(crate) fn draw_controls(
     // Row 2: Info (trackpad help), PanDown, ZoomOut
     ui.put(
         btn_rect(0.0, 2.0),
-        egui::Button::new(Icon::Info.as_str()).fill(BG),
+        egui::Button::image(Icon::Info.image(IconSize::Large)).fill(BG),
     )
     .on_hover_text(&dc.trackpad_help);
 
     if ui
         .put(
             btn_rect(1.0, 2.0),
-            egui::Button::new(Icon::PanDown.as_str()).fill(BG),
+            egui::Button::image(Icon::PanDown.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.pan_down)
         .clicked()
@@ -135,7 +135,7 @@ pub(crate) fn draw_controls(
     if ui
         .put(
             btn_rect(2.0, 2.0),
-            egui::Button::new(Icon::ZoomOut.as_str()).fill(BG),
+            egui::Button::image(Icon::ZoomOut.image(IconSize::Large)).fill(BG),
         )
         .on_hover_text(&dc.zoom_out)
         .clicked()
@@ -162,7 +162,7 @@ pub(crate) fn draw_fullscreen_button(ui: &mut egui::Ui, container_rect: egui::Re
     );
     ui.put(
         btn_rect,
-        egui::Button::new(Icon::Fullscreen.as_str()).fill(BG),
+        egui::Button::image(Icon::Fullscreen.image(IconSize::Large)).fill(BG),
     )
     .on_hover_text(&dc.fullscreen)
     .clicked()

@@ -379,7 +379,7 @@ fn fixture_en_s1_1_centered_heading_h1() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 1.1", "### 1.2");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     assert_centered(&harness, "KatanA Desktop", "§1.1 centered h1");
 }
 
@@ -389,7 +389,7 @@ fn fixture_en_s1_2_centered_paragraph() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 1.2", "### 1.3");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     assert_centered(
         &harness,
         "A fast, lightweight Markdown workspace for macOS — built with Rust and egui.",
@@ -403,7 +403,7 @@ fn fixture_en_s1_3_centered_blocks_no_overlap() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 1.3", "### 1.4");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 400.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
     assert_below(
         &harness,
         "Centered Heading",
@@ -433,7 +433,7 @@ fn fixture_en_s1_4_badge_section_renders() {
         "§1.4 badge section should produce at least one RenderedSection"
     );
     // Verify no panic during harness rendering
-    let _harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let _harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
 }
 
 /// §1.5: "English | 日本語" — link exists and is to the right of text, same row.
@@ -442,7 +442,7 @@ fn fixture_en_s1_5_text_link_same_row_and_centered() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 1.5", "### 1.6");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     // Verify link exists
     let _link = harness.get_by_label("日本語");
     // Verify text and link are on the same row, link to the right
@@ -455,7 +455,7 @@ fn fixture_en_s1_6_readme_header_centered() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 1.6", "## 2.");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 500.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 500.0);
     // Heading centered
     assert_centered(&harness, "KatanA Desktop", "§1.6 heading");
     // Description centered
@@ -485,7 +485,7 @@ fn fixture_en_s2_1_heading_levels_render_and_order() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 2.1", "### 2.2");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 500.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 500.0);
     // All exist
     let _h1 = harness.get_by_label("H1 Heading");
     let _h2 = harness.get_by_label("H2 Heading");
@@ -505,7 +505,7 @@ fn fixture_en_s2_2_text_decorations_render() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 2.2", "### 2.3");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 300.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
     let _bold = harness.get_by_label("Bold text");
     let _italic = harness.get_by_label("Italic text");
     let _strike = harness.get_by_label("Strikethrough");
@@ -525,7 +525,7 @@ fn fixture_en_s2_3_links_render() {
     let (_, _, source) = load_fixture("sample.md");
     let section_md = extract_section(&source, "### 2.3", "### 2.4");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     let _link = harness.get_by_label("Normal link");
     let _email = harness.get_by_label("Email link");
 }
@@ -557,7 +557,7 @@ fn fixture_ja_s1_1_centered_heading() {
     let (_, _, source) = load_fixture("sample.ja.md");
     let section_md = extract_section(&source, "### 1.1", "### 1.2");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     assert_centered(&harness, "KatanA Desktop", "§1.1 JA centered h1");
 }
 
@@ -567,7 +567,7 @@ fn fixture_ja_s1_3_centered_blocks_no_overlap() {
     let (_, _, source) = load_fixture("sample.ja.md");
     let section_md = extract_section(&source, "### 1.3", "### 1.4");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 400.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
     assert_below(
         &harness,
         "中央寄せ見出し",
@@ -582,7 +582,7 @@ fn fixture_ja_s1_5_bidirectional_link() {
     let (_, _, source) = load_fixture("sample.ja.md");
     let section_md = extract_section(&source, "### 1.5", "### 1.6");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 200.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     let _link = harness.get_by_label("English");
     // Verify text+link are on same row
     assert_right_of_same_row(&harness, "English", "| 日本語", "§1.5 JA link same row");
@@ -594,7 +594,7 @@ fn fixture_ja_s1_6_readme_header_has_block_spacing() {
     let (_, _, source) = load_fixture("sample.ja.md");
     let section_md = extract_section(&source, "### 1.6", "## 2.");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 500.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 500.0);
     assert_gap_at_least(
         &harness,
         "KatanA Desktop",
@@ -612,7 +612,7 @@ fn top_level_html_paragraphs_keep_browser_like_vertical_spacing() {
         "<p align=\"center\">Second paragraph</p>\n\n",
         "<p align=\"center\">Third paragraph</p>\n",
     ));
-    let harness = build_harness(pane.sections, PANEL_WIDTH, 280.0);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 280.0);
 
     assert_gap_at_least(
         &harness,
@@ -655,7 +655,7 @@ fn fixture_ja_drawio_renders() {
 
 fn load_fixture_harness(filename: &str) -> Harness<'static> {
     let (pane, _, _) = load_fixture(filename);
-    build_harness(pane.sections, PANEL_WIDTH, PANEL_HEIGHT)
+    build_harness(pane.sections.clone(), PANEL_WIDTH, PANEL_HEIGHT)
 }
 
 // ── HTML Centering ──
@@ -744,7 +744,7 @@ fn basic_fixture_ja_s11_2_long_inline_code_wraps_within_panel() {
     let (_, _, source) = load_fixture("sample_basic.ja.md");
     let section_md = extract_section(&source, "### 11.2", "### 11.3");
     let pane = render_snippet(&section_md);
-    let harness = build_harness(pane.sections, 420.0, 220.0);
+    let harness = build_harness(pane.sections.clone(), 420.0, 220.0);
     let node = harness.get_by_label_contains("このテキストは非常に長い行");
     let bounds = node
         .accesskit_node()
