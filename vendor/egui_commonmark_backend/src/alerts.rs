@@ -17,7 +17,6 @@ pub struct Alert {
 // Seperate function to not leak into the public API
 pub fn alert_ui(alert: &Alert, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) {
     blockquote(ui, alert.accent_color, |ui| {
-        newline(ui);
         ui.colored_label(alert.accent_color, alert.icon.to_string());
         ui.add_space(3.0);
         ui.colored_label(alert.accent_color, &alert.identifier_rendered);

@@ -17,14 +17,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 2. P1/P3/P4 UI レンダリングバグ修正
 
-- [ ] 2.1 `needs_splash` フラグを使い、UI初期化ではなく「更新（初回フレーム）」タイミングでSplashタイマーを開始させる
-- [ ] 2.2 Blockquote 上下の不要な表示改行を削除する
-- [ ] 2.3 `KatanaApp` から不要にエラーが出る `bytes://icon/copy.svg` などを事前登録し、アイコンエラーを解消する
+- [x] 2.1 `needs_splash` フラグを使い、UI初期化ではなく「更新（初回フレーム）」タイミングでSplashタイマーを開始させる
+- [x] 2.2 Blockquote 上下の不要な表示改行を削除する
+- [x] 2.3 `KatanaApp` から不要にエラーが出る `bytes://icon/copy.svg` などを事前登録し、アイコンエラーを解消する
 
 ### Definition of Done (DoD)
 
-- [ ] 起動時に正しくスプラッシュが表示され、テスト `make test` にも退行が生じていない
-- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] 起動時に正しくスプラッシュが表示され、テスト `make test` にも退行が生じていない
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -42,14 +42,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 4. P0 ゾンビスレッドと外部プロセスの無制限実行バグ修正 (追加対応)
 
-- [ ] 4.1 キャンセルトークンの導入
+- [x] 4.1 キャンセルトークンの導入
   - `PreviewPane` に `cancel_token: Arc<AtomicBool>` を持たせ、新しく `full_render` する前やドロップ時に以前のトークンを `true` に更新する。
-- [ ] 4.2 バックグラウンドスレッドの早期終了
+- [x] 4.2 バックグラウンドスレッドの早期終了
   - スレッドプール (`std::thread::spawn`) のループ内でジョブ取り出しごとに `cancel_token` を評価し、`true` なら直ちに `break` でスレッドを抜ける実装を行う。
-- [ ] 4.3 `shell.rs` でのタブ削除時キャンセル
+- [x] 4.3 `shell.rs` でのタブ削除時キャンセル
   - タブを削除するアクション (`handle_close_tab` 等) において、対象の `PreviewPane` の `cancel_token` を `true` にして確実に不要なプロセスを殺す。
 
 ### Definition of Done (DoD)
 
-- [ ] 巨大なダイアグラムファイル (`sample_diagrams.ja.md`) を開いてからすぐに別タブに移動したりタブを閉じたりした場合、裏で処理が走らず CPU が 0% 近くのアイドル状態にすぐ戻ることを Activity Monitor 等で確認できる。
-- [ ] TDDで、キャンセルトークンが機能してスレッドが中断されることを証明する（GREEN）。
+- [x] 巨大なダイアグラムファイル (`sample_diagrams.ja.md`) を開いてからすぐに別タブに移動したりタブを閉じたりした場合、裏で処理が走らず CPU が 0% 近くのアイドル状態にすぐ戻ることを Activity Monitor 等で確認できる。
+- [x] TDDで、キャンセルトークンが機能してスレッドが中断されることを証明する（GREEN）。
