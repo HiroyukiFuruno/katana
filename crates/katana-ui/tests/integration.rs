@@ -799,7 +799,7 @@ fn test_integration_open_all_markdown() {
     );
 
     // Switch between them
-    assert_eq!(state.active_doc_idx, None); // OpenAll is completely lazy and activates none
+    assert_eq!(state.active_doc_idx, Some(0)); // First file is activated
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

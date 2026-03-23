@@ -685,10 +685,12 @@ impl KatanaApp {
             AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
             AppAction::SelectDocument(p) => self.handle_select_document(p, true),
             AppAction::OpenMultipleDocuments(paths) => {
-                // When recursively opening a directory, open all files lazily
-                // and do not artificially activate the last file nor auto-expand the directory tree.
+                // When recursively opening a directory, activate the first file
+                // and open the rest lazily (no load, no activate).
+                let mut first = true;
                 for path in paths.into_iter() {
-                    self.handle_select_document(path, false);
+                    self.handle_select_document(path, first);
+                    first = false;
                 }
             }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
@@ -2238,24 +2240,30 @@ mod tests_extra {
     }
 
     #[test]
-    fn test_open_multiple_documents_is_entirely_lazy() {
+    fn test_open_multiple_documents_activates_first_file() {
         let mut app = make_app();
-        let paths = vec![
-            std::path::PathBuf::from("/a/1.md"),
-            std::path::PathBuf::from("/a/2.md"),
-        ];
+        let temp_dir = std::env::temp_dir().join("katana_test_open_multi");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let f1 = temp_dir.join("1.md");
+        let f2 = temp_dir.join("2.md");
+        std::fs::write(&f1, "# First").unwrap();
+        std::fs::write(&f2, "# Second").unwrap();
 
         app.process_action(
             &egui::Context::default(),
-            AppAction::OpenMultipleDocuments(paths),
+            AppAction::OpenMultipleDocuments(vec![f1.clone(), f2.clone()]),
         );
 
-        // Ensure documents were opened but none of them triggered auto-expansion
+        // Both documents are opened
         assert_eq!(app.state.open_documents.len(), 2);
-        assert!(app.state.expanded_directories.is_empty());
-        // Ensure they are not loaded
-        assert!(!app.state.open_documents[0].is_loaded);
+        // First document is activated (loaded) and second stays lazy
+        assert!(app.state.open_documents[0].is_loaded);
         assert!(!app.state.open_documents[1].is_loaded);
+        // Active index points to the first document
+        assert_eq!(app.state.active_doc_idx, Some(0));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     // Removed redundant AiProviderRegistry and PluginRegistry imports
