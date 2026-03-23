@@ -15,7 +15,7 @@ All notable changes to KatanA Desktop will be documented in this file.
 
 ### 🔧 Miscellaneous
 
-- Internal: formalize specification-driven development (SDD) workflow and directory organization.
+- **OpenSpec Workflow Integration**: [UI Rendering Bug Fixes (v0.6.0)](./openspec/changes/archive/2026-03-23-v0-6-0-ui-bug-fixes/tasks.md) Specification-driven development (SDD) workflow with consolidated task management.
 
 ## [0.5.2] - 2026-03-22 12:44:52 (UTC)
 

@@ -15,7 +15,7 @@ KatanA Desktop の主な変更点をこのファイルに記録します。
 
 ### 🔧 その他
 
-- **OpenSpec ワークフロー連携**: [UI Rendering Bug Fixes (v0.6.0)](./openspec/archive/v0-6-0-ui-bug-fixes/tasks.md) 配下での仕様概要・タスク管理による仕様駆動開発フローを導入。
+- **OpenSpec ワークフロー連携**: [UI Rendering Bug Fixes (v0.6.0)](./openspec/changes/archive/2026-03-23-v0-6-0-ui-bug-fixes/tasks.md) 配下での仕様概要・タスク管理による仕様駆動開発フローを導入。
 
 ## [0.5.2] - 2026-03-22 21:44:52 (JST)
 
