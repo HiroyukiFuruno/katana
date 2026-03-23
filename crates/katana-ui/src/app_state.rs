@@ -146,6 +146,8 @@ pub enum AppAction {
     AcceptTerms(String),
     /// Decline the terms of service (exits the app).
     DeclineTerms,
+    /// Shows metadata info for the selected path.
+    ShowMetaInfo(std::path::PathBuf),
     /// No-op (used internally).
     None,
 }

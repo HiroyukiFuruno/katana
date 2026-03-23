@@ -24,7 +24,8 @@
     "no_document_selected": "Ningún documento abierto.",
     "workspace_title": "Espacio de Trabajo",
     "recent_workspaces": "Espacios de trabajo recientes",
-    "metadata_tooltip": "Tamaño: {size} B\nModificado: {mod_time}"
+    "metadata_tooltip": "Tamaño: {size} B\nModificado: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "Vista Previa",
@@ -83,7 +84,8 @@
     "remove_workspace": "Eliminar de la historia",
     "recursive_expand": "Expansión recursiva",
     "recursive_open_all": "Abrir todos los archivos recursivamente",
-    "toggle_toc": "Alternar tabla de contenidos"
+    "toggle_toc": "Alternar tabla de contenidos",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[IA: no configurado]"

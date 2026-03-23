@@ -52,7 +52,8 @@
     "no_document_selected": "ドキュメントが開かれていません。",
     "workspace_title": "ワークスペース",
     "recent_workspaces": "最近のワークスペース",
-    "metadata_tooltip": "サイズ: {size} B\n更新日時: {mod_time}"
+    "metadata_tooltip": "サイズ: {size} B\n更新日時: {mod_time}",
+    "path_label": "パス"
   },
   "preview": {
     "preview_title": "プレビュー",
@@ -111,7 +112,8 @@
     "remove_workspace": "履歴から削除",
     "recursive_expand": "再帰的にディレクトリを展開",
     "recursive_open_all": "再帰的に全ファイルを開く",
-    "toggle_toc": "目次の表示切替"
+    "toggle_toc": "目次の表示切替",
+    "show_meta_info": "メタ情報表示"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未設定]"

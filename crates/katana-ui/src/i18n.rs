@@ -137,6 +137,7 @@ pub struct WorkspaceMessages {
     pub recent_workspaces: String,
     #[serde(default = "default_metadata_tooltip")]
     pub metadata_tooltip: String,
+    pub path_label: String,
 }
 
 fn default_metadata_tooltip() -> String {
@@ -249,6 +250,7 @@ pub struct ActionMessages {
     pub recursive_open_all: String,
     #[serde(default)]
     pub toggle_toc: String,
+    pub show_meta_info: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -24,7 +24,8 @@
     "no_document_selected": "未開啟文件。",
     "workspace_title": "工作區",
     "recent_workspaces": "最近的工作區",
-    "metadata_tooltip": "大小: {size} B\n修改時間: {mod_time}"
+    "metadata_tooltip": "大小: {size} B\n修改時間: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "預覽",
@@ -83,7 +84,8 @@
     "remove_workspace": "從歷史記錄中移除",
     "recursive_expand": "遞迴展開",
     "recursive_open_all": "遞迴打開所有文件",
-    "toggle_toc": "切換目錄"
+    "toggle_toc": "切換目錄",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未設定]"

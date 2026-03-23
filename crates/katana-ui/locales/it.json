@@ -24,7 +24,8 @@
     "no_document_selected": "Nessun documento aperto.",
     "workspace_title": "Spazio di Lavoro",
     "recent_workspaces": "Spazi di lavoro recenti",
-    "metadata_tooltip": "Dimensioni: {size} B\nModificato: {mod_time}"
+    "metadata_tooltip": "Dimensioni: {size} B\nModificato: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "Anteprima",
@@ -83,7 +84,8 @@
     "remove_workspace": "Rimuovi dalla cronologia",
     "recursive_expand": "Espandi ricorsivamente",
     "recursive_open_all": "Apri tutti i file ricorsivamente",
-    "toggle_toc": "Attiva/disattiva indice"
+    "toggle_toc": "Attiva/disattiva indice",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: non configurato]"

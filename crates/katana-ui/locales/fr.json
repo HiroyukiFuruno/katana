@@ -24,7 +24,8 @@
     "no_document_selected": "Aucun document ouvert.",
     "workspace_title": "Espace de travail",
     "recent_workspaces": "Espaces de travail récents",
-    "metadata_tooltip": "Taille: {size} B\nModifié: {mod_time}"
+    "metadata_tooltip": "Taille: {size} B\nModifié: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "Aperçu",
@@ -83,7 +84,8 @@
     "remove_workspace": "Supprimer de l'historique",
     "recursive_expand": "Expansion récursive",
     "recursive_open_all": "Tout ouvrir récursivement",
-    "toggle_toc": "Basculer la table des matières"
+    "toggle_toc": "Basculer la table des matières",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI : non configuré]"

@@ -24,7 +24,8 @@
     "no_document_selected": "未打开文档。",
     "workspace_title": "工作区",
     "recent_workspaces": "最近的工作区",
-    "metadata_tooltip": "大小: {size} B\n修改时间: {mod_time}"
+    "metadata_tooltip": "大小: {size} B\n修改时间: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "预览",
@@ -83,7 +84,8 @@
     "remove_workspace": "从历史记录中移除",
     "recursive_expand": "递归展开",
     "recursive_open_all": "递归打开所有文件",
-    "toggle_toc": "切换目录"
+    "toggle_toc": "切换目录",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未配置]"

@@ -52,7 +52,8 @@
     "no_document_selected": "No document open.",
     "workspace_title": "Workspace",
     "recent_workspaces": "Recent Workspaces",
-    "metadata_tooltip": "Size: {size} B\nModified: {mod_time}"
+    "metadata_tooltip": "Size: {size} B\nModified: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "Preview",
@@ -111,7 +112,8 @@
     "remove_workspace": "Remove from history",
     "recursive_expand": "Recursive Expand Subdirectories",
     "recursive_open_all": "Recursive Open All Files",
-    "toggle_toc": "Toggle Table of Contents"
+    "toggle_toc": "Toggle Table of Contents",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: unconfigured]"

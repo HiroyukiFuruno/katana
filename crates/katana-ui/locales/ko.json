@@ -24,7 +24,8 @@
     "no_document_selected": "열린 문서가 없습니다.",
     "workspace_title": "워크스페이스",
     "recent_workspaces": "최근 워크스페이스",
-    "metadata_tooltip": "크기: {size} B\n수정: {mod_time}"
+    "metadata_tooltip": "크기: {size} B\n수정: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "미리보기",
@@ -83,7 +84,8 @@
     "remove_workspace": "기록에서 제거",
     "recursive_expand": "재귀적 확장",
     "recursive_open_all": "모든 파일 재귀적 열기",
-    "toggle_toc": "목차 토글"
+    "toggle_toc": "목차 토글",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: 설정되지 않음]"

@@ -24,7 +24,8 @@
     "no_document_selected": "Kein Dokument geöffnet.",
     "workspace_title": "Arbeitsbereich",
     "recent_workspaces": "Zuletzt verwendete Arbeitsbereiche",
-    "metadata_tooltip": "Größe: {size} B\nGeändert: {mod_time}"
+    "metadata_tooltip": "Größe: {size} B\nGeändert: {mod_time}",
+    "path_label": "Path"
   },
   "preview": {
     "preview_title": "Vorschau",
@@ -83,7 +84,8 @@
     "remove_workspace": "Aus Verlauf entfernen",
     "recursive_expand": "Unterordner rekursiv ausklappen",
     "recursive_open_all": "Alle Dateien rekursiv öffnen",
-    "toggle_toc": "Inhaltsverzeichnis umschalten"
+    "toggle_toc": "Inhaltsverzeichnis umschalten",
+    "show_meta_info": "Show Meta Info"
   },
   "ai": {
     "ai_unconfigured": "[AI: nicht konfiguriert]"

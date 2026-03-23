@@ -140,6 +140,8 @@ pub struct KatanaApp {
     pub(crate) needs_splash: bool,
     /// Tracks the startup time for the splash screen fade animation.
     pub(crate) splash_start: Option<std::time::Instant>,
+    /// Path for the currently active metadata dialog.
+    pub(crate) show_meta_info_for: Option<std::path::PathBuf>,
 }
 
 impl KatanaApp {
@@ -164,6 +166,7 @@ impl KatanaApp {
             settings_preview: PreviewPane::default(),
             needs_splash: !cfg!(test),
             splash_start: None,
+            show_meta_info_for: None,
         };
         app.start_update_check(false);
         app
@@ -898,6 +901,9 @@ impl KatanaApp {
             }
             AppAction::DeclineTerms => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            AppAction::ShowMetaInfo(path) => {
+                self.show_meta_info_for = Some(path);
             }
             AppAction::None => {}
         }
@@ -2309,6 +2315,7 @@ mod tests_extra {
             settings_preview: PreviewPane::default(),
             needs_splash: false,
             splash_start: None,
+            show_meta_info_for: None,
         }
     }
 

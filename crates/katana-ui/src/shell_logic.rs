@@ -99,11 +99,12 @@ pub fn calculate_splash_progress(elapsed_secs: f32) -> f32 {
 /// Helper function to format the full tooltip for a file tree entry.
 /// This currently embodies the buggy behavior where `Path` is swallowed.
 pub fn format_tree_tooltip(name: &str, path: &std::path::Path) -> String {
-    let absolute_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let path_str = absolute_path.display().to_string();
+    // std::fs::canonicalize resolves /Users to /System/Volumes/Data/Users on macOS, producing confusing paths.
+    // Instead we just display the actual path without canonicalizing.
+    let path_str = path.display().to_string();
     format!(
         "{name}\n{}: {path_str}\n{}",
-        crate::i18n::tf("Path", &[]),
+        crate::i18n::get().workspace.path_label,
         if let Ok(metadata) = std::fs::metadata(path) {
             format_metadata_tooltip(
                 metadata.len(),
@@ -265,10 +266,10 @@ mod tests {
 
         // Use buggy format_tree_tooltip behavior internally replicating what we had
         let tooltip = format_tree_tooltip("test_file.txt", &file_path);
-        let abs_path = std::fs::canonicalize(&file_path).unwrap();
+        let expected_path = file_path.display().to_string();
         assert!(
-            tooltip.contains(&abs_path.display().to_string()),
-            "Tooltip must contain the absolute path.\nGot tooltip:\n{}",
+            tooltip.contains(&expected_path),
+            "Tooltip must contain the path.\nGot tooltip:\n{}",
             tooltip
         );
     }
