@@ -211,7 +211,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 &mut layout_job,
                 &style,
                 egui::FontSelection::Default,
-                egui::Align::BOTTOM,
+                egui::Align::Center,
             );
         }
 

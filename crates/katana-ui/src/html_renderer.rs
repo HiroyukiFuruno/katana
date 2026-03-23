@@ -488,7 +488,7 @@ impl<'a> HtmlRenderer<'a> {
                     job,
                     self.ui.style().as_ref(),
                     egui::FontSelection::Default,
-                    egui::Align::BOTTOM,
+                    egui::Align::Center,
                 );
             }
             HtmlNode::Emphasis(children) => {
@@ -510,7 +510,7 @@ impl<'a> HtmlRenderer<'a> {
                     job,
                     self.ui.style().as_ref(),
                     egui::FontSelection::Default,
-                    egui::Align::BOTTOM,
+                    egui::Align::Center,
                 );
             }
             _ => {}

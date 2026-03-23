@@ -4,12 +4,12 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 1. P3 インラインコード配置最適化
 
-- [ ] 1.1 `pulldown.rs` 内の `self.line.append_to` に使用される `egui::Align` を `BOTTOM` から `Center` へ変更。
-- [ ] 1.2 `katana-ui/tests/preview_pane.rs` において、`html_...` となっている旧テストケースを `Center` 対応へと修正する。
+- [x] 1.1 `pulldown.rs` 内の `self.line.append_to` に使用される `egui::Align` を `BOTTOM` から `Center` へ変更。
+- [x] 1.2 `katana-ui/tests/preview_pane.rs` において、`html_...` となっている旧テストケースを `Center` 対応へと修正する。
 
 ### Definition of Done (DoD)
 
-- [ ] インラインコードのアラインメントが中央寄りになり、テストが問題なくパスする
+- [x] インラインコードのアラインメントが中央寄りになり、テストが問題なくパスする
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ## 2. 実験機能 テーブル描画変更
