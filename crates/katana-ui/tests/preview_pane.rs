@@ -1186,7 +1186,7 @@ fn inline_emoji_stays_within_text_line_height_budget() {
 }
 
 #[test]
-fn markdown_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
+fn markdown_text_uses_center_vertical_alignment_for_mixed_cjk_runs() {
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections(
         "KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。\n",
@@ -1240,13 +1240,13 @@ fn markdown_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
             .job
             .sections
             .iter()
-            .all(|section| section.format.valign == egui::Align::BOTTOM),
-        "mixed CJK markdown text should use bottom baseline alignment"
+            .all(|section| section.format.valign == egui::Align::Center),
+        "mixed CJK markdown text should use center baseline alignment"
     );
 }
 
 #[test]
-fn html_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
+fn html_text_uses_center_vertical_alignment_for_mixed_cjk_runs() {
     let mut pane = PreviewPane::default();
     pane.sections = vec![RenderedSection::Markdown(
         "<p>KatanA は AIエージェントと共に仕様駆動開発を行う時代のために設計されたツールです。</p>\n"
@@ -1300,8 +1300,8 @@ fn html_text_uses_bottom_vertical_alignment_for_mixed_cjk_runs() {
             .job
             .sections
             .iter()
-            .all(|section| section.format.valign == egui::Align::BOTTOM),
-        "mixed CJK html text should use bottom baseline alignment"
+            .all(|section| section.format.valign == egui::Align::Center),
+        "mixed CJK html text should use center baseline alignment"
     );
 }
 

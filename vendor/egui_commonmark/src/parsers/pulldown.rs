@@ -101,7 +101,7 @@ pub(crate) struct CommonMarkViewerInternal<'a> {
     def_list: DefinitionList,
     code_block: Option<CodeBlock>,
     html_block: String,
-    is_table: bool,
+    table_alignments: Option<Vec<pulldown_cmark::Alignment>>,
     is_blockquote: bool,
     /// True while processing events inside a blockquote. Used to suppress
     /// paragraph-level newlines that would otherwise create large vertical gaps.
@@ -132,7 +132,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
             def_list: Default::default(),
             code_block: None,
             html_block: String::new(),
-            is_table: false,
+            table_alignments: None,
             is_blockquote: false,
             inside_blockquote: false,
             checkbox_events: Vec::new(),
@@ -211,8 +211,19 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 &mut layout_job,
                 &style,
                 egui::FontSelection::Default,
-                egui::Align::BOTTOM,
+                egui::Align::Center,
             );
+        }
+
+        // Task 1.3: Shift inline code and strikethrough text upward.
+        // Monospace (code) and strikethrough sections appear ~5px too low
+        // when using Align::Center. Use Align::TOP for a raised-text effect.
+        for section in &mut layout_job.sections {
+            if section.format.font_id.family == egui::FontFamily::Monospace
+                || section.format.strikethrough != egui::Stroke::NONE
+            {
+                section.format.valign = egui::Align::TOP;
+            }
         }
 
         ui.add(egui::Label::new(layout_job).wrap().halign(egui::Align::LEFT));
@@ -666,15 +677,37 @@ impl<'a> CommonMarkViewerInternal<'a> {
         }
     }
 
+    fn apply_alignment<R>(
+        ui: &mut egui::Ui,
+        alignment: &pulldown_cmark::Alignment,
+        add_contents: impl FnOnce(&mut egui::Ui) -> R,
+    ) -> egui::InnerResponse<R> {
+        let layout = match alignment {
+            pulldown_cmark::Alignment::None | pulldown_cmark::Alignment::Left => {
+                egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true)
+            }
+            pulldown_cmark::Alignment::Center => {
+                egui::Layout::left_to_right(egui::Align::Center)
+                    .with_main_wrap(true)
+                    .with_main_align(egui::Align::Center)
+            }
+            pulldown_cmark::Alignment::Right => {
+                // right_to_left respects with_main_wrap and wraps starting from the right
+                egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true)
+            }
+        };
+        ui.with_layout(layout, add_contents)
+    }
+
     fn table<'e>(
         &mut self,
         events: &mut Peekable<impl Iterator<Item = EventIteratorItem<'e>>>,
         cache: &mut CommonMarkCache,
         options: &CommonMarkOptions,
         ui: &mut Ui,
-        max_width: f32,
+        _max_width: f32,
     ) {
-        if self.is_table {
+        if let Some(alignments) = self.table_alignments.take() {
             self.line.try_insert_start(ui);
 
             let id = ui.id().with("_table").with(self.curr_table);
@@ -697,50 +730,68 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 let min_col = (table_width - spacing_total) / (num_cols as f32);
 
                 egui::Grid::new(id)
+                    .num_columns(num_cols)
                     .striped(true)
                     .min_col_width(min_col.max(0.0))
                     .show(ui, |ui| {
-                    for col in header {
-                        ui.horizontal(|ui| {
-                            for (e, src_span) in col {
-                                let tmp_start =
-                                    std::mem::replace(&mut self.line.should_start_newline, false);
-                                let tmp_end =
-                                    std::mem::replace(&mut self.line.should_end_newline, false);
-                                self.event(ui, e, src_span, cache, options, max_width);
-                                self.line.should_start_newline = tmp_start;
-                                self.line.should_end_newline = tmp_end;
-                            }
-                            self.flush_pending_inline(ui, max_width);
-                        });
-                    }
-
-                    ui.end_row();
-
-                    for row in rows {
-                        for col in row {
-                            ui.horizontal(|ui| {
+                        // ── Header row ──
+                        for (col_idx, col) in header.iter().enumerate() {
+                            let cell_width = min_col;
+                            Self::apply_alignment(ui, alignments.get(col_idx).unwrap_or(&pulldown_cmark::Alignment::None), |ui| {
                                 for (e, src_span) in col {
-                                    let tmp_start = std::mem::replace(
-                                        &mut self.line.should_start_newline,
-                                        false,
-                                    );
+                                    let tmp_start =
+                                        std::mem::replace(&mut self.line.should_start_newline, false);
                                     let tmp_end =
                                         std::mem::replace(&mut self.line.should_end_newline, false);
-                                    self.event(ui, e, src_span, cache, options, max_width);
+                                    self.event(ui, e.clone(), src_span.clone(), cache, options, cell_width);
                                     self.line.should_start_newline = tmp_start;
                                     self.line.should_end_newline = tmp_end;
                                 }
-                                self.flush_pending_inline(ui, max_width);
+                                self.flush_pending_inline(ui, cell_width);
                             });
-                        }
 
+                            if col_idx < num_cols - 1 {
+                                let rect = ui.max_rect();
+                                let x = rect.right() + ui.spacing().item_spacing.x / 2.0;
+                                ui.painter().vline(x, rect.y_range(), ui.visuals().widgets.noninteractive.bg_stroke);
+                            }
+                        }
                         ui.end_row();
-                    }
-                });
+
+                        // ── Body rows ──
+                        for row_data in &rows {
+                            for col_idx in 0..num_cols {
+                                if let Some(col_data) = row_data.get(col_idx) {
+                                    let cell_width = min_col;
+                                    Self::apply_alignment(ui, alignments.get(col_idx).unwrap_or(&pulldown_cmark::Alignment::None), |ui| {
+                                        for (e, src_span) in col_data {
+                                            let tmp_start = std::mem::replace(
+                                                &mut self.line.should_start_newline,
+                                                false,
+                                            );
+                                            let tmp_end =
+                                                std::mem::replace(&mut self.line.should_end_newline, false);
+                                            self.event(ui, e.clone(), src_span.clone(), cache, options, cell_width);
+                                            self.line.should_start_newline = tmp_start;
+                                            self.line.should_end_newline = tmp_end;
+                                        }
+                                        self.flush_pending_inline(ui, cell_width);
+                                    });
+                                } else {
+                                    ui.label("");
+                                }
+
+                                if col_idx < num_cols - 1 {
+                                    let rect = ui.max_rect();
+                                    let x = rect.right() + ui.spacing().item_spacing.x / 2.0;
+                                    ui.painter().vline(x, rect.y_range(), ui.visuals().widgets.noninteractive.bg_stroke);
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    });
             });
 
-            self.is_table = false;
             if events.peek().is_none() {
                 self.line.should_end_newline_forced = false;
             }
@@ -951,8 +1002,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 self.line.should_end_newline = false;
                 footnote(ui, &note);
             }
-            pulldown_cmark::Tag::Table(_) => {
-                self.is_table = true;
+            pulldown_cmark::Tag::Table(alignments) => {
+                self.table_alignments = Some(alignments);
             }
             pulldown_cmark::Tag::TableHead => {}
             pulldown_cmark::Tag::TableRow => {}
@@ -1058,10 +1109,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
             pulldown_cmark::TagEnd::Table => {}
             pulldown_cmark::TagEnd::TableHead => {}
             pulldown_cmark::TagEnd::TableRow => {}
-            pulldown_cmark::TagEnd::TableCell => {
-                // Ensure space between cells
-                ui.label("  ");
-            }
+            pulldown_cmark::TagEnd::TableCell => {}
             pulldown_cmark::TagEnd::Emphasis => {
                 self.text_style.emphasis = false;
             }

@@ -75,17 +75,23 @@ fn parse_row<'e>(
     let mut column = Vec::new();
 
     for (e, src_span) in events.by_ref() {
-        if let pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableCell) = e {
-            row.push(column);
-            column = Vec::new();
-        }
-
-        if let pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableHead) = e {
-            break;
-        }
-
-        if let pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableRow) = e {
-            break;
+        match &e {
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableCell) => {
+                row.push(column);
+                column = Vec::new();
+                continue;
+            }
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableHead)
+            | pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableRow) => {
+                break;
+            }
+            // Skip structural start tags — they carry no renderable content.
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableCell)
+            | pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableRow)
+            | pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableHead) => {
+                continue;
+            }
+            _ => {}
         }
 
         column.push((e, src_span));

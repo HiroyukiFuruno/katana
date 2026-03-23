@@ -276,7 +276,10 @@ pub(crate) fn render_workspace_panel(
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if !state.settings.settings().workspace.paths.is_empty() {
-                            ui.menu_image_button(crate::icon::Icon::Document.uri(), |ui| {
+                            let ws_history_img =
+                                egui::Image::new(crate::icon::Icon::Document.uri())
+                                    .tint(ui.visuals().text_color());
+                            ui.menu_image_button(ws_history_img, |ui| {
                                 for path in state.settings.settings().workspace.paths.iter().rev() {
                                     ui.horizontal(|ui| {
                                         if ui
@@ -588,7 +591,9 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
         *action = AppAction::RefreshDiagrams;
     }
 
-    overlay_ui.menu_image_button(crate::icon::Icon::Export.uri(), |ui| {
+    let export_img =
+        egui::Image::new(crate::icon::Icon::Export.uri()).tint(overlay_ui.visuals().text_color());
+    overlay_ui.menu_image_button(export_img, |ui| {
         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
         if ui
             .button(crate::i18n::get().menu.export_html.clone())
@@ -698,6 +703,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                             .inner;
 
                         tab_rects.push((idx, resp.rect));
+                        // Task 3.3: Keep the active tab visible in the scroll area.
+                        if is_active {
+                            resp.scroll_to_me(Some(egui::Align::Center));
+                        }
                         if resp.drag_stopped() {
                             if let Some(pos) = ui.input(|i| i.pointer.hover_pos()) {
                                 dragged_source = Some((idx, pos));
