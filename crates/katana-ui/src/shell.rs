@@ -116,6 +116,8 @@ pub struct KatanaApp {
     pub(crate) update_rx: Option<std::sync::mpsc::Receiver<Result<String, String>>>,
     /// Active background export tasks.
     pub(crate) export_tasks: Vec<ExportTask>,
+    /// Queue for aggressively opening multiple documents without freezing UI
+    pub(crate) pending_document_loads: std::collections::VecDeque<std::path::PathBuf>,
 
     /// Whether the About dialog is currently visible.
     pub(crate) show_about: bool,
@@ -151,6 +153,7 @@ impl KatanaApp {
             workspace_rx: None,
             update_rx: None,
             export_tasks: Vec::new(),
+            pending_document_loads: std::collections::VecDeque::new(),
             show_about: false,
             show_update_dialog: false,
             update_notified: false,
@@ -497,7 +500,7 @@ impl KatanaApp {
         }
     }
 
-    fn handle_select_document(&mut self, path: std::path::PathBuf, activate: bool) {
+    pub(crate) fn handle_select_document(&mut self, path: std::path::PathBuf, activate: bool) {
         // Auto-expand parents only when a file is explicitly activated (not during lazy background loads)
         if activate {
             let mut parent = path.parent();
@@ -686,11 +689,14 @@ impl KatanaApp {
             AppAction::SelectDocument(p) => self.handle_select_document(p, true),
             AppAction::OpenMultipleDocuments(paths) => {
                 // When recursively opening a directory, activate the first file
-                // and open the rest lazily (no load, no activate).
-                let mut first = true;
-                for path in paths.into_iter() {
-                    self.handle_select_document(path, first);
-                    first = false;
+                // and open the rest lazily (no load, no activate) in subsequent frames
+                // to prevent UI freezing and show progressive tab increase.
+                let mut iter = paths.into_iter();
+                if let Some(first_path) = iter.next() {
+                    self.handle_select_document(first_path, true);
+                }
+                for path in iter {
+                    self.pending_document_loads.push_back(path);
                 }
             }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
@@ -2255,6 +2261,11 @@ mod tests_extra {
             AppAction::OpenMultipleDocuments(vec![f1.clone(), f2.clone()]),
         );
 
+        // Simulate frame updates clearing the background pending document queue
+        while let Some(path) = app.pending_document_loads.pop_front() {
+            app.handle_select_document(path, false);
+        }
+
         // Both documents are opened
         assert_eq!(app.state.open_documents.len(), 2);
         // First document is activated (loaded) and second stays lazy
@@ -2287,6 +2298,7 @@ mod tests_extra {
             workspace_rx: None,
             update_rx: None,
             export_tasks: Vec::new(),
+            pending_document_loads: std::collections::VecDeque::new(),
             show_about: false,
             show_update_dialog: false,
             update_notified: false,

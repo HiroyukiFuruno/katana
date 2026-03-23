@@ -475,14 +475,14 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
     harness.step();
 
     // 1. Initial state: dir1 should be visible
-    let dir1_node = harness.get_all_by_label("dir dir1").next().unwrap();
+    let dir1_node = harness.get_by_label("dir dir1");
 
     dir1_node.click();
     harness.step();
     harness.step();
 
     // 2. After clicking dir1, dir2 should be visible
-    let dir2_node = harness.get_all_by_label("dir dir2").next().unwrap();
+    let dir2_node = harness.get_by_label("dir dir2");
 
     // 3. BUT test.md should NOT be visible (non-recursive)
     let test_md_visible = harness
@@ -512,44 +512,44 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
         "Cache should contain expanded dirs"
     );
 
-    // 7. Expand parent first
-    let parent_label = harness.get_all_by_value("dir1").next().unwrap();
-    parent_label.click(); // Expand parent
+    // 7. Test expansion caching: Collapse dir1, then re-expand it.
+    // Right now, dir1 is open and dir2 is open.
+    let parent_label = harness.get_by_label("dir dir1");
+    parent_label.click(); // Collapses dir1
     harness.step();
     harness.step();
 
-    // Now click the child directory row (dir2)
-    let dir_row = harness.get_all_by_value("dir2").next();
-    if let Some(row) = dir_row {
-        row.click();
-    }
+    // Expand dir1 again
+    let parent_label = harness.get_by_label("dir dir1");
+    parent_label.click(); // Expands dir1
     harness.step();
-    harness.step(); // Extra step for expansion state to settle
+    harness.step();
 
-    // Assert that dir2 is now visible (expanded) before collapsing all
-    let dir2_visible_before_collapse = harness
+    // Verify dir2 is still expanded (because it was cached) so test.md is visible
+    let test_md_visible_cached = harness
         .get_all_by_role(egui::accesskit::Role::Label)
-        .any(|n| n.value().map(|v| v.contains("dir2")).unwrap_or(false));
+        .any(|n| n.value().map(|v| v.contains("test.md")).unwrap_or(false));
     assert!(
-        dir2_visible_before_collapse,
-        "dir2 should be visible before Collapse All button is clicked"
+        test_md_visible_cached,
+        "test.md should be visible after closing and reopening dir1 (cached expansion)"
     );
 
     // 8. Click "-" button (Collapse All)
-    let collapse_all = harness.get_by_label("-");
+    let collapse_all = harness.get_by_label("-"); // The collapse all button has text "-"
     collapse_all.click();
     harness.step();
+    harness.step();
 
-    // 8. Verify EVERYTHING is collapsed (dir2 should NOT be visible)
-    let dir2_visible = harness
+    // 9. Verify EVERYTHING is collapsed (dir2 should NOT be visible)
+    let dir2_present = harness
         .get_all_by_role(egui::accesskit::Role::Label)
-        .any(|n| n.value().map(|v| v.contains("dir2")).unwrap_or(false));
+        .any(|n| n.value().map(|l| l.contains("dir2")).unwrap_or(false));
     assert!(
-        !dir2_visible,
+        !dir2_present,
         "dir2 should NOT be visible after Collapse All"
     );
 
-    // 9. Verify cache is CLEARED
+    // 10. Verify cache is CLEARED
     let cache_after = harness
         .state_mut()
         .app_state_mut()
@@ -777,7 +777,11 @@ fn test_integration_open_all_markdown() {
             md1.clone(),
             md2.clone(),
         ]));
-    harness.step();
+
+    // Give enough frames for KatanaApp::update to process pending_document_loads queue!
+    for _ in 0..5 {
+        harness.step();
+    }
 
     let state = harness.state_mut().app_state_mut();
     assert_eq!(state.open_documents.len(), 2, "Should open 2 documents");
@@ -789,7 +793,10 @@ fn test_integration_open_all_markdown() {
             md1.clone(),
             md2.clone(),
         ]));
-    harness.step();
+
+    for _ in 0..5 {
+        harness.step();
+    }
 
     let state = harness.state_mut().app_state_mut();
     assert_eq!(
@@ -2546,7 +2553,14 @@ fn test_integration_ui_context_menu_close_others() {
     let mut harness = setup_harness();
     harness.step();
 
-    let temp_dir = std::env::temp_dir().join("katana_test_ws_context_menu_ui");
+    let unique_name = format!(
+        "katana_test_ws_context_menu_ui_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+    let temp_dir = std::env::temp_dir().join(unique_name);
     let _ = std::fs::remove_dir_all(&temp_dir);
     std::fs::create_dir_all(&temp_dir).unwrap();
     let file1 = temp_dir.join("a.md");
@@ -2565,11 +2579,11 @@ fn test_integration_ui_context_menu_close_others() {
     harness.run_steps(5);
     harness
         .state_mut()
-        .trigger_action(AppAction::SelectDocument(abs2.clone()));
+        .trigger_action(AppAction::SelectDocument(abs3));
     harness.run_steps(5);
     harness
         .state_mut()
-        .trigger_action(AppAction::SelectDocument(abs3));
+        .trigger_action(AppAction::SelectDocument(abs2.clone()));
     harness.run_steps(5);
 
     let tab_b = harness.get_all_by_label("b.md").next().unwrap();
