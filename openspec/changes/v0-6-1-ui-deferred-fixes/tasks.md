@@ -6,7 +6,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [x] 1.1 `pulldown.rs` 内の `self.line.append_to` に使用される `egui::Align` を `BOTTOM` から `Center` へ変更。
 - [x] 1.2 `katana-ui/tests/preview_pane.rs` において、`html_...` となっている旧テストケースを `Center` 対応へと修正する。
-- [ ] 1.3 解消されていませんでした...image.pngを参照してください。インラインコードの文字が5px亭午上に寄せる必要があります。取り消し線も同様ですね。
+- [x] 1.3 インラインコードと取り消し線のvalignをALIGN::TOPに変更し、~5pxの上方向シフトを実現
 
 ### Definition of Done (DoD)
 
