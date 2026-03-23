@@ -2316,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "katana-core"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "katana-linter"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "ignore",
  "proc-macro2",
@@ -2350,7 +2350,7 @@ dependencies = [
 
 [[package]]
 name = "katana-platform"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "cc",
@@ -2366,7 +2366,7 @@ dependencies = [
 
 [[package]]
 name = "katana-ui"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "base64",
