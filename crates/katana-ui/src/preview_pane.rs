@@ -169,6 +169,10 @@ pub struct PreviewPane {
     pub scroll_request: Option<usize>,
     /// Channel for background rendering completion notifications.
     pub render_rx: Option<std::sync::mpsc::Receiver<RenderMessage>>,
+    /// State flag indicating if background rendering is currently in progress.
+    pub is_loading: bool,
+    /// Token used to abort background rendering threads if the pane is dropped or reloaded.
+    pub cancel_token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Path to the currently previewed Markdown file (for resolving relative paths in render_html_fn).
     md_file_path: std::path::PathBuf,
     /// Signals shell to reduce diagram concurrency settings if a worker fails.
@@ -185,6 +189,9 @@ pub struct PreviewPane {
     pub fullscreen_viewer_state: ViewerState,
     /// Tracks whether the OS was already in fullscreen mode before opening the modal.
     pub was_os_fullscreen_before_modal: bool,
+    /// Cached egui Context for background threads to signal repaint on completion.
+    /// Set from `show()` / `show_content()` so threads can wake the UI without polling.
+    repaint_ctx: Option<egui::Context>,
 }
 
 struct RenderJob {
@@ -202,6 +209,14 @@ pub enum RenderMessage {
         section: RenderedSection,
     },
     ReduceConcurrency,
+}
+
+impl Drop for PreviewPane {
+    fn drop(&mut self) {
+        // Automatically kill running background children explicitly if a pane is deleted (e.g., closing a tab)
+        self.cancel_token
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl PreviewPane {
@@ -253,6 +268,15 @@ impl PreviewPane {
             }
         }
         self.sections = new_sections;
+    }
+
+    /// Gracefully aborts all currently running background renders for this pane.
+    /// Used when a tab goes into the background without being fully destroyed.
+    pub fn abort_renders(&mut self) {
+        self.cancel_token
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.is_loading = false;
+        self.render_rx = None;
     }
 
     /// Completely re-renders all sections (including diagrams).
@@ -317,8 +341,17 @@ impl PreviewPane {
         self.sections = sections;
 
         if jobs.is_empty() {
+            self.is_loading = false;
             return;
         }
+
+        // Cancel previous running threads first!
+        self.cancel_token
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let current_cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.cancel_token = current_cancel_token.clone();
+
+        self.is_loading = true;
         let (tx, rx) = std::sync::mpsc::channel();
         self.render_rx = Some(rx);
 
@@ -329,6 +362,8 @@ impl PreviewPane {
         for _ in 0..concurrency.min(jobs_len) {
             let tx = tx.clone();
             let jobs_rx = jobs_rx.clone();
+            let current_cancel_token = current_cancel_token.clone();
+            let repaint_ctx = self.repaint_ctx.clone();
             std::thread::spawn(move || loop {
                 let job = {
                     let mut lock = jobs_rx.lock().unwrap();
@@ -337,6 +372,11 @@ impl PreviewPane {
                 let Some(job) = job else {
                     break;
                 };
+
+                // Abort before spinning up heavy rendering logic/CLI tasks
+                if current_cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
 
                 let cache_key = get_cache_key(&job.path, &job.kind, &job.src);
                 let is_http = job.src.contains("http://") || job.src.contains("https://");
@@ -392,6 +432,12 @@ impl PreviewPane {
                 if tx.send(msg).is_err() {
                     break; // Receiver was dropped.
                 }
+                // Signal the UI thread that new data is available.
+                // This replaces the polling-based request_repaint_after in poll_renders.
+                // Note: repaint_ctx is None in test context (no egui::Context available).
+                if let Some(ctx) = &repaint_ctx {
+                    ctx.request_repaint();
+                }
             });
         }
     }
@@ -401,6 +447,7 @@ impl PreviewPane {
     /// Returns `Some(DownloadRequest)` if the download button is pressed.
     #[allow(dead_code)]
     pub fn show(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+        self.repaint_ctx = Some(ui.ctx().clone());
         // Poll for background rendering completion.
         self.poll_renders(ui.ctx());
 
@@ -429,6 +476,7 @@ impl PreviewPane {
     /// Renders only the preview content without a ScrollArea.
     /// Used when you want to control the outer ScrollArea (e.g. for scroll sync).
     pub fn show_content(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+        self.repaint_ctx = Some(ui.ctx().clone());
         self.poll_renders(ui.ctx());
         let request = self.render_sections(ui);
         self.render_fullscreen_modal(ui.ctx());
@@ -525,50 +573,52 @@ impl PreviewPane {
             }
         }
 
-        let still_pending = if let Some(rx) = &self.render_rx {
-            let mut updated = false;
-            while let Ok(msg) = rx.try_recv() {
-                match msg {
-                    RenderMessage::Section {
-                        kind,
-                        source,
-                        section,
-                    } => {
-                        for slot in &mut self.sections {
-                            if let RenderedSection::Pending {
-                                kind: p_kind,
-                                source: p_source,
-                            } = slot
-                            {
-                                if p_kind == &kind && p_source == &source {
-                                    *slot = section.clone();
-                                    updated = true;
+        let mut disconnected = false;
+
+        if let Some(rx) = &self.render_rx {
+            loop {
+                match rx.try_recv() {
+                    Ok(msg) => match msg {
+                        RenderMessage::Section {
+                            kind,
+                            source,
+                            section,
+                        } => {
+                            for slot in &mut self.sections {
+                                if let RenderedSection::Pending {
+                                    kind: p_kind,
+                                    source: p_source,
+                                } = slot
+                                {
+                                    if p_kind == &kind && p_source == &source {
+                                        *slot = section.clone();
+                                    }
                                 }
                             }
                         }
+                        RenderMessage::ReduceConcurrency => {
+                            self.concurrency_reduction_requested = true;
+                        }
+                    },
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {
+                        break;
                     }
-                    RenderMessage::ReduceConcurrency => {
-                        self.concurrency_reduction_requested = true;
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        disconnected = true;
+                        break;
                     }
                 }
             }
-            if updated {
-                tracing::debug!("[CPU_LEAK] preview_pane requesting repaint because of render_rx update (updated=true)");
-                ctx.request_repaint();
+
+            // No repaint requested here — background threads signal directly
+            // via repaint_ctx.request_repaint() when they send messages.
+
+            if disconnected {
+                self.is_loading = false;
+                self.render_rx = None;
             }
-            self.sections
-                .iter()
-                .any(|s| matches!(s, RenderedSection::Pending { .. }))
         } else {
-            false
-        };
-        if still_pending {
-            tracing::debug!(
-                "[CPU_LEAK] preview_pane still_pending=true, requesting repaint after 100ms"
-            );
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
-        } else {
-            self.render_rx = None;
+            self.is_loading = false;
         }
     }
 
@@ -1606,5 +1656,79 @@ mod tests {
         let state = ViewerState::default();
         let debug_str = format!("{:?}", state);
         assert!(debug_str.contains("ViewerState"));
+    }
+    #[test]
+    fn poll_renders_clears_is_loading_on_disconnect() {
+        let mut pane = PreviewPane::default();
+        let (tx, rx) = std::sync::mpsc::channel::<RenderMessage>();
+        drop(tx); // EXPLICIT DISCONNECT
+        pane.render_rx = Some(rx);
+        pane.is_loading = true;
+
+        let ctx = egui::Context::default();
+        pane.poll_renders(&ctx);
+
+        assert!(
+            !pane.is_loading,
+            "poll_renders did not clear is_loading when disconnected"
+        );
+        assert!(
+            pane.render_rx.is_none(),
+            "poll_renders did not drop the disconnected rx"
+        );
+    }
+
+    #[test]
+    fn full_render_sets_is_loading_to_true() {
+        let mut pane = PreviewPane::default();
+        assert!(!pane.is_loading);
+
+        let cache = std::sync::Arc::new(katana_platform::InMemoryCacheService::default());
+        pane.full_render(
+            "```mermaid\ngraph TD;\nA-->B;\n```",
+            std::path::Path::new("test.md"),
+            cache,
+            false,
+            1,
+        );
+
+        assert!(
+            pane.is_loading,
+            "full_render did not set is_loading to true"
+        );
+        assert!(pane.render_rx.is_some());
+    }
+
+    #[test]
+    fn full_render_aborts_on_cancel_token() {
+        let mut pane = PreviewPane::default();
+        let cache = std::sync::Arc::new(katana_platform::InMemoryCacheService::default());
+
+        pane.full_render(
+            "```mermaid\ngraph TD\nA-->B\n```",
+            &std::path::PathBuf::from("test.md"),
+            cache,
+            true,
+            1,
+        );
+        let rx = pane.render_rx.take().unwrap();
+        assert!(pane.is_loading);
+
+        // Immediately cancel before background thread executes or finishes
+        pane.cancel_token
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        // The rx should now disconnect without producing a Section result
+        // (because the thread breaks instantly on cancel_token).
+        // Drain any messages and verify none are Section results.
+        let sections: Vec<_> =
+            std::iter::from_fn(|| rx.recv_timeout(std::time::Duration::from_millis(500)).ok())
+                .filter(|msg| matches!(msg, RenderMessage::Section { .. }))
+                .collect();
+        assert!(
+            sections.is_empty(),
+            "Renderer should have aborted due to cancel_token but produced {} section(s)",
+            sections.len()
+        );
     }
 }

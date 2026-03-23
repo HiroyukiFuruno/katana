@@ -151,9 +151,15 @@ impl<'a> HtmlRenderer<'a> {
 
                 match align {
                     Some(TextAlign::Center) => {
-                        self.ui.vertical_centered(|ui| {
-                            ui.label(rt);
-                        });
+                        let avail_w = self.ui.available_width();
+                        self.ui.allocate_ui_with_layout(
+                            egui::vec2(avail_w, 0.0),
+                            egui::Layout::top_down(egui::Align::Center),
+                            |ui| {
+                                ui.set_width(avail_w);
+                                ui.label(rt);
+                            },
+                        );
                     }
                     _ => {
                         self.ui.label(rt);
@@ -591,5 +597,44 @@ mod tests {
         let url = "https://img.shields.io/badge/License-MIT-blue.svg?style=flat";
 
         assert_eq!(ensure_svg_extension(url), url);
+    }
+
+    #[test]
+    fn heading_with_align_center_is_centered() {
+        use eframe::egui;
+        use egui_kittest::{
+            kittest::{NodeT, Queryable},
+            Harness,
+        };
+
+        let html = "<h1 align=\"center\">Centered Heading</h1>";
+        let parser = katana_core::html::HtmlParser::new(std::path::Path::new("."));
+        let nodes = parser.parse(html);
+
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(600.0, 400.0))
+            .build_ui(move |ui| {
+                ui.set_width(600.0);
+                let renderer = HtmlRenderer::new(ui, std::path::Path::new("."));
+                renderer.render(&nodes);
+            });
+
+        harness.step();
+
+        let label = harness.get_by_label("Centered Heading");
+        let bounds = label
+            .accesskit_node()
+            .raw_bounds()
+            .expect("heading must have bounds");
+
+        // The text is rendered inside a 600px wide area.
+        // If centered, the left edge (x0) should be roughly (600 - text_width) / 2.
+        // If it's left-aligned, it will be close to 0.0.
+        // debug log for bounds
+        assert!(
+            bounds.x0 > 200.0,
+            "Heading with align='center' should be centered, but its x0 is {:.1}",
+            bounds.x0
+        );
     }
 }

@@ -32,6 +32,10 @@ run: build ## Run the application (KatanA)
 run-release: ## Run the application in release mode
 	cargo run --bin KatanA --release
 
+.PHONY: run-performance
+run-performance: ## Run in release mode with FPS monitor logging
+	RUST_LOG=warn cargo run --bin KatanA --release
+
 VERSION      := $(shell grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 
 .PHONY: package-mac

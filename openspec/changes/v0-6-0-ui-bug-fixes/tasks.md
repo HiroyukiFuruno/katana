@@ -6,11 +6,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [x] 1.1 `KatanaSvgLoader::load` が失敗した場合にエラーを返し、キャッシュさせるようにする (`LoadError::NotSupported` の利用)
 - [x] 1.2 `shell.rs` において、`tab.hash` （キャッシュ）を判定し、同一ハッシュなら早期リターンするよう最適化 (CPU100%バグ修正)
+- [x] 1.3 スプラッシュ画面の無限再描画ループの修正 (`request_repaint_after` の利用)
+- [x] 1.4 エディタのレンダリングループ内に埋め込まれていた大量の `println!` (ゴミ) の削除
 
 ### Definition of Done (DoD)
 
-- [x] CPUが100%に張り付く現象が消失し、`tests::svg_loader` などが通過する
-- [/] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] CPUが100%に張り付く現象が消失し、UIスレッドがアイドル状態に戻ることを確認
+- [x] `tests::svg_loader` などが通過する
+- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ## 2. P1/P3/P4 UI レンダリングバグ修正
 
@@ -34,3 +37,19 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 3.5 Merge into master (※ `--admin` is permitted)
 - [ ] 3.6 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md` for `0.6.0`
 - [ ] 3.7 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
+
+---
+
+## 4. P0 ゾンビスレッドと外部プロセスの無制限実行バグ修正 (追加対応)
+
+- [ ] 4.1 キャンセルトークンの導入
+  - `PreviewPane` に `cancel_token: Arc<AtomicBool>` を持たせ、新しく `full_render` する前やドロップ時に以前のトークンを `true` に更新する。
+- [ ] 4.2 バックグラウンドスレッドの早期終了
+  - スレッドプール (`std::thread::spawn`) のループ内でジョブ取り出しごとに `cancel_token` を評価し、`true` なら直ちに `break` でスレッドを抜ける実装を行う。
+- [ ] 4.3 `shell.rs` でのタブ削除時キャンセル
+  - タブを削除するアクション (`handle_close_tab` 等) において、対象の `PreviewPane` の `cancel_token` を `true` にして確実に不要なプロセスを殺す。
+
+### Definition of Done (DoD)
+
+- [ ] 巨大なダイアグラムファイル (`sample_diagrams.ja.md`) を開いてからすぐに別タブに移動したりタブを閉じたりした場合、裏で処理が走らず CPU が 0% 近くのアイドル状態にすぐ戻ることを Activity Monitor 等で確認できる。
+- [ ] TDDで、キャンセルトークンが機能してスレッドが中断されることを証明する（GREEN）。

@@ -16,6 +16,8 @@ use crate::{
 };
 
 const INVISIBLE_LABEL_SIZE: f32 = 0.1;
+/// Splash screen animation repaint interval (~30fps).
+const SPLASH_REPAINT_INTERVAL_MS: u64 = 32;
 
 fn invisible_label(text: &str) -> egui::RichText {
     egui::RichText::new(text)
@@ -1001,7 +1003,6 @@ pub(crate) fn render_editor_content(
 
                 // Draw line numbers
                 let clip_rect = ui.clip_rect().expand(100.0);
-                println!("Test Debug: clip_rect={:?}", clip_rect);
                 let mut p = 0;
                 let mut is_start_of_para = true;
 
@@ -1011,13 +1012,6 @@ pub(crate) fn render_editor_content(
                     let is_visible = is_start_of_para
                         && y <= clip_rect.max.y
                         && (y + row.rect().height()) >= clip_rect.min.y;
-
-                    if !is_visible && is_start_of_para {
-                        println!(
-                            "Test Debug: row skipped y={} clip.min={} clip.max={}",
-                            y, clip_rect.min.y, clip_rect.max.y
-                        );
-                    }
 
                     if is_visible {
                         let is_current = current_cursor_y == Some(top_y);
@@ -1153,7 +1147,6 @@ pub(crate) fn render_directory_entry(
     });
 
     if resp.clicked() {
-        eprintln!("Directory clicked! Path: {:?}, was open: {}", path, is_open);
         if is_open {
             ctx.expanded_directories.remove(path);
         } else {
@@ -1952,6 +1945,9 @@ impl eframe::App for KatanaApp {
         if self.cached_theme.as_ref() != Some(&theme_colors) {
             let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+            // Disable floating scrollbar animation — egui's animate_bool_responsive
+            // for floating scrollbar hover detection triggers continuous repaints (~90fps).
+            ctx.style_mut(|s| s.spacing.scroll.floating = false);
             katana_core::markdown::color_preset::DiagramColorPreset::set_dark_mode(dark);
             self.cached_theme = Some(theme_colors.clone());
             // Re-render diagrams with the new theme colours.
@@ -2386,8 +2382,10 @@ impl eframe::App for KatanaApp {
                             });
                         });
                     });
-
-                ctx.request_repaint();
+                // Animate splash screen (fade in/out, progress text)
+                ctx.request_repaint_after(std::time::Duration::from_millis(
+                    SPLASH_REPAINT_INTERVAL_MS,
+                ));
             }
         }
     }

@@ -8,10 +8,9 @@ fn test_sourcepos_bytes() {
     for node in doc.descendants() {
         if let NodeValue::Image(_) = node.data.borrow().value {
             let pos = node.data.borrow().sourcepos;
-            println!("Pos: {:?}", pos);
             let lines: Vec<&str> = src.lines().collect();
             let line = lines[pos.start.line - 1];
-            println!("Text: {}", &line[pos.start.column - 1..pos.end.column]);
+            assert_eq!(&line[pos.start.column - 1..pos.end.column], "![alt](test.png)");
         }
     }
 }
