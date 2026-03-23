@@ -275,54 +275,80 @@ pub(crate) fn render_workspace_panel(
                         state.force_tree_open = Some(false);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let icon_bg = if ui.visuals().dark_mode {
+                            egui::Color32::TRANSPARENT
+                        } else {
+                            egui::Color32::from_gray(LIGHT_MODE_ICON_BG) // Always gray for icons in light mode
+                        };
+
                         if !state.settings.settings().workspace.paths.is_empty() {
                             let ws_history_img =
-                                egui::Image::new(crate::icon::Icon::Document.uri())
-                                    .tint(ui.visuals().text_color());
-                            ui.menu_image_button(ws_history_img, |ui| {
-                                for path in state.settings.settings().workspace.paths.iter().rev() {
-                                    ui.horizontal(|ui| {
-                                        if ui
-                                            .add(egui::Button::image_and_text(
-                                                crate::Icon::Remove
-                                                    .ui_image(ui, crate::icon::IconSize::Small),
-                                                invisible_label("x"),
-                                            ))
-                                            .on_hover_text(
-                                                crate::i18n::get().action.remove_workspace.clone(),
-                                            )
-                                            .clicked()
-                                        {
-                                            *action = AppAction::RemoveWorkspace(path.clone());
-                                            ui.close();
-                                        }
-                                        if ui.selectable_label(false, path).clicked() {
-                                            *action = AppAction::OpenWorkspace(
-                                                std::path::PathBuf::from(path),
-                                            );
-                                            ui.close();
-                                        }
-                                    });
-                                }
-                            })
-                            .response
-                            .on_hover_text(crate::i18n::get().workspace.recent_workspaces.clone());
+                                crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Small);
+                            ui.scope(|ui| {
+                                ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
+                                ui.menu_image_button(ws_history_img, |ui| {
+                                    for path in
+                                        state.settings.settings().workspace.paths.iter().rev()
+                                    {
+                                        ui.horizontal(|ui| {
+                                            if ui
+                                                .add(egui::Button::image_and_text(
+                                                    crate::Icon::Remove
+                                                        .ui_image(ui, crate::icon::IconSize::Small),
+                                                    invisible_label("x"),
+                                                ))
+                                                .on_hover_text(
+                                                    crate::i18n::get()
+                                                        .action
+                                                        .remove_workspace
+                                                        .clone(),
+                                                )
+                                                .clicked()
+                                            {
+                                                *action = AppAction::RemoveWorkspace(path.clone());
+                                                ui.close();
+                                            }
+                                            if ui.selectable_label(false, path).clicked() {
+                                                *action = AppAction::OpenWorkspace(
+                                                    std::path::PathBuf::from(path),
+                                                );
+                                                ui.close();
+                                            }
+                                        });
+                                    }
+                                })
+                                .response
+                                .on_hover_text(
+                                    crate::i18n::get().workspace.recent_workspaces.clone(),
+                                );
+                            });
                         }
+
                         if ui
-                            .add(egui::Button::image_and_text(
-                                crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Small),
-                                invisible_label("🔄"),
-                            ))
+                            .add(
+                                egui::Button::image_and_text(
+                                    crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Small),
+                                    invisible_label("🔄"),
+                                )
+                                .fill(icon_bg),
+                            )
                             .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
                             .clicked()
                         {
                             *action = AppAction::RefreshWorkspace;
                         }
+
                         let filter_btn_color = if state.filter_enabled {
-                            ui.visuals().selection.bg_fill
+                            if ui.visuals().dark_mode {
+                                ui.visuals().selection.bg_fill
+                            } else {
+                                egui::Color32::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
+                                // Darker gray when active in light mode
+                            }
                         } else {
-                            egui::Color32::TRANSPARENT
+                            icon_bg
                         };
+
                         if ui
                             .add(
                                 egui::Button::image_and_text(
@@ -336,11 +362,15 @@ pub(crate) fn render_workspace_panel(
                         {
                             state.filter_enabled = !state.filter_enabled;
                         }
+
                         if ui
-                            .add(egui::Button::image_and_text(
-                                crate::Icon::Search.ui_image(ui, crate::icon::IconSize::Small),
-                                invisible_label("🔍"),
-                            ))
+                            .add(
+                                egui::Button::image_and_text(
+                                    crate::Icon::Search.ui_image(ui, crate::icon::IconSize::Small),
+                                    invisible_label("🔍"),
+                                )
+                                .fill(icon_bg),
+                            )
                             .on_hover_text(crate::i18n::get().search.modal_title.clone())
                             .clicked()
                         {
@@ -576,6 +606,13 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
             .layout(egui::Layout::right_to_left(egui::Align::Center)),
     );
     let has_doc = state.active_document().is_some();
+
+    let icon_bg = if ui.visuals().dark_mode {
+        egui::Color32::TRANSPARENT
+    } else {
+        egui::Color32::from_gray(LIGHT_MODE_ICON_BG)
+    };
+
     if overlay_ui
         .add_enabled(
             has_doc,
@@ -583,7 +620,8 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
                 crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Medium),
                 invisible_label("🔄"),
             )
-            .min_size(button_size),
+            .min_size(button_size)
+            .fill(icon_bg),
         )
         .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
         .clicked()
@@ -593,43 +631,50 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
 
     let export_img =
         egui::Image::new(crate::icon::Icon::Export.uri()).tint(overlay_ui.visuals().text_color());
-    overlay_ui.menu_image_button(export_img, |ui| {
-        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-        if ui
-            .button(crate::i18n::get().menu.export_html.clone())
-            .clicked()
-        {
-            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
-            ui.close();
-        }
-        if ui
-            .button(crate::i18n::get().menu.export_pdf.clone())
-            .clicked()
-        {
-            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
-            ui.close();
-        }
-        if ui
-            .button(crate::i18n::get().menu.export_png.clone())
-            .clicked()
-        {
-            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
-            ui.close();
-        }
-        if ui
-            .button(crate::i18n::get().menu.export_jpg.clone())
-            .clicked()
-        {
-            *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
-            ui.close();
-        }
+    overlay_ui.scope(|ui| {
+        ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
+        ui.menu_image_button(export_img, |ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+            if ui
+                .button(crate::i18n::get().menu.export_html.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_pdf.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_png.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::get().menu.export_jpg.clone())
+                .clicked()
+            {
+                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
+                ui.close();
+            }
+        });
     });
 
     if state.settings.settings().layout.toc_visible {
         let toc_bg = if state.show_toc {
-            ui.visuals().selection.bg_fill
+            if ui.visuals().dark_mode {
+                ui.visuals().selection.bg_fill
+            } else {
+                egui::Color32::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
+            }
         } else {
-            egui::Color32::TRANSPARENT
+            icon_bg
         };
         if overlay_ui
             .add_enabled(
@@ -703,8 +748,13 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                             .inner;
 
                         tab_rects.push((idx, resp.rect));
-                        // Task 3.3: Keep the active tab visible in the scroll area.
-                        if is_active {
+                        let should_scroll = ui.memory_mut(|mem| {
+                            mem.data
+                                .remove_temp::<bool>(egui::Id::new("scroll_tab_req"))
+                                .unwrap_or(false)
+                        });
+                        // Task 3.7: Only scroll when navigated via left/right buttons.
+                        if is_active && should_scroll {
                             resp.scroll_to_me(Some(egui::Align::Center));
                         }
                         if resp.drag_stopped() {
@@ -779,13 +829,20 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         ui.separator();
 
         let nav_enabled = doc_count > 1;
+        let icon_bg = if ui.visuals().dark_mode {
+            egui::Color32::TRANSPARENT
+        } else {
+            egui::Color32::from_gray(LIGHT_MODE_ICON_BG)
+        };
+
         if ui
             .add_enabled(
                 nav_enabled,
                 egui::Button::image_and_text(
                     crate::Icon::TriangleLeft.ui_image(ui, crate::icon::IconSize::Small),
                     invisible_label("◀"),
-                ),
+                )
+                .fill(icon_bg),
             )
             .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
@@ -795,6 +852,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 tab_action = Some(AppAction::SelectDocument(
                     state.open_documents[new_idx].path.clone(),
                 ));
+                ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
             }
         }
         if ui
@@ -803,7 +861,8 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 egui::Button::image_and_text(
                     crate::Icon::TriangleRight.ui_image(ui, crate::icon::IconSize::Small),
                     invisible_label("▶"),
-                ),
+                )
+                .fill(icon_bg),
             )
             .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
@@ -813,6 +872,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 tab_action = Some(AppAction::SelectDocument(
                     state.open_documents[new_idx].path.clone(),
                 ));
+                ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
             }
         }
     });
@@ -1145,7 +1205,7 @@ pub(crate) fn render_directory_entry(
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
     state.set_open(is_open);
     let file_tree_color = ui.visuals().text_color();
-    let (rect, resp) = ui.allocate_at_least(
+    let (rect, mut resp) = ui.allocate_at_least(
         egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
         egui::Sense::click(),
     );
@@ -1187,30 +1247,33 @@ pub(crate) fn render_directory_entry(
             crate::icon::Icon::FolderClosed
         };
 
-        child_ui.label(egui::RichText::new(prefix));
+        let r1 = child_ui.add(egui::Label::new(prefix));
 
         // Add spacing equivalent to item_spacing.x = 2.0 manually or rely on default layout
-        child_ui.add(
+        let r2 = child_ui.add(
             arrow_icon
                 .image(crate::icon::IconSize::Small)
-                .tint(file_tree_color),
+                .tint(file_tree_color)
+                .sense(egui::Sense::click()),
         );
-        child_ui.add(
+        let r3 = child_ui.add(
             folder_icon
                 .image(crate::icon::IconSize::Medium)
-                .tint(file_tree_color),
+                .tint(file_tree_color)
+                .sense(egui::Sense::click()),
         );
-        child_ui.add(egui::Label::new(egui::RichText::new(name).color(file_tree_color)).truncate());
+        let r4 = child_ui
+            .add(egui::Label::new(egui::RichText::new(name).color(file_tree_color)).truncate());
+        resp = resp.union(r1).union(r2).union(r3).union(r4);
     }
-
-    // Directory level Meta Info on Hover
-    let resp = resp.on_hover_ui(|ui| {
-        let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
-        ui.label(meta_text);
-    });
 
     // "Open All" Context Menu for directories
     resp.context_menu(|ui| {
+        // Meta info moved to context menu to prevent on_hover_ui interference
+        let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
+        ui.label(meta_text);
+        ui.separator();
+
         if ui
             .button(crate::i18n::get().action.recursive_expand.clone())
             .clicked()
@@ -1332,32 +1395,45 @@ pub(crate) fn render_file_entry(
         child_ui.add_space(TREE_LABEL_HOFFSET);
 
         let prefix_string = indent_prefix(ctx.depth);
-        child_ui.label(egui::RichText::new(prefix_string).color(text_color));
+        let r1 = child_ui.add(egui::Label::new(
+            egui::RichText::new(prefix_string).color(text_color),
+        ));
 
         // Allocate empty space exactly matching the directory arrow icon's size
-        child_ui.allocate_space(egui::vec2(crate::icon::IconSize::Small.to_vec2().x, 0.0));
+        let r2 = child_ui.allocate_response(
+            egui::vec2(crate::icon::IconSize::Small.to_vec2().x, 0.0),
+            egui::Sense::click(),
+        );
 
-        if entry.is_markdown() {
+        let r3 = if entry.is_markdown() {
             child_ui.add(
                 crate::icon::Icon::Document
                     .image(crate::icon::IconSize::Medium)
-                    .tint(text_color),
-            );
+                    .tint(text_color)
+                    .sense(egui::Sense::click()),
+            )
         } else {
             // For non-markdown, we might want a raw file icon, but for now we fallback to invisible space to match old behavior
-            child_ui.add_space(crate::icon::IconSize::Medium.to_vec2().x);
-        }
+            child_ui.allocate_response(
+                egui::vec2(crate::icon::IconSize::Medium.to_vec2().x, 0.0),
+                egui::Sense::click(),
+            )
+        };
 
         let mut rich = egui::RichText::new(name).color(text_color);
         if is_active {
             rich = rich.strong();
         }
-        let resp_label = child_ui.add(egui::Label::new(rich).truncate());
+        let resp_label = child_ui.add(
+            egui::Label::new(rich)
+                .truncate()
+                .sense(egui::Sense::click()),
+        );
 
         resp_label.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &accessible_label)
         });
-        resp = resp.union(resp_label);
+        resp = resp.union(r1).union(r2).union(r3).union(resp_label);
     }
 
     // File level Meta Info on Hover
@@ -2014,6 +2090,13 @@ impl eframe::App for KatanaApp {
 
         self.poll_download(ctx);
         self.poll_workspace_load(ctx);
+
+        // Process pending document loads (1 per frame to avoid UI freeze)
+        if let Some(path) = self.pending_document_loads.pop_front() {
+            self.handle_select_document(path, false);
+            ctx.request_repaint();
+        }
+
         self.poll_update_check(ctx);
         self.poll_export(ctx);
 
@@ -3476,6 +3559,9 @@ const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
 const TOC_PANEL_MARGIN: f32 = 8.0;
 const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
 const TOC_INDENT_PER_LEVEL: f32 = 12.0;
+
+const LIGHT_MODE_ICON_BG: u8 = 235;
+const LIGHT_MODE_ICON_ACTIVE_BG: u8 = 200;
 
 pub(crate) fn render_toc_panel(
     ctx: &egui::Context,
