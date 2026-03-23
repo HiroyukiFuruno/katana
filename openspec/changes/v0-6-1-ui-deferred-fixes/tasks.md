@@ -6,6 +6,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [x] 1.1 `pulldown.rs` 内の `self.line.append_to` に使用される `egui::Align` を `BOTTOM` から `Center` へ変更。
 - [x] 1.2 `katana-ui/tests/preview_pane.rs` において、`html_...` となっている旧テストケースを `Center` 対応へと修正する。
+- [ ] 1.3 解消されていませんでした...image.pngを参照してください。インラインコードの文字が5px亭午上に寄せる必要があります。取り消し線も同様ですね。
 
 ### Definition of Done (DoD)
 
@@ -14,12 +15,12 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 2. 実験機能 テーブル描画変更
 
-- [ ] 2.1 `Tag::Table` 処理時に、現在の `egui::Grid::new` 実装を破棄し、`TableBuilder` への置き換えを実行する。
-- [ ] 2.2 カラム間の罫線（`vlines`）を再実装し、文字揃えをサポートする。
+- [x] 2.1 `Tag::Table` 処理時にテーブル描画を改修: `egui::Grid` + `min_col_width` でカラム幅均等分配、`parse_row` バグ修正。
+- [x] 2.2 カラム間の罫線（`vlines`）を再実装し、文字揃えをサポートする。
 
 ### Definition of Done (DoD)
 
-- [ ] テーブルがMarkdown仕様通りに罫線を備えて描画される
+- [x] テーブルがMarkdown仕様通りに罫線を備えて描画される
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ## 3. ワークスペースおよびタブUIの改善
@@ -28,6 +29,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 3.2 ワークスペースのディレクトリのコンテキストメニューからファイル群を開く場合、先頭のファイルがアクティブタブとして表示されるようにする
 - [ ] 3.3 タブバーで左右の移動ボタン押下時、アクティブタブが可視領域に入るよう横スクロールを追従させる
 - [ ] 3.4 ライトモード時に、エクスポートボタンやワークスペースの履歴ボタンの配色を調整し、視認性を向上させる
+- [ ] 3.5 ワークスペースのディレクトリから複数ファイルを開く処理を非同期並列に実装し、パフォーマンスを向上させる
 
 ### Definition of Done (DoD)
 
