@@ -1366,6 +1366,25 @@ impl<'a> CommonMarkViewerInternal<'a> {
         max_width: f32,
     ) {
         if let Some(block) = self.code_block.take() {
+            // Route ```math blocks through render_math_fn so they are treated as
+            // display math instead of being rendered as a fenced code block.
+            let is_math = block
+                .lang
+                .as_deref()
+                .map(|l| l.eq_ignore_ascii_case("math"))
+                .unwrap_or(false);
+
+            if is_math {
+                if let Some(math_fn) = options.math_fn {
+                    self.line.try_insert_start(ui);
+                    math_fn(ui, block.content.trim(), false);
+                    if !self.inside_blockquote {
+                        self.line.try_insert_end(ui);
+                    }
+                    return;
+                }
+            }
+
             block.end(ui, cache, options, max_width);
             if !self.inside_blockquote {
                 self.line.try_insert_end(ui);
