@@ -37,7 +37,7 @@ const CENTERING_TOLERANCE: f64 = 50.0;
 /// Load fixture file, full_render with diagrams, and wait for completion.
 fn load_fixture(filename: &str) -> (PreviewPane, std::path::PathBuf, String) {
     let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
+        .join("../../assets/fixtures")
         .join(filename);
     let source = std::fs::read_to_string(&fixture_path)
         .unwrap_or_else(|e| panic!("Failed to read {}: {e}", fixture_path.display()));
