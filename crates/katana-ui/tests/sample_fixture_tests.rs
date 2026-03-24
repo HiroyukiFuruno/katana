@@ -824,7 +824,22 @@ fn basic_fixture_en_s12_accordion_renders_summary() {
 
 // ── §13 Math ──
 
-/// §13.2: Inline math `$ E = mc^2 $` renders as visible monospace text.
+/// §13.1: ` ```math ` block renders the LaTeX source (not dropped or shown as raw code block).
+#[test]
+fn basic_fixture_en_s13_block_math_renders() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 13.1", "### 13.2");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
+    // The LaTeX source content should appear as a label (render_math_fn fallback)
+    let node = harness.get_by_label("f(x) = \\int_{0}^{x} \\frac{t^2}{1 + t^4} \\, dt");
+    assert!(
+        !node.accesskit_node().is_hidden(),
+        "Block math content should be rendered and visible"
+    );
+}
+
+/// §13.2: Inline math `$E = mc^2$` renders as visible monospace text (no spaces inside delimiters).
 #[test]
 fn basic_fixture_en_s13_inline_math_renders() {
     let (_, _, source) = load_fixture("sample_basic.md");
@@ -838,6 +853,20 @@ fn basic_fixture_en_s13_inline_math_renders() {
     assert!(
         !node.accesskit_node().is_hidden(),
         "Inline math node should not be hidden"
+    );
+}
+
+/// §13.3: Single-line `$$ ... $$` renders the LaTeX source as block math.
+#[test]
+fn basic_fixture_en_s13_singleline_math_renders() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 13.3", "---");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
+    let node = harness.get_by_label("\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}");
+    assert!(
+        !node.accesskit_node().is_hidden(),
+        "Single-line $$ math content should be rendered and visible"
     );
 }
 
