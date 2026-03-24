@@ -182,7 +182,11 @@ impl Style {
         }
 
         if self.code {
-            text = text.code();
+            // Use monospace font + explicit background_color instead of `code()`.
+            // Both paths share the same TextFormat.background rendering, giving
+            // consistent vertical centering with `<mark>` highlight backgrounds.
+            let code_bg = ui.visuals().code_bg_color;
+            text = text.monospace().background_color(code_bg);
         }
 
         if self.underline {
