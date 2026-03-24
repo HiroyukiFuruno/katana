@@ -5,6 +5,7 @@ use std::fs;
 /// Y-offset factor for CJK fallback fonts in monospace context.
 /// Aligns CJK baseline with the primary Latin monospace font (e.g. Menlo).
 const MONO_FALLBACK_Y_OFFSET_FACTOR: f32 = 0.40;
+const MONO_PRIMARY_Y_OFFSET_FACTOR: f32 = -0.15;
 
 /// Font wrapper that tracks normalization state for consistent baseline
 /// alignment across mixed-language text (JP/EN) and across font families
@@ -52,11 +53,14 @@ impl NormalizeFonts {
         self
     }
 
-    /// CJK baseline normalization: Insert tweaked CJK fallback into Monospace.
+    /// CJK baseline normalization:
+    /// Adjusts the `Monospace` fallback so it perfectly aligns with `Monospace` primary,
+    /// which is in turn raised by `MONO_PRIMARY_Y_OFFSET_FACTOR` to match `Proportional` baselines
+    /// during `egui` LayoutJob center alignment mixed rendering.
     fn normalize_cjk_baseline(&mut self, proportional_candidates: &[&str]) {
         let tweaked_fallback = egui::FontTweak {
             scale: 1.0,
-            y_offset_factor: MONO_FALLBACK_Y_OFFSET_FACTOR,
+            y_offset_factor: MONO_FALLBACK_Y_OFFSET_FACTOR + MONO_PRIMARY_Y_OFFSET_FACTOR,
             y_offset: 0.0,
         };
         let mono_fallback_name = SystemFontLoader::load_first_valid(
@@ -70,12 +74,6 @@ impl NormalizeFonts {
             SystemFontLoader::insert_after_primary(&mut self.fonts, FontFamily::Monospace, name);
         }
     }
-
-    // NOTE: Cross-family baseline normalization (Proportional ↔ Monospace) has been
-    // intentionally removed. Applying y_offset_factor to either family's primary font
-    // caused unacceptable side-effects:
-    // - Proportional y_offset → all body text appears bottom-aligned in widgets
-    // - Monospace y_offset → breaks CJK fallback alignment within Monospace
     //
     // Inline code baseline alignment is handled at the LayoutJob level instead.
 
@@ -137,7 +135,12 @@ impl SystemFontLoader {
         let mut fonts = FontDefinitions::default();
 
         let prop_name = Self::load_first_valid(&mut fonts, proportional_candidates, None, "");
-        let mono_name = Self::load_first_valid(&mut fonts, monospace_candidates, None, "");
+        let mono_tweak = egui::FontTweak {
+            scale: 1.0,
+            y_offset_factor: MONO_PRIMARY_Y_OFFSET_FACTOR,
+            y_offset: 0.0,
+        };
+        let mono_name = Self::load_first_valid(&mut fonts, monospace_candidates, Some(mono_tweak), "");
 
         // Add primary fonts mapped to their corresponding families
         if let Some(name) = &prop_name {

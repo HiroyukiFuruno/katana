@@ -202,8 +202,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
         let remaining_width = (ui.clip_rect().right() - ui.cursor().min.x).max(0.0);
         let max_width = max_width.min(remaining_width);
         let style = ui.style().clone();
+        let halign = ui.layout().horizontal_align();
         let mut layout_job = egui::text::LayoutJob::default();
-        layout_job.halign = egui::Align::LEFT;
+        layout_job.halign = halign;
         layout_job.wrap.max_width = max_width;
         layout_job.wrap.break_anywhere = true;
         for rich_text in &pending_inline {
@@ -211,11 +212,11 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 &mut layout_job,
                 &style,
                 egui::FontSelection::Default,
-                egui::Align::BOTTOM,
+                egui::Align::Center,
             );
         }
 
-        ui.add(egui::Label::new(layout_job).wrap().halign(egui::Align::LEFT));
+        ui.add(egui::Label::new(layout_job).wrap().halign(halign));
     }
 
     fn emit_wrapped_followup_chunks(&self, ui: &mut Ui, text: &str) {
