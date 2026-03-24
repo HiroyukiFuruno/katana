@@ -822,6 +822,25 @@ fn basic_fixture_en_s12_accordion_renders_summary() {
     );
 }
 
+// ── §13 Math ──
+
+/// §13.2: Inline math `$ E = mc^2 $` renders as visible monospace text.
+#[test]
+fn basic_fixture_en_s13_inline_math_renders() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 13.2", "### 13.3");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
+    // The LaTeX source "E = mc^2" is what render_math_fn receives (delimiters stripped by pulldown-cmark).
+    // pulldown-cmark only parses $...$ as InlineMath when there are NO spaces inside the delimiters.
+    let node = harness.get_by_label("E = mc^2");
+    // Node exists and is not hidden — math was rendered (not silently dropped).
+    assert!(
+        !node.accesskit_node().is_hidden(),
+        "Inline math node should not be hidden"
+    );
+}
+
 // ── Diagrams (External Dependencies) ──
 // These tests depend on external tools (mmdc, plantuml.jar, drawio) and produce
 // vastly different output depending on whether they are installed. CI runners

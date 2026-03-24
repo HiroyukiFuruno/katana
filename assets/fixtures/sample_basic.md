@@ -302,7 +302,7 @@ f(x) = \int_{0}^{x} \frac{t^2}{1 + t^4} \, dt
 
 ### 13.2 Inline Math
 
-Mass-energy equivalence: $ E = mc^2 $
+Mass-energy equivalence: $E = mc^2$
 
 ### 13.3 Single-line Math
 

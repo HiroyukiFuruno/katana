@@ -54,11 +54,16 @@ pub(crate) fn show_section(
                     render_html_block(ui, html, text_color, &md_path_owned);
                 };
 
+                let math_binding = |ui: &mut egui::Ui, tex: &str, is_inline: bool| {
+                    render_math(ui, tex, is_inline);
+                };
+
                 let mut viewer = CommonMarkViewer::new()
                     .syntax_theme_dark(preset.syntax_theme_dark)
                     .syntax_theme_light(preset.syntax_theme_light)
                     .heading_offset(heading_offset)
-                    .render_html_fn(Some(&binding));
+                    .render_html_fn(Some(&binding))
+                    .render_math_fn(Some(&math_binding));
 
                 if let Some(idx) = scroll_to_heading_index {
                     viewer = viewer.scroll_to_heading_index(idx);
@@ -781,6 +786,49 @@ pub(crate) fn show_fullscreen_local_image(
         });
 
     keep_open
+}
+
+/// Renders a LaTeX math expression as a readable fallback.
+///
+/// Full KaTeX rendering (LaTeX → SVG → egui texture) requires a GPU rasterization
+/// pipeline and is not yet implemented. This fallback displays the LaTeX source
+/// in a styled code block so the content is always visible.
+///
+/// - Inline math: rendered as monospace text with code background, inline.
+/// - Block math: rendered in a framed code block with `$$` delimiters.
+fn render_math(ui: &mut egui::Ui, tex: &str, is_inline: bool) {
+    /// Horizontal padding (left/right) inside the block math frame.
+    const MATH_BLOCK_H_MARGIN: i8 = 8;
+    /// Vertical padding (top/bottom) inside the block math frame.
+    const MATH_BLOCK_V_MARGIN: i8 = 4;
+    /// Corner radius for the block math frame.
+    const MATH_BLOCK_CORNER_RADIUS: u8 = 4;
+
+    if is_inline {
+        let code_bg = ui.visuals().code_bg_color;
+        ui.label(
+            egui::RichText::new(tex)
+                .monospace()
+                .background_color(code_bg),
+        );
+    } else {
+        // Block math: frame + delimiter lines for visual clarity.
+        egui::Frame::new()
+            .fill(ui.visuals().extreme_bg_color)
+            .inner_margin(egui::Margin::symmetric(MATH_BLOCK_H_MARGIN, MATH_BLOCK_V_MARGIN))
+            .corner_radius(egui::CornerRadius::same(MATH_BLOCK_CORNER_RADIUS))
+            .show(ui, |ui| {
+                ui.label(
+                    // `$$…$$` are LaTeX delimiters, not user-facing strings; i18n is not applicable.
+                    {
+                        let display = format!("$$\n{tex}\n$$");
+                        egui::RichText::new(display)
+                            .monospace()
+                            .color(ui.visuals().text_color())
+                    },
+                );
+            });
+    }
 }
 
 /// Renders an HTML block using our HtmlParser + HtmlRenderer pipeline.
