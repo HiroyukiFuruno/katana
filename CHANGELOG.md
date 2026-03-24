@@ -2,6 +2,30 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.6.1] - 2026-03-24 03:15:14 (UTC)
+
+### 🎨 UI/UX
+
+- **Strikethrough Rendering**: Replace `allocate_painter` with `Label` + `ui.painter()` overlay rendering. Resolves text clipping (left-side truncation) and misalignment within list items, with Y-position tuned for CJK glyph centering.
+- **Table Centering**: Replace manual margin calculations with native `Layout::top_down(Align::Center)`, providing stable CSS-like `margin: 0 auto` behavior for tables.
+- **Workspace Click Areas**: Expand clickable regions to cover both icon and name for directories/files, with hover effects and context menu support across the full row.
+- **Tab Scroll Following**: Active tab scrolls into view only on navigation button press, preventing unwanted scroll jumps during manual scrolling.
+- **Light Mode Icons**: Apply consistent gray background to all sidebar icons (filter, TOC toggle, etc.) for improved visibility in light theme.
+- **Preview Padding**: Remove extraneous padding on preview and main window outer frames, and equalize left/right inner margins.
+
+### 🐛 Bug Fixes
+
+- **Inline Code Alignment**: Change `egui::Align` from `BOTTOM` to `TOP` for inline code and strikethrough, correcting vertical positioning of background fills.
+- **Table Header Border**: Fix header-row border rendering that was being cut off midway.
+- **Table Column Alignment**: Implement per-column text alignment (left/center/right) as specified in Markdown alignment syntax.
+- **Force Reload**: Explicitly read file content from disk and call `mark_clean()` on `AppAction::RefreshDiagrams` to prevent stale UI state.
+- **Multi-Tab Open**: Ensure truly asynchronous/parallel tab loading when opening multiple files from a workspace directory, with the first file activated immediately.
+
+### 🔧 Miscellaneous
+
+- **Coverage**: Remove conditional branch around `katana_fonts_loaded` flag — always write the value unconditionally to guarantee coverage under `cargo llvm-cov`.
+- **Fixture Relocation**: Move test fixture files from `crates/katana-ui/tests/fixtures/` to `assets/fixtures/` for centralized resource management.
+
 ## [0.6.0] - 2026-03-22 21:52:53 (UTC)
 
 ### 🐛 Bug Fixes
