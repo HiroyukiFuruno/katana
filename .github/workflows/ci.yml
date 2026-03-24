@@ -12,17 +12,7 @@ on:
       - 'docs/**'
       - 'Makefile'
       - 'scripts'
-  pull_request:
-    branches: [master]
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - 'LICENSE'
-      - '.gitignore'
-      - 'openspec/**'
-      - 'docs/**'
-      - 'Makefile'
-      - 'scripts'
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
