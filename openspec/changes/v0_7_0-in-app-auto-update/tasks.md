@@ -12,7 +12,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 ## 1. アプリ内自動更新機能の実装 (Core Update Logic)
 
 - [x] 1.1 `katana-core` へのバージョンチェック機能実装 (GitHub Releases API連携。ローカル検証用APIオーバーライド機能を含む)
-- [ ] 1.2 `katana-core` への .zip ダウンロード・一時展開・Relauncher（ヘルパースクリプト）生成機能の実装
+- [x] 1.2 `katana-core` への .zip ダウンロード・一時展開・Relauncher（ヘルパースクリプト）生成機能の実装
 - [ ] 1.3 `katana-core` から Relauncher をバックグラウンド起動し、自身を終了させるフローの構築（置換・`xattr -cr`・テンポラリのクリーンアップ・再起動処理を委譲）
 - [ ] 1.4 `katana-core` へのチェック頻度や状態管理・エラーハンドリング機能の実装
 - [ ] 1.5 ローカルHTTPサーバーとダミーファイルを用いた、実リリース前の完全ローカル疑似E2Eテストの実行と検証
