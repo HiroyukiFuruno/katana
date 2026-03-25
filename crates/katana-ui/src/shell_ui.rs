@@ -465,6 +465,7 @@ pub(crate) fn render_workspace_content(
                     active_path: active_path.as_deref(),
                     filter_set,
                     expanded_directories: &mut state.expanded_directories,
+                    disable_context_menu: false,
                 };
                 for entry in &entries {
                     render_tree_entry(ui, entry, &mut ctx);
@@ -1409,6 +1410,57 @@ pub(crate) struct TreeRenderContext<'a, 'b> {
     pub active_path: Option<&'b std::path::Path>,
     pub filter_set: Option<&'b std::collections::HashSet<std::path::PathBuf>>,
     pub expanded_directories: &'a mut std::collections::HashSet<std::path::PathBuf>,
+    pub disable_context_menu: bool,
+}
+
+fn find_node_in_tree<'a>(
+    entries: &'a [katana_core::workspace::TreeEntry],
+    target: &std::path::Path,
+) -> Option<&'a katana_core::workspace::TreeEntry> {
+    for entry in entries {
+        match entry {
+            katana_core::workspace::TreeEntry::Directory { path, children } => {
+                if path == target {
+                    return Some(entry);
+                }
+                if target.starts_with(path) {
+                    if let Some(found) = find_node_in_tree(children, target) {
+                        return Some(found);
+                    }
+                }
+            }
+            katana_core::workspace::TreeEntry::File { path } => {
+                if path == target {
+                    return Some(entry);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn render_breadcrumb_menu(
+    ui: &mut egui::Ui,
+    entries: &[katana_core::workspace::TreeEntry],
+    action: &mut crate::app_state::AppAction,
+) {
+    for entry in entries {
+        match entry {
+            katana_core::workspace::TreeEntry::Directory { path, children } => {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+                ui.menu_button(name, |ui| {
+                    render_breadcrumb_menu(ui, children, action);
+                });
+            }
+            katana_core::workspace::TreeEntry::File { path } => {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+                if ui.button(name).clicked() {
+                    *action = crate::app_state::AppAction::SelectDocument(path.clone());
+                    ui.close();
+                }
+            }
+        }
+    }
 }
 
 pub(crate) fn render_tree_entry(
@@ -1611,9 +1663,11 @@ pub(crate) fn render_directory_entry(
     }
 
     // Context Menu for directories
-    resp.context_menu(|ui| {
-        render_tree_context_menu(ui, path, true, Some(children), None, ctx);
-    });
+    if !ctx.disable_context_menu {
+        resp.context_menu(|ui| {
+            render_tree_context_menu(ui, path, true, Some(children), None, ctx);
+        });
+    }
 
     if resp.clicked() {
         let new_state = !is_open;
@@ -1746,9 +1800,11 @@ pub(crate) fn render_file_entry(
         });
     }
 
-    resp.context_menu(|ui| {
-        render_tree_context_menu(ui, path, false, None, Some(entry), ctx);
-    });
+    if !ctx.disable_context_menu {
+        resp.context_menu(|ui| {
+            render_tree_context_menu(ui, path, false, None, Some(entry), ctx);
+        });
+    }
 
     if resp.clicked() && entry.is_markdown() {
         *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
@@ -2581,36 +2637,40 @@ impl eframe::App for KatanaApp {
 
                             current_path = current_path.join(seg);
                             let is_last = i == segments.len() - 1;
-                            let is_dir = !is_last;
 
-                            let resp = ui.add(
-                                egui::Label::new(egui::RichText::new(*seg).small())
-                                    .sense(egui::Sense::click()),
-                            );
+                            // The doc_path_clone is only needed for the original `render_tree_entry` logic,
+                            // which is being replaced.
+                            // let doc_path_clone = doc_path.clone();
 
-                            let doc_path_clone = doc_path.clone();
-                            // Context menu matching the Source Tree
-                            resp.context_menu(|ui| {
-                                let mut ctx_action = crate::app_state::AppAction::None;
-                                let mut tree_ctx = TreeRenderContext {
-                                    action: &mut ctx_action,
-                                    depth: 0,
-                                    active_path: Some(doc_path_clone.as_path()),
-                                    filter_set: None,
-                                    expanded_directories: &mut self.state.expanded_directories,
-                                };
-                                render_tree_context_menu(
-                                    ui,
-                                    &current_path,
-                                    is_dir,
-                                    None,
-                                    None,
-                                    &mut tree_ctx,
+                            if is_last {
+                                // Last segment is the file itself, just render it as text
+                                ui.add(
+                                    egui::Label::new(egui::RichText::new(*seg).small())
+                                        .sense(egui::Sense::hover()),
                                 );
-                                if !matches!(ctx_action, crate::app_state::AppAction::None) {
-                                    breadcrumb_action = Some(ctx_action);
-                                }
-                            });
+                            } else {
+                                // Dropdown mini-workspace for Breadcrumbs
+                                ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
+                                    let mut ctx_action = crate::app_state::AppAction::None;
+
+                                    if let Some(ws) = &self.state.workspace {
+                                        if let Some(
+                                            katana_core::workspace::TreeEntry::Directory {
+                                                children,
+                                                ..
+                                            },
+                                        ) = find_node_in_tree(&ws.tree, &current_path)
+                                        {
+                                            render_breadcrumb_menu(ui, children, &mut ctx_action);
+                                        }
+                                    }
+
+                                    if !matches!(ctx_action, crate::app_state::AppAction::None) {
+                                        breadcrumb_action = Some(ctx_action);
+                                        ui.close();
+                                    }
+                                });
+                            }
                         }
                     });
                     if let Some(a) = breadcrumb_action {
@@ -3076,6 +3136,7 @@ mod tests {
                         active_path: Some(path.as_path()),
                         filter_set: None,
                         expanded_directories: &mut expanded_directories,
+                        disable_context_menu: false,
                     };
                     render_file_entry(ui, &entry, &path, &mut render_ctx);
                 });

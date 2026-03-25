@@ -40,7 +40,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] Source Tree のタブ右クリックでメニューが表示される
 - [x] Workspace コンテキストメニューと同等の操作が実行できる
 - [x] `make check` が exit code 0 で通過
-- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 

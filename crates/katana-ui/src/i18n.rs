@@ -629,6 +629,20 @@ mod tests {
     use std::sync::RwLock;
 
     #[test]
+    fn test_i18n_default_action_values() {
+        assert_eq!(default_action_new_file(), "New File");
+        assert_eq!(default_action_new_directory(), "New Folder");
+        assert_eq!(default_action_open(), "Open");
+        assert_eq!(default_action_rename(), "Rename");
+        assert_eq!(default_action_delete(), "Delete");
+        assert_eq!(default_action_copy_path(), "Copy Path");
+        assert_eq!(default_action_copy_relative_path(), "Copy Relative Path");
+        assert_eq!(default_action_reveal_in_os(), "Reveal in OS");
+        assert_eq!(default_action_save(), "Save");
+        assert_eq!(default_action_cancel(), "Cancel");
+    }
+
+    #[test]
     fn test_get_fallback_to_en() {
         // Test that an unsupported language defaults to 'en' dictionary without failing.
         set_language("unsupported-lang-code");
