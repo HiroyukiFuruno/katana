@@ -39,6 +39,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Networking / Auto Update
 ureq = { version = "2.10", features = ["json"] }
 semver = "1.0"
+zip = "2.2"
 
 # Testing
 tempfile = "3"

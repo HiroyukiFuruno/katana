@@ -23,6 +23,7 @@ headless_chrome.workspace = true
 base64 = "0.22"
 ureq.workspace = true
 semver.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 pulldown-cmark = "0.13.2"
