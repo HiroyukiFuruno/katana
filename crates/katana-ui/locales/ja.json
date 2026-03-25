@@ -111,26 +111,26 @@
     "cannot_open_file": "ファイルを開けませんでした: {error}"
   },
   "action": {
-    "expand_all": "[ja] すべて展開",
-    "collapse_all": "[ja] すべて折りたたむ",
-    "collapse_sidebar": "[ja] サイドバーを隠す",
-    "refresh_workspace": "[ja] ワークスペースを更新",
-    "toggle_filter": "[ja] フィルター切り替え",
-    "remove_workspace": "[ja] 履歴から削除",
-    "recursive_expand": "[ja] 再帰的にディレクトリを展開",
-    "recursive_open_all": "[ja] 再帰的に全ファイルを開く",
-    "toggle_toc": "[ja] 目次の表示切替",
-    "show_meta_info": "[ja] メタ情報表示",
-    "new_file": "[ja] 新しいファイル...",
-    "new_directory": "[ja] 新しいフォルダー...",
-    "open": "[ja] 開く",
-    "rename": "[ja] 名前の変更...",
-    "delete": "[ja] 削除",
-    "copy_path": "[ja] パスのコピー",
-    "reveal_in_os": "[ja] OSの機能で表示する",
-    "save": "[ja] 保存",
-    "cancel": "[ja] キャンセル",
-    "copy_relative_path": "[ja] 相対パスのコピー"
+    "expand_all": "すべて展開",
+    "collapse_all": "すべて折りたたむ",
+    "collapse_sidebar": "サイドバーを隠す",
+    "refresh_workspace": "ワークスペースを更新",
+    "toggle_filter": "フィルター切り替え",
+    "remove_workspace": "履歴から削除",
+    "recursive_expand": "再帰的にディレクトリを展開",
+    "recursive_open_all": "再帰的に全ファイルを開く",
+    "toggle_toc": "目次の表示切替",
+    "show_meta_info": "メタ情報表示",
+    "new_file": "新しいファイル...",
+    "new_directory": "新しいフォルダー...",
+    "open": "開く",
+    "rename": "名前の変更...",
+    "delete": "削除",
+    "copy_path": "パスのコピー",
+    "reveal_in_os": "OSの機能で表示する",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "copy_relative_path": "相対パスのコピー"
   },
   "ai": {
     "ai_unconfigured": "[AI: 未設定]"
@@ -270,10 +270,10 @@
     "decline": "同意しない"
   },
   "dialog": {
-    "new_file_title": "[ja] 新規ファイル",
-    "new_directory_title": "[ja] 新規フォルダ",
-    "rename_title": "[ja] 名前変更",
-    "delete_title": "[ja] 削除の確認",
-    "delete_confirm_msg": "[ja] '{name}' を削除してもよろしいですか？\nこの操作は元に戻せません。"
+    "new_file_title": "新規ファイル",
+    "new_directory_title": "新規フォルダ",
+    "rename_title": "名前変更",
+    "delete_title": "削除の確認",
+    "delete_confirm_msg": "'{name}' を削除してもよろしいですか？\nこの操作は元に戻せません。"
   }
 }
