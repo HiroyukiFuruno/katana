@@ -35,9 +35,12 @@ pub(crate) fn show_section(
     id: usize,
     md_file_path: &std::path::Path,
     scroll_to_heading_index: Option<usize>,
-    populate_heading_rects: Option<&mut Vec<egui::Rect>>,
+    mut heading_anchors: Option<&mut Vec<(std::ops::Range<usize>, egui::Rect)>>,
     heading_offset: usize,
     global_task_list_idx: &mut usize,
+    active_editor_line: Option<usize>,
+    hovered_lines: Option<&mut Vec<std::ops::Range<usize>>>,
+    global_line_offset: usize,
 ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
     let mut actions = Vec::new();
     match section {
@@ -70,11 +73,75 @@ pub(crate) fn show_section(
                 if let Some(idx) = scroll_to_heading_index {
                     viewer = viewer.scroll_to_heading_index(idx);
                 }
-                if let Some(rects) = populate_heading_rects {
-                    viewer = viewer.populate_heading_rects(rects);
+
+                let previous_anchor_count = heading_anchors.as_ref().map(|a| a.len()).unwrap_or(0);
+                if let Some(anchors) = heading_anchors.as_mut() {
+                    viewer = viewer.heading_anchors(anchors);
+                }
+
+                if let Some(global_line) = active_editor_line {
+                    let lines_in_md = md.chars().filter(|c| *c == '\n').count();
+                    if global_line >= global_line_offset
+                        && global_line <= global_line_offset + lines_in_md
+                    {
+                        let local_line = global_line - global_line_offset;
+                        let mut current_line = 0;
+                        let mut start_byte = None;
+                        let mut end_byte = None;
+                        for (i, c) in md.char_indices() {
+                            if current_line == local_line && start_byte.is_none() {
+                                start_byte = Some(i);
+                            }
+                            if current_line == local_line + 1 {
+                                end_byte = Some(i);
+                                break;
+                            }
+                            if c == '\n' {
+                                current_line += 1;
+                            }
+                        }
+                        if current_line == local_line && start_byte.is_none() {
+                            start_byte = Some(0);
+                        }
+                        if let Some(s) = start_byte {
+                            viewer = viewer.active_char_range(s..end_byte.unwrap_or(md.len()));
+                        }
+                    }
+                }
+
+                let mut local_hovered_spans = Vec::new();
+                if hovered_lines.is_some() {
+                    viewer = viewer.hovered_spans(&mut local_hovered_spans);
                 }
 
                 let (_, newly_captured) = viewer.show_with_events(ui, cache, md);
+
+                if let Some(anchors) = heading_anchors {
+                    for anchor in &mut anchors[previous_anchor_count..] {
+                        let local_span = &anchor.0;
+                        let start_line = global_line_offset
+                            + md[..local_span.start]
+                                .chars()
+                                .filter(|c| *c == '\n')
+                                .count();
+                        let end_line = global_line_offset
+                            + md[..local_span.end].chars().filter(|c| *c == '\n').count();
+                        anchor.0 = start_line..end_line;
+                    }
+                }
+
+                if let Some(hovered) = hovered_lines {
+                    for local_span in local_hovered_spans {
+                        let start_line = global_line_offset
+                            + md[..local_span.start]
+                                .chars()
+                                .filter(|c| *c == '\n')
+                                .count();
+                        let end_line = global_line_offset
+                            + md[..local_span.end].chars().filter(|c| *c == '\n').count();
+                        hovered.push(start_line..end_line);
+                    }
+                }
                 let spans = egui_commonmark::extract_task_list_spans(md);
                 for action in newly_captured {
                     if let Some(local_idx) = spans.iter().position(|s| s == &action.span) {
@@ -85,19 +152,15 @@ pub(crate) fn show_section(
             });
             (None, actions)
         }
-        RenderedSection::Image { svg_data, alt } => {
+        RenderedSection::Image { svg_data, alt, .. } => {
             show_rasterized(ui, svg_data, alt, id, None, None);
             (None, vec![])
         }
-        RenderedSection::LocalImage { path, alt } => {
+        RenderedSection::LocalImage { path, alt, .. } => {
             show_local_image(ui, path, alt, id, None, None);
             (None, vec![])
         }
-        RenderedSection::Error {
-            kind,
-            _source: _,
-            message,
-        } => {
+        RenderedSection::Error { kind, message, .. } => {
             ui.label(
                 egui::RichText::new(crate::i18n::tf(
                     &crate::i18n::get().error.render_error,
@@ -111,7 +174,7 @@ pub(crate) fn show_section(
         RenderedSection::CommandNotFound {
             tool_name,
             install_hint,
-            _source: _,
+            ..
         } => {
             let msg = crate::i18n::get()
                 .error
@@ -130,6 +193,7 @@ pub(crate) fn show_section(
             kind,
             download_url,
             install_path,
+            ..
         } => (
             show_not_installed(ui, kind, download_url, install_path),
             vec![],
@@ -250,17 +314,17 @@ const MAX_ZOOM: f32 = 10.0;
 pub(crate) fn show_rasterized(
     ui: &mut egui::Ui,
     img: &RasterizedSvg,
-    _alt: &str,
-    id: usize,
-    mut viewer_state: Option<&mut ViewerState>,
+    _alt_text: &str,
+    idx: usize,
+    mut state: Option<&mut ViewerState>,
     fullscreen_request: Option<&mut Option<usize>>,
 ) {
     let max_w = ui.available_width();
     let base_scale = (max_w / img.width as f32).min(1.0);
 
     // Apply viewer zoom/pan if state is provided.
-    let zoom = viewer_state.as_ref().map_or(1.0, |s| s.zoom);
-    let pan = viewer_state.as_ref().map_or(egui::Vec2::ZERO, |s| s.pan);
+    let zoom = state.as_ref().map_or(1.0, |s| s.zoom);
+    let pan = state.as_ref().map_or(egui::Vec2::ZERO, |s| s.pan);
 
     // The base display size (zoom = 1.0)
     let base_size = Vec2::new(
@@ -275,7 +339,7 @@ pub(crate) fn show_rasterized(
     let (container_rect, response) =
         ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::click_and_drag());
 
-    if let Some(state) = viewer_state.as_mut() {
+    if let Some(state) = state.as_mut() {
         if response.hovered() {
             let zoom_delta = ui.input(|i| i.zoom_delta());
             if zoom_delta != 1.0 {
@@ -287,7 +351,7 @@ pub(crate) fn show_rasterized(
         }
     }
 
-    let texture_handle = if let Some(state) = viewer_state.as_mut() {
+    let texture_handle = if let Some(state) = state.as_mut() {
         if state.texture.is_none() {
             let color_img = egui::ColorImage::from_rgba_unmultiplied(
                 std::array::from_fn(|i| {
@@ -300,7 +364,7 @@ pub(crate) fn show_rasterized(
                 &img.rgba,
             );
             state.texture = Some(ui.ctx().load_texture(
-                format!("diagram_{id}"),
+                format!("diagram_{idx}"),
                 color_img,
                 egui::TextureOptions::LINEAR,
             ));
@@ -318,7 +382,7 @@ pub(crate) fn show_rasterized(
             &img.rgba,
         );
         ui.ctx().load_texture(
-            format!("diagram_{id}"),
+            format!("diagram_{idx}"),
             color_img,
             egui::TextureOptions::LINEAR,
         )
@@ -338,11 +402,11 @@ pub(crate) fn show_rasterized(
     );
 
     // Draw overlay controls only when viewer_state is provided.
-    if let Some(state) = viewer_state {
+    if let Some(state) = state {
         // Fullscreen button (top-right).
         if crate::diagram_controller::draw_fullscreen_button(ui, container_rect) {
             if let Some(req) = fullscreen_request {
-                *req = Some(id);
+                *req = Some(idx);
             }
         }
 
@@ -363,24 +427,38 @@ pub(crate) fn render_sections(
     sections: &[RenderedSection],
     md_file_path: &std::path::Path,
     scroll_to_heading_index: Option<usize>,
-    mut populate_heading_rects: Option<&mut Vec<egui::Rect>>,
+    mut heading_anchors: Option<&mut Vec<(std::ops::Range<usize>, egui::Rect)>>,
     mut viewer_states: Option<&mut Vec<ViewerState>>,
     mut fullscreen_request: Option<&mut Option<usize>>,
+    active_editor_line: Option<usize>,
+    mut hovered_lines: Option<&mut Vec<std::ops::Range<usize>>>,
 ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
     let mut request: Option<DownloadRequest> = None;
     let mut actions = Vec::new();
     let mut current_heading_offset = 0;
     let mut global_task_list_idx = 0;
+    let mut global_line_offset = 0;
 
     for (i, section) in sections.iter().enumerate() {
         ui.push_id(format!("section_{i}"), |ui| {
             let mut offset = 0;
-            if let RenderedSection::Markdown(md) = section {
+            let lines_in_section = if let RenderedSection::Markdown(md) = section {
                 offset = current_heading_offset;
                 current_heading_offset += katana_core::markdown::outline::extract_outline(md).len();
-            }
+                md.chars().filter(|c| *c == '\n').count()
+            } else {
+                match section {
+                    RenderedSection::Image { source_lines, .. } => *source_lines,
+                    RenderedSection::LocalImage { source_lines, .. } => *source_lines,
+                    RenderedSection::Error { source_lines, .. } => *source_lines,
+                    RenderedSection::NotInstalled { source_lines, .. } => *source_lines,
+                    RenderedSection::Pending { source_lines, .. } => *source_lines,
+                    RenderedSection::CommandNotFound { source_lines, .. } => *source_lines,
+                    _ => 0,
+                }
+            };
             match section {
-                RenderedSection::Image { svg_data, alt } => {
+                RenderedSection::Image { svg_data, alt, .. } => {
                     // Auto-extend viewer_states Vec if needed and take a mutable reference.
                     let state = viewer_states.as_mut().map(|vs| {
                         if vs.len() <= i {
@@ -397,7 +475,7 @@ pub(crate) fn render_sections(
                         fullscreen_request.as_deref_mut(),
                     );
                 }
-                RenderedSection::LocalImage { path, alt } => {
+                RenderedSection::LocalImage { path, alt, .. } => {
                     let state = viewer_states.as_mut().map(|vs| {
                         if vs.len() <= i {
                             vs.resize_with(i + 1, ViewerState::default);
@@ -414,9 +492,12 @@ pub(crate) fn render_sections(
                         i,
                         md_file_path,
                         scroll_to_heading_index,
-                        populate_heading_rects.as_deref_mut(),
+                        heading_anchors.as_deref_mut(),
                         offset,
                         &mut global_task_list_idx,
+                        active_editor_line,
+                        hovered_lines.as_deref_mut(),
+                        global_line_offset,
                     );
                     if let Some(r) = req {
                         request = Some(r);
@@ -424,12 +505,28 @@ pub(crate) fn render_sections(
                     actions.append(&mut event_actions);
                 }
             }
+            global_line_offset += lines_in_section;
         });
     }
     if sections.is_empty() {
         ui.label(egui::RichText::new(crate::i18n::get().preview.no_preview.clone()).weak());
     }
     (request, actions)
+}
+
+pub fn open_fullscreen_viewer(
+    ui: &mut egui::Ui,
+    idx: usize,
+    sections: &[RenderedSection],
+    opened_fullscreen_idx: &mut Option<usize>,
+) {
+    if let Some(RenderedSection::Image { svg_data, alt, .. }) = sections.get(idx) {
+        show_fullscreen_modal(ui.ctx(), svg_data, alt, &mut ViewerState::default(), idx);
+        *opened_fullscreen_idx = Some(idx);
+    } else if let Some(RenderedSection::LocalImage { path, alt, .. }) = sections.get(idx) {
+        show_fullscreen_local_image(ui.ctx(), path, alt, &mut ViewerState::default(), idx);
+        *opened_fullscreen_idx = Some(idx);
+    }
 }
 
 /// Renders the fullscreen modal overlay if `fullscreen_image` is `Some`.
@@ -441,13 +538,13 @@ pub(crate) fn render_fullscreen_if_active(
     fullscreen_state: &mut ViewerState,
 ) -> Option<usize> {
     let idx = fullscreen_image?;
-    if let Some(RenderedSection::Image { svg_data, alt }) = sections.get(idx) {
+    if let Some(RenderedSection::Image { svg_data, alt, .. }) = sections.get(idx) {
         if show_fullscreen_modal(ctx, svg_data, alt, fullscreen_state, idx) {
             Some(idx) // keep open
         } else {
             None // user closed
         }
-    } else if let Some(RenderedSection::LocalImage { path, alt }) = sections.get(idx) {
+    } else if let Some(RenderedSection::LocalImage { path, alt, .. }) = sections.get(idx) {
         if show_fullscreen_local_image(ctx, path, alt, fullscreen_state, idx) {
             Some(idx) // keep open
         } else {

@@ -155,7 +155,7 @@ fn build_harness(sections: Vec<RenderedSection>, width: f32, height: f32) -> Har
             }
             let mut pane = PreviewPane::default();
             pane.sections = sections.clone();
-            pane.show_content(ui);
+            pane.show_content(ui, None, None);
         });
     for _ in 0..5 {
         harness.step();
@@ -887,7 +887,7 @@ fn build_harness_accordion_open(sections: Vec<RenderedSection>) -> Harness<'stat
             }
             let mut pane = PreviewPane::default();
             pane.sections = sections.clone();
-            pane.show_content(ui);
+            pane.show_content(ui, None, None);
         });
     // Open the accordion by clicking its summary
     for _ in 0..3 {
@@ -1036,7 +1036,7 @@ After open paragraph.
             }
             let mut p = PreviewPane::default();
             p.sections = sections.clone();
-            p.show_content(ui);
+            p.show_content(ui, None, None);
         });
     // Open the accordion.
     for _ in 0..3 {

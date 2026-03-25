@@ -103,8 +103,10 @@ use egui_commonmark_backend::*;
 pub struct CommonMarkViewer<'f> {
     options: CommonMarkOptions<'f>,
     scroll_to_heading_index: Option<usize>,
-    populate_heading_rects: Option<&'f mut Vec<egui::Rect>>,
+    heading_anchors: Option<&'f mut Vec<(std::ops::Range<usize>, egui::Rect)>>,
     heading_offset: usize,
+    active_char_range: Option<std::ops::Range<usize>>,
+    hovered_spans: Option<&'f mut Vec<std::ops::Range<usize>>>,
 }
 
 impl<'f> Default for CommonMarkViewer<'f> {
@@ -112,8 +114,10 @@ impl<'f> Default for CommonMarkViewer<'f> {
         Self {
             options: Default::default(),
             scroll_to_heading_index: None,
-            populate_heading_rects: None,
+            heading_anchors: None,
             heading_offset: 0,
+            active_char_range: None,
+            hovered_spans: None,
         }
     }
 }
@@ -128,8 +132,18 @@ impl<'f> CommonMarkViewer<'f> {
         self
     }
 
-    pub fn populate_heading_rects(mut self, rects: &'f mut Vec<egui::Rect>) -> Self {
-        self.populate_heading_rects = Some(rects);
+    pub fn heading_anchors(mut self, anchors: &'f mut Vec<(std::ops::Range<usize>, egui::Rect)>) -> Self {
+        self.heading_anchors = Some(anchors);
+        self
+    }
+
+    pub fn active_char_range(mut self, range: std::ops::Range<usize>) -> Self {
+        self.active_char_range = Some(range);
+        self
+    }
+
+    pub fn hovered_spans(mut self, spans: &'f mut Vec<std::ops::Range<usize>>) -> Self {
+        self.hovered_spans = Some(spans);
         self
     }
 
@@ -270,8 +284,10 @@ impl<'f> CommonMarkViewer<'f> {
 
         let (response, _) = parsers::pulldown::CommonMarkViewerInternal::new(
             self.scroll_to_heading_index,
-            self.populate_heading_rects,
+            self.heading_anchors,
             self.heading_offset,
+            self.active_char_range.clone(),
+            self.hovered_spans,
         ).show(
             ui,
             cache,
@@ -298,8 +314,10 @@ impl<'f> CommonMarkViewer<'f> {
         let (mut inner_response, checkmark_events) =
             parsers::pulldown::CommonMarkViewerInternal::new(
                 self.scroll_to_heading_index,
-                self.populate_heading_rects,
+                self.heading_anchors,
                 self.heading_offset,
+                self.active_char_range.clone(),
+                self.hovered_spans,
             ).show(
                 ui,
                 cache,
@@ -362,8 +380,10 @@ impl<'f> CommonMarkViewer<'f> {
 
         parsers::pulldown::CommonMarkViewerInternal::new(
             self.scroll_to_heading_index,
-            self.populate_heading_rects,
+            self.heading_anchors,
             self.heading_offset,
+            self.active_char_range.clone(),
+            self.hovered_spans,
         ).show(
             ui,
             cache,
@@ -398,8 +418,10 @@ impl<'f> CommonMarkViewer<'f> {
         egui_commonmark_backend::prepare_show(cache, ui.ctx());
         parsers::pulldown::CommonMarkViewerInternal::new(
             self.scroll_to_heading_index,
-            self.populate_heading_rects,
+            self.heading_anchors,
             self.heading_offset,
+            self.active_char_range.clone(),
+            self.hovered_spans,
         ).show_scrollable(
             Id::new(source_id),
             ui,

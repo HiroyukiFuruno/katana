@@ -511,7 +511,7 @@ pub(crate) fn render_workspace_content(
 pub(crate) fn render_preview_content(
     ui: &mut egui::Ui,
     preview: &mut PreviewPane,
-    state: &AppState,
+    state: &mut AppState,
     action: &mut AppAction,
     scroll_sync: bool,
     scroll_state: &mut (f32, ScrollSource, f32),
@@ -526,9 +526,47 @@ pub(crate) fn render_preview_content(
         .id_salt("preview_scroll")
         .auto_shrink(std::array::from_fn(|_| false));
 
+    let mut target_scroll_offset = *fraction * (*prev_max_scroll).max(1.0);
     let consuming_editor = scroll_sync && *source == ScrollSource::Editor;
     if consuming_editor {
-        scroll_area = scroll_area.vertical_scroll_offset(*fraction * (*prev_max_scroll).max(1.0));
+        if let Some(doc) = state.active_document() {
+            let _buffer = &doc.buffer;
+            let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+            let editor_y = *fraction * state.editor_max_scroll.max(1.0);
+
+            let mut points = Vec::new();
+            points.push((0.0, 0.0));
+            for (span, rect) in &preview.heading_anchors {
+                let e_y = span.start as f32 * row_height;
+                let p_y = (rect.min.y - preview.content_top_y).max(0.0);
+                points.push((e_y, p_y));
+            }
+            points.push((
+                state.editor_max_scroll.max(1.0),
+                (*prev_max_scroll).max(1.0),
+            ));
+
+            let mut mapped_y = 0.0;
+            for i in 0..points.len() - 1 {
+                let (e_y1, p_y1) = points[i];
+                let (e_y2, p_y2) = points[i + 1];
+                if editor_y >= e_y1 && editor_y <= e_y2 {
+                    if e_y2 > e_y1 {
+                        let t = (editor_y - e_y1) / (e_y2 - e_y1);
+                        mapped_y = p_y1 + t * (p_y2 - p_y1);
+                    } else {
+                        mapped_y = p_y1;
+                    }
+                    break;
+                }
+            }
+            if editor_y > points.last().unwrap().0 {
+                mapped_y = points.last().unwrap().1;
+            }
+            target_scroll_offset = mapped_y;
+        }
+
+        scroll_area = scroll_area.vertical_scroll_offset(target_scroll_offset);
     }
 
     let mut content_ui = ui.new_child(
@@ -557,7 +595,23 @@ pub(crate) fn render_preview_content(
                     |ui| {
                         const PREVIEW_PANE_TOP_BOTTOM_PADDING: f32 = 4.0; // 0.25rem padding
                         ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
-                        let (req, actions) = preview.show_content(ui);
+                        let mut hovered_lines = Vec::new();
+                        let (req, actions) = preview.show_content(
+                            ui,
+                            state.active_editor_line,
+                            Some(&mut hovered_lines),
+                        );
+                        if scroll_sync && *source != ScrollSource::Preview {
+                            state.hovered_preview_lines = hovered_lines.clone();
+                        }
+
+                        if ui.rect_contains_pointer(ui.min_rect())
+                            && ui.input(|i| i.pointer.primary_clicked())
+                        {
+                            if let Some(hovered) = hovered_lines.first() {
+                                state.scroll_to_line = Some(hovered.start);
+                            }
+                        }
                         download_req = req;
                         if let Some((global_index, new_state)) = actions.into_iter().next() {
                             *action = AppAction::ToggleTaskList {
@@ -578,11 +632,50 @@ pub(crate) fn render_preview_content(
         if consuming_editor {
             *source = ScrollSource::Neither;
             if max_scroll > 0.0 {
-                *fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                // If mapped via piecewise, we should inversely map the actual offset back to fraction to stay stable.
+                // However, holding the fraction is generally safer.
+                // We leave fraction alone when consuming editor input.
             }
         } else {
             if max_scroll > 0.0 {
-                let current_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                let preview_y = output.state.offset.y;
+                let mut editor_target_y = preview_y;
+
+                if let Some(doc) = state.active_document() {
+                    let _buffer = &doc.buffer;
+                    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+
+                    let mut points = Vec::new();
+                    points.push((0.0, 0.0));
+                    for (span, rect) in &preview.heading_anchors {
+                        let e_y = span.start as f32 * row_height;
+                        let p_y = (rect.min.y - preview.content_top_y).max(0.0);
+                        points.push((e_y, p_y));
+                    }
+                    points.push((state.editor_max_scroll.max(1.0), max_scroll));
+
+                    let mut mapped_y = 0.0;
+                    for i in 0..points.len() - 1 {
+                        let (e_y1, p_y1) = points[i];
+                        let (e_y2, p_y2) = points[i + 1];
+                        if preview_y >= p_y1 && preview_y <= p_y2 {
+                            if p_y2 > p_y1 {
+                                let t = (preview_y - p_y1) / (p_y2 - p_y1);
+                                mapped_y = e_y1 + t * (e_y2 - e_y1);
+                            } else {
+                                mapped_y = e_y1;
+                            }
+                            break;
+                        }
+                    }
+                    if preview_y > points.last().unwrap().1 {
+                        mapped_y = points.last().unwrap().0;
+                    }
+                    editor_target_y = mapped_y;
+                }
+
+                let current_fraction =
+                    (editor_target_y / state.editor_max_scroll.max(1.0)).clamp(0.0, 1.0);
                 let diff = (current_fraction - *fraction).abs();
                 if diff > SCROLL_SYNC_DEAD_ZONE {
                     *fraction = current_fraction;
@@ -1074,9 +1167,30 @@ pub(crate) fn render_editor_content(
                 let response = text_output.response;
                 let galley = text_output.galley;
 
-                // Draw current line background
+                if response.clicked() {
+                    if let Some(c) = text_output.cursor_range {
+                        let char_idx = c.primary.index;
+                        let line = galley
+                            .text()
+                            .chars()
+                            .take(char_idx)
+                            .filter(|&ch| ch == '\n')
+                            .count();
+                        state.scroll_to_line = Some(line);
+                    }
+                }
+
                 let mut current_cursor_y = None;
                 if let Some(c) = text_output.cursor_range {
+                    let char_idx = c.primary.index;
+                    let paragraph = galley
+                        .text()
+                        .chars()
+                        .take(char_idx)
+                        .filter(|&ch| ch == '\n')
+                        .count();
+                    state.active_editor_line = Some(paragraph);
+
                     let cursor_rect = galley.pos_from_cursor(c.primary);
                     current_cursor_y = Some(cursor_rect.min.y);
 
@@ -1096,6 +1210,59 @@ pub(crate) fn render_editor_content(
                     };
                     ui.painter()
                         .rect_filled(highlight_rect, 0.0, highlight_color);
+                } else {
+                    state.active_editor_line = None;
+                }
+
+                // Hover highlights from preview pane
+                const HOVER_HIGHLIGHT_ALPHA: u8 = 10;
+                let hover_color = if ui.visuals().dark_mode {
+                    egui::Color32::from_white_alpha(HOVER_HIGHLIGHT_ALPHA)
+                } else {
+                    egui::Color32::from_black_alpha(HOVER_HIGHLIGHT_ALPHA)
+                };
+
+                for line_range in &state.hovered_preview_lines {
+                    let mut current_line = 0;
+                    let mut start_char = None;
+                    let mut end_char = None;
+
+                    for (char_idx, c) in buffer.chars().enumerate() {
+                        if current_line == line_range.start && start_char.is_none() {
+                            start_char = Some(char_idx);
+                        }
+                        if current_line == line_range.end + 1 {
+                            end_char = Some(char_idx.saturating_sub(1));
+                            break;
+                        }
+                        if c == '\n' {
+                            current_line += 1;
+                        }
+                    }
+                    if start_char.is_some() && end_char.is_none() {
+                        end_char = Some(buffer.chars().count().saturating_sub(1));
+                    }
+
+                    if let (Some(start_idx), Some(end_idx)) = (start_char, end_char) {
+                        let cursor_start = egui::text::CCursor {
+                            index: start_idx,
+                            prefer_next_row: false,
+                        };
+                        // Ensure we don't highlight beyond the actual characters
+                        let cursor_end = egui::text::CCursor {
+                            index: end_idx.saturating_sub(1),
+                            prefer_next_row: false,
+                        };
+
+                        let pos_start = galley.pos_from_cursor(cursor_start);
+                        let pos_end = galley.pos_from_cursor(cursor_end);
+
+                        let highlight_rect = egui::Rect::from_min_max(
+                            egui::pos2(ln_rect.min.x, response.rect.min.y + pos_start.min.y),
+                            egui::pos2(response.rect.max.x, response.rect.min.y + pos_end.max.y),
+                        );
+                        ui.painter().rect_filled(highlight_rect, 0.0, hover_color);
+                    }
                 }
 
                 // Draw line numbers
@@ -1138,6 +1305,15 @@ pub(crate) fn render_editor_content(
                             label_rect.min + egui::vec2(offset_x, 0.0),
                             galley_ln.1.rect.size(),
                         );
+
+                        let resp = ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
+                        if resp.clicked() {
+                            state.scroll_to_line = Some(p);
+                        }
+                        if resp.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
                         ui.put(tight_rect, egui::Label::new(text_rt).selectable(false));
                     }
 
@@ -1148,7 +1324,33 @@ pub(crate) fn render_editor_content(
                 }
 
                 if response.changed() {
-                    *action = AppAction::UpdateBuffer(buffer);
+                    *action = AppAction::UpdateBuffer(buffer.clone());
+                }
+
+                if let Some(target_line) = state.scroll_to_line.take() {
+                    let mut current_line = 0;
+                    let mut target_char = None;
+                    for (char_idx, c) in buffer.chars().enumerate() {
+                        if current_line == target_line && target_char.is_none() {
+                            target_char = Some(char_idx);
+                            break;
+                        }
+                        if c == '\n' {
+                            current_line += 1;
+                        }
+                    }
+                    if let Some(idx) = target_char {
+                        let cursor = egui::text::CCursor {
+                            index: idx,
+                            prefer_next_row: false,
+                        };
+                        let pos = galley.pos_from_cursor(cursor);
+                        let rect = egui::Rect::from_min_max(
+                            egui::pos2(response.rect.min.x, response.rect.min.y + pos.min.y),
+                            egui::pos2(response.rect.max.x, response.rect.min.y + pos.max.y),
+                        );
+                        ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                    }
                 }
 
                 response
@@ -1552,7 +1754,7 @@ fn render_horizontal_split(
                 download_req = render_preview_content(
                     ui,
                     pane,
-                    &app.state,
+                    &mut app.state,
                     &mut app.pending_action,
                     true,
                     &mut scroll_state,
@@ -1623,7 +1825,7 @@ fn render_vertical_split(
                     download_req = render_preview_content(
                         ui,
                         pane,
-                        &app.state,
+                        &mut app.state,
                         &mut app.pending_action,
                         true,
                         &mut scroll_state,
@@ -1659,7 +1861,7 @@ fn render_vertical_split(
                     download_req = render_preview_content(
                         ui,
                         pane,
-                        &app.state,
+                        &mut app.state,
                         &mut app.pending_action,
                         true,
                         &mut scroll_state,
@@ -1701,7 +1903,7 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
         render_preview_content(
             ui,
             pane,
-            &app.state,
+            &mut app.state,
             &mut app.pending_action,
             false,
             &mut scroll_state,
@@ -3714,7 +3916,7 @@ pub(crate) fn render_toc_panel(
                         let mut active_index = 0;
                         if let Some(visible_rect) = preview.visible_rect {
                             let threshold = visible_rect.min.y + TOC_HEADING_VISIBILITY_THRESHOLD;
-                            for (i, rect) in preview.heading_rects.iter().enumerate() {
+                            for (i, (_, rect)) in preview.heading_anchors.iter().enumerate() {
                                 if rect.min.y <= threshold {
                                     active_index = i;
                                 } else {

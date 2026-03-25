@@ -66,7 +66,7 @@ fn build_harness(sections: Vec<RenderedSection>, width: f32, height: f32) -> Har
         .build_ui(move |ui| {
             let mut pane = PreviewPane::default();
             pane.sections = sections.clone();
-            pane.show_content(ui);
+            pane.show_content(ui, None, None);
         });
     for _ in 0..5 {
         harness.step();
@@ -92,6 +92,7 @@ fn drawio_render_error_ui() {
             kind: "DrawIo".to_string(),
             _source: "<invalid/>".to_string(),
             message: "Failed to extract SVG from rendered HTML".to_string(),
+            source_lines: 0,
         },
         RenderedSection::Markdown("## After diagram\n".to_string()),
     ];
@@ -159,7 +160,7 @@ fn mermaid_both_states_render_semantically() {
     if katana_core::markdown::mermaid_renderer::is_mmdc_available() {
         let pane = render_and_wait("mermaid", MERMAID_SOURCE);
         assert_image(&pane.sections, 1, "Mermaid rendered");
-        if let RenderedSection::Image { svg_data, alt } = &pane.sections[1] {
+        if let RenderedSection::Image { svg_data, alt, .. } = &pane.sections[1] {
             assert!(svg_data.width > 0, "Mermaid image width should be > 0");
             assert!(svg_data.height > 0, "Mermaid image height should be > 0");
             assert!(alt.contains("Mermaid"), "Alt should mention Mermaid");
@@ -225,7 +226,7 @@ fn plantuml_both_states_render_semantically() {
     if katana_core::markdown::plantuml_renderer::find_plantuml_jar().is_some() {
         let pane = render_and_wait("plantuml", PLANTUML_SOURCE);
         assert_image(&pane.sections, 1, "PlantUML rendered");
-        if let RenderedSection::Image { svg_data, alt } = &pane.sections[1] {
+        if let RenderedSection::Image { svg_data, alt, .. } = &pane.sections[1] {
             assert!(svg_data.width > 0, "PlantUML image width should be > 0");
             assert!(svg_data.height > 0, "PlantUML image height should be > 0");
             assert!(alt.contains("PlantUml"), "Alt should mention PlantUml");
@@ -327,6 +328,7 @@ fn mixed_diagrams_with_fallbacks_render_semantically() {
             tool_name: "mmdc (Mermaid CLI)".to_string(),
             install_hint: "`npm install -g @mermaid-js/mermaid-cli`".to_string(),
             _source: "graph TD; A-->B".to_string(),
+            source_lines: 0,
         },
         RenderedSection::Markdown("---\n".to_string()),
         RenderedSection::NotInstalled {
@@ -335,6 +337,7 @@ fn mixed_diagrams_with_fallbacks_render_semantically() {
                 "https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar"
                     .to_string(),
             install_path: std::path::PathBuf::from("/tmp/plantuml.jar"),
+            source_lines: 0,
         },
         RenderedSection::Markdown("## End\n".to_string()),
     ];
@@ -362,10 +365,12 @@ fn snapshot_diagram_pending_spinner() {
         RenderedSection::Pending {
             kind: "Mermaid".to_string(),
             source: "".to_string(),
+            source_lines: 0,
         },
         RenderedSection::Pending {
             kind: "PlantUML".to_string(),
             source: "".to_string(),
+            source_lines: 0,
         },
         RenderedSection::Markdown("## Waiting...\n".to_string()),
     ];
@@ -375,7 +380,7 @@ fn snapshot_diagram_pending_spinner() {
         .build_ui(move |ui| {
             let mut pane = PreviewPane::default();
             pane.sections = sections.clone();
-            pane.show_content(ui);
+            pane.show_content(ui, None, None);
         });
     harness.step();
     // Use run_steps instead of run() because spin animations loop forever.

@@ -225,8 +225,13 @@ pub struct AppState {
     pub scroll_source: ScrollSource,
     /// Previous frame's editor-side max_scroll (content_height - viewport_height).
     pub editor_max_scroll: f32,
-    /// Previous frame's preview-side max_scroll (content_height - viewport_height).
     pub preview_max_scroll: f32,
+    /// Global line index of the editor's cursor/selection for preview highlighting.
+    pub active_editor_line: Option<usize>,
+    /// Request to scroll the code editor to a specific line.
+    pub scroll_to_line: Option<usize>,
+    /// Global line ranges of the hovered blocks in the preview pane.
+    pub hovered_preview_lines: Vec<std::ops::Range<usize>>,
     /// Settings persistence service.
     pub settings: SettingsService,
     /// Token used to cancel an ongoing background workspace scan.
@@ -300,6 +305,9 @@ impl AppState {
             scroll_source: ScrollSource::Neither,
             editor_max_scroll: 0.0,
             preview_max_scroll: 0.0,
+            active_editor_line: None,
+            scroll_to_line: None,
+            hovered_preview_lines: Vec::new(),
             settings,
             workspace_cancel_token: None,
             is_loading_workspace: false,

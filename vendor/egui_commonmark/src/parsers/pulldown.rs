@@ -82,9 +82,8 @@ struct DefinitionList {
 pub(crate) struct CommonMarkViewerInternal<'a> {
     curr_table: usize,
     curr_heading: usize,
-    curr_heading_start_y: Option<f32>,
     scroll_to_heading_index: Option<usize>,
-    populate_heading_rects: Option<&'a mut Vec<egui::Rect>>,
+    heading_anchors: Option<&'a mut Vec<(std::ops::Range<usize>, egui::Rect)>>,
     text_style: Style,
     pending_inline: Vec<RichText>,
     after_inline_widget: bool,
@@ -109,20 +108,25 @@ pub(crate) struct CommonMarkViewerInternal<'a> {
     task_list_indices: std::collections::HashSet<usize>,
     current_event_idx: usize,
     active_task_context_menu: Option<(char, std::ops::Range<usize>, bool)>,
+    active_char_range: Option<std::ops::Range<usize>>,
+    hovered_spans: Option<&'a mut Vec<std::ops::Range<usize>>>,
+    active_rects: Vec<(egui::Rect, std::ops::Range<usize>)>,
+    block_states: Vec<(f32, std::ops::Range<usize>)>,
 }
 
 impl<'a> CommonMarkViewerInternal<'a> {
     pub fn new(
         scroll_to_heading_index: Option<usize>,
-        populate_heading_rects: Option<&'a mut Vec<egui::Rect>>,
+        heading_anchors: Option<&'a mut Vec<(std::ops::Range<usize>, egui::Rect)>>,
         heading_offset: usize,
+        active_char_range: Option<std::ops::Range<usize>>,
+        hovered_spans: Option<&'a mut Vec<std::ops::Range<usize>>>,
     ) -> Self {
         Self {
             curr_table: 0,
             curr_heading: heading_offset,
-            curr_heading_start_y: None,
             scroll_to_heading_index,
-            populate_heading_rects,
+            heading_anchors,
             text_style: Style::default(),
             pending_inline: Vec::new(),
             after_inline_widget: false,
@@ -143,6 +147,10 @@ impl<'a> CommonMarkViewerInternal<'a> {
             task_list_indices: std::collections::HashSet::new(),
             current_event_idx: 0,
             active_task_context_menu: None,
+            active_char_range,
+            hovered_spans,
+            active_rects: Vec::new(),
+            block_states: Vec::new(),
         }
     }
 }
@@ -1461,13 +1469,49 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 if Self::should_flush_before_start_tag(&tag) {
                     self.flush_pending_inline(ui, max_width);
                 }
+                let start_y = ui.next_widget_position().y;
+                self.block_states.push((start_y, src_span.clone()));
                 self.start_tag(ui, tag, options)
             }
             pulldown_cmark::Event::End(tag) => {
                 if Self::should_flush_before_end_tag(&tag) {
                     self.flush_pending_inline(ui, max_width);
                 }
-                self.end_tag(ui, tag, cache, options, max_width)
+                self.end_tag(ui, tag.clone(), cache, options, max_width);
+                
+                if let Some((start_y, span)) = self.block_states.pop() {
+                    let end_y = ui.next_widget_position().y;
+                    if end_y > start_y {
+                        let rect = egui::Rect::from_min_max(
+                            egui::pos2(ui.min_rect().left(), start_y),
+                            egui::pos2(ui.min_rect().right(), end_y),
+                        );
+                        if let Some(active) = &self.active_char_range {
+                            if active.start <= span.end && active.end >= span.start {
+                                self.active_rects.push((rect, span.clone()));
+                                let highlight_color = if ui.visuals().dark_mode {
+                                    egui::Color32::from_white_alpha(15)
+                                } else {
+                                    egui::Color32::from_black_alpha(15)
+                                };
+                                ui.painter().rect_filled(rect, 0.0, highlight_color);
+                            }
+                        }
+                        if let Some(hovered) = &mut self.hovered_spans {
+                            if let Some(pos) = ui.ctx().pointer_hover_pos() {
+                                if rect.contains(pos) {
+                                    hovered.push(span.clone());
+                                    let hover_color = if ui.visuals().dark_mode {
+                                        egui::Color32::from_white_alpha(8)
+                                    } else {
+                                        egui::Color32::from_black_alpha(8)
+                                    };
+                                    ui.painter().rect_filled(rect, 0.0, hover_color);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             pulldown_cmark::Event::Text(text) => {
                 self.event_text(text, ui, max_width);
@@ -1657,7 +1701,6 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         ui.scroll_to_cursor(Some(egui::Align::TOP));
                     }
                 }
-                self.curr_heading_start_y = Some(ui.next_widget_position().y);
 
                 self.text_style.heading = Some(match level {
                     HeadingLevel::H1 => 0,
@@ -1811,15 +1854,19 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 self.line.try_insert_end(ui);
                 self.text_style.heading = None;
 
-                if let (Some(rects), Some(start_y)) =
-                    (&mut self.populate_heading_rects, self.curr_heading_start_y)
+                let last_state = self.block_states.last().cloned();
+                if let (Some(anchors), Some((start_y, span))) =
+                    (&mut self.heading_anchors, last_state)
                 {
                     let end_y = ui.next_widget_position().y;
                     let width = ui.available_width();
                     let min_x = ui.min_rect().left();
-                    rects.push(egui::Rect::from_min_max(
-                        egui::pos2(min_x, start_y),
-                        egui::pos2(min_x + width, end_y),
+                    anchors.push((
+                        span,
+                        egui::Rect::from_min_max(
+                            egui::pos2(min_x, start_y),
+                            egui::pos2(min_x + width, end_y),
+                        ),
                     ));
                 }
                 self.curr_heading += 1;

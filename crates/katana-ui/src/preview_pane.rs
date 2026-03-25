@@ -38,32 +38,41 @@ pub enum RenderedSection {
     Image {
         svg_data: RasterizedSvg,
         alt: String,
+        source_lines: usize,
     },
     /// A standalone local image handled by Katana (with viewer controls).
     LocalImage {
         path: std::path::PathBuf,
         alt: String,
+        source_lines: usize,
     },
     /// Rendering error (holds source and message).
     Error {
         kind: String,
         _source: String,
         message: String,
+        source_lines: usize,
     },
     /// Command line tool not found (path issues, etc.).
     CommandNotFound {
         tool_name: String,
         install_hint: String,
         _source: String,
+        source_lines: usize,
     },
     /// Required tool is not installed — can be downloaded from the UI.
     NotInstalled {
         kind: String,
         download_url: String,
         install_path: std::path::PathBuf,
+        source_lines: usize,
     },
     /// Placeholder during background rendering.
-    Pending { kind: String, source: String },
+    Pending {
+        kind: String,
+        source: String,
+        source_lines: usize,
+    },
 }
 
 /// Download request returned by the preview pane.
@@ -164,7 +173,8 @@ pub struct PreviewPane {
     commonmark_cache: CommonMarkCache,
     pub sections: Vec<RenderedSection>,
     pub outline_items: Vec<OutlineItem>,
-    pub heading_rects: Vec<egui::Rect>,
+    pub heading_anchors: Vec<(std::ops::Range<usize>, egui::Rect)>,
+    pub content_top_y: f32,
     pub visible_rect: Option<egui::Rect>,
     pub scroll_request: Option<usize>,
     /// Channel for background rendering completion notifications.
@@ -200,6 +210,7 @@ struct RenderJob {
     path: std::path::PathBuf,
     cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     force: bool,
+    source_lines: usize,
 }
 
 pub enum RenderMessage {
@@ -245,7 +256,11 @@ impl PreviewPane {
                 PreviewSection::Markdown(md) => {
                     new_sections.push(RenderedSection::Markdown(md.clone()));
                 }
-                PreviewSection::Diagram { kind, source } => {
+                PreviewSection::Diagram {
+                    kind,
+                    source,
+                    lines,
+                } => {
                     // Reuse existing rendered image if available.
                     let reused =
                         diagram_iter
@@ -255,14 +270,16 @@ impl PreviewPane {
                                 kind: format!("{kind:?}"),
                                 _source: source.clone(),
                                 message: "🔄 Please refresh the preview".to_string(),
+                                source_lines: *lines,
                             });
                     new_sections.push(reused);
                 }
-                PreviewSection::LocalImage { path, alt } => {
+                PreviewSection::LocalImage { path, alt, lines } => {
                     let path_buf = std::path::PathBuf::from(path.trim_start_matches("file://"));
                     new_sections.push(RenderedSection::LocalImage {
                         path: path_buf,
                         alt: alt.clone(),
+                        source_lines: *lines,
                     });
                 }
             }
@@ -316,24 +333,31 @@ impl PreviewPane {
                 PreviewSection::Markdown(md) => {
                     sections.push(RenderedSection::Markdown(md.clone()));
                 }
-                PreviewSection::Diagram { kind, source: src } => {
+                PreviewSection::Diagram {
+                    kind,
+                    source,
+                    lines,
+                } => {
                     sections.push(RenderedSection::Pending {
-                        kind: format!("{kind:?}", kind = kind),
-                        source: src.clone(),
+                        kind: format!("{kind:?}"),
+                        source: source.clone(),
+                        source_lines: *lines,
                     });
                     jobs.push(RenderJob {
                         kind: kind.clone(),
-                        src: src.clone(),
+                        src: source.clone(),
                         path: self.md_file_path.clone(),
                         cache: cache.clone(),
                         force,
+                        source_lines: *lines,
                     });
                 }
-                PreviewSection::LocalImage { path, alt } => {
+                PreviewSection::LocalImage { path, alt, lines } => {
                     let path_buf = std::path::PathBuf::from(path.trim_start_matches("file://"));
                     sections.push(RenderedSection::LocalImage {
                         path: path_buf,
                         alt: alt.clone(),
+                        source_lines: *lines,
                     });
                 }
             }
@@ -423,7 +447,7 @@ impl PreviewPane {
                     res
                 };
 
-                let section = map_diagram_result(&job.kind, &job.src, result);
+                let section = map_diagram_result(&job.kind, &job.src, result, job.source_lines);
                 let msg = RenderMessage::Section {
                     kind: format!("{:?}", job.kind),
                     source: job.src.clone(),
@@ -466,7 +490,7 @@ impl PreviewPane {
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                     |ui| {
-                        let (req, act) = self.render_sections(ui);
+                        let (req, act) = self.render_sections(ui, None, None);
                         request = req;
                         actions = act;
                     },
@@ -481,10 +505,12 @@ impl PreviewPane {
     pub fn show_content(
         &mut self,
         ui: &mut egui::Ui,
+        active_editor_line: Option<usize>,
+        hovered_lines: Option<&mut Vec<std::ops::Range<usize>>>,
     ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.repaint_ctx = Some(ui.ctx().clone());
         self.poll_renders(ui.ctx());
-        let (request, actions) = self.render_sections(ui);
+        let (request, actions) = self.render_sections(ui, active_editor_line, hovered_lines);
         self.render_fullscreen_modal(ui.ctx());
         (request, actions)
     }
@@ -494,9 +520,12 @@ impl PreviewPane {
     fn render_sections(
         &mut self,
         ui: &mut egui::Ui,
+        active_editor_line: Option<usize>,
+        hovered_lines: Option<&mut Vec<std::ops::Range<usize>>>,
     ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.visible_rect = Some(ui.clip_rect());
-        self.heading_rects.clear();
+        self.content_top_y = ui.next_widget_position().y;
+        self.heading_anchors.clear();
         let mut fullscreen_request: Option<usize> = None;
         let (request, actions) = crate::preview_pane_ui::render_sections(
             ui,
@@ -504,9 +533,11 @@ impl PreviewPane {
             &self.sections,
             &self.md_file_path,
             self.scroll_request,
-            Some(&mut self.heading_rects),
+            Some(&mut self.heading_anchors),
             Some(&mut self.viewer_states),
             Some(&mut fullscreen_request),
+            active_editor_line,
+            hovered_lines,
         );
         self.scroll_request = None;
 
@@ -597,6 +628,7 @@ impl PreviewPane {
                                 if let RenderedSection::Pending {
                                     kind: p_kind,
                                     source: p_source,
+                                    ..
                                 } = slot
                                 {
                                     if p_kind == &kind && p_source == &source {
@@ -646,6 +678,7 @@ impl PreviewPane {
                             if let RenderedSection::Pending {
                                 kind: p_kind,
                                 source: p_source,
+                                ..
                             } = slot
                             {
                                 if p_kind == &kind && p_source == &source {
@@ -676,13 +709,13 @@ impl PreviewPane {
 /// Renders a `PreviewSection` into a `RenderedSection`.
 /// Converts diagram blocks via the renderer and attempts SVG rasterization.
 #[cfg(test)]
-fn render_diagram(kind: &DiagramKind, source: &str) -> RenderedSection {
+fn render_diagram(kind: &DiagramKind, source: &str, source_lines: usize) -> RenderedSection {
     let block = DiagramBlock {
         kind: kind.clone(),
         source: source.to_string(),
     };
     let result = dispatch_renderer(&block);
-    map_diagram_result(kind, source, result)
+    map_diagram_result(kind, source, result, source_lines)
 }
 
 /// Generates a cache key based on the file path, diagram kind, and source text.
@@ -704,14 +737,16 @@ pub(crate) fn map_diagram_result(
     kind: &DiagramKind,
     source: &str,
     result: DiagramResult,
+    source_lines: usize,
 ) -> RenderedSection {
     match result {
-        DiagramResult::Ok(html) => try_rasterize(kind, source, &html),
-        DiagramResult::OkPng(bytes) => decode_png_to_section(kind, source, bytes),
+        DiagramResult::Ok(html) => try_rasterize(kind, source, &html, source_lines),
+        DiagramResult::OkPng(bytes) => decode_png_to_section(kind, source, bytes, source_lines),
         DiagramResult::Err { source, error } => RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source,
             message: error,
+            source_lines,
         },
         DiagramResult::CommandNotFound {
             tool_name,
@@ -721,6 +756,7 @@ pub(crate) fn map_diagram_result(
             tool_name,
             install_hint,
             _source: source,
+            source_lines,
         },
         DiagramResult::NotInstalled {
             kind: k,
@@ -730,6 +766,7 @@ pub(crate) fn map_diagram_result(
             kind: k,
             download_url,
             install_path,
+            source_lines,
         },
     }
 }
@@ -744,23 +781,31 @@ fn dispatch_renderer(block: &DiagramBlock) -> DiagramResult {
 }
 
 /// Extracts SVG from an HTML fragment and rasterizes it.
-fn try_rasterize(kind: &DiagramKind, source: &str, html: &str) -> RenderedSection {
+fn try_rasterize(
+    kind: &DiagramKind,
+    source: &str,
+    html: &str,
+    source_lines: usize,
+) -> RenderedSection {
     let Some(svg) = extract_svg(html) else {
         return RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source.to_string(),
             message: "Failed to extract SVG".to_string(),
+            source_lines,
         };
     };
     match rasterize_svg(svg, DIAGRAM_SVG_DISPLAY_SCALE) {
         Ok(img) => RenderedSection::Image {
             svg_data: img,
             alt: format!("{kind:?} diagram"),
+            source_lines,
         },
         Err(e) => RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source.to_string(),
             message: e.to_string(),
+            source_lines,
         },
     }
 }
@@ -776,16 +821,23 @@ pub fn extract_svg(html: &str) -> Option<&str> {
 ///
 /// Decodes mmdc PNG output using the `image` crate to get an RGBA pixel buffer.
 /// This completely avoids resvg's lack of support for `<foreignObject>`.
-fn decode_png_to_section(kind: &DiagramKind, source: &str, bytes: Vec<u8>) -> RenderedSection {
+fn decode_png_to_section(
+    kind: &DiagramKind,
+    source: &str,
+    bytes: Vec<u8>,
+    source_lines: usize,
+) -> RenderedSection {
     match decode_png_rgba(&bytes) {
         Ok(rasterized) => RenderedSection::Image {
             svg_data: rasterized,
             alt: format!("{kind:?} diagram"),
+            source_lines,
         },
         Err(e) => RenderedSection::Error {
             kind: format!("{kind:?}"),
             _source: source.to_string(),
             message: format!("PNG decode failed: {e}"),
+            source_lines,
         },
     }
 }
@@ -886,7 +938,7 @@ mod tests {
     #[test]
     fn render_diagram_drawio_returns_ok_section() {
         let xml = r#"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>"#;
-        let section = render_diagram(&DiagramKind::DrawIo, xml);
+        let section = render_diagram(&DiagramKind::DrawIo, xml, 0);
         assert_variant!(
             section,
             RenderedSection::Image { .. } | RenderedSection::Error { .. }
@@ -937,7 +989,7 @@ mod tests {
     #[test]
     fn try_rasterize_returns_error_when_no_svg_in_html() {
         let kind = DiagramKind::DrawIo;
-        let section = try_rasterize(&kind, "source", "<div>no svg here</div>");
+        let section = try_rasterize(&kind, "source", "<div>no svg here</div>", 0);
         assert_variant!(section, RenderedSection::Error { .. });
     }
 
@@ -946,7 +998,7 @@ mod tests {
     fn try_rasterize_returns_image_for_valid_svg() {
         let kind = DiagramKind::DrawIo;
         let html = r#"<div class="diagram"><svg width="10" height="10"><rect fill="white" width="10" height="10"/></svg></div>"#;
-        let section = try_rasterize(&kind, "source", html);
+        let section = try_rasterize(&kind, "source", html, 0);
         assert_variant!(
             section,
             RenderedSection::Image { .. } | RenderedSection::Error { .. }
@@ -961,14 +1013,14 @@ mod tests {
         let img = ImageBuffer::from_pixel(2, 2, Rgba([100u8, 150, 200, 255]));
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
             .unwrap();
-        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", buf);
+        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", buf, 0);
         assert_variant!(section, RenderedSection::Image { .. });
     }
 
     // decode_png_to_section: Invalid data
     #[test]
     fn decode_png_to_section_returns_error_for_invalid_data() {
-        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec());
+        let section = decode_png_to_section(&DiagramKind::DrawIo, "source", b"not png".to_vec(), 0);
         assert_variant!(section, RenderedSection::Error { .. });
     }
 
@@ -979,6 +1031,7 @@ mod tests {
             &DiagramKind::DrawIo,
             "src",
             DiagramResult::Ok("<svg width=\"10\" height=\"10\"></svg>".to_string()),
+            0,
         );
         assert_variant!(
             section,
@@ -993,7 +1046,8 @@ mod tests {
         let img = ImageBuffer::from_pixel(2, 2, Rgba([0u8, 0, 0, 255]));
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
             .unwrap();
-        let section = map_diagram_result(&DiagramKind::Mermaid, "src", DiagramResult::OkPng(buf));
+        let section =
+            map_diagram_result(&DiagramKind::Mermaid, "src", DiagramResult::OkPng(buf), 0);
         assert_variant!(section, RenderedSection::Image { .. });
     }
 
@@ -1006,6 +1060,7 @@ mod tests {
                 source: "src".to_string(),
                 error: "render failed".to_string(),
             },
+            0,
         );
         assert_variant!(section, RenderedSection::Error { .. });
     }
@@ -1020,6 +1075,7 @@ mod tests {
                 install_hint: "npm install".to_string(),
                 source: "src".to_string(),
             },
+            0,
         );
         assert_variant!(section, RenderedSection::CommandNotFound { .. });
     }
@@ -1034,6 +1090,7 @@ mod tests {
                 download_url: "https://example.com".to_string(),
                 install_path: std::path::PathBuf::from("/tmp/plantuml.jar"),
             },
+            0,
         );
         assert_variant!(section, RenderedSection::NotInstalled { .. });
     }
@@ -1041,7 +1098,7 @@ mod tests {
     // render_diagram_mermaid: Integration test (independent of mmdc presence)
     #[test]
     fn render_diagram_mermaid_produces_valid_section() {
-        let section = render_diagram(&DiagramKind::Mermaid, "graph TD; A-->B");
+        let section = render_diagram(&DiagramKind::Mermaid, "graph TD; A-->B", 0);
         // CommandNotFound if mmdc is absent, Image if present
         assert!(!matches!(section, RenderedSection::Pending { .. }));
     }
@@ -1056,6 +1113,7 @@ mod tests {
         pane.sections = vec![RenderedSection::Pending {
             kind: "DrawIo".to_string(),
             source: "src".to_string(),
+            source_lines: 0,
         }];
 
         // Create an mpsc channel and set it to render_rx
@@ -1091,6 +1149,7 @@ mod tests {
         pane.sections = vec![RenderedSection::Pending {
             kind: "DrawIo".to_string(),
             source: "src".to_string(),
+            source_lines: 0,
         }];
 
         let (tx, rx) = mpsc::channel();
@@ -1519,6 +1578,7 @@ mod tests {
                 rgba: vec![0; 4],
             },
             alt: String::new(),
+            source_lines: 0,
         });
         pane.handle_fullscreen_request(Some(0), None);
         assert_eq!(pane.fullscreen_image, Some(0));
@@ -1557,6 +1617,7 @@ mod tests {
                 rgba: vec![0; 4],
             },
             alt: String::new(),
+            source_lines: 0,
         });
         pane.fullscreen_image = Some(0);
         // Remove section, then validate state.
@@ -1646,12 +1707,13 @@ mod tests {
         let ctx = egui::Context::default();
 
         pane.sections.push(RenderedSection::Image {
-            svg_data: RasterizedSvg {
-                width: 10,
-                height: 10,
-                rgba: vec![],
+            svg_data: katana_core::markdown::svg_rasterize::RasterizedSvg {
+                width: 1,
+                height: 1,
+                rgba: vec![0; 4],
             },
-            alt: String::new(),
+            alt: "Diagram A".to_string(),
+            source_lines: 0,
         });
 
         // Simulating opening modal when it was None
