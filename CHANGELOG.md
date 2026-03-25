@@ -2,6 +2,26 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.6.2] - 2026-03-25 08:05:30 (UTC)
+
+### 🚀 Features
+
+- **Interactive Task Lists**: Support for custom states (`[/]`), context menu interactions, and precision vertical alignment.
+- **MathJax Support**: High-fidelity TeX/LaTeX equation rendering leveraging the MathJax pipeline for native-quality formatting.
+
+### 🎨 UI/UX
+
+- **Split-View Scroll Synchronization**: Bidirectional scroll tracking between the editor and preview pane with exact block-level precision.
+- **Hover Highlights**: Visual highlight of the corresponding markdown structure under the cursor in Split-View mode.
+
+### 🐛 Bug Fixes
+
+- **Scroll Sync Drift**: Resolve multi-byte character panics (`byte index is not a char boundary`) and long-document drift by switching to char-iterator coordinate maps.
+
+### 🔧 Miscellaneous
+
+- **CI Stability**: Fix flaky integration tests and address race conditions to guarantee stable CI runs.
+
 ## [0.6.1] - 2026-03-24 03:15:14 (UTC)
 
 ### 🎨 UI/UX
