@@ -29,13 +29,27 @@ fi
 # Ensure checksums.txt is created
 cd "$(dirname "$DMG_PATH")"
 DMG_NAME=$(basename "$DMG_PATH")
-shasum -a 256 "$DMG_NAME" > checksums.txt
+ZIP_NAME="KatanA-macOS.zip"
 
-echo "[INFO] Creating GitHub Release v$VERSION..."
-gh release create "v$VERSION" \
-    --title "KatanA Desktop v$VERSION" \
-    --notes-file "$NOTES_PATH" \
-    "$DMG_NAME" \
-    "checksums.txt"
+if [[ -f "$ZIP_NAME" ]]; then
+    shasum -a 256 "$DMG_NAME" "$ZIP_NAME" > checksums.txt
+    
+    echo "[INFO] Creating GitHub Release v$VERSION..."
+    gh release create "v$VERSION" \
+        --title "KatanA Desktop v$VERSION" \
+        --notes-file "$NOTES_PATH" \
+        "$DMG_NAME" \
+        "$ZIP_NAME" \
+        "checksums.txt"
+else
+    shasum -a 256 "$DMG_NAME" > checksums.txt
+    
+    echo "[INFO] Creating GitHub Release v$VERSION..."
+    gh release create "v$VERSION" \
+        --title "KatanA Desktop v$VERSION" \
+        --notes-file "$NOTES_PATH" \
+        "$DMG_NAME" \
+        "checksums.txt"
+fi
 
 echo "[OK] GitHub Release $VERSION created and artifacts uploaded."

@@ -191,6 +191,18 @@ else
     fi
     success "Local DMG built: $DMG_PATH"
 
+    ZIP_PATH="target/release/KatanA-macOS.zip"
+    rm -f "$ZIP_PATH"
+    info "Building ZIP locally ($ZIP_PATH)..."
+    APP_PATH=$(find target/release/bundle/osx -name "*.app" -maxdepth 1 | head -1)
+    if [[ -n "$APP_PATH" ]]; then
+        (cd "$(dirname "$APP_PATH")" && zip -r -q "../../KatanA-macOS.zip" "$(basename "$APP_PATH")")
+        success "Local ZIP built: $ZIP_PATH"
+    else
+        error "Local APP bundle not found for zipping."
+        exit 1
+    fi
+
     RELEASE_NOTES_PATH="/tmp/RELEASE_NOTES_${VERSION}.md"
     info "Extracting release notes..."
     ./scripts/release/extract-notes.sh "$VERSION" > "$RELEASE_NOTES_PATH"
