@@ -59,5 +59,5 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 5.3 Merge the intermediate base branch (derived originally from master) into the `master` branch
 - [ ] 5.4 Create a PR targeting `master`
 - [ ] 5.5 Merge into master (※ `--admin` is permitted)
-- [ ] 5.6 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md` for `0.7.0`
-- [ ] 5.7 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
+- [x] 5.6 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md` for `0.7.0`
+- [x] 5.7 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
