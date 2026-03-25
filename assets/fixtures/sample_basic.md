@@ -68,10 +68,10 @@ Text below
 ### 3.3 Task Lists
 
 - [x] Completed task
-- [ ] Pending task
+- [-] Pending task
 - [x] Another completed task
-  - [ ] Nested pending
-  - [x] Nested completed
+  - [/] Nested pending
+  - [ ] Nested completed
 
 ---
 

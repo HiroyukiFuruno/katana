@@ -106,6 +106,16 @@ pub enum AppAction {
     CloseDocument(usize),
     /// Update the buffer of the active document.
     UpdateBuffer(String),
+    /// Replace a specific range of text in the active document.
+    ReplaceText {
+        span: std::ops::Range<usize>,
+        replacement: String,
+    },
+    /// Toggles the nth task list item globally across the active document.
+    ToggleTaskList {
+        global_index: usize,
+        new_state: char,
+    },
     /// Explicitly save the active document.
     SaveDocument,
     /// Fully re-render the preview, including diagrams.

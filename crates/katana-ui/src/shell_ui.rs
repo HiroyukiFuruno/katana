@@ -557,7 +557,14 @@ pub(crate) fn render_preview_content(
                     |ui| {
                         const PREVIEW_PANE_TOP_BOTTOM_PADDING: f32 = 4.0; // 0.25rem padding
                         ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
-                        download_req = preview.show_content(ui);
+                        let (req, actions) = preview.show_content(ui);
+                        download_req = req;
+                        if let Some((global_index, new_state)) = actions.into_iter().next() {
+                            *action = AppAction::ToggleTaskList {
+                                global_index,
+                                new_state,
+                            };
+                        }
                         ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
                     },
                 );

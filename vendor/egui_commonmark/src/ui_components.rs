@@ -37,3 +37,127 @@ pub mod centering {
         }
     }
 }
+
+pub mod task_list {
+    use egui::Ui;
+    use std::ops::Range;
+
+    pub fn katana_task_box(
+        ui: &mut Ui,
+        state: char,
+        span: Range<usize>,
+        mutable: bool,
+        events: &mut Vec<crate::TaskListAction>,
+    ) {
+        let is_checked = state == 'x' || state == 'X';
+        let is_progress = state == '/' || state == '-' || state == '~';
+        let is_active = is_checked || is_progress;
+
+        let icon_width = ui.spacing().icon_width;
+        let (rect, response) = ui.allocate_exact_size(
+            egui::vec2(icon_width, icon_width),
+            if mutable { egui::Sense::click() } else { egui::Sense::hover() },
+        );
+
+        if ui.is_rect_visible(rect) {
+            // Use `interact_selectable` to colorize background if it's checked or in progress
+            let visuals = ui.style().interact_selectable(&response, is_active);
+            let rounding = ui.visuals().widgets.noninteractive.corner_radius;
+            
+            ui.painter().rect(
+                rect.expand(visuals.expansion),
+                rounding,
+                visuals.bg_fill,
+                visuals.bg_stroke,
+                egui::StrokeKind::Inside,
+            );
+
+            let stroke_width = ui.visuals().widgets.noninteractive.fg_stroke.width.max(1.5);
+            let stroke = egui::Stroke::new(stroke_width, visuals.fg_stroke.color);
+            let center = rect.center();
+            let width = rect.width();
+
+            if is_checked {
+                // Draw checkmark
+                ui.painter().line_segment(
+                    [
+                        center + egui::vec2(-width * 0.25, 0.0),
+                        center + egui::vec2(-width * 0.05, width * 0.25),
+                    ],
+                    stroke,
+                );
+                ui.painter().line_segment(
+                    [
+                        center + egui::vec2(-width * 0.05, width * 0.25),
+                        center + egui::vec2(width * 0.3, -width * 0.25),
+                    ],
+                    stroke,
+                );
+            } else if is_progress {
+                if state == '/' {
+                    // Slight diagonal for [/]
+                    let half_w = width * 0.35;
+                    ui.painter().line_segment(
+                        [
+                            center + egui::vec2(-half_w, half_w),
+                            center + egui::vec2(half_w, -half_w),
+                        ],
+                        stroke,
+                    );
+                } else {
+                    // Horizontal for [-]
+                    let half_w = width * 0.35;
+                    ui.painter().line_segment(
+                        [
+                            center - egui::vec2(half_w, 0.0),
+                            center + egui::vec2(half_w, 0.0),
+                        ],
+                        stroke,
+                    );
+                }
+            }
+        }
+
+        if mutable {
+            if response.clicked() {
+                let new_state = match state {
+                    ' ' => 'x',
+                    '/' | '-' | '~' => 'x',
+                    'x' | 'X' => ' ',
+                    _ => ' ',
+                };
+                events.push(crate::TaskListAction {
+                    span: span.clone(),
+                    new_state,
+                });
+            }
+
+            response.context_menu(|ui| {
+                if ui.button("未実施 [ ]").clicked() {
+                    events.push(crate::TaskListAction {
+                        span: span.clone(),
+                        new_state: ' ',
+                    });
+                    ui.close();
+                }
+                if ui.button("実施中 [/]").clicked() {
+                    events.push(crate::TaskListAction {
+                        span: span.clone(),
+                        new_state: '/',
+                    });
+                    ui.close();
+                }
+                if ui.button("完了 [x]").clicked() {
+                    events.push(crate::TaskListAction {
+                        span: span.clone(),
+                        new_state: 'x',
+                    });
+                    ui.close();
+                }
+            });
+        }
+        
+        // Add margin between checkbox and text
+        ui.add_space(8.0);
+    }
+}

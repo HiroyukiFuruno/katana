@@ -446,12 +446,13 @@ impl PreviewPane {
     /// Used when scroll sync is not needed, such as in PreviewOnly mode.
     /// Returns `Some(DownloadRequest)` if the download button is pressed.
     #[allow(dead_code)]
-    pub fn show(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+    pub fn show(&mut self, ui: &mut egui::Ui) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.repaint_ctx = Some(ui.ctx().clone());
         // Poll for background rendering completion.
         self.poll_renders(ui.ctx());
 
         let mut request: Option<DownloadRequest> = None;
+        let mut actions = Vec::new();
         let content_width = ui.available_width();
         ScrollArea::vertical()
             .auto_shrink([false; 2])
@@ -465,31 +466,39 @@ impl PreviewPane {
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                     |ui| {
-                        request = self.render_sections(ui);
+                        let (req, act) = self.render_sections(ui);
+                        request = req;
+                        actions = act;
                     },
                 );
             });
         self.render_fullscreen_modal(ui.ctx());
-        request
+        (request, actions)
     }
 
     /// Renders only the preview content without a ScrollArea.
     /// Used when you want to control the outer ScrollArea (e.g. for scroll sync).
-    pub fn show_content(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+    pub fn show_content(
+        &mut self,
+        ui: &mut egui::Ui,
+    ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.repaint_ctx = Some(ui.ctx().clone());
         self.poll_renders(ui.ctx());
-        let request = self.render_sections(ui);
+        let (request, actions) = self.render_sections(ui);
         self.render_fullscreen_modal(ui.ctx());
-        request
+        (request, actions)
     }
 
     /// Internal method to sequentially render sections.
     /// Actual UI rendering is delegated to preview_pane_ui::render_sections.
-    fn render_sections(&mut self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
+    fn render_sections(
+        &mut self,
+        ui: &mut egui::Ui,
+    ) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.visible_rect = Some(ui.clip_rect());
         self.heading_rects.clear();
         let mut fullscreen_request: Option<usize> = None;
-        let request = crate::preview_pane_ui::render_sections(
+        let (request, actions) = crate::preview_pane_ui::render_sections(
             ui,
             &mut self.commonmark_cache,
             &self.sections,
@@ -505,7 +514,7 @@ impl PreviewPane {
         let ctx = ui.ctx().clone();
         self.handle_fullscreen_request(fullscreen_request, Some(&ctx));
 
-        request
+        (request, actions)
     }
 
     /// Renders the fullscreen modal overlay (requires egui Context).

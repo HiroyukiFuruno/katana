@@ -82,6 +82,14 @@ pub use egui_commonmark_backend::RenderMathFn;
 pub use egui_commonmark_backend::alerts::{Alert, AlertBundle};
 pub use egui_commonmark_backend::misc::CommonMarkCache;
 
+/// An action emitted when a user interacts with a task list checkbox.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskListAction {
+    pub span: std::ops::Range<usize>,
+    pub new_state: char,
+}
+
+
 #[cfg(feature = "macros")]
 pub use egui_commonmark_macros::*;
 
@@ -277,7 +285,7 @@ impl<'f> CommonMarkViewer<'f> {
 
     /// Shows rendered markdown, and allows the rendered ui to mutate the source text.
     ///
-    /// The only currently implemented mutation is allowing checkboxes to be toggled through the ui.
+    /// Checkmarks can be toggled through the ui, supporting standard `[x]` and custom Katana states `[/]`.
     pub fn show_mut(
         mut self,
         ui: &mut egui::Ui,
@@ -302,16 +310,67 @@ impl<'f> CommonMarkViewer<'f> {
 
         // Update source text for checkmarks that were clicked
         for ev in checkmark_events {
-            if ev.checked {
-                text.replace_range(ev.span, "[x]")
-            } else {
-                text.replace_range(ev.span, "[ ]")
-            }
-
+            text.replace_range(ev.span, &format!("[{}]", ev.new_state));
             inner_response.response.mark_changed();
         }
 
         inner_response
+    }
+}
+
+/// Helper to accurately map task list events back to the original text.
+/// Extracts the span of every task list item `[ ]`, `[x]`, `[/]` in the order they appear.
+pub fn extract_task_list_spans(text: &str) -> Vec<std::ops::Range<usize>> {
+    let mut options = pulldown_cmark::Options::empty();
+    options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
+    options.insert(pulldown_cmark::Options::ENABLE_TABLES);
+    options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
+    options.insert(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
+    
+    let parser = pulldown_cmark::Parser::new_ext(text, options).into_offset_iter();
+    // Use the raw events vector to run our pre-pass
+    let events: Vec<_> = parser.collect();
+    let (processed, _) = crate::parsers::pulldown::extract_custom_task_lists(events);
+    
+    let mut spans = Vec::new();
+    for (event, span) in processed {
+        if let pulldown_cmark::Event::Html(html) = event {
+            if html.starts_with("<!-- KATANA_TASK:") {
+                spans.push(span);
+            }
+        }
+    }
+    
+    // pulldown-cmark sometimes emits the same HTML block multiple times if it wraps? 
+    // No, our pass shouldn't duplicate. We'll sort and deduplicate just in case.
+    spans.sort_by_key(|s| s.start);
+    spans.dedup();
+    spans
+}
+
+impl<'f> CommonMarkViewer<'f> {
+    /// Shows parsed markdown and returns any task list action events.
+    /// Used when the application needs to handle the text mutation externally.
+    pub fn show_with_events(
+        mut self,
+        ui: &mut egui::Ui,
+        cache: &mut CommonMarkCache,
+        text: &str,
+    ) -> (egui::InnerResponse<()>, Vec<TaskListAction>) {
+        self.options.mutable = true;
+        egui_commonmark_backend::prepare_show(cache, ui.ctx());
+
+        parsers::pulldown::CommonMarkViewerInternal::new(
+            self.scroll_to_heading_index,
+            self.populate_heading_rects,
+            self.heading_offset,
+        ).show(
+            ui,
+            cache,
+            &self.options,
+            text,
+            None,
+        )
     }
 
     /// Shows markdown inside a [`ScrollArea`].
@@ -382,7 +441,7 @@ impl List {
         self.items.len() == 1
     }
 
-    pub fn start_item(&mut self, ui: &mut egui::Ui, options: &CommonMarkOptions, inside_blockquote: bool) {
+    pub fn start_item(&mut self, ui: &mut egui::Ui, options: &CommonMarkOptions, inside_blockquote: bool, is_task_list: bool) {
         // To ensure that newlines are only inserted within the list and not before it
         if self.has_list_begun {
             if !inside_blockquote {
@@ -399,9 +458,9 @@ impl List {
             if let Some(number) = &mut item.current_number {
                 number_point(ui, &number.to_string());
                 *number += 1;
-            } else if len > 1 {
+            } else if !is_task_list && len > 1 {
                 bullet_point_hollow(ui);
-            } else {
+            } else if !is_task_list {
                 bullet_point(ui);
             }
         } else {

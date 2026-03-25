@@ -79,11 +79,6 @@ struct DefinitionList {
     is_def_list_def: bool,
 }
 
-pub(crate) struct CheckboxClickEvent {
-    pub(crate) checked: bool,
-    pub(crate) span: Range<usize>,
-}
-
 pub(crate) struct CommonMarkViewerInternal<'a> {
     curr_table: usize,
     curr_heading: usize,
@@ -106,12 +101,14 @@ pub(crate) struct CommonMarkViewerInternal<'a> {
     /// True while processing events inside a blockquote. Used to suppress
     /// paragraph-level newlines that would otherwise create large vertical gaps.
     inside_blockquote: bool,
-    checkbox_events: Vec<CheckboxClickEvent>,
+    checkbox_events: Vec<crate::TaskListAction>,
     /// When inside a `<details>` block, holds the summary text.
     /// Used to render a CollapsingHeader across HTML block boundaries.
     details_summary: Option<String>,
-    /// Counter for generating unique IDs for `<details>` elements.
     details_id_counter: usize,
+    task_list_indices: std::collections::HashSet<usize>,
+    current_event_idx: usize,
+    active_task_context_menu: Option<(char, std::ops::Range<usize>, bool)>,
 }
 
 impl<'a> CommonMarkViewerInternal<'a> {
@@ -143,6 +140,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
             checkbox_events: Vec::new(),
             details_summary: None,
             details_id_counter: 0,
+            task_list_indices: std::collections::HashSet::new(),
+            current_event_idx: 0,
+            active_task_context_menu: None,
         }
     }
 }
@@ -266,7 +266,38 @@ impl<'a> CommonMarkViewerInternal<'a> {
             // Render text using Label (identical to non-strikethrough path)
             // so that list indentation, wrapping, and positioning are correct.
             let layout_job_for_galley = layout_job.clone();
-            let response = ui.add(egui::Label::new(layout_job).wrap().halign(halign));
+            let mut response = ui.add(egui::Label::new(layout_job).wrap().halign(halign));
+
+            // Attach context menu to the text response if we are within an active task
+            if let Some((_state, ref span, mutable)) = self.active_task_context_menu {
+                response = ui.interact(response.rect, response.id.with("hitbox"), if mutable { egui::Sense::click() } else { egui::Sense::hover() });
+                
+                if mutable {
+                    response.context_menu(|ui| {
+                        if ui.button("未実施 [ ]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: ' ',
+                            });
+                            ui.close();
+                        }
+                        if ui.button("実施中 [/]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: '/',
+                            });
+                            ui.close();
+                        }
+                        if ui.button("完了 [x]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: 'x',
+                            });
+                            ui.close();
+                        }
+                    });
+                }
+            }
 
             // Lay out a separate galley to get per-row glyph positions
             // for drawing the strikethrough overlay.
@@ -303,7 +334,38 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 }
             }
         } else {
-            ui.add(egui::Label::new(layout_job).wrap().halign(halign));
+            let mut response = ui.add(egui::Label::new(layout_job).wrap().halign(halign));
+            
+            // Attach context menu to the text response if we are within an active task
+            if let Some((_state, ref span, mutable)) = self.active_task_context_menu {
+                response = ui.interact(response.rect, response.id.with("hitbox"), if mutable { egui::Sense::click() } else { egui::Sense::hover() });
+                
+                if mutable {
+                    response.context_menu(|ui| {
+                        if ui.button("未実施 [ ]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: ' ',
+                            });
+                            ui.close();
+                        }
+                        if ui.button("実施中 [/]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: '/',
+                            });
+                            ui.close();
+                        }
+                        if ui.button("完了 [x]").clicked() {
+                            self.checkbox_events.push(crate::TaskListAction {
+                                span: span.clone(),
+                                new_state: 'x',
+                            });
+                            ui.close();
+                        }
+                    });
+                }
+            }
         }
     }
 
@@ -407,7 +469,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
         options: &CommonMarkOptions,
         text: &str,
         split_points_id: Option<Id>,
-    ) -> (egui::InnerResponse<()>, Vec<CheckboxClickEvent>) {
+    ) -> (egui::InnerResponse<()>, Vec<crate::TaskListAction>) {
         let max_width = options.max_width(ui);
         let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
         let child_rect =
@@ -426,12 +488,16 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 )
                 .into_offset_iter();
 
-                let mut events = extract_footnotes(raw_events)
+                let (extracted_events, task_indices) = extract_custom_task_lists(extract_footnotes(raw_events));
+                self.task_list_indices = task_indices;
+
+                let mut events = extracted_events
                     .into_iter()
                     .enumerate()
                     .peekable();
 
                 while let Some((index, (e, src_span))) = events.next() {
+                    self.current_event_idx = index;
                     let start_position = ui.next_widget_position();
                     let is_element_end = matches!(e, pulldown_cmark::Event::End(_));
                     let should_add_split_point = self.list.is_inside_a_list() && is_element_end;
@@ -557,6 +623,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                             .peekable();
 
                         while let Some((i, (e, src_span))) = events.next() {
+                            self.current_event_idx = i;
                             if events.peek().is_none() {
                                 self.line.should_end_newline_forced = false;
                             }
@@ -662,6 +729,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                                 ui.set_row_height(height);
                                 let mut iter = body_events.into_iter().peekable();
                                 while let Some((index, (e, src_span))) = iter.next() {
+                                    self.current_event_idx = index;
                                     if iter.peek().is_none() {
                                         self.line.should_end_newline_forced = false;
                                     }
@@ -968,6 +1036,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
         let mut local_html_block = String::new();
 
         while let Some((i, (event, src_span))) = events.next() {
+            self.current_event_idx = i;
             let mut is_closing = false;
 
             match &event {
@@ -1082,7 +1151,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 // that would place it in a separate top_down row.  Draw it here so that
                 // bullet and text share the same horizontal_wrapped row.
                 if self.inside_blockquote {
-                    self.list.start_item(ui, options, true);
+                    let is_task_list = self.task_list_indices.contains(&self.current_event_idx);
+                    self.list.start_item(ui, options, true, is_task_list);
                 }
                 while let Some((_, (e, src_span))) = events_iter.next() {
                     self.process_event(
@@ -1423,6 +1493,28 @@ impl<'a> CommonMarkViewerInternal<'a> {
             }
 
             pulldown_cmark::Event::Html(text) => {
+                if let Some(task_state_str) = text.strip_prefix("<!-- KATANA_TASK:") {
+                    if let Some(task_state_str) = task_state_str.strip_suffix(" -->") {
+                        if !task_state_str.is_empty() {
+                            let state_char = task_state_str.chars().next().unwrap();
+                            self.after_inline_widget = false;
+                            self.flush_pending_inline(ui, max_width);
+                            
+                            // Activate context menu state for subsequent text events in this list item
+                            self.active_task_context_menu = Some((state_char, src_span.clone(), options.mutable));
+                            
+                            crate::ui_components::task_list::katana_task_box(
+                                ui, 
+                                state_char, 
+                                src_span, 
+                                options.mutable, 
+                                &mut self.checkbox_events
+                            );
+                            return;
+                        }
+                    }
+                }
+
                 if options.html_fn.is_some() {
                     self.flush_pending_inline(ui, max_width);
                     self.html_block.push_str(&text);
@@ -1492,12 +1584,14 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 self.after_inline_widget = false;
                 self.flush_pending_inline(ui, max_width);
                 if options.mutable {
-                    if ui
-                        .add(egui::Checkbox::without_text(&mut checkbox))
-                        .clicked()
-                    {
-                        self.checkbox_events.push(CheckboxClickEvent {
-                            checked: checkbox,
+                    let mut is_checked = checkbox;
+                    let response = ui.add(egui::Checkbox::without_text(&mut is_checked));
+                    
+                    if response.clicked() {
+                        // For generic checkboxes, we just emit x or space
+                        let new_state = if !checkbox { 'x' } else { ' ' };
+                        self.checkbox_events.push(crate::TaskListAction {
+                            new_state,
                             span: src_span,
                         });
                     }
@@ -1618,9 +1712,13 @@ impl<'a> CommonMarkViewerInternal<'a> {
             }
 
             pulldown_cmark::Tag::Item => {
+                // Clear any active task context if a new item starts (safety)
+                self.active_task_context_menu = None;
                 self.is_list_item = true;
+                let is_task_list = self.task_list_indices.contains(&self.current_event_idx);
+
                 if !self.inside_blockquote {
-                    self.list.start_item(ui, options, false);
+                    self.list.start_item(ui, options, false, is_task_list);
                 }
             }
 
@@ -1745,7 +1843,10 @@ impl<'a> CommonMarkViewerInternal<'a> {
                     self.list = List::default();
                 }
             }
-            pulldown_cmark::TagEnd::Item => {}
+            pulldown_cmark::TagEnd::Item => {
+                // Deactivate the task context menu when the item ends
+                self.active_task_context_menu = None;
+            }
             pulldown_cmark::TagEnd::FootnoteDefinition => {
                 self.line.should_start_newline = true;
                 self.line.should_end_newline = true;
@@ -1940,6 +2041,72 @@ fn extract_details_summary(html: &str) -> Option<String> {
     }
     let start = summary_start + "<summary>".len();
     Some(html[start..summary_end].trim().to_string())
+}
+
+pub(crate) fn extract_custom_task_lists<'e>(
+    events: Vec<(pulldown_cmark::Event<'e>, std::ops::Range<usize>)>,
+) -> (Vec<(pulldown_cmark::Event<'e>, std::ops::Range<usize>)>, std::collections::HashSet<usize>) {
+    let mut out = Vec::with_capacity(events.len());
+    let mut task_list_indices = std::collections::HashSet::new();
+    let mut i = 0;
+    while i < events.len() {
+        if let pulldown_cmark::Event::Start(pulldown_cmark::Tag::Item) = &events[i].0 {
+            let item_start_idx = out.len();
+            out.push(events[i].clone());
+
+            // Check for native TaskListMarker
+            if i + 1 < events.len() {
+                if let pulldown_cmark::Event::TaskListMarker(checked) = &events[i + 1].0 {
+                    task_list_indices.insert(item_start_idx);
+                    let c = if *checked { 'x' } else { ' ' };
+                    let span = events[i + 1].1.clone();
+                    let marker = format!("<!-- KATANA_TASK:{} -->", c);
+                    out.push((pulldown_cmark::Event::Html(marker.into()), span));
+                    i += 2;
+                    continue;
+                }
+            }
+
+            // Check for custom task list e.g. [/], [-], [~] as Text
+            if i + 3 < events.len() {
+                if let (pulldown_cmark::Event::Text(t1), span1) = &events[i + 1] {
+                    if let (pulldown_cmark::Event::Text(t2), _) = &events[i + 2] {
+                        if let (pulldown_cmark::Event::Text(t3), span3) = &events[i + 3] {
+                            if t1.as_ref() == "[" && t3.as_ref() == "]" && t2.as_ref().len() == 1 {
+                                task_list_indices.insert(item_start_idx);
+                                let c = t2.as_ref().chars().next().unwrap();
+                                let merged_span = span1.start..span3.end;
+                                let marker = format!("<!-- KATANA_TASK:{} -->", c);
+                                out.push((pulldown_cmark::Event::Html(marker.into()), merged_span));
+
+                                i += 4;
+                                // Strip leading space from the subsequent text event
+                                if i < events.len() {
+                                    if let (pulldown_cmark::Event::Text(t4), span4) = &events[i] {
+                                        if t4.as_ref().starts_with(' ') {
+                                            let mut new_text = t4.as_ref().to_string();
+                                            new_text.remove(0); // slice off leading space
+                                            let new_span = (span4.start + 1)..span4.end;
+                                            if !new_text.is_empty() {
+                                                out.push((pulldown_cmark::Event::Text(new_text.into()), new_span));
+                                            }
+                                            i += 1;
+                                            continue;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            out.push(events[i].clone());
+        }
+        i += 1;
+    }
+    (out, task_list_indices)
 }
 
 fn extract_footnotes<'e>(

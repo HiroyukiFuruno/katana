@@ -643,6 +643,43 @@ impl KatanaApp {
         self.refresh_preview(&path, &content);
     }
 
+    fn handle_toggle_task_list(&mut self, global_index: usize, new_state: char) {
+        let (path, content) = if let Some(doc) = self.state.active_document_mut() {
+            let spans = egui_commonmark::extract_task_list_spans(&doc.buffer);
+            if let Some(span) = spans.get(global_index) {
+                let replacement = format!("[{}]", new_state);
+                if span.start <= span.end && span.end <= doc.buffer.len() {
+                    doc.buffer.replace_range(span.clone(), &replacement);
+                    doc.is_dirty = true;
+                }
+            } else {
+                tracing::warn!(
+                    "Interactive Task List out of bounds: global_index {} vs {}",
+                    global_index,
+                    spans.len()
+                );
+            }
+            (doc.path.clone(), doc.buffer.clone())
+        } else {
+            return;
+        };
+        self.refresh_preview(&path, &content);
+    }
+
+    fn handle_replace_text(&mut self, span: std::ops::Range<usize>, replacement: String) {
+        let (path, content) = if let Some(doc) = self.state.active_document_mut() {
+            // Ensure the span is within bounds
+            if span.start <= span.end && span.end <= doc.buffer.len() {
+                doc.buffer.replace_range(span, &replacement);
+                doc.is_dirty = true;
+            }
+            (doc.path.clone(), doc.buffer.clone())
+        } else {
+            return;
+        };
+        self.refresh_preview(&path, &content);
+    }
+
     fn handle_save_document(&mut self) {
         let Some(doc) = self.state.active_document_mut() else {
             return;
@@ -727,6 +764,13 @@ impl KatanaApp {
                 self.cleanup_closed_tab_previews();
             }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
+            AppAction::ReplaceText { span, replacement } => {
+                self.handle_replace_text(span, replacement)
+            }
+            AppAction::ToggleTaskList {
+                global_index,
+                new_state,
+            } => self.handle_toggle_task_list(global_index, new_state),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
                 // Clear all egui texture caches (e.g. diagrams, network images)

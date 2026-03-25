@@ -37,7 +37,9 @@ pub(crate) fn show_section(
     scroll_to_heading_index: Option<usize>,
     populate_heading_rects: Option<&mut Vec<egui::Rect>>,
     heading_offset: usize,
-) -> Option<DownloadRequest> {
+    global_task_list_idx: &mut usize,
+) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
+    let mut actions = Vec::new();
     match section {
         RenderedSection::Markdown(md) => {
             with_preview_text_style(ui, |ui| {
@@ -72,17 +74,24 @@ pub(crate) fn show_section(
                     viewer = viewer.populate_heading_rects(rects);
                 }
 
-                viewer.show(ui, cache, md);
+                let (_, newly_captured) = viewer.show_with_events(ui, cache, md);
+                let spans = egui_commonmark::extract_task_list_spans(md);
+                for action in newly_captured {
+                    if let Some(local_idx) = spans.iter().position(|s| s == &action.span) {
+                        actions.push((*global_task_list_idx + local_idx, action.new_state));
+                    }
+                }
+                *global_task_list_idx += spans.len();
             });
-            None
+            (None, actions)
         }
         RenderedSection::Image { svg_data, alt } => {
             show_rasterized(ui, svg_data, alt, id, None, None);
-            None
+            (None, vec![])
         }
         RenderedSection::LocalImage { path, alt } => {
             show_local_image(ui, path, alt, id, None, None);
-            None
+            (None, vec![])
         }
         RenderedSection::Error {
             kind,
@@ -97,7 +106,7 @@ pub(crate) fn show_section(
                 .color(egui::Color32::YELLOW)
                 .small(),
             );
-            None
+            (None, vec![])
         }
         RenderedSection::CommandNotFound {
             tool_name,
@@ -115,13 +124,16 @@ pub(crate) fn show_section(
                     .color(egui::Color32::YELLOW)
                     .small(),
             );
-            None
+            (None, vec![])
         }
         RenderedSection::NotInstalled {
             kind,
             download_url,
             install_path,
-        } => show_not_installed(ui, kind, download_url, install_path),
+        } => (
+            show_not_installed(ui, kind, download_url, install_path),
+            vec![],
+        ),
         RenderedSection::Pending { kind, .. } => {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -133,7 +145,7 @@ pub(crate) fn show_section(
                     .weak(),
                 );
             });
-            None
+            (None, vec![])
         }
     }
 }
@@ -354,9 +366,11 @@ pub(crate) fn render_sections(
     mut populate_heading_rects: Option<&mut Vec<egui::Rect>>,
     mut viewer_states: Option<&mut Vec<ViewerState>>,
     mut fullscreen_request: Option<&mut Option<usize>>,
-) -> Option<DownloadRequest> {
+) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
     let mut request: Option<DownloadRequest> = None;
+    let mut actions = Vec::new();
     let mut current_heading_offset = 0;
+    let mut global_task_list_idx = 0;
 
     for (i, section) in sections.iter().enumerate() {
         ui.push_id(format!("section_{i}"), |ui| {
@@ -393,7 +407,7 @@ pub(crate) fn render_sections(
                     show_local_image(ui, path, alt, i, state, fullscreen_request.as_deref_mut());
                 }
                 _ => {
-                    if let Some(req) = show_section(
+                    let (req, mut event_actions) = show_section(
                         ui,
                         cache,
                         section,
@@ -402,9 +416,12 @@ pub(crate) fn render_sections(
                         scroll_to_heading_index,
                         populate_heading_rects.as_deref_mut(),
                         offset,
-                    ) {
-                        request = Some(req);
+                        &mut global_task_list_idx,
+                    );
+                    if let Some(r) = req {
+                        request = Some(r);
                     }
+                    actions.append(&mut event_actions);
                 }
             }
         });
@@ -412,7 +429,7 @@ pub(crate) fn render_sections(
     if sections.is_empty() {
         ui.label(egui::RichText::new(crate::i18n::get().preview.no_preview.clone()).weak());
     }
-    request
+    (request, actions)
 }
 
 /// Renders the fullscreen modal overlay if `fullscreen_image` is `Some`.
