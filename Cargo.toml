@@ -36,6 +36,10 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Networking / Auto Update
+ureq = { version = "2.10", features = ["json"] }
+semver = "1.0"
+
 # Testing
 tempfile = "3"
 syn = { version = "2", features = ["full", "visit"] }
