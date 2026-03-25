@@ -74,7 +74,8 @@
 
 use egui::{self, Id};
 
-mod parsers;
+pub(crate) mod parsers;
+pub mod ui_components;
 
 pub use egui_commonmark_backend::RenderHtmlFn;
 pub use egui_commonmark_backend::RenderMathFn;

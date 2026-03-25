@@ -1,7 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::iter::Peekable;
 use std::ops::Range;
-use std::hash::{Hash, Hasher};
 
 use crate::{CommonMarkCache, CommonMarkOptions};
 
@@ -290,8 +290,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         let gx_end = text_pos.x + glyph.max_x();
                         st_min_x = Some(st_min_x.map_or(gx, |v: f32| v.min(gx)));
                         st_max_x = Some(st_max_x.map_or(gx_end, |v: f32| v.max(gx_end)));
-                    } else if let (Some(min_x), Some(max_x)) = (st_min_x.take(), st_max_x.take())
-                    {
+                    } else if let (Some(min_x), Some(max_x)) = (st_min_x.take(), st_max_x.take()) {
                         let y = text_pos.y + row_rect.min.y + row_rect.height() * 0.38;
                         ui.painter().hline(min_x..=max_x, y, st_stroke);
                     }
@@ -357,7 +356,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 .ceil()
                 .max(INLINE_EMOJI_MIN_PIXEL_SIZE as f32) as u32;
             let display_size = pixel_size as f32 * INLINE_EMOJI_DISPLAY_SCALE;
-            if let Some(bytes) = katana_core::emoji::render_apple_color_emoji_png(grapheme, pixel_size) {
+            if let Some(bytes) =
+                katana_core::emoji::render_apple_color_emoji_png(grapheme, pixel_size)
+            {
                 self.flush_pending_inline(ui, max_width);
                 ui.add(
                     egui::Image::from_bytes(inline_emoji_uri(grapheme, pixel_size), bytes)
@@ -398,7 +399,6 @@ impl<'a> CommonMarkViewerInternal<'a> {
         )
     }
 
-    /// Be aware that this acquires egui::Context internally.
     /// If split Id is provided then split points will be populated
     pub(crate) fn show(
         &mut self,
@@ -416,57 +416,63 @@ impl<'a> CommonMarkViewerInternal<'a> {
         let re = ui.scope_builder(
             egui::UiBuilder::new().max_rect(child_rect).layout(layout),
             |ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            let height = ui.text_style_height(&TextStyle::Body);
-            ui.set_row_height(height);
+                ui.spacing_mut().item_spacing.x = 0.0;
+                let height = ui.text_style_height(&TextStyle::Body);
+                ui.set_row_height(height);
 
-            let mut events = pulldown_cmark::Parser::new_ext(
-                text,
-                parser_options_math(options.math_fn.is_some()),
-            )
-            .into_offset_iter()
-            .enumerate()
-            .peekable();
+                let raw_events = pulldown_cmark::Parser::new_ext(
+                    text,
+                    parser_options_math(options.math_fn.is_some()),
+                )
+                .into_offset_iter();
 
-            while let Some((index, (e, src_span))) = events.next() {
-                let start_position = ui.next_widget_position();
-                let is_element_end = matches!(e, pulldown_cmark::Event::End(_));
-                let should_add_split_point = self.list.is_inside_a_list() && is_element_end;
+                let mut events = extract_footnotes(raw_events)
+                    .into_iter()
+                    .enumerate()
+                    .peekable();
 
-                if events.peek().is_none() {
-                    self.line.should_end_newline_forced = false;
-                }
+                while let Some((index, (e, src_span))) = events.next() {
+                    let start_position = ui.next_widget_position();
+                    let is_element_end = matches!(e, pulldown_cmark::Event::End(_));
+                    let should_add_split_point = self.list.is_inside_a_list() && is_element_end;
 
-                self.process_event(ui, &mut events, e, src_span, cache, options, max_width);
+                    if events.peek().is_none() {
+                        self.line.should_end_newline_forced = false;
+                    }
 
-                if let Some(source_id) = split_points_id {
-                    if should_add_split_point {
-                        let scroll_cache = scroll_cache(cache, &source_id);
-                        let end_position = ui.next_widget_position();
+                    self.process_event(ui, &mut events, e, src_span, cache, options, max_width);
 
-                        let split_point_exists = scroll_cache
-                            .split_points
-                            .iter()
-                            .any(|(i, _, _)| *i == index);
+                    if let Some(source_id) = split_points_id {
+                        if should_add_split_point {
+                            let scroll_cache = scroll_cache(cache, &source_id);
+                            let end_position = ui.next_widget_position();
 
-                        if !split_point_exists {
-                            scroll_cache
+                            let split_point_exists = scroll_cache
                                 .split_points
-                                .push((index, start_position, end_position));
+                                .iter()
+                                .any(|(i, _, _)| *i == index);
+
+                            if !split_point_exists {
+                                scroll_cache.split_points.push((
+                                    index,
+                                    start_position,
+                                    end_position,
+                                ));
+                            }
                         }
+                    }
+
+                    if index == 0 {
+                        self.line.should_not_start_newline_forced = false;
                     }
                 }
 
-                if index == 0 {
-                    self.line.should_not_start_newline_forced = false;
+                if let Some(source_id) = split_points_id {
+                    scroll_cache(cache, &source_id).page_size =
+                        Some(ui.next_widget_position().to_vec2());
                 }
-            }
-
-            if let Some(source_id) = split_points_id {
-                scroll_cache(cache, &source_id).page_size =
-                    Some(ui.next_widget_position().to_vec2());
-            }
-        });
+            },
+        );
 
         (re, std::mem::take(&mut self.checkbox_events))
     }
@@ -494,10 +500,10 @@ impl<'a> CommonMarkViewerInternal<'a> {
             return;
         };
 
-        let events =
+        let raw_events =
             pulldown_cmark::Parser::new_ext(text, parser_options_math(options.math_fn.is_some()))
-                .into_offset_iter()
-                .collect::<Vec<_>>();
+                .into_offset_iter();
+        let events = extract_footnotes(raw_events);
 
         let num_rows = events.len();
 
@@ -519,49 +525,58 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 ui.scope_builder(
                     egui::UiBuilder::new().max_rect(child_rect).layout(layout),
                     |ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    let scroll_cache = scroll_cache(cache, &source_id);
+                        ui.spacing_mut().item_spacing.x = 0.0;
+                        let scroll_cache = scroll_cache(cache, &source_id);
 
-                    // finding the first element that's not in the viewport anymore
-                    let (first_event_index, _, first_end_position) = scroll_cache
-                        .split_points
-                        .iter()
-                        .filter(|(_, _, end_position)| end_position.y < viewport.min.y)
-                        .nth_back(1)
-                        .copied()
-                        .unwrap_or((0, Pos2::ZERO, Pos2::ZERO));
+                        // finding the first element that's not in the viewport anymore
+                        let (first_event_index, _, first_end_position) = scroll_cache
+                            .split_points
+                            .iter()
+                            .filter(|(_, _, end_position)| end_position.y < viewport.min.y)
+                            .nth_back(1)
+                            .copied()
+                            .unwrap_or((0, Pos2::ZERO, Pos2::ZERO));
 
-                    // finding the last element that's just outside the viewport
-                    let last_event_index = scroll_cache
-                        .split_points
-                        .iter()
-                        .filter(|(_, start_position, _)| start_position.y > viewport.max.y)
-                        .nth(1)
-                        .map(|(index, _, _)| *index)
-                        .unwrap_or(num_rows);
+                        // finding the last element that's just outside the viewport
+                        let last_event_index = scroll_cache
+                            .split_points
+                            .iter()
+                            .filter(|(_, start_position, _)| start_position.y > viewport.max.y)
+                            .nth(1)
+                            .map(|(index, _, _)| *index)
+                            .unwrap_or(num_rows);
 
-                    ui.allocate_space(first_end_position.to_vec2());
+                        ui.allocate_space(first_end_position.to_vec2());
 
-                    // only rendering the elements that are inside the viewport
-                    let mut events = events
-                        .into_iter()
-                        .enumerate()
-                        .skip(first_event_index)
-                        .take(last_event_index - first_event_index)
-                        .peekable();
+                        // only rendering the elements that are inside the viewport
+                        let mut events = events
+                            .into_iter()
+                            .enumerate()
+                            .skip(first_event_index)
+                            .take(last_event_index - first_event_index)
+                            .peekable();
 
-                    while let Some((i, (e, src_span))) = events.next() {
-                        if events.peek().is_none() {
-                            self.line.should_end_newline_forced = false;
+                        while let Some((i, (e, src_span))) = events.next() {
+                            if events.peek().is_none() {
+                                self.line.should_end_newline_forced = false;
+                            }
+
+                            self.process_event(
+                                ui,
+                                &mut events,
+                                e,
+                                src_span,
+                                cache,
+                                options,
+                                max_width,
+                            );
+
+                            if i == 0 {
+                                self.line.should_not_start_newline_forced = false;
+                            }
                         }
-
-                        self.process_event(ui, &mut events, e, src_span, cache, options, max_width);
-
-                        if i == 0 {
-                            self.line.should_not_start_newline_forced = false;
-                        }
-                    }
-                });
+                    },
+                );
             });
 
         // Forcing full re-render to repopulate split points for the new size
@@ -588,26 +603,349 @@ impl<'a> CommonMarkViewerInternal<'a> {
         // The first event after setting details_summary triggers the header rendering.
         if let Some(summary) = self.details_summary.take() {
             let id = ui.id().with("_details").with(self.details_id_counter);
-            let state = egui::collapsing_header::CollapsingState::load_with_default_open(
-                ui.ctx(), id, false,
+
+            // Collect the body events up to </details>
+            let mut body_events = Vec::new();
+            body_events.push((0, (event, src_span)));
+            body_events.extend(self.collect_until_details_close(events));
+
+            // Flush inline content first, then render accordion in a top_down scope.
+            // A top_down scope is required so that ui.add_space() works as VERTICAL spacing;
+            // in the outer left_to_right+main_wrap layout add_space is horizontal (4.3 fix).
+            self.flush_pending_inline(ui, max_width);
+            let cursor = ui.next_widget_position();
+            let outer_rect = egui::Rect::from_min_max(
+                cursor,
+                egui::pos2(
+                    cursor.x + max_width,
+                    ui.max_rect().max.y.max(cursor.y + 1.0),
+                ),
             );
-            let is_open = state.is_open();
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(outer_rect)
+                    .layout(egui::Layout::top_down(egui::Align::LEFT)),
+                |ui| {
+                    // 4.3 (Optical): Markdown block parser generates empty \n\n gaps resulting in a massive 
+                    // unbalanced top gap before <details> compared to the bottom. 
+                    // Explicitly pull the widget back up to optically balance against 8px bottom spacing.
+                    ui.add_space(-24.0); 
 
-            // Render the collapsing header
-            let _ = state.show_header(ui, |ui| {
-                ui.label(egui::RichText::new(&summary).strong());
-            });
+                    // 4.4 (Optical): Egui natively generates geometrically centered icons that map incorrectly 
+                    // to the optical visual weight of Japanese fonts, plunging to the baseline.
+                    // Instead of inflating/deflating interact_size, we use standard spacing and apply an optical shift.
+                    ui.spacing_mut().interact_size.y = 18.0;
 
-            if !is_open {
-                // Collapsed: skip rendering content until </details>.
-                // Consume events until the closing </details> HtmlBlock.
-                self.skip_until_details_close(events);
+                    let id_salt = egui::Id::new(&summary).with(id);
+                    let collapsing = egui::CollapsingHeader::new(
+                        egui::RichText::new(&summary).strong()
+                    )
+                    .id_salt(id_salt)
+                    .icon(crate::ui_components::centering::paint_collapsing_icon_optically_centered);
+
+                    let _header_res = collapsing.show_unindented(ui, |ui| {
+                        let layout = egui::Layout::left_to_right(egui::Align::Center)
+                            .with_main_wrap(true);
+                        let body_width = ui.available_width();
+                        let child_rect = egui::Rect::from_min_size(
+                            ui.next_widget_position(),
+                            egui::vec2(body_width, 0.0),
+                        );
+                        ui.scope_builder(
+                            egui::UiBuilder::new().max_rect(child_rect).layout(layout),
+                            |ui| {
+                                ui.spacing_mut().item_spacing.x = 0.0;
+                                let height = ui.text_style_height(&egui::TextStyle::Body);
+                                ui.set_row_height(height);
+                                let mut iter = body_events.into_iter().peekable();
+                                while let Some((index, (e, src_span))) = iter.next() {
+                                    if iter.peek().is_none() {
+                                        self.line.should_end_newline_forced = false;
+                                    }
+                                    self.process_event(
+                                        ui, &mut iter, e, src_span, cache, options, max_width,
+                                    );
+                                    if index == 0 {
+                                        self.line.should_not_start_newline_forced = false;
+                                    }
+                                }
+                            },
+                        );
+                    });
+
+                    // 4.3: Because `egui_commonmark` inline HTML processing strips some block spacing,
+                    // we add a small bottom margin so the next block (like heading 13) isn't crushed.
+                    ui.add_space(8.0);
+                },
+            );
+            return;
+        }
+
+        if let pulldown_cmark::Event::Html(ref text) = event {
+            if text.starts_with("<!-- FOOTNOTE_START_BLOCK:") {
+                // Collect ALL remaining footnote blocks (this one + subsequent ones) upfront
+                // so we can render them inside a single top_down scope — eliminating any
+                // inter-block spacing that the outer left_to_right+main_wrap layout would insert.
+                // Each collected entry: (note_name, is_highlighted, should_scroll, frame, body_events)
+                let active_highlight_key = egui::Id::new("highlight_footnote_active");
+                let scroll_key = egui::Id::new("scroll_to_footnote");
+
+                // Helper to clone an Event<'e> into an owned Event<'static> so we can
+                // store it across lifetime boundaries inside the local Vec.
+                fn own_event(e: pulldown_cmark::Event<'_>) -> pulldown_cmark::Event<'static> {
+                    use pulldown_cmark::Event;
+                    match e {
+                        Event::Text(s) => Event::Text(s.into_string().into()),
+                        Event::Code(s) => Event::Code(s.into_string().into()),
+                        Event::Html(s) => Event::Html(s.into_string().into()),
+                        Event::InlineHtml(s) => Event::InlineHtml(s.into_string().into()),
+                        Event::SoftBreak => Event::SoftBreak,
+                        Event::HardBreak => Event::HardBreak,
+                        Event::Rule => Event::Rule,
+                        Event::Start(tag) => Event::Start(own_tag(tag)),
+                        Event::End(tag) => Event::End(tag),
+                        _ => Event::SoftBreak, // footnotes won't contain other variants
+                    }
+                }
+                fn own_tag(t: pulldown_cmark::Tag<'_>) -> pulldown_cmark::Tag<'static> {
+                    use pulldown_cmark::Tag;
+                    match t {
+                        Tag::Emphasis => Tag::Emphasis,
+                        Tag::Strong => Tag::Strong,
+                        Tag::Strikethrough => Tag::Strikethrough,
+                        Tag::Paragraph => Tag::Paragraph,
+                        Tag::Heading {
+                            level,
+                            id,
+                            classes,
+                            attrs,
+                        } => Tag::Heading {
+                            level,
+                            id: id.map(|s| s.into_string().into()),
+                            classes: classes
+                                .into_iter()
+                                .map(|c| c.into_string().into())
+                                .collect(),
+                            attrs: attrs
+                                .into_iter()
+                                .map(|(k, v)| {
+                                    (k.into_string().into(), v.map(|v| v.into_string().into()))
+                                })
+                                .collect(),
+                        },
+                        Tag::Link {
+                            link_type,
+                            dest_url,
+                            title,
+                            id,
+                        } => Tag::Link {
+                            link_type,
+                            dest_url: dest_url.into_string().into(),
+                            title: title.into_string().into(),
+                            id: id.into_string().into(),
+                        },
+                        Tag::Image {
+                            link_type,
+                            dest_url,
+                            title,
+                            id,
+                        } => Tag::Image {
+                            link_type,
+                            dest_url: dest_url.into_string().into(),
+                            title: title.into_string().into(),
+                            id: id.into_string().into(),
+                        },
+                        Tag::CodeBlock(kind) => Tag::CodeBlock(match kind {
+                            pulldown_cmark::CodeBlockKind::Fenced(s) => {
+                                pulldown_cmark::CodeBlockKind::Fenced(s.into_string().into())
+                            }
+                            pulldown_cmark::CodeBlockKind::Indented => {
+                                pulldown_cmark::CodeBlockKind::Indented
+                            }
+                        }),
+                        Tag::List(n) => Tag::List(n),
+                        Tag::Item => Tag::Item,
+                        Tag::BlockQuote(k) => Tag::BlockQuote(k),
+                        Tag::FootnoteDefinition(s) => {
+                            Tag::FootnoteDefinition(s.into_string().into())
+                        }
+                        Tag::Table(alignment) => Tag::Table(alignment),
+                        Tag::TableHead => Tag::TableHead,
+                        Tag::TableRow => Tag::TableRow,
+                        Tag::TableCell => Tag::TableCell,
+                        Tag::DefinitionList => Tag::DefinitionList,
+                        Tag::DefinitionListTitle => Tag::DefinitionListTitle,
+                        Tag::DefinitionListDefinition => Tag::DefinitionListDefinition,
+                        Tag::HtmlBlock => Tag::HtmlBlock,
+                        Tag::MetadataBlock(k) => Tag::MetadataBlock(k),
+                        _ => Tag::Paragraph, // safe fallback for any future variants
+                    }
+                }
+
+                struct FootnoteBlock {
+                    frame: egui::Frame,
+                    should_scroll: bool,
+                    body_events: Vec<(
+                        usize,
+                        (pulldown_cmark::Event<'static>, std::ops::Range<usize>),
+                    )>,
+                }
+
+                let mut all_blocks: Vec<FootnoteBlock> = Vec::new();
+
+                // Process the CURRENT block (triggered by `event`)
+                let process_block =
+                    |note: &str, events: &mut Peekable<_>, ctx: &egui::Context| -> FootnoteBlock {
+                        let is_highlighted = ctx.memory(|m| {
+                            m.data
+                                .get_temp::<String>(active_highlight_key)
+                                .map(|active| active == note)
+                                .unwrap_or(false)
+                        });
+                        let should_scroll = ctx.memory_mut(|m| {
+                            if let Some(target) = m.data.get_temp::<String>(scroll_key) {
+                                if target == note {
+                                    m.data.remove_temp::<String>(scroll_key);
+                                    return true;
+                                }
+                            }
+                            false
+                        });
+                        let frame = if is_highlighted {
+                            egui::Frame::NONE
+                                .fill(ctx.style().visuals.selection.bg_fill.linear_multiply(0.3))
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    ctx.style().visuals.selection.bg_fill,
+                                ))
+                                .inner_margin(egui::Margin {
+                                    left: 6,
+                                    right: 6,
+                                    top: 1,
+                                    bottom: 1,
+                                })
+                                .corner_radius(4.0)
+                        } else {
+                            egui::Frame::NONE
+                        };
+                        let mut body_events = Vec::new();
+                        while let Some(&(_, (ref e, _))) = events.peek() {
+                            let mut done = false;
+                            if let pulldown_cmark::Event::Html(t) = e {
+                                if t.starts_with("<!-- FOOTNOTE_END_BLOCK:") && t.contains(note) {
+                                    done = true;
+                                }
+                            }
+                            if done {
+                                events.next();
+                                break;
+                            }
+                            let (idx, (e, span)) = events.next().unwrap();
+                            body_events.push((idx, (own_event(e), span)));
+                        }
+                        FootnoteBlock {
+                            frame,
+                            should_scroll,
+                            body_events,
+                        }
+                    };
+
+                let first_note = text
+                    .trim_start_matches("<!-- FOOTNOTE_START_BLOCK:")
+                    .trim_end_matches(" -->");
+                all_blocks.push(process_block(first_note, events, ui.ctx()));
+
+                // Peek ahead and collect any immediately following footnote blocks.
+                loop {
+                    let next_is_footnote = events.peek().map(|(_, (e, _))| {
+                        matches!(e, pulldown_cmark::Event::Html(t) if t.starts_with("<!-- FOOTNOTE_START_BLOCK:"))
+                    }).unwrap_or(false);
+                    if !next_is_footnote {
+                        break;
+                    }
+                    // Consume the FOOTNOTE_START_BLOCK marker event.
+                    let (_, (start_event, _)) = events.next().unwrap();
+                    if let pulldown_cmark::Event::Html(t) = start_event {
+                        let note = t
+                            .trim_start_matches("<!-- FOOTNOTE_START_BLOCK:")
+                            .trim_end_matches(" -->");
+                        let note_owned = note.to_string();
+                        all_blocks.push(process_block(&note_owned, events, ui.ctx()));
+                    }
+                }
+
+                // Render all footnote blocks in a single top_down scope_builder.
+                // Use the remaining panel height (not 0) so egui treats the scope as
+                // properly bounded. frame.show inside draws around content min_rect so the
+                // frame border is correctly sized to the text (not the full panel height).
+                self.flush_pending_inline(ui, max_width);
+                let footnote_width = max_width;
+                let cursor = ui.next_widget_position();
+                let outer_rect = egui::Rect::from_min_max(
+                    cursor,
+                    egui::pos2(
+                        cursor.x + footnote_width,
+                        ui.max_rect().max.y.max(cursor.y + 1.0),
+                    ),
+                );
+                let td_layout = egui::Layout::top_down(egui::Align::LEFT);
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(outer_rect)
+                        .layout(td_layout),
+                    |ui| {
+                        // Zero vertical spacing so consecutive frame.show blocks touch (fix 5.10).
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        for block in all_blocks {
+                            if block.should_scroll {
+                                ui.scroll_to_cursor(Some(egui::Align::Center));
+                            }
+                            block.frame.show(ui, |ui| {
+                                ui.set_min_width(footnote_width - 12.0);
+                                let inner_layout = egui::Layout::left_to_right(egui::Align::Center)
+                                    .with_main_wrap(true);
+                                ui.with_layout(inner_layout, |ui| {
+                                    ui.spacing_mut().item_spacing.x = 0.0;
+                                    // 5.9: use Small text style for footnotes
+                                    let small_size = ui.text_style_height(&egui::TextStyle::Small);
+                                    ui.style_mut().override_text_style =
+                                        Some(egui::TextStyle::Small);
+                                    ui.set_row_height(small_size);
+                                    let mut iter = block.body_events.into_iter().peekable();
+                                    while let Some((_, (e, src_span))) = iter.next() {
+                                        // Skip Paragraph start/end: they call newline(ui) which
+                                        // adds ~body_font_height gap inside the frame (fix 5.10).
+                                        if matches!(
+                                            e,
+                                            pulldown_cmark::Event::Start(
+                                                pulldown_cmark::Tag::Paragraph
+                                            ) | pulldown_cmark::Event::End(
+                                                pulldown_cmark::TagEnd::Paragraph
+                                            )
+                                        ) {
+                                            continue;
+                                        }
+                                        if iter.peek().is_none() {
+                                            self.line.should_end_newline_forced = false;
+                                        }
+                                        self.process_event(
+                                            ui, &mut iter, e, src_span, cache, options, max_width,
+                                        );
+                                        self.def_list_def_wrapping(
+                                            &mut iter, max_width, cache, options, ui,
+                                        );
+                                        self.item_list_wrapping(
+                                            &mut iter, max_width, cache, options, ui,
+                                        );
+                                    }
+                                });
+                            });
+                        }
+                    },
+                );
+                newline(ui);
                 return;
             }
-
-            // Open: continue rendering the current event and subsequent events normally.
-            // Stash None so we know we're inside details but header is rendered.
-            // (details_summary is already None from take())
         }
 
         self.event(ui, event, src_span, cache, options, max_width);
@@ -618,36 +956,45 @@ impl<'a> CommonMarkViewerInternal<'a> {
         self.blockquote(events, max_width, cache, options, ui);
     }
 
-    /// Consume events from the stream until a `</details>` closing HtmlBlock is found.
-    fn skip_until_details_close<'e>(
+    fn collect_until_details_close<'e>(
         &mut self,
         events: &mut Peekable<impl Iterator<Item = EventIteratorItem<'e>>>,
-    ) {
+    ) -> Vec<EventIteratorItem<'e>> {
+        let mut collected = Vec::new();
         let mut depth = 0i32;
-        while let Some((_, (event, _))) = events.next() {
+        let mut local_html_block = String::new();
+
+        while let Some((i, (event, src_span))) = events.next() {
+            let mut is_closing = false;
+
             match &event {
                 pulldown_cmark::Event::Start(pulldown_cmark::Tag::HtmlBlock) => {
-                    // Enter a new HTML block — could be nested details or closing tag.
-                    self.html_block.clear();
+                    local_html_block.clear();
                 }
                 pulldown_cmark::Event::Html(text) => {
-                    self.html_block.push_str(text);
+                    local_html_block.push_str(text);
                 }
                 pulldown_cmark::Event::End(pulldown_cmark::TagEnd::HtmlBlock) => {
-                    let block = std::mem::take(&mut self.html_block);
-                    let trimmed = block.trim();
+                    let trimmed = local_html_block.trim();
                     if extract_details_summary(trimmed).is_some() {
-                        depth += 1; // Nested <details>
+                        depth += 1;
                     } else if trimmed.contains("</details>") {
                         if depth == 0 {
-                            return; // Our closing tag found
+                            is_closing = true;
+                        } else {
+                            depth -= 1;
                         }
-                        depth -= 1;
                     }
                 }
-                _ => {} // Skip all other events
+                _ => {}
+            }
+
+            collected.push((i, (event, src_span)));
+            if is_closing {
+                break;
             }
         }
+        collected
     }
 
     fn def_list_def_wrapping<'e>(
@@ -834,8 +1181,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 })
             }
             pulldown_cmark::Alignment::Right => {
-                let layout =
-                    egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true);
+                let layout = egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true);
                 ui.with_layout(layout, |ui| {
                     if min_width > 0.0 {
                         ui.set_min_width(min_width);
@@ -845,8 +1191,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
             }
             _ => {
                 // Left or None
-                let layout =
-                    egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
+                let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
                 ui.with_layout(layout, |ui| {
                     if min_width > 0.0 {
                         ui.set_min_width(min_width);
@@ -872,8 +1217,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
             self.curr_table += 1;
 
             let table_width_key = id.with("_table_width");
-            let prev_table_width: Option<f32> =
-                ui.memory(|mem| mem.data.get_temp(table_width_key));
+            let prev_table_width: Option<f32> = ui.memory(|mem| mem.data.get_temp(table_width_key));
 
             let Table { header, rows } = parse_table(events);
             let num_cols = header.len().max(1);
@@ -908,76 +1252,116 @@ impl<'a> CommonMarkViewerInternal<'a> {
                             .striped(true)
                             .min_col_width(min_col.max(0.0))
                             .show(ui, |ui| {
-                            // ── Header row ──
-                            for (col_idx, col) in header.iter().enumerate() {
-                                let alignment = alignments.get(col_idx).unwrap_or(&pulldown_cmark::Alignment::None);
+                                // ── Header row ──
+                                for (col_idx, col) in header.iter().enumerate() {
+                                    let alignment = alignments
+                                        .get(col_idx)
+                                        .unwrap_or(&pulldown_cmark::Alignment::None);
 
-                                Self::apply_alignment(ui, alignment, min_col, |ui| {
-                                    for (e, src_span) in col {
-                                        let tmp_start = std::mem::replace(&mut self.line.should_start_newline, false);
-                                        let tmp_end = std::mem::replace(&mut self.line.should_end_newline, false);
-                                        self.event(ui, e.clone(), src_span.clone(), cache, options, ui.available_width());
-                                        self.line.should_start_newline = tmp_start;
-                                        self.line.should_end_newline = tmp_end;
-                                    }
-                                    self.flush_pending_inline(ui, ui.available_width());
-                                });
+                                    Self::apply_alignment(ui, alignment, min_col, |ui| {
+                                        for (e, src_span) in col {
+                                            let tmp_start = std::mem::replace(
+                                                &mut self.line.should_start_newline,
+                                                false,
+                                            );
+                                            let tmp_end = std::mem::replace(
+                                                &mut self.line.should_end_newline,
+                                                false,
+                                            );
+                                            self.event(
+                                                ui,
+                                                e.clone(),
+                                                src_span.clone(),
+                                                cache,
+                                                options,
+                                                ui.available_width(),
+                                            );
+                                            self.line.should_start_newline = tmp_start;
+                                            self.line.should_end_newline = tmp_end;
+                                        }
+                                        self.flush_pending_inline(ui, ui.available_width());
+                                    });
 
-                                if col_boundaries.len() < num_cols - 1 && col_idx < num_cols - 1 {
-                                    col_boundaries.push(ui.cursor().min.x - ui.spacing().item_spacing.x / 2.0);
-                                }
-                            }
-                            header_bottom_y = Some(ui.min_rect().bottom() + ui.spacing().item_spacing.y / 2.0);
-                            ui.end_row();
-
-                            // ── Body rows ──
-                            for (row_idx, row_data) in rows.iter().enumerate() {
-                                for col_idx in 0..num_cols {
-                                    if let Some(col_data) = row_data.get(col_idx) {
-                                        let alignment = alignments.get(col_idx).unwrap_or(&pulldown_cmark::Alignment::None);
-
-                                        Self::apply_alignment(ui, alignment, min_col, |ui| {
-                                            for (e, src_span) in col_data {
-                                                let tmp_start = std::mem::replace(
-                                                    &mut self.line.should_start_newline,
-                                                    false,
-                                                );
-                                                let tmp_end = std::mem::replace(&mut self.line.should_end_newline, false);
-                                                self.event(ui, e.clone(), src_span.clone(), cache, options, ui.available_width());
-                                                self.line.should_start_newline = tmp_start;
-                                                self.line.should_end_newline = tmp_end;
-                                            }
-                                            self.flush_pending_inline(ui, ui.available_width());
-                                        });
-                                    } else {
-                                        ui.label("");
+                                    if col_boundaries.len() < num_cols - 1 && col_idx < num_cols - 1
+                                    {
+                                        col_boundaries.push(
+                                            ui.cursor().min.x - ui.spacing().item_spacing.x / 2.0,
+                                        );
                                     }
                                 }
-                                if row_idx < rows.len() - 1 {
-                                    row_bottoms.push(ui.min_rect().bottom() + ui.spacing().item_spacing.y / 2.0);
-                                }
+                                header_bottom_y = Some(
+                                    ui.min_rect().bottom() + ui.spacing().item_spacing.y / 2.0,
+                                );
                                 ui.end_row();
-                            }
-                        });
 
-                    // Draw vertical and horizontal separators
-                    let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
-                    let visual_rect = ui.min_rect();
-                    for x in col_boundaries {
-                        ui.painter().vline(x, visual_rect.y_range(), stroke);
-                    }
-                    if let (Some(y), false) = (header_bottom_y, rows.is_empty()) {
-                        let header_stroke = egui::Stroke::new(1.0, ui.visuals().text_color().gamma_multiply(0.4));
-                        ui.painter().hline(visual_rect.x_range(), y, header_stroke);
-                    }
-                    for y in row_bottoms {
-                        ui.painter().hline(visual_rect.x_range(), y, stroke);
-                    }
-                });
+                                // ── Body rows ──
+                                for (row_idx, row_data) in rows.iter().enumerate() {
+                                    for col_idx in 0..num_cols {
+                                        if let Some(col_data) = row_data.get(col_idx) {
+                                            let alignment = alignments
+                                                .get(col_idx)
+                                                .unwrap_or(&pulldown_cmark::Alignment::None);
+
+                                            Self::apply_alignment(ui, alignment, min_col, |ui| {
+                                                for (e, src_span) in col_data {
+                                                    let tmp_start = std::mem::replace(
+                                                        &mut self.line.should_start_newline,
+                                                        false,
+                                                    );
+                                                    let tmp_end = std::mem::replace(
+                                                        &mut self.line.should_end_newline,
+                                                        false,
+                                                    );
+                                                    self.event(
+                                                        ui,
+                                                        e.clone(),
+                                                        src_span.clone(),
+                                                        cache,
+                                                        options,
+                                                        ui.available_width(),
+                                                    );
+                                                    self.line.should_start_newline = tmp_start;
+                                                    self.line.should_end_newline = tmp_end;
+                                                }
+                                                self.flush_pending_inline(ui, ui.available_width());
+                                            });
+                                        } else {
+                                            ui.label("");
+                                        }
+                                    }
+                                    if row_idx < rows.len() - 1 {
+                                        row_bottoms.push(
+                                            ui.min_rect().bottom()
+                                                + ui.spacing().item_spacing.y / 2.0,
+                                        );
+                                    }
+                                    ui.end_row();
+                                }
+                            });
+
+                        // Draw vertical and horizontal separators
+                        let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
+                        let visual_rect = ui.min_rect();
+                        for x in col_boundaries {
+                            ui.painter().vline(x, visual_rect.y_range(), stroke);
+                        }
+                        if let (Some(y), false) = (header_bottom_y, rows.is_empty()) {
+                            let header_stroke = egui::Stroke::new(
+                                1.0,
+                                ui.visuals().text_color().gamma_multiply(0.4),
+                            );
+                            ui.painter().hline(visual_rect.x_range(), y, header_stroke);
+                        }
+                        for y in row_bottoms {
+                            ui.painter().hline(visual_rect.x_range(), y, stroke);
+                        }
+                    });
 
                 let current_table_width = frame_res.response.rect.width();
                 if prev_table_width.map_or(true, |pw| (pw - current_table_width).abs() > 0.1) {
-                    ui.memory_mut(|mem| { mem.data.insert_temp(table_width_key, current_table_width); });
+                    ui.memory_mut(|mem| {
+                        mem.data.insert_temp(table_width_key, current_table_width);
+                    });
                     ui.ctx().request_repaint();
                 }
             });
@@ -1046,7 +1430,45 @@ impl<'a> CommonMarkViewerInternal<'a> {
             pulldown_cmark::Event::FootnoteReference(footnote) => {
                 self.after_inline_widget = false;
                 self.flush_pending_inline(ui, max_width);
-                footnote_start(ui, &footnote);
+
+                let scroll_back_key = egui::Id::new("scroll_to_footnote_ref");
+                let should_scroll_back = ui.memory_mut(|m| {
+                    if let Some(target) = m.data.get_temp::<String>(scroll_back_key) {
+                        if target == footnote.as_ref() {
+                            m.data.remove_temp::<String>(scroll_back_key);
+                            return true;
+                        }
+                    }
+                    false
+                });
+
+                if should_scroll_back {
+                    ui.scroll_to_cursor(Some(egui::Align::Center));
+                }
+
+                let num_str = match footnote.as_ref().parse::<u32>() {
+                    Ok(n) => format!("[{n}]"),
+                    Err(_) => format!("[{}]", footnote.as_ref()),
+                };
+
+                let text = RichText::new(num_str)
+                    .raised()
+                    .small()
+                    .color(ui.visuals().hyperlink_color)
+                    .underline();
+                let mut resp = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+
+                if resp.clicked() {
+                    let scroll_key = egui::Id::new("scroll_to_footnote");
+                    ui.ctx()
+                        .memory_mut(|m| m.data.insert_temp(scroll_key, footnote.to_string()));
+                    // Use a single "active highlight" key so only one footnote is highlighted
+                    // at a time, preventing accumulation on back/forth navigation (fix 5.7).
+                    let active_key = egui::Id::new("highlight_footnote_active");
+                    ui.ctx()
+                        .memory_mut(|m| m.data.insert_temp(active_key, footnote.to_string()));
+                }
             }
             pulldown_cmark::Event::SoftBreak => {
                 self.after_inline_widget = false;
@@ -1176,7 +1598,10 @@ impl<'a> CommonMarkViewerInternal<'a> {
             }
 
             pulldown_cmark::Tag::List(point) => {
-                if !self.inside_blockquote && !self.list.is_inside_a_list() && self.line.can_insert_start() {
+                if !self.inside_blockquote
+                    && !self.list.is_inside_a_list()
+                    && self.line.can_insert_start()
+                {
                     newline(ui);
                 }
 
@@ -1201,7 +1626,21 @@ impl<'a> CommonMarkViewerInternal<'a> {
 
                 self.line.should_start_newline = false;
                 self.line.should_end_newline = false;
-                footnote(ui, &note);
+
+                let scroll_key = egui::Id::new("scroll_to_footnote");
+                let should_scroll = ui.ctx().memory_mut(|m| {
+                    if let Some(target) = m.data.get_temp::<String>(scroll_key) {
+                        if target == note.as_ref() {
+                            m.data.remove_temp::<String>(scroll_key);
+                            return true;
+                        }
+                    }
+                    false
+                });
+
+                if should_scroll {
+                    ui.scroll_to_cursor(Some(egui::Align::Center));
+                }
             }
             pulldown_cmark::Tag::Table(alignments) => {
                 self.table_alignments = Some(alignments);
@@ -1271,7 +1710,9 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 self.line.try_insert_end(ui);
                 self.text_style.heading = None;
 
-                if let (Some(rects), Some(start_y)) = (&mut self.populate_heading_rects, self.curr_heading_start_y) {
+                if let (Some(rects), Some(start_y)) =
+                    (&mut self.populate_heading_rects, self.curr_heading_start_y)
+                {
                     let end_y = ui.next_widget_position().y;
                     let width = ui.available_width();
                     let min_x = ui.min_rect().left();
@@ -1322,7 +1763,40 @@ impl<'a> CommonMarkViewerInternal<'a> {
             }
             pulldown_cmark::TagEnd::Link => {
                 if let Some(link) = self.link.take() {
-                    link.end(ui, cache);
+                    let dest = link.destination.clone();
+                    if let Some(target) = dest.strip_prefix("scroll-to-footnote-ref:") {
+                        // Render ↩ in hyperlink_color (blue) without underline (fix 5.8).
+                        let hyperlink_color = ui.visuals().hyperlink_color;
+                        let mut layout_job = egui::text::LayoutJob::default();
+                        for t in link.text {
+                            let section_start = layout_job.text.len();
+                            t.append_to(
+                                &mut layout_job,
+                                ui.style(),
+                                egui::FontSelection::Default,
+                                egui::Align::LEFT,
+                            );
+                            for section in layout_job.sections.iter_mut() {
+                                if section.byte_range.start >= section_start {
+                                    section.format.color = hyperlink_color;
+                                    section.format.underline = egui::Stroke::NONE;
+                                }
+                            }
+                        }
+                        let resp = ui.link(layout_job);
+                        if resp.clicked() {
+                            let back_key = egui::Id::new("scroll_to_footnote_ref");
+                            ui.ctx()
+                                .memory_mut(|m| m.data.insert_temp(back_key, target.to_string()));
+
+                            // Clear the single active-highlight key when returning (fix 5.7)
+                            let active_key = egui::Id::new("highlight_footnote_active");
+                            ui.ctx()
+                                .memory_mut(|m| m.data.remove_temp::<String>(active_key));
+                        }
+                    } else {
+                        link.end(ui, cache);
+                    }
                     self.after_inline_widget = true;
                 }
             }
@@ -1463,4 +1937,97 @@ fn extract_details_summary(html: &str) -> Option<String> {
     }
     let start = summary_start + "<summary>".len();
     Some(html[start..summary_end].trim().to_string())
+}
+
+fn extract_footnotes<'e>(
+    raw_events: impl Iterator<Item = (pulldown_cmark::Event<'e>, std::ops::Range<usize>)>,
+) -> Vec<(pulldown_cmark::Event<'e>, std::ops::Range<usize>)> {
+    let mut main_events = Vec::new();
+    let mut footnote_events = Vec::new();
+    let mut in_footnote = 0;
+    let mut current_footnote = String::new();
+    let mut is_first_paragraph_of_footnote = false;
+
+    for (event, span) in raw_events {
+        match &event {
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::FootnoteDefinition(note)) => {
+                in_footnote += 1;
+                current_footnote = note.to_string();
+                is_first_paragraph_of_footnote = true;
+                let start_html = format!("<!-- FOOTNOTE_START_BLOCK:{} -->", current_footnote);
+                footnote_events
+                    .push((pulldown_cmark::Event::Html(start_html.into()), span.clone()));
+            }
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::FootnoteDefinition) => {
+                let return_url = format!("scroll-to-footnote-ref:{}", current_footnote);
+                let pos = footnote_events.iter().rposition(|(e, _)| {
+                    matches!(
+                        e,
+                        pulldown_cmark::Event::End(pulldown_cmark::TagEnd::Paragraph)
+                    )
+                });
+
+                let s_space = (pulldown_cmark::Event::Text("  ".into()), 0..0);
+                let link_start = (
+                    pulldown_cmark::Event::Start(pulldown_cmark::Tag::Link {
+                        link_type: pulldown_cmark::LinkType::Inline,
+                        dest_url: return_url.into(),
+                        title: "".into(),
+                        id: "".into(),
+                    }),
+                    0..0,
+                );
+                let link_text = (pulldown_cmark::Event::Text("↩".into()), 0..0);
+                let link_end = (
+                    pulldown_cmark::Event::End(pulldown_cmark::TagEnd::Link),
+                    0..0,
+                );
+
+                if let Some(p) = pos {
+                    footnote_events.insert(p, s_space);
+                    footnote_events.insert(p + 1, link_start);
+                    footnote_events.insert(p + 2, link_text);
+                    footnote_events.insert(p + 3, link_end);
+                } else {
+                    footnote_events.push(s_space);
+                    footnote_events.push(link_start);
+                    footnote_events.push(link_text);
+                    footnote_events.push(link_end);
+                }
+
+                let end_html = format!("<!-- FOOTNOTE_END_BLOCK:{} -->", current_footnote);
+                footnote_events.push((pulldown_cmark::Event::Html(end_html.into()), 0..0));
+
+                in_footnote -= 1;
+            }
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::Paragraph) => {
+                if in_footnote > 0 {
+                    footnote_events.push((event.clone(), span.clone()));
+                    if is_first_paragraph_of_footnote {
+                        let label = match current_footnote.parse::<u32>() {
+                            Ok(n) => format!("{n}. "),
+                            Err(_) => format!("{}. ", current_footnote),
+                        };
+                        footnote_events.push((pulldown_cmark::Event::Text(label.into()), 0..0));
+                        is_first_paragraph_of_footnote = false;
+                    }
+                } else {
+                    main_events.push((event.clone(), span.clone()));
+                }
+            }
+            _ => {
+                if in_footnote > 0 {
+                    footnote_events.push((event.clone(), span.clone()));
+                } else {
+                    main_events.push((event.clone(), span.clone()));
+                }
+            }
+        }
+    }
+
+    if !footnote_events.is_empty() {
+        main_events.push((pulldown_cmark::Event::Rule, 0..0));
+        main_events.extend(footnote_events);
+    }
+    main_events
 }

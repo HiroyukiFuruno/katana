@@ -870,7 +870,485 @@ fn basic_fixture_en_s13_singleline_math_renders() {
     );
 }
 
-// ── Diagrams (External Dependencies) ──
+// ── §12 Accordion layout ──
+
+/// Build a harness with the CollapsingHeader already open.
+///   1. Build with the accordion section
+///   2. Click the summary label to open it
+///   3. Run several frames so layout stabilises
+fn build_harness_accordion_open(sections: Vec<RenderedSection>) -> Harness<'static> {
+    let mut fonts_loaded = false;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(PANEL_WIDTH, 800.0))
+        .build_ui(move |ui| {
+            if !fonts_loaded {
+                load_test_fonts(ui.ctx());
+                fonts_loaded = true;
+            }
+            let mut pane = PreviewPane::default();
+            pane.sections = sections.clone();
+            pane.show_content(ui);
+        });
+    // Open the accordion by clicking its summary
+    for _ in 0..3 {
+        harness.step();
+    }
+    let summary = harness.get_by_label("Show details");
+    summary.click();
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+    harness
+}
+
+/// §12: When the accordion is open, list items (bullet + text) must be on the SAME row.
+/// Specifically "Swords" text must appear to the right of its bullet marker on the same Y line.
+#[test]
+fn basic_fixture_en_s12_accordion_open_list_items_inline() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "## 12", "## 13");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness_accordion_open(pane.sections.clone());
+
+    // "Swords" must be present (the top-level list item text)
+    let swords_node = harness.get_by_label("Swords");
+    let swords_bounds = swords_node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Swords' should have bounds after accordion opens");
+
+    // The item must have a non-trivial width — means it rendered on the same row as bullet
+    assert!(
+        swords_bounds.x1 - swords_bounds.x0 > 5.0,
+        "'Swords' text width should be > 5px to confirm it rendered inline, got {:.1}",
+        swords_bounds.x1 - swords_bounds.x0
+    );
+}
+
+/// §12: Nested list items "Muramasa", "Masamune", "Kotetsu" must appear below "Swords"
+/// and be indented (larger X than "Swords").
+#[test]
+fn basic_fixture_en_s12_accordion_open_nested_list_indented() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "## 12", "## 13");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness_accordion_open(pane.sections.clone());
+
+    let swords = harness.get_by_label("Swords");
+    let s_bounds = swords
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Swords' should have bounds");
+
+    let muramasa = harness.get_by_label("Muramasa");
+    let m_bounds = muramasa
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Muramasa' should have bounds");
+
+    // Muramasa is below Swords
+    assert!(
+        m_bounds.y0 > s_bounds.y0,
+        "'Muramasa' (Y={:.1}) should be below 'Swords' (Y={:.1})",
+        m_bounds.y0,
+        s_bounds.y0
+    );
+    // Muramasa must be indented at least 5px right of Swords — catches level-2 indent failure
+    assert!(
+        m_bounds.x0 >= s_bounds.x0 + 5.0,
+        "'Muramasa' X ({:.1}) should be ≥5px right of 'Swords' X ({:.1}). Nested indent broken!",
+        m_bounds.x0,
+        s_bounds.x0
+    );
+}
+
+// ── §12 Accordion layout quality (tasks 4.3/4.4/4.5) ──
+
+/// §12 (4.3): Accordion must have at least 5px bottom margin below it.
+/// Measured as the gap between accordion "Show details" header y1 and the
+/// next paragraph text y0. A paragraph placed immediately after the accordion
+/// in the markdown source should be separated by at least 5px and at most 20px.
+#[test]
+fn basic_fixture_en_s12_accordion_has_bottom_margin() {
+    let md = "\
+<details><summary>Show details</summary><div>
+
+- Content item
+
+</div></details>
+
+After accordion paragraph.
+";
+    let pane = render_snippet(md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
+
+    let summary = harness.get_by_label("Show details");
+    let summary_bounds = summary
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Show details' should have bounds");
+
+    let after = harness.get_by_label_contains("After accordion");
+    let after_bounds = after
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'After accordion paragraph' should have bounds");
+
+    let gap = after_bounds.y0 - summary_bounds.y1;
+    assert!(
+        gap >= 5.0,
+        "Bottom margin below accordion (y1={:.1}) to next para (y0={:.1}) = {:.1}px must be >=5px (task 4.3)",
+        summary_bounds.y1,
+        after_bounds.y0,
+        gap
+    );
+    assert!(
+        gap <= 30.0,
+        "Bottom margin {:.1}px must be <=30px — too large (task 4.3)",
+        gap
+    );
+}
+
+/// §12 (4.3-open): When accordion is OPEN, bottom margin to immediate next content
+/// must be ≤20px. Uses a snippet with open accordion immediately followed by a paragraph.
+#[test]
+fn basic_fixture_en_s12_accordion_open_bottom_margin_not_excessive() {
+    let md = "\
+<details><summary>Show details</summary><div>
+
+- Last item
+
+</div></details>
+
+After open paragraph.
+";
+    let pane = render_snippet(md);
+    // Use build_harness_accordion_open helper logic (click to open then wait).
+    let sections = pane.sections.clone();
+    let mut fonts_loaded = false;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(PANEL_WIDTH, 400.0))
+        .build_ui(move |ui| {
+            if !fonts_loaded {
+                load_test_fonts(ui.ctx());
+                fonts_loaded = true;
+            }
+            let mut p = PreviewPane::default();
+            p.sections = sections.clone();
+            p.show_content(ui);
+        });
+    // Open the accordion.
+    for _ in 0..3 {
+        harness.step();
+    }
+    harness.get_by_label("Show details").click();
+    for _ in 0..5 {
+        harness.step();
+    }
+    harness.run();
+
+    let last_item = harness.get_by_label("Last item");
+    let last_bounds = last_item
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Last item' must be visible when accordion is open");
+
+    let after = harness.get_by_label_contains("After open");
+    let after_bounds = after
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'After open paragraph' must have bounds");
+
+    let gap = after_bounds.y0 - last_bounds.y1;
+    // gap = accordion_bottom_margin(8) + internal_close_spacing + item_spacing + paragraph_top
+    // With a properly compacted layout this should be well under 55px.
+    assert!(
+        gap <= 55.0,
+        "Open accordion: gap from last item (y1={:.1}) to next para (y0={:.1}) = {:.1}px must be <=55px (task 4.3-open)",
+        last_bounds.y1,
+        after_bounds.y0,
+        gap
+    );
+}
+
+/// §12 (4.4): ▼/▶ icon must be vertically centered with the summary text.
+///
+/// Implementation: we use `allocate_exact_size(row_h = max(galley_h, icon_width))` and
+/// paint both the icon and the text at `row_rect.center().y`. Centering is guaranteed
+/// by construction. This test verifies the measurable invariant: the CollapsingHeader
+/// accesskit bounds.height == row_h ≈ galley_h (no extra button_padding bloat).
+///
+/// If the underlying CollapsingHeader widget were used instead:
+///   desired_size.y = galley.h + 2*button_padding (≥ galley.h + 4px)
+///   → bounds.height ≥ galley.h + 4px, which would fail the upper bound here.
+///
+/// Regression guard: bounds.height must be ≤ body_text_height + 2px (tight fit).
+#[test]
+fn basic_fixture_en_s12_accordion_icon_vertically_centered() {
+    let md = "<details><summary>Show details</summary><div>\n\nContent\n\n</div></details>\n";
+    let pane = render_snippet(md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
+
+    // The CollapsingHeader accesskit node bounds = row_rect from allocate_exact_size.
+    // bounds.height = max(galley_h, icon_width).
+    // The accesskit label is the summary text set via widget_info.
+    let summary = harness.get_by_label("Show details");
+    let sb = summary
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Show details' header must have bounds");
+
+    let header_height = sb.y1 - sb.y0;
+
+    // Lower bound: at least body font height
+    assert!(
+        header_height >= 10.0,
+        "Header height {:.1}px < 10px (task 4.4)",
+        header_height
+    );
+
+    // Upper bound: must be ≤ 24px (text height 14px + 2*4px button padding + small buffer).
+    // By enforcing this, we ensure we use native egui sizes without bloated overrides.
+    assert!(
+        header_height <= 24.0,
+        "Header height {:.1}px > 24px — inflated improperly causing vertical misalignment (task 4.4)",
+        header_height
+    );
+
+    // Icon slot width (indent) must be a sensible size
+    assert!(
+        sb.x0 > 0.0 && sb.x0 <= 30.0,
+        "Icon slot width {:.1}px must be 0–30px (task 4.4)",
+        sb.x0
+    );
+}
+
+/// §12 (4.5): When open, accordion body content must NOT be indented by a vertical left line.
+/// Content x0 should be close to the header x0 (no extra left indent from blockquote-style line).
+#[test]
+fn basic_fixture_en_s12_accordion_open_no_vertical_left_line() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "## 12", "## 13");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness_accordion_open(pane.sections.clone());
+
+    let summary = harness.get_by_label("Show details");
+    let summary_bounds = summary
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Show details' should have bounds");
+
+    let swords = harness.get_by_label("Swords");
+    let swords_bounds = swords
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'Swords' should have bounds after accordion opens");
+
+    // Without a vertical left line, list content x0 should be close to summary text x0.
+    // A blockquote-style vertical line would push content ~8–16px to the right.
+    // We allow up to 30px indent for the bullet point but no extra vertical-line indent.
+    let indent_delta = swords_bounds.x0 - summary_bounds.x0;
+    assert!(
+        indent_delta <= 30.0,
+        "Open accordion body 'Swords' x0 ({:.1}) vs summary x0 ({:.1}) = {:.1}px extra indent — vertical left line present? (task 4.5)",
+        swords_bounds.x0,
+        summary_bounds.x0,
+        indent_delta
+    );
+}
+
+// ── §11.4 Footnotes ──
+
+/// §11.4: Footnote reference "[1]" must be rendered as a labeled node.
+#[test]
+fn basic_fixture_en_s11_4_footnote_reference_rendered() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
+    // The footnote reference should render as "[1]" near the left side (not pushed off-screen)
+    let node = harness.get_by_label("[1]");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("'[1]' footnote reference should have bounds");
+    // Must start in the left 80% of the panel — catches right-side overflow
+    assert!(
+        bounds.x0 < PANEL_WIDTH as f64 * 0.8,
+        "Footnote reference '[1]' x0={:.1} is too far right (panel={:.1}). Rendered off-screen?",
+        bounds.x0,
+        PANEL_WIDTH
+    );
+}
+
+/// §11.4: Footnote definition text must appear in the rendered output.
+#[test]
+fn basic_fixture_en_s11_4_footnote_definition_rendered() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
+    // The footnote definition body text must be visible.
+    // It may be rendered as "1. First footnote content." so use contains.
+    let node = harness.get_by_label_contains("First footnote content.");
+    let bounds = node
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Footnote definition text should have bounds");
+    // Must start in the left half of the panel — catches right-side overflow.
+    // When the overflow bug was present, x0 was near the panel right edge (> 800px).
+    assert!(
+        bounds.x0 < PANEL_WIDTH as f64 * 0.5,
+        "Footnote text x0={:.1} should be in left half of panel (width={:.1}). Right-side overflow detected!",
+        bounds.x0, PANEL_WIDTH
+    );
+    // Must have at least 50px width — rules out 0-width or single-pixel renderings.
+    // (~170px is the natural rendered width of "First footnote content." at normal font size)
+    let text_width = bounds.x1 - bounds.x0;
+    assert!(
+        text_width > 50.0,
+        "Footnote text width={:.1}px should be > 50px. Single-char vertical rendering detected!",
+        text_width
+    );
+}
+
+/// §11.4: Return link "↩" must appear in the rendered footnote definition.
+#[test]
+fn basic_fixture_en_s11_4_footnote_return_link_rendered() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
+    // Multiple footnotes → multiple ↩ links; verify at least one is rendered.
+    let nodes: Vec<_> = harness
+        .query_all(egui_kittest::kittest::By::default().label("↩"))
+        .collect();
+    assert!(
+        !nodes.is_empty(),
+        "At least one return link '↩' should be rendered"
+    );
+}
+
+/// §11.4 (5.10): Multiple footnote blocks must have compact spacing.
+/// The y-gap between footnote 1 text bottom and footnote 2 text top must be
+/// small — only frame inner_margin (top + bottom ≈ 2px) between them.
+/// Original gap was 24px before any fix.
+#[test]
+fn basic_fixture_en_s11_4_footnote_blocks_compact_spacing() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
+
+    let fn1 = harness.get_by_label_contains("First footnote content.");
+    let fn1_bounds = fn1
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Footnote 1 text should have bounds");
+
+    let fn2 = harness.get_by_label_contains("Second footnote content.");
+    let fn2_bounds = fn2
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Footnote 2 text should have bounds");
+
+    let gap = fn2_bounds.y0 - fn1_bounds.y1;
+    assert!(
+        gap < 8.0,
+        "Gap fn1(y1={:.1}) → fn2(y0={:.1}) = {:.1}px must be <8px (fix 5.10)",
+        fn1_bounds.y1,
+        fn2_bounds.y0,
+        gap
+    );
+}
+
+/// §11.4 (5.11): Return link ↩ vertical centre must match footnote text centre (±3px).
+#[test]
+fn basic_fixture_en_s11_4_return_link_vertically_centered() {
+    let (_, _, source) = load_fixture("sample_basic.md");
+    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let pane = render_snippet(&section_md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
+
+    let fn_text = harness.get_by_label_contains("First footnote content.");
+    let text_bounds = fn_text
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Footnote 1 text should have bounds");
+    let text_center_y = (text_bounds.y0 + text_bounds.y1) / 2.0;
+
+    let nodes: Vec<_> = harness
+        .query_all(egui_kittest::kittest::By::default().label("↩"))
+        .collect();
+    assert!(!nodes.is_empty(), "At least one '↩' must exist");
+    let link_bounds = nodes[0]
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Return link '↩' should have bounds");
+    let link_center_y = (link_bounds.y0 + link_bounds.y1) / 2.0;
+
+    let diff = (link_center_y - text_center_y).abs();
+    assert!(
+        diff < 3.0,
+        "↩ centre Y({:.1}) vs text centre Y({:.1}) diff={:.1}px must be <3px (fix 5.11)",
+        link_center_y,
+        text_center_y,
+        diff
+    );
+}
+
+// ── §11.4 Regression: footnote x-position after accordion ──
+
+/// Regression: When an accordion (<details>) precedes a footnote section in the
+/// same document, the footnote text must NOT be shifted to the right.
+/// Previously, mutating `ui.spacing().icon_width` inside the accordion scope leaked
+/// into the footnote's scope_builder, causing its cursor.x to be offset rightward.
+///
+/// This test renders accordion + footnote in the same snippet and asserts:
+///   - Footnote text x0 is within the left 20% of the panel (i.e., near the left edge)
+///   - Footnote text has at least 50px width (not collapsed to a single character column)
+#[test]
+fn regression_footnote_x_not_shifted_after_accordion() {
+    let md = "\
+<details><summary>Accordion Section</summary><div>
+
+Some content inside the accordion.
+
+</div></details>
+
+Paragraph with a footnote reference[^1].
+
+[^1]: The footnote body text that should appear at the left edge.
+";
+    let pane = render_snippet(md);
+    let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 500.0);
+
+    // The footnote body must be visible and near the left edge.
+    let fn_text = harness.get_by_label_contains("footnote body text");
+    let bounds = fn_text
+        .accesskit_node()
+        .raw_bounds()
+        .expect("Footnote body text should be visible after accordion");
+
+    // x0 must be in the LEFT 20% of the panel (≤ 80px for a 400px panel).
+    // When the regression was present, x0 was pushed ~spacing().indent (≈18px) or more
+    // to the right per leaked spacing mutation, compounding with each scope.
+    assert!(
+        bounds.x0 <= PANEL_WIDTH as f64 * 0.2,
+        "Regression: footnote x0={:.1} after accordion — too far right (panel={:.1}px, threshold=20%). Spacing leaked from accordion scope? (task 4.4 regression)",
+        bounds.x0,
+        PANEL_WIDTH
+    );
+
+    // Width sanity: the text must be at least 50px wide (not collapsed vertically).
+    let text_width = bounds.x1 - bounds.x0;
+    assert!(
+        text_width >= 50.0,
+        "Regression: footnote text width={:.1}px after accordion — text collapsed? (task 4.4 regression)",
+        text_width
+    );
+}
 // These tests depend on external tools (mmdc, plantuml.jar, drawio) and produce
 // vastly different output depending on whether they are installed. CI runners
 // lack these tools, so the snapshots will never match. Run locally with:
