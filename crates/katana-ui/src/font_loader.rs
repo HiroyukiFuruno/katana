@@ -4,7 +4,7 @@ use std::fs;
 
 const MONO_FALLBACK_Y_OFFSET_FACTOR: f32 = 0.40;
 const MONO_PRIMARY_Y_OFFSET_FACTOR: f32 = -0.15;
-const MARKDOWN_PROPORTIONAL_Y_OFFSET_FACTOR: f32 = 0.13;
+const MARKDOWN_PROPORTIONAL_Y_OFFSET_FACTOR: f32 = 0.0;
 
 /// Font wrapper that tracks normalization state for consistent baseline
 /// alignment across mixed-language text (JP/EN) and across font families

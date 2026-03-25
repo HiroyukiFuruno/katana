@@ -231,24 +231,27 @@ impl<'a> CommonMarkViewerInternal<'a> {
             );
         }
 
-        // Extract and strip strikethrough from LayoutJob sections so that we
-        // can draw them ourselves at the correct vertical center of each row.
-        // epaint's built-in strikethrough uses per-glyph logical_rect().center().y
-        // which is off-center for mixed CJK/Latin text.
+        // Extract and strip text decorations from LayoutJob sections so that we
+        // can draw them ourselves at visually pleasing native Y coordinates.
+        // epaint's built-in strikethrough and underline use inaccurate font metrics
+        // from ab_glyph for macOS system CJK fonts, causing misalignments or clipping.
         let mut strikethrough_char_flags: Vec<bool> = Vec::new();
+        let mut underline_char_flags: Vec<bool> = Vec::new();
         let mut any_strikethrough = false;
+        let mut any_underline = false;
         let mut st_stroke = egui::Stroke::NONE;
+        let mut ul_stroke = egui::Stroke::NONE;
 
         {
             let text = &layout_job.text;
-            // Build per- char-index strikethrough flag from section byte ranges
             let total_chars = text.chars().count();
             strikethrough_char_flags.resize(total_chars, false);
+            underline_char_flags.resize(total_chars, false);
+
             for section in &layout_job.sections {
                 if section.format.strikethrough != egui::Stroke::NONE {
                     any_strikethrough = true;
                     st_stroke = section.format.strikethrough;
-                    // Map byte range to char indices
                     let start_char = text[..section.byte_range.start].chars().count();
                     let end_char = start_char
                         + text[section.byte_range.start..section.byte_range.end]
@@ -258,19 +261,37 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         *flag = true;
                     }
                 }
+
+                if section.format.underline != egui::Stroke::NONE {
+                    any_underline = true;
+                    ul_stroke = section.format.underline;
+                    let start_char = text[..section.byte_range.start].chars().count();
+                    let end_char = start_char
+                        + text[section.byte_range.start..section.byte_range.end]
+                            .chars()
+                            .count();
+                    for flag in &mut underline_char_flags[start_char..end_char] {
+                        *flag = true;
+                    }
+                }
             }
         }
 
-        // Strip strikethrough from sections so epaint won't draw it
+        // Strip decorations from sections so epaint won't draw them with buggy bounds
         if any_strikethrough {
             for section in &mut layout_job.sections {
                 section.format.strikethrough = egui::Stroke::NONE;
             }
         }
+        if any_underline {
+            for section in &mut layout_job.sections {
+                section.format.underline = egui::Stroke::NONE;
+            }
+        }
 
-        // Lay out and paint the galley manually for strikethrough override,
-        // or fall back to Label for the common non-strikethrough case.
-        if any_strikethrough {
+        // Lay out and paint the galley manually for decoration overrides,
+        // or fall back to Label for the common un-decorated case.
+        if any_strikethrough || any_underline {
             // Render text using Label (identical to non-strikethrough path)
             // so that list indentation, wrapping, and positioning are correct.
             let layout_job_for_galley = layout_job.clone();
@@ -312,18 +333,21 @@ impl<'a> CommonMarkViewerInternal<'a> {
             let galley = ui.fonts_mut(|f| f.layout_job(layout_job_for_galley));
             let text_pos = response.rect.left_top();
 
-            // Draw strikethrough lines at each row's visual center.
-            // CJK glyphs sit higher than geometric center, so use 0.38
-            // ratio to approximate the visual midpoint of the text.
+            // Draw overlay lines
             let mut char_idx = 0usize;
             for row in &galley.rows {
                 let row_rect = row.rect();
                 let mut st_min_x: Option<f32> = None;
                 let mut st_max_x: Option<f32> = None;
+                let mut ul_min_x: Option<f32> = None;
+                let mut ul_max_x: Option<f32> = None;
 
                 for glyph in &row.glyphs {
                     let is_st = char_idx < strikethrough_char_flags.len()
                         && strikethrough_char_flags[char_idx];
+                    let is_ul = char_idx < underline_char_flags.len()
+                        && underline_char_flags[char_idx];
+
                     if is_st {
                         let gx = text_pos.x + glyph.pos.x;
                         let gx_end = text_pos.x + glyph.max_x();
@@ -333,12 +357,28 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         let y = text_pos.y + row_rect.min.y + row_rect.height() * 0.38;
                         ui.painter().hline(min_x..=max_x, y, st_stroke);
                     }
+
+                    if is_ul {
+                        let gx = text_pos.x + glyph.pos.x;
+                        let gx_end = text_pos.x + glyph.max_x();
+                        ul_min_x = Some(ul_min_x.map_or(gx, |v: f32| v.min(gx)));
+                        ul_max_x = Some(ul_max_x.map_or(gx_end, |v: f32| v.max(gx_end)));
+                    } else if let (Some(min_x), Some(max_x)) = (ul_min_x.take(), ul_max_x.take()) {
+                        let y = text_pos.y + row_rect.min.y + row_rect.height() * 0.70; // Tighten precisely to the visual text baseline
+                        ui.painter().hline(min_x..=max_x, y, ul_stroke);
+                    }
+
                     char_idx += 1;
                 }
-                // Flush remaining strikethrough run at end of row
-                if let (Some(min_x), Some(max_x)) = (st_min_x, st_max_x) {
+                
+                // Flush remaining runs at end of row
+                if let (Some(min_x), Some(max_x)) = (st_min_x.take(), st_max_x.take()) {
                     let y = text_pos.y + row_rect.min.y + row_rect.height() * 0.38;
                     ui.painter().hline(min_x..=max_x, y, st_stroke);
+                }
+                if let (Some(min_x), Some(max_x)) = (ul_min_x.take(), ul_max_x.take()) {
+                    let y = text_pos.y + row_rect.min.y + row_rect.height() * 0.70;
+                    ui.painter().hline(min_x..=max_x, y, ul_stroke);
                 }
             }
         } else {
