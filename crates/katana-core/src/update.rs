@@ -132,14 +132,18 @@ mod tests {
 
         // Spawn a tiny server that just replies with a 200 OK + valid JSON
         thread::spawn(move || {
+            use std::io::Read;
             if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0; 1024];
+                let _ = stream.read(&mut buf); // Consume the request headers to prevent TCP RST
+                
                 let body = r#"{
                     "tag_name": "v0.7.0",
                     "html_url": "https://github.com/HiroyukiFuruno/KatanA/releases/tag/v0.7.0",
                     "assets": []
                 }"#;
                 let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                     body.len(),
                     body
                 );
