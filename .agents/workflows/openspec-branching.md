@@ -48,6 +48,41 @@ After merge, return to the Base Feature Branch and sync before starting the next
 git switch <Change-Directory-Name> && git pull
 ```
 
+### Step 5: Merge Base Feature Branch into `master`
+
+After **all** Major Task Groups are complete and merged into the Base Feature Branch, create a PR from the Base Feature Branch into `master`.
+
+```bash
+gh pr create --base master --head <Change-Directory-Name> \
+  --title "<PR title summarizing the change>" \
+  --body "<summary of all completed tasks>"
+```
+
+Merge the PR once approved (or self-merge if the project policy allows):
+
+```bash
+gh pr merge --squash  # or --merge, per project convention
+```
+
+### Step 6: Branch Cleanup (Local and Remote)
+
+After the Base Feature Branch is merged into `master`, delete both the **local** and **remote** branches to keep the repository clean.
+
+```bash
+# Delete local branch
+git branch -d <Change-Directory-Name>
+
+# Delete remote branch
+git push origin --delete <Change-Directory-Name>
+```
+
+**⚠️ MANDATORY**: Both local AND remote cleanup MUST be performed. Leaving either as an orphan branch is a workflow violation. Verify with:
+
+```bash
+git branch -a | grep <Change-Directory-Name>
+# Expected: no output
+```
+
 ---
 
-**Strict Instruction for AI Agents**: Always execute this branching strategy before starting task implementation. Never commit feature work directly to `master`.
+**Strict Instruction for AI Agents**: Always execute this branching strategy before starting task implementation. Never commit feature work directly to `master`. Never delete a branch (local or remote) without first ensuring it is fully merged into its target.
