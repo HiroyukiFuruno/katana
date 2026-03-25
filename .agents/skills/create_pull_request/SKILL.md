@@ -26,15 +26,23 @@ Determine the correct `--base` value:
 3. If the caller explicitly specifies a base branch, use that.
 4. **If none of the above apply, ask the user.** Do not guess.
 
-Verify the base branch exists:
+verify the base branch exists:
+
 ```bash
 git branch -a | grep {base_branch}
 ```
+
+### 0.5. Mandatory Self-Review (MANDATORY)
+
+> [!IMPORTANT]
+> **Before creating any PR, you MUST execute a self-review (via the `self-review` skill) and self-correct any detected issues.**
+> Do NOT create a PR containing code that has not been proactively reviewed and fixed by you.
 
 ### 1. Verify Template Existence
 
 Check if a template file exists within the repository.
 Priority:
+
 1. `.github/PULL_REQUEST_TEMPLATE.md`
 
 ### 2. Create the PR
@@ -50,6 +58,7 @@ cat .github/PULL_REQUEST_TEMPLATE.md
 # Create PR — ALWAYS specify --base
 gh pr create --base {base_branch} --head {branch_name} --title "{commit_message}" --body-file .github/PULL_REQUEST_TEMPLATE.md
 ```
+
 *Tip: `--body-file` is convenient during `gh pr create`. Edit the contents appropriately.*
 
 #### B. When no template file exists
@@ -73,6 +82,7 @@ Use the following standard template.
 ```
 
 Command execution example:
+
 ```bash
 gh pr create --base {base_branch} --head {branch_name} --title "{commit_message}" --body "..."
 ```

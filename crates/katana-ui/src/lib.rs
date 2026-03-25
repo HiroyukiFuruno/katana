@@ -20,4 +20,3 @@ pub mod shell_logic;
 pub mod shell_ui;
 pub mod svg_loader;
 pub mod theme_bridge;
-pub mod updater;

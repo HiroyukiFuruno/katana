@@ -3,6 +3,9 @@
 // Captures the rustc version for display in the About dialog.
 
 fn main() {
+    // Tell Cargo to allow #[cfg(coverage)] to satisfy `unexpected_cfgs` lint when testing
+    println!("cargo::rustc-check-cfg=cfg(coverage)");
+
     // Capture rustc version (e.g. "rustc 1.82.0 (f6e511eec 2024-10-15)")
     // and expose it as KATANA_RUSTC_VERSION for use with env!() in about_info.rs.
     if let Ok(output) = std::process::Command::new("rustc")

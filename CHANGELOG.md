@@ -2,6 +2,13 @@
 
 All notable changes to KatanA Desktop will be documented in this file.
 
+## [0.7.0] - 2026-03-25 18:00:00 (UTC)
+
+### ✨ Features
+
+- **In-App Updater**: Implement interactive UI for the auto-update release framework, incorporating Markdown-rendered release notes and integrated extraction logic.
+
+
 ## [0.6.4] - 2026-03-25 09:50:20 (UTC)
 
 ### 🐛 Bug Fixes

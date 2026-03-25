@@ -198,7 +198,16 @@
         "key": "group_system",
         "name": "システム"
       }
-    ]
+    ],
+    "updates": {
+      "section_title": "アプリアップデート",
+      "interval": "自動更新チェック間隔",
+      "never": "チェックしない",
+      "daily": "毎日",
+      "weekly": "毎週",
+      "monthly": "毎月",
+      "check_now": "今すぐ更新をチェックする"
+    }
   },
   "tab": {
     "nav_prev": "前のタブへ移動",

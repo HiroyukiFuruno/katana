@@ -77,6 +77,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub export: ExportSettings,
 
+    /// Application update settings (nesting).
+    #[serde(default)]
+    pub updates: UpdateSettings,
+
     /// Terms of service accepted version (None = not accepted).
     #[serde(default)]
     pub terms_accepted_version: Option<String>,
@@ -254,6 +258,31 @@ impl Default for ExportSettings {
     }
 }
 
+/// Interval for checking for application updates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum UpdateInterval {
+    /// Skip automatic updates
+    Never,
+    /// Check for updates daily
+    #[default]
+    Daily,
+    /// Check for updates weekly
+    Weekly,
+    /// Check for updates monthly
+    Monthly,
+}
+
+/// Auto-updater configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpdateSettings {
+    /// The interval at which the app should check for updates.
+    #[serde(default)]
+    pub interval: UpdateInterval,
+    /// The last time an update check was performed (UNIX timestamp in seconds).
+    #[serde(default)]
+    pub last_checked_timestamp_sec: Option<u64>,
+}
+
 fn default_version() -> String {
     "0.2.0".to_string()
 }
@@ -301,6 +330,7 @@ impl Default for AppSettings {
             workspace: WorkspaceSettings::default(),
             performance: PerformanceSettings::default(),
             export: ExportSettings::default(),
+            updates: UpdateSettings::default(),
             terms_accepted_version: None,
             language: default_language(),
             extra: Vec::new(),
