@@ -1231,7 +1231,7 @@ pub(crate) fn render_editor_content(
                         egui::Color32::from_black_alpha(HIGHLIGHT_ALPHA)
                     };
                     ui.painter()
-                        .rect_filled(highlight_rect, 0.0, highlight_color);
+                        .rect_filled(highlight_rect, 1.0, highlight_color);
                 } else {
                     state.active_editor_line = None;
                 }
@@ -1283,7 +1283,7 @@ pub(crate) fn render_editor_content(
                             egui::pos2(ln_rect.min.x, response.rect.min.y + pos_start.min.y),
                             egui::pos2(response.rect.max.x, response.rect.min.y + pos_end.max.y),
                         );
-                        ui.painter().rect_filled(highlight_rect, 0.0, hover_color);
+                        ui.painter().rect_filled(highlight_rect, 1.0, hover_color);
                     }
                 }
 
@@ -2690,7 +2690,7 @@ impl eframe::App for KatanaApp {
                             )
                         };
                         let fill_color = bg_color.gamma_multiply(opacity);
-                        ui.painter().rect_filled(content_rect, 0.0, fill_color);
+                        ui.painter().rect_filled(content_rect, 1.0, fill_color);
 
                         let text_color = if is_dark {
                             egui::Color32::WHITE

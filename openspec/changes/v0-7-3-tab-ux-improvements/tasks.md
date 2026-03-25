@@ -11,16 +11,16 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 1. ハイライト背景バグ調査・修正
 
-- [ ] 1.1 再現条件の調査（特定GPU/描画環境、macOS バージョン、egui のバージョン）。※技術負債メモに記録されている「コードブロック背景色が `syntect` に強制上書きされる問題」と同一事象の可能性があるため、調査時に関連性を確認すること
-- [ ] 1.2 egui の `Painter::rect_filled` / `Frame::fill` の描画パスを追跡し、背景が描画されないコードパスを特定
-- [ ] 1.3 修正実装（描画パス変更またはフォールバック追加）
-- [ ] 1.4 ユーザーへのUIスナップショット（画像等）の提示および動作報告
-- [ ] 1.5 ユーザーからのフィードバックに基づくUIの微調整および改善実装
+- [x] 1.1 再現条件の調査（特定GPU/描画環境、macOS バージョン、egui のバージョン）。※技術負債メモに記録されている「コードブロック背景色が `syntect` に強制上書きされる問題」と同一事象の可能性があるため、調査時に関連性を確認すること
+- [x] 1.2 egui の `Painter::rect_filled` / `Frame::fill` の描画パスを追跡し、背景が描画されないコードパスを特定
+- [x] 1.3 修正実装（描画パス変更またはフォールバック追加）
+- [x] 1.4 ユーザーへのUIスナップショット（画像等）の提示および動作報告
+- [x] 1.5 ユーザーからのフィードバックに基づくUIの微調整および改善実装
 
 ### Definition of Done (DoD)
 
-- [ ] 再現していた環境で背景が表示されることを確認
-- [ ] `make check` が exit code 0 で通過
+- [x] 再現していた環境で背景が表示されることを確認
+- [x] `make check` が exit code 0 で通過
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---

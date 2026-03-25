@@ -1534,7 +1534,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                                 } else {
                                     egui::Color32::from_black_alpha(15)
                                 };
-                                ui.painter().rect_filled(rect, 0.0, highlight_color);
+                                ui.painter().rect_filled(rect, 1.0, highlight_color);
                             }
                         }
                         if let Some(hovered) = &mut self.hovered_spans {
@@ -1546,7 +1546,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                                     } else {
                                         egui::Color32::from_black_alpha(8)
                                     };
-                                    ui.painter().rect_filled(rect, 0.0, hover_color);
+                                    ui.painter().rect_filled(rect, 1.0, hover_color);
                                 }
                             }
                         }
