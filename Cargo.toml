@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.6.4"
+version = "0.7.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/HiroyukiFuruno/KatanA"
@@ -35,6 +35,11 @@ anyhow = "1"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Networking / Auto Update
+ureq = { version = "2.10", features = ["json"] }
+semver = "1.0"
+zip = "2.2"
 
 # Testing
 tempfile = "3"

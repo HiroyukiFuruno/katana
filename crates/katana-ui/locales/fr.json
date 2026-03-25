@@ -1,242 +1,251 @@
 {
-  "menu": {
-    "file": "Fichier",
-    "settings": "Paramètres",
-    "language": "Langue (Language)",
-    "open_workspace": "Ouvrir un espace de travail…",
-    "save": "Enregistrer",
-    "open_all": "Tout ouvrir",
-    "export": "Exporter",
-    "export_html": "Document HTML (.html)",
-    "export_pdf": "Document PDF (.pdf)",
-    "export_png": "Image PNG (.png)",
-    "export_jpg": "Image JPEG (.jpg)",
-    "about": "À propos de KatanA",
-    "quit": "Quitter KatanA",
-    "hide": "Masquer KatanA",
-    "hide_others": "Masquer les autres",
-    "show_all": "Tout afficher",
-    "help": "Aide",
-    "check_updates": "Vérifier les mises à jour..."
-  },
-  "workspace": {
-    "no_workspace_open": "Aucun espace de travail ouvert.",
-    "no_document_selected": "Aucun document ouvert.",
-    "workspace_title": "Espace de travail",
-    "recent_workspaces": "Espaces de travail récents",
-    "metadata_tooltip": "Taille: {size} B\nModifié: {mod_time}",
-    "path_label": "Chemin"
-  },
-  "preview": {
-    "preview_title": "Aperçu",
-    "refresh_diagrams": "Actualiser les diagrammes",
-    "rendering": "Rendu de {kind} en cours...",
-    "no_preview": "(Aucun aperçu)",
-    "diagram_controller": {
-      "pan_up": "Monter",
-      "pan_down": "Descendre",
-      "pan_left": "Gauche",
-      "pan_right": "Droite",
-      "zoom_in": "Zoom avant",
-      "zoom_out": "Zoom arrière",
-      "reset": "Réinitialiser",
-      "fullscreen": "Plein écran",
-      "close": "Fermer",
-      "trackpad_help": "Pavé tactile : pincement à 2 doigts pour zoomer, glissement à 1 doigt pour panoramique"
-    }
-  },
-  "plantuml": {
-    "downloading_plantuml": "⬇ Téléchargement de PlantUML JAR...",
-    "plantuml_installed": "✅ PlantUML installé. Actualisation de l'aperçu...",
-    "download_error": "❌ Erreur de téléchargement : "
-  },
-  "view_mode": {
-    "preview": "Aperçu",
-    "code": "Code",
-    "split": "Fractionner"
-  },
-  "split_toggle": {
-    "horizontal": "Passer au fractionnement horizontal (gauche/droite)",
-    "vertical": "Passer au fractionnement vertical (haut/bas)",
-    "editor_first": "Placer l'éditeur à gauche/en haut",
-    "preview_first": "Placer l'aperçu à gauche/en haut"
-  },
-  "error": {
-    "missing_dependency": "⚠️ {tool_name} introuvable. Veuillez l'installer à l'aide de {install_hint}.",
-    "curl_launch_failed": "échec du lancement de curl",
-    "download_failed": "Échec du téléchargement",
-    "render_error": "⚠ [{kind}] {message}"
-  },
-  "status": {
-    "ready": "Prêt",
-    "saved": "Enregistré.",
-    "save_failed": "Échec de l'enregistrement : {error}",
-    "opened_workspace": "Espace de travail ouvert : {name}",
-    "cannot_open_workspace": "Impossible d'ouvrir l'espace de travail : {error}",
-    "cannot_open_file": "Impossible d'ouvrir le fichier : {error}"
-  },
-  "action": {
-    "expand_all": "Tout développer",
-    "collapse_all": "Tout réduire",
-    "collapse_sidebar": "Masquer la sidebar",
-    "refresh_workspace": "Actualiser l'espace de travail",
-    "toggle_filter": "Basculer le filtre",
-    "remove_workspace": "Supprimer de l'historique",
-    "recursive_expand": "Expansion récursive",
-    "recursive_open_all": "Tout ouvrir récursivement",
-    "toggle_toc": "Basculer la table des matières",
-    "show_meta_info": "Afficher Média"
-  },
-  "ai": {
-    "ai_unconfigured": "[AI : non configuré]"
-  },
-  "tool": {
-    "not_installed": "⚠ {tool} n'est pas installé",
-    "install_path": "Chemin d'installation : {path}",
-    "download": "⬇ Télécharger {tool}"
-  },
-  "settings": {
-    "title": "Paramètres",
-    "toc_visible": "Afficher la table des matières",
-    "theme": {
-      "preset": "Préréglage du thème",
-      "dark_section": "Sombre",
-      "light_section": "Clair",
-      "custom_colors": "Couleurs personnalisées",
-      "reset_custom": "Réinitialiser"
+    "menu": {
+        "file": "Fichier",
+        "settings": "Paramètres",
+        "language": "Langue (Language)",
+        "open_workspace": "Ouvrir un espace de travail…",
+        "save": "Enregistrer",
+        "open_all": "Tout ouvrir",
+        "export": "Exporter",
+        "export_html": "Document HTML (.html)",
+        "export_pdf": "Document PDF (.pdf)",
+        "export_png": "Image PNG (.png)",
+        "export_jpg": "Image JPEG (.jpg)",
+        "about": "À propos de KatanA",
+        "quit": "Quitter KatanA",
+        "hide": "Masquer KatanA",
+        "hide_others": "Masquer les autres",
+        "show_all": "Tout afficher",
+        "help": "Aide",
+        "check_updates": "Vérifier les mises à jour..."
     },
-    "font": {
-      "size": "Taille de la police",
-      "family": "Police",
-      "size_slider_hint": "Faites glisser vers la gauche ou la droite pour ajuster"
-    },
-    "layout": {
-      "split_direction": "Direction de fractionnement",
-      "horizontal": "Horizontal (Gauche / Droite)",
-      "vertical": "Vertical (Haut / Bas)",
-      "pane_order": "Ordre des volets",
-      "editor_first": "Éditeur en premier",
-      "preview_first": "Aperçu en premier",
-      "toc_position": "Position de la table des matières",
-      "left": "Gauche",
-      "right": "Droite"
+    "workspace": {
+        "no_workspace_open": "Aucun espace de travail ouvert.",
+        "no_document_selected": "Aucun document ouvert.",
+        "workspace_title": "Espace de travail",
+        "recent_workspaces": "Espaces de travail récents",
+        "metadata_tooltip": "Taille: {size} B\nModifié: {mod_time}",
+        "path_label": "Chemin"
     },
     "preview": {
-      "title": "Aperçu",
-      "heading": "# Exemple de titre",
-      "normal_text": "Texte normal et ",
-      "accent_link": "lien d'accentuation",
-      "secondary_text": "Exemple de texte secondaire",
-      "code_sample": "fn main() { println!(\"Bonjour!\"); }"
+        "preview_title": "Aperçu",
+        "refresh_diagrams": "Actualiser les diagrammes",
+        "rendering": "Rendu de {kind} en cours...",
+        "no_preview": "(Aucun aperçu)",
+        "diagram_controller": {
+            "pan_up": "Monter",
+            "pan_down": "Descendre",
+            "pan_left": "Gauche",
+            "pan_right": "Droite",
+            "zoom_in": "Zoom avant",
+            "zoom_out": "Zoom arrière",
+            "reset": "Réinitialiser",
+            "fullscreen": "Plein écran",
+            "close": "Fermer",
+            "trackpad_help": "Pavé tactile : pincement à 2 doigts pour zoomer, glissement à 1 doigt pour panoramique"
+        }
     },
-    "color": {
-      "background": "Arrière-plan",
-      "panel_background": "Arrière-plan du panneau",
-      "text": "Texte",
-      "text_secondary": "Texte secondaire",
-      "accent": "Accentuation",
-      "border": "Bordure",
-      "selection": "Sélection",
-      "code_background": "Arrière-plan du code",
-      "preview_background": "Arrière-plan de l'aperçu"
+    "plantuml": {
+        "downloading_plantuml": "⬇ Téléchargement de PlantUML JAR...",
+        "plantuml_installed": "✅ PlantUML installé. Actualisation de l'aperçu...",
+        "download_error": "❌ Erreur de téléchargement : "
     },
-    "tabs": [
-      {
-        "key": "theme",
-        "name": "Thème"
-      },
-      {
-        "key": "font",
-        "name": "Police"
-      },
-      {
-        "key": "layout",
-        "name": "Disposition"
-      },
-      {
-        "key": "workspace",
-        "name": "Espace de travail"
-      },
-      {
-        "key": "group_appearance",
-        "name": "Apparence"
-      },
-      {
-        "key": "group_system",
-        "name": "Système"
-      }
-    ],
-    "workspace": {
-      "max_depth": "Profondeur de scan max",
-      "ignored_directories": "Répertoires ignorés",
-      "ignored_directories_hint": "Liste de répertoires à exclure, séparés par des virgules (ex: .git, node_modules, .terraform)"
+    "view_mode": {
+        "preview": "Aperçu",
+        "code": "Code",
+        "split": "Fractionner"
+    },
+    "split_toggle": {
+        "horizontal": "Passer au fractionnement horizontal (gauche/droite)",
+        "vertical": "Passer au fractionnement vertical (haut/bas)",
+        "editor_first": "Placer l'éditeur à gauche/en haut",
+        "preview_first": "Placer l'aperçu à gauche/en haut"
+    },
+    "error": {
+        "missing_dependency": "⚠️ {tool_name} introuvable. Veuillez l'installer à l'aide de {install_hint}.",
+        "curl_launch_failed": "échec du lancement de curl",
+        "download_failed": "Échec du téléchargement",
+        "render_error": "⚠ [{kind}] {message}"
+    },
+    "status": {
+        "ready": "Prêt",
+        "saved": "Enregistré.",
+        "save_failed": "Échec de l'enregistrement : {error}",
+        "opened_workspace": "Espace de travail ouvert : {name}",
+        "cannot_open_workspace": "Impossible d'ouvrir l'espace de travail : {error}",
+        "cannot_open_file": "Impossible d'ouvrir le fichier : {error}"
+    },
+    "action": {
+        "expand_all": "Tout développer",
+        "collapse_all": "Tout réduire",
+        "collapse_sidebar": "Masquer la sidebar",
+        "refresh_workspace": "Actualiser l'espace de travail",
+        "toggle_filter": "Basculer le filtre",
+        "remove_workspace": "Supprimer de l'historique",
+        "recursive_expand": "Expansion récursive",
+        "recursive_open_all": "Tout ouvrir récursivement",
+        "toggle_toc": "Basculer la table des matières",
+        "show_meta_info": "Afficher Média"
+    },
+    "ai": {
+        "ai_unconfigured": "[AI : non configuré]"
+    },
+    "tool": {
+        "not_installed": "⚠ {tool} n'est pas installé",
+        "install_path": "Chemin d'installation : {path}",
+        "download": "⬇ Télécharger {tool}"
+    },
+    "settings": {
+        "title": "Paramètres",
+        "toc_visible": "Afficher la table des matières",
+        "theme": {
+            "preset": "Préréglage du thème",
+            "dark_section": "Sombre",
+            "light_section": "Clair",
+            "custom_colors": "Couleurs personnalisées",
+            "reset_custom": "Réinitialiser"
+        },
+        "font": {
+            "size": "Taille de la police",
+            "family": "Police",
+            "size_slider_hint": "Faites glisser vers la gauche ou la droite pour ajuster"
+        },
+        "layout": {
+            "split_direction": "Direction de fractionnement",
+            "horizontal": "Horizontal (Gauche / Droite)",
+            "vertical": "Vertical (Haut / Bas)",
+            "pane_order": "Ordre des volets",
+            "editor_first": "Éditeur en premier",
+            "preview_first": "Aperçu en premier",
+            "toc_position": "Position de la table des matières",
+            "left": "Gauche",
+            "right": "Droite"
+        },
+        "preview": {
+            "title": "Aperçu",
+            "heading": "# Exemple de titre",
+            "normal_text": "Texte normal et ",
+            "accent_link": "lien d'accentuation",
+            "secondary_text": "Exemple de texte secondaire",
+            "code_sample": "fn main() { println!(\"Bonjour!\"); }"
+        },
+        "color": {
+            "background": "Arrière-plan",
+            "panel_background": "Arrière-plan du panneau",
+            "text": "Texte",
+            "text_secondary": "Texte secondaire",
+            "accent": "Accentuation",
+            "border": "Bordure",
+            "selection": "Sélection",
+            "code_background": "Arrière-plan du code",
+            "preview_background": "Arrière-plan de l'aperçu"
+        },
+        "tabs": [
+            {
+                "key": "theme",
+                "name": "Thème"
+            },
+            {
+                "key": "font",
+                "name": "Police"
+            },
+            {
+                "key": "layout",
+                "name": "Disposition"
+            },
+            {
+                "key": "workspace",
+                "name": "Espace de travail"
+            },
+            {
+                "key": "group_appearance",
+                "name": "Apparence"
+            },
+            {
+                "key": "group_system",
+                "name": "Système"
+            }
+        ],
+        "workspace": {
+            "max_depth": "Profondeur de scan max",
+            "ignored_directories": "Répertoires ignorés",
+            "ignored_directories_hint": "Liste de répertoires à exclure, séparés par des virgules (ex: .git, node_modules, .terraform)"
+        },
+        "updates": {
+            "section_title": "[fr] App Updates",
+            "interval": "[fr] Check for updates automatically",
+            "never": "[fr] Never",
+            "daily": "[fr] Daily",
+            "weekly": "[fr] Weekly",
+            "monthly": "[fr] Monthly",
+            "check_now": "[fr] Check for Updates Now"
+        }
+    },
+    "tab": {
+        "nav_prev": "Passer à l'onglet précédent",
+        "nav_next": "Passer à l'onglet suivant",
+        "close": "Fermer",
+        "close_others": "Fermer les autres",
+        "close_all": "Tout fermer",
+        "close_right": "Fermer à droite",
+        "close_left": "Fermer à gauche",
+        "pin": "Épingler",
+        "unpin": "Désépingler",
+        "restore_closed": "Restaurer l'onglet fermé"
+    },
+    "search": {
+        "modal_title": "Rechercher des fichiers",
+        "query_hint": "Tapez pour rechercher par nom de fichier...",
+        "include_pattern_hint": "Inclure (regex, séparées par des virgules)",
+        "exclude_pattern_hint": "Exclure (regex, séparées par des virgules)",
+        "no_results": "Aucun fichier trouvé."
+    },
+    "toc": {
+        "title": "Table des matières",
+        "empty": "Aucun titre trouvé"
+    },
+    "about": {
+        "basic_info": "Informations de base",
+        "version": "Version",
+        "build": "Build",
+        "copyright": "Copyright",
+        "runtime": "Runtime",
+        "platform": "Plateforme",
+        "architecture": "Architecture",
+        "rust": "Rust",
+        "license": "Licence",
+        "links": "Liens",
+        "source_code": "Code source",
+        "documentation": "Documentation",
+        "report_issue": "Signaler un problème",
+        "support": "Support",
+        "sponsor": "Soutenir",
+        "coming_soon": "Bientôt disponible"
+    },
+    "update": {
+        "update_available": "Mise à jour disponible",
+        "update_available_desc": "Une nouvelle version de KatanA ({version}) est disponible. Veuillez exécuter `brew update && brew upgrade --cask katana-desktop` pour mettre à jour.",
+        "up_to_date": "À jour",
+        "up_to_date_desc": "KatanA est à jour.",
+        "failed_to_check": "Échec de la vérification des mises à jour.",
+        "action_close": "OK",
+        "title": "Vérifier les mises à jour",
+        "checking_for_updates": "Vérification des mises à jour..."
+    },
+    "export": {
+        "success": "Exporté vers {format} : {path}",
+        "failed": "L'exportation vers {format} a échoué : {error}",
+        "tool_missing": "L'outil d'exportation n'est pas disponible. Veuillez vous assurer que Chrome ou Chromium est installé pour exporter en {format}.",
+        "temp_file_error": "Échec de création du fichier temporaire : {error}",
+        "write_error": "Échec de l'écriture : {error}",
+        "persist_error": "Échec de persistance du fichier temporaire",
+        "exporting": "⏳ Export de {filename} en cours..."
+    },
+    "terms": {
+        "title": "Conditions d'utilisation",
+        "version_label": "Version : {version}",
+        "content": "Terms content.",
+        "accept": "Accepter",
+        "decline": "Décliner"
     }
-  },
-  "tab": {
-    "nav_prev": "Passer à l'onglet précédent",
-    "nav_next": "Passer à l'onglet suivant",
-    "close": "Fermer",
-    "close_others": "Fermer les autres",
-    "close_all": "Tout fermer",
-    "close_right": "Fermer à droite",
-    "close_left": "Fermer à gauche",
-    "pin": "Épingler",
-    "unpin": "Désépingler",
-    "restore_closed": "Restaurer l'onglet fermé"
-  },
-  "search": {
-    "modal_title": "Rechercher des fichiers",
-    "query_hint": "Tapez pour rechercher par nom de fichier...",
-    "include_pattern_hint": "Inclure (regex, séparées par des virgules)",
-    "exclude_pattern_hint": "Exclure (regex, séparées par des virgules)",
-    "no_results": "Aucun fichier trouvé."
-  },
-  "toc": {
-    "title": "Table des matières",
-    "empty": "Aucun titre trouvé"
-  },
-  "about": {
-    "basic_info": "Informations de base",
-    "version": "Version",
-    "build": "Build",
-    "copyright": "Copyright",
-    "runtime": "Runtime",
-    "platform": "Plateforme",
-    "architecture": "Architecture",
-    "rust": "Rust",
-    "license": "Licence",
-    "links": "Liens",
-    "source_code": "Code source",
-    "documentation": "Documentation",
-    "report_issue": "Signaler un problème",
-    "support": "Support",
-    "sponsor": "Soutenir",
-    "coming_soon": "Bientôt disponible"
-  },
-  "update": {
-    "update_available": "Mise à jour disponible",
-    "update_available_desc": "Une nouvelle version de KatanA ({version}) est disponible. Veuillez exécuter `brew update && brew upgrade --cask katana-desktop` pour mettre à jour.",
-    "up_to_date": "À jour",
-    "up_to_date_desc": "KatanA est à jour.",
-    "failed_to_check": "Échec de la vérification des mises à jour.",
-    "action_close": "OK",
-    "title": "Vérifier les mises à jour",
-    "checking_for_updates": "Vérification des mises à jour..."
-  },
-  "export": {
-    "success": "Exporté vers {format} : {path}",
-    "failed": "L'exportation vers {format} a échoué : {error}",
-    "tool_missing": "L'outil d'exportation n'est pas disponible. Veuillez vous assurer que Chrome ou Chromium est installé pour exporter en {format}.",
-    "temp_file_error": "Échec de création du fichier temporaire : {error}",
-    "write_error": "Échec de l'écriture : {error}",
-    "persist_error": "Échec de persistance du fichier temporaire",
-    "exporting": "⏳ Export de {filename} en cours..."
-  },
-  "terms": {
-    "title": "Conditions d'utilisation",
-    "version_label": "Version : {version}",
-    "content": "Terms content.",
-    "accept": "Accepter",
-    "decline": "Décliner"
-  }
 }

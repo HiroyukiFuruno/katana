@@ -98,6 +98,12 @@ pub struct UpdateMessages {
     pub up_to_date_desc: String,
     pub failed_to_check: String,
     pub action_close: String,
+    #[serde(default = "default_install_update")]
+    pub install_update: String,
+}
+
+fn default_install_update() -> String {
+    "Install and Relaunch".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -277,6 +283,8 @@ pub struct SettingsMessages {
     pub font: SettingsFontMessages,
     pub layout: SettingsLayoutMessages,
     pub workspace: SettingsWorkspaceMessages,
+    #[serde(default)]
+    pub updates: SettingsUpdatesMessages,
     pub preview: SettingsPreviewMessages,
     pub color: SettingsColorMessages,
 }
@@ -336,6 +344,18 @@ pub struct SettingsWorkspaceMessages {
     pub max_depth: String,
     pub ignored_directories: String,
     pub ignored_directories_hint: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct SettingsUpdatesMessages {
+    pub section_title: String,
+    pub interval: String,
+    pub never: String,
+    pub daily: String,
+    pub weekly: String,
+    pub monthly: String,
+    pub check_now: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

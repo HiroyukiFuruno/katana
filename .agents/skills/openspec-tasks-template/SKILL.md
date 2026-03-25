@@ -54,4 +54,14 @@ To prevent AI workflow skipping and ensure delivery consistency, you MUST INCLUD
 ### Definition of Done (DoD)
 - [ ] (Other task-specific verifiable conditions...)
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+
+## 4. Mandatory UI Verification & Feedback (When UI is involved)
+
+Because this project does not use rigid design mockups (e.g., Figma), any change involving the creation or modification of User Interfaces (UI) MUST explicitly include the following items as dedicated tasks within the respective UI implementation group:
+
+```markdown
+- [ ] x.x ユーザーへのUIスナップショット（画像等）の提示および動作報告
+- [ ] x.y ユーザーからのフィードバックに基づくUIの微調整および改善実装
+```
+*(Ensure these task items are placed *before* the Definition of Done for any UI-related group)*
 ```

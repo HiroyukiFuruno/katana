@@ -113,7 +113,10 @@ pub struct KatanaApp {
     /// Receiver for background workspace loading.
     pub(crate) workspace_rx: Option<std::sync::mpsc::Receiver<WorkspaceLoadMessage>>,
     /// Receiver for background update checks.
-    pub(crate) update_rx: Option<std::sync::mpsc::Receiver<Result<String, String>>>,
+    pub(crate) update_rx:
+        Option<std::sync::mpsc::Receiver<Result<Option<katana_core::update::ReleaseInfo>, String>>>,
+    pub(crate) update_install_rx:
+        Option<std::sync::mpsc::Receiver<Result<katana_core::update::UpdatePreparation, String>>>,
     /// Active background export tasks.
     pub(crate) export_tasks: Vec<ExportTask>,
     /// Queue for aggressively opening multiple documents without freezing UI
@@ -123,6 +126,7 @@ pub struct KatanaApp {
     pub(crate) show_about: bool,
     /// Whether the Update dialog is currently visible.
     pub(crate) show_update_dialog: bool,
+    pub(crate) update_markdown_cache: egui_commonmark::CommonMarkCache,
     /// Tracks if we have already automatically shown the update dialog on startup.
     pub(crate) update_notified: bool,
     /// App icon texture for the About dialog.
@@ -154,10 +158,12 @@ impl KatanaApp {
             download_rx: None,
             workspace_rx: None,
             update_rx: None,
+            update_install_rx: None,
             export_tasks: Vec::new(),
             pending_document_loads: std::collections::VecDeque::new(),
             show_about: false,
             show_update_dialog: false,
+            update_markdown_cache: egui_commonmark::CommonMarkCache::default(),
             update_notified: false,
             about_icon: None,
             cached_theme: None,
@@ -956,6 +962,36 @@ impl KatanaApp {
                 self.show_meta_info_for = Some(path);
             }
             AppAction::None => {}
+            AppAction::InstallUpdate => {
+                if let Some(release) = &self.state.update_available {
+                    self.state.checking_for_updates = true;
+                    // Usually we don't have the MacOS .app path when running via `cargo run` locally normally.
+                    // For safety, let's grab the current exe context:
+                    let exe_path = std::env::current_exe().unwrap();
+                    let target_app_path = if exe_path.to_string_lossy().contains("MacOS") {
+                        const MACOS_BUNDLE_LEVELS: usize = 3;
+                        exe_path
+                            .ancestors()
+                            .nth(MACOS_BUNDLE_LEVELS)
+                            .unwrap()
+                            .to_path_buf()
+                    } else {
+                        // Development mode fallback
+                        exe_path.clone()
+                    };
+
+                    let download_url = release.download_url.clone();
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    self.update_install_rx = Some(rx);
+
+                    std::thread::spawn(move || {
+                        let res =
+                            katana_core::update::prepare_update(&download_url, &target_app_path)
+                                .map_err(|e| e.to_string());
+                        let _ = tx.send(res);
+                    });
+                }
+            }
         }
 
         // Clean up resources whenever an action completes.
@@ -1302,32 +1338,68 @@ impl KatanaApp {
         let (tx, rx) = std::sync::mpsc::channel();
         self.update_rx = Some(rx);
 
-        crate::updater::check_for_updates(move |result| {
+        std::thread::spawn(move || {
+            let result = katana_core::update::check_for_updates(env!("CARGO_PKG_VERSION"), None)
+                .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
     }
 
     /// Polls for update check completion.
+    pub(crate) fn poll_update_install(&mut self, _ctx: &egui::Context) {
+        if let Some(rx) = &self.update_install_rx {
+            match rx.try_recv() {
+                Ok(Ok(_prep)) => {
+                    // Safety net: in dev it might try to replace target/debug/katana. Ignore failure.
+                    #[cfg(all(not(test), not(coverage)))]
+                    {
+                        let _ = katana_core::update::execute_relauncher(_prep);
+                        std::process::exit(0);
+                    }
+                }
+                Ok(Err(err)) => {
+                    self.state.checking_for_updates = false;
+                    self.state.update_check_error = Some(err);
+                    self.show_update_dialog = true;
+                    self.update_install_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(_) => {
+                    self.state.checking_for_updates = false;
+                    self.update_install_rx = None;
+                }
+            }
+        }
+    }
+
     pub(crate) fn poll_update_check(&mut self, _ctx: &egui::Context) {
         if let Some(rx) = &self.update_rx {
             match rx.try_recv() {
-                Ok(Ok(latest_version)) => {
+                Ok(Ok(Some(release_info))) => {
                     self.state.checking_for_updates = false;
                     self.update_rx = None;
-                    if crate::updater::is_newer_version(env!("CARGO_PKG_VERSION"), &latest_version)
-                    {
-                        self.state.update_available = Some(latest_version);
+                    if katana_core::update::is_newer_version(
+                        env!("CARGO_PKG_VERSION"),
+                        &release_info.tag_name,
+                    ) {
+                        self.state.update_available = Some(release_info);
                         if !self.update_notified {
                             self.show_update_dialog = true;
                             self.update_notified = true;
                         }
                     } else {
-                        // Already up-to-date
                         self.state.update_available = None;
                         if !self.update_notified {
-                            // Don't interrupt them if it's a background startup check and it's up to date.
                             self.update_notified = true;
                         }
+                    }
+                }
+                Ok(Ok(None)) => {
+                    self.state.checking_for_updates = false;
+                    self.update_rx = None;
+                    self.state.update_available = None;
+                    if !self.update_notified {
+                        self.update_notified = true;
                     }
                 }
                 Ok(Err(err)) => {
@@ -2353,10 +2425,12 @@ mod tests_extra {
             download_rx: None,
             workspace_rx: None,
             update_rx: None,
+            update_install_rx: None,
             export_tasks: Vec::new(),
             pending_document_loads: std::collections::VecDeque::new(),
             show_about: false,
             show_update_dialog: false,
+            update_markdown_cache: egui_commonmark::CommonMarkCache::default(),
             update_notified: false,
             about_icon: None,
             cached_theme: None,
@@ -2406,14 +2480,23 @@ mod tests_extra {
 
         // Emulate an update channel response
         let (tx, rx) = std::sync::mpsc::channel();
-        tx.send(Ok("100.0.0".to_string())).unwrap();
+        tx.send(Ok(Some(katana_core::update::ReleaseInfo {
+            tag_name: "100.0.0".to_string(),
+            html_url: "".to_string(),
+            download_url: "".to_string(),
+            body: "".to_string(),
+        })))
+        .unwrap();
         app.update_rx = Some(rx);
 
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
         assert!(app.state.update_available.is_some());
-        assert_eq!(app.state.update_available.unwrap(), "100.0.0");
+        assert_eq!(
+            app.state.update_available.as_ref().unwrap().tag_name,
+            "100.0.0"
+        );
         assert!(app.update_rx.is_none());
         assert!(app.update_notified);
     }
@@ -2437,7 +2520,8 @@ mod tests_extra {
     fn test_update_check_channel_closed() {
         let mut app = setup_test_app();
         app.state.checking_for_updates = true;
-        let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
+        let (tx, rx) =
+            std::sync::mpsc::channel::<Result<Option<katana_core::update::ReleaseInfo>, String>>();
         drop(tx); // cause Err(RecvError) or Disconnected
         app.update_rx = Some(rx);
 
@@ -2456,7 +2540,13 @@ mod tests_extra {
         assert!(!app.update_notified);
 
         let (tx, rx) = std::sync::mpsc::channel();
-        tx.send(Ok("100.0.0".to_string())).unwrap();
+        tx.send(Ok(Some(katana_core::update::ReleaseInfo {
+            tag_name: "100.0.0".to_string(),
+            html_url: "".to_string(),
+            download_url: "".to_string(),
+            body: "".to_string(),
+        })))
+        .unwrap();
         app.update_rx = Some(rx);
 
         let ctx = eframe::egui::Context::default();

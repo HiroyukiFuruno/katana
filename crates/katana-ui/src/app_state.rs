@@ -94,6 +94,7 @@ pub enum ExportFormat {
 
 #[derive(Debug)]
 pub enum AppAction {
+    InstallUpdate,
     /// Open a workspace at the given path.
     OpenWorkspace(std::path::PathBuf),
     /// Select a file in the project tree.
@@ -149,7 +150,10 @@ pub enum AppAction {
     /// Restore the most recently closed tab.
     RestoreClosedDocument,
     /// Reorder tab from one index to another.
-    ReorderDocument { from: usize, to: usize },
+    ReorderDocument {
+        from: usize,
+        to: usize,
+    },
     /// Export the active document to a specified format.
     ExportDocument(ExportFormat),
     /// Accept the terms of service.
@@ -239,9 +243,10 @@ pub struct AppState {
     /// Indicates if a workspace is currently being loaded asynchronously in the background.
     pub is_loading_workspace: bool,
     /// If an update is available on GitHub, contains the latest version string
-    pub update_available: Option<String>,
+    pub update_available: Option<katana_core::update::ReleaseInfo>,
     /// Flags whether an update check is currently running
     pub checking_for_updates: bool,
+    pub manual_update_check_requested: bool,
     /// Stores any error encountered during update checking
     pub update_check_error: Option<String>,
     /// Global UI scale factor.
@@ -313,6 +318,7 @@ impl AppState {
             is_loading_workspace: false,
             update_available: None,
             checking_for_updates: false,
+            manual_update_check_requested: false,
             update_check_error: None,
             scale_override: 1.0,
             cache,

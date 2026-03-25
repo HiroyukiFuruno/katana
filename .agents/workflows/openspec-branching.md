@@ -21,13 +21,18 @@ Before starting any tasks, create the Base Feature Branch from `master` named ex
 git switch -c <Change-Directory-Name> master
 ```
 
-### Step 2: Task Branch Creation (Per Task)
+### Step 2: Task Branch Creation (Per MAJOR Task Group)
 
-For each task in `tasks.md`, derive a task branch from the Base Feature Branch.
+For each **Major Task Group** (e.g., `## 1. Core Logic`, `## 2. UI implementation`) in `tasks.md`, derive a *single* task branch from the Base Feature Branch.
 
 ```bash
 git switch -c <Change-Directory-Name>-task<N> <Change-Directory-Name>
 ```
+
+**⚠️ MANDATORY RULE: NO SUBTASK BRANCHING**
+- DO NOT branch for subtasks (`1.1`, `1.2`, `1.4`, etc.).
+- A branch named `-task4` for subtask `1.4` is logically incorrect and strictly prohibited. Subtasks `1.1` to `1.5` MUST all be implemented and committed into the same `...-task1` branch.
+- You should proceed sequentially on the `-task<N>` branch through all its subtasks, committing regularly, and DO NOT open a Pull Request until ALL subtasks for that Major Task Group are completed.
 
 ### Step 3: Implementation and Delivery
 

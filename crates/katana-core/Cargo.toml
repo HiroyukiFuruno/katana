@@ -21,8 +21,14 @@ tempfile.workspace = true
 regex = "1.12.3"
 headless_chrome.workspace = true
 base64 = "0.22"
+ureq.workspace = true
+semver.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 pulldown-cmark = "0.13.2"
 tempfile.workspace = true
 tracing-subscriber = "0.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage)'] }

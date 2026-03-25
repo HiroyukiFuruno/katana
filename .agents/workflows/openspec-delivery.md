@@ -12,6 +12,13 @@ When a task implementation is complete and this workflow is invoked, execute all
 
 ### Step 1: Self-Review & Quality Assurance
 
+> **🚨 CRITICAL AI INSTRUCTION: DO NOT SKIP THIS STEP 🚨**
+> AI Agents frequently skip self-review and immediately attempt to run `cargo fmt && make check && git commit ...`. This is a strict violation of the delivery process.
+> **BEFORE** you type any bash commands to compile, format, or commit:
+> 1. You MUST explicitly plan a task and use `view_file` to read `.agents/skills/self-review/SKILL.md`.
+> 2. You MUST perform the cognitive self-review described in the skill against the project's coding rules (`docs/coding-rules.ja.md`).
+> 3. Only after correcting any logical or formatting violations (like Magic Numbers or `#[allow]` violations) are you permitted to proceed to bash execution.
+
 Read and execute `.agents/skills/self-review/SKILL.md`.
 
 ### Step 2: Commit & Push

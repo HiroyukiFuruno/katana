@@ -1018,7 +1018,11 @@ pub(crate) fn relative_full_path(
     crate::shell_logic::relative_full_path(path, ws_root)
 }
 
-pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
+pub(crate) fn render_view_mode_bar(
+    ui: &mut egui::Ui,
+    state: &mut AppState,
+    pending_action: &mut AppAction,
+) {
     let mut mode = state.active_view_mode();
     let prev = mode;
     let bar_height = ui.spacing().interact_size.y;
@@ -1027,6 +1031,24 @@ pub(crate) fn render_view_mode_bar(ui: &mut egui::Ui, state: &mut AppState) {
         egui::vec2(available_width, bar_height),
         egui::Layout::right_to_left(egui::Align::Center),
         |ui| {
+            // Render non-intrusive Update Available Badge
+            if state.update_available.is_some() && !state.checking_for_updates {
+                const COLOR_SUCCESS_G: u8 = 200;
+                let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
+                let badge_text = egui::RichText::new(badge_str)
+                    .color(egui::Color32::from_rgb(0, COLOR_SUCCESS_G, 100))
+                    .strong();
+
+                if ui
+                    .add(egui::Button::new(badge_text).sense(egui::Sense::click()))
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    *pending_action = AppAction::CheckForUpdates;
+                }
+                ui.separator();
+            }
+
             let is_split = mode == ViewMode::Split;
             if ui
                 .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
@@ -2347,6 +2369,7 @@ impl eframe::App for KatanaApp {
             ctx.request_repaint();
         }
 
+        self.poll_update_install(ctx);
         self.poll_update_check(ctx);
         self.poll_export(ctx);
 
@@ -2503,7 +2526,7 @@ impl eframe::App for KatanaApp {
                             ui.label(egui::RichText::new(*seg).small());
                         }
                     });
-                    render_view_mode_bar(ui, &mut self.state);
+                    render_view_mode_bar(ui, &mut self.state, &mut self.pending_action);
                 }
             });
 
@@ -2577,7 +2600,13 @@ impl eframe::App for KatanaApp {
 
         // Update notification dialog
         if self.show_update_dialog {
-            render_update_window(ctx, &mut self.show_update_dialog, &self.state);
+            render_update_window(
+                ctx,
+                &mut self.show_update_dialog,
+                &self.state,
+                &mut self.update_markdown_cache,
+                &mut self.pending_action,
+            );
         }
 
         // Intercept all URL opening requests globally
@@ -3950,20 +3979,26 @@ pub(crate) fn render_toc_panel(
         });
 }
 
-fn render_update_window(ctx: &egui::Context, open: &mut bool, state: &AppState) {
-    const DEFAULT_WIDTH: f32 = 320.0;
+fn render_update_window(
+    ctx: &egui::Context,
+    open: &mut bool,
+    state: &AppState,
+    markdown_cache: &mut egui_commonmark::CommonMarkCache,
+    pending_action: &mut AppAction,
+) {
+    const DEFAULT_WIDTH: f32 = 500.0;
     const SPACING_SMALL: f32 = 4.0;
     const SPACING_MEDIUM: f32 = 8.0;
     const SPACING_LARGE: f32 = 12.0;
-    const SPACING_XLARGE: f32 = 16.0;
 
     let msgs = &crate::i18n::get().update;
     let mut force_close = false;
+    let mut trigger_install = false;
     egui::Window::new(msgs.title.clone())
         .id(egui::Id::new("katana_update_dialog_v5"))
         .open(open)
         .collapsible(false)
-        .resizable(false)
+        .resizable(true)
         .default_width(DEFAULT_WIDTH)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
@@ -3973,10 +4008,12 @@ fn render_update_window(ctx: &egui::Context, open: &mut bool, state: &AppState) 
                     ui.add(egui::Spinner::new());
                     ui.add_space(SPACING_MEDIUM);
                     ui.label(msgs.checking_for_updates.clone());
+                    ui.add_space(SPACING_LARGE);
                 } else if let Some(err) = &state.update_check_error {
                     ui.colored_label(egui::Color32::RED, msgs.failed_to_check.clone());
                     ui.add_space(SPACING_SMALL);
                     ui.label(err);
+                    ui.add_space(SPACING_LARGE);
                 } else if let Some(latest) = &state.update_available {
                     // Accent heading for new version
                     ui.label(
@@ -3987,19 +4024,52 @@ fn render_update_window(ctx: &egui::Context, open: &mut bool, state: &AppState) 
                     ui.add_space(SPACING_MEDIUM);
                     let desc = msgs
                         .update_available_desc
-                        .replace("{version}", latest.as_str());
+                        .replace("{version}", latest.tag_name.as_str());
                     ui.label(desc);
+
+                    ui.add_space(SPACING_LARGE);
+
+                    // Revert to left alignment for Markdown release notes content
+                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                        const MAX_SCROLL_HEIGHT: f32 = 250.0;
+                        egui::ScrollArea::vertical()
+                            .max_height(MAX_SCROLL_HEIGHT)
+                            .auto_shrink([false; 2])
+                            .show(ui, |ui| {
+                                egui_commonmark::CommonMarkViewer::new().show(
+                                    ui,
+                                    markdown_cache,
+                                    &latest.body,
+                                );
+                            });
+                    });
+
+                    ui.add_space(SPACING_LARGE);
                 } else {
                     ui.heading(msgs.up_to_date.clone());
                     ui.add_space(SPACING_SMALL);
                     ui.label(msgs.up_to_date_desc.clone());
+                    ui.add_space(SPACING_LARGE);
                 }
-                ui.add_space(SPACING_XLARGE);
             });
 
             if !state.checking_for_updates {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                ui.separator();
+                ui.add_space(SPACING_SMALL);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button(msgs.action_close.clone()).clicked() {
+                        force_close = true;
+                    }
+                    if state.update_available.is_some()
+                        && ui
+                            .button(
+                                egui::RichText::new(msgs.install_update.clone())
+                                    .color(ui.visuals().widgets.active.text_color())
+                                    .strong(),
+                            )
+                            .clicked()
+                    {
+                        trigger_install = true;
                         force_close = true;
                     }
                 });
@@ -4010,5 +4080,8 @@ fn render_update_window(ctx: &egui::Context, open: &mut bool, state: &AppState) 
 
     if force_close {
         *open = false;
+    }
+    if trigger_install {
+        *pending_action = AppAction::InstallUpdate;
     }
 }

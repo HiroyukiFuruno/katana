@@ -782,7 +782,7 @@ fn basic_fixture_ja_semantic_smoke() {
 #[test]
 fn basic_fixture_ja_s11_2_long_inline_code_wraps_within_panel() {
     let (_, _, source) = load_fixture("sample_basic.ja.md");
-    let section_md = extract_section(&source, "### 11.2", "### 11.3");
+    let section_md = extract_section(&source, "### 13.2", "### 13.3");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), 420.0, 220.0);
     let node = harness.get_by_label_contains("このテキストは非常に長い行");
@@ -806,7 +806,7 @@ fn basic_fixture_ja_s11_2_long_inline_code_wraps_within_panel() {
 #[test]
 fn basic_fixture_en_s12_accordion_renders_summary() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "## 12", "## 13");
+    let section_md = extract_section(&source, "## 7", "## 8");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
     // The summary text "Show details" should appear as a clickable label
@@ -828,7 +828,7 @@ fn basic_fixture_en_s12_accordion_renders_summary() {
 #[test]
 fn basic_fixture_en_s13_block_math_renders() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 13.1", "### 13.2");
+    let section_md = extract_section(&source, "### 8.1", "### 8.2");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
     // The LaTeX source content should appear as a label (render_math_fn fallback)
@@ -843,7 +843,7 @@ fn basic_fixture_en_s13_block_math_renders() {
 #[test]
 fn basic_fixture_en_s13_inline_math_renders() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 13.2", "### 13.3");
+    let section_md = extract_section(&source, "### 8.2", "### 8.3");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 200.0);
     // The LaTeX source "E = mc^2" is what render_math_fn receives (delimiters stripped by pulldown-cmark).
@@ -860,7 +860,7 @@ fn basic_fixture_en_s13_inline_math_renders() {
 #[test]
 fn basic_fixture_en_s13_singleline_math_renders() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 13.3", "---");
+    let section_md = extract_section(&source, "### 8.3", "---");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 300.0);
     let node = harness.get_by_label("\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}");
@@ -907,7 +907,7 @@ fn build_harness_accordion_open(sections: Vec<RenderedSection>) -> Harness<'stat
 #[test]
 fn basic_fixture_en_s12_accordion_open_list_items_inline() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "## 12", "## 13");
+    let section_md = extract_section(&source, "## 7", "## 8");
     let pane = render_snippet(&section_md);
     let harness = build_harness_accordion_open(pane.sections.clone());
 
@@ -931,7 +931,7 @@ fn basic_fixture_en_s12_accordion_open_list_items_inline() {
 #[test]
 fn basic_fixture_en_s12_accordion_open_nested_list_indented() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "## 12", "## 13");
+    let section_md = extract_section(&source, "## 7", "## 8");
     let pane = render_snippet(&section_md);
     let harness = build_harness_accordion_open(pane.sections.clone());
 
@@ -1129,7 +1129,7 @@ fn basic_fixture_en_s12_accordion_icon_vertically_centered() {
 #[test]
 fn basic_fixture_en_s12_accordion_open_no_vertical_left_line() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "## 12", "## 13");
+    let section_md = extract_section(&source, "## 7", "## 8");
     let pane = render_snippet(&section_md);
     let harness = build_harness_accordion_open(pane.sections.clone());
 
@@ -1164,7 +1164,7 @@ fn basic_fixture_en_s12_accordion_open_no_vertical_left_line() {
 #[test]
 fn basic_fixture_en_s11_4_footnote_reference_rendered() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let section_md = extract_section(&source, "### 13.4", "### 13.5");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
     // The footnote reference should render as "[1]" near the left side (not pushed off-screen)
@@ -1186,7 +1186,7 @@ fn basic_fixture_en_s11_4_footnote_reference_rendered() {
 #[test]
 fn basic_fixture_en_s11_4_footnote_definition_rendered() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let section_md = extract_section(&source, "### 13.4", "### 13.5");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
     // The footnote definition body text must be visible.
@@ -1217,7 +1217,7 @@ fn basic_fixture_en_s11_4_footnote_definition_rendered() {
 #[test]
 fn basic_fixture_en_s11_4_footnote_return_link_rendered() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let section_md = extract_section(&source, "### 13.4", "### 13.5");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
     // Multiple footnotes → multiple ↩ links; verify at least one is rendered.
@@ -1237,7 +1237,7 @@ fn basic_fixture_en_s11_4_footnote_return_link_rendered() {
 #[test]
 fn basic_fixture_en_s11_4_footnote_blocks_compact_spacing() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let section_md = extract_section(&source, "### 13.4", "### 13.5");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
 
@@ -1267,7 +1267,7 @@ fn basic_fixture_en_s11_4_footnote_blocks_compact_spacing() {
 #[test]
 fn basic_fixture_en_s11_4_return_link_vertically_centered() {
     let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "### 11.4", "### 11.5");
+    let section_md = extract_section(&source, "### 13.4", "### 13.5");
     let pane = render_snippet(&section_md);
     let harness = build_harness(pane.sections.clone(), PANEL_WIDTH, 400.0);
 

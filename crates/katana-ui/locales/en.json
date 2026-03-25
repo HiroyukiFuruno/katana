@@ -198,7 +198,16 @@
         "key": "group_system",
         "name": "System"
       }
-    ]
+    ],
+    "updates": {
+      "section_title": "App Updates",
+      "interval": "Check for updates automatically",
+      "never": "Never",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "check_now": "Check for Updates Now"
+    }
   },
   "tab": {
     "nav_prev": "Move to previous tab",
