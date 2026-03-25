@@ -3064,4 +3064,3 @@ fn test_regression_update_dialog_up_to_date_renders_correctly() {
     // The egui-provided close button must be present.
     harness.get_by_label("Close window");
 }
-

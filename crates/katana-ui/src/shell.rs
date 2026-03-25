@@ -190,8 +190,6 @@ impl KatanaApp {
         self.show_update_dialog = true;
     }
 
-
-
     pub(crate) fn take_action(&mut self) -> AppAction {
         std::mem::replace(&mut self.pending_action, AppAction::None)
     }
