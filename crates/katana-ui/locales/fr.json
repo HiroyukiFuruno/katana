@@ -95,6 +95,8 @@
     "reveal_in_os": "[fr] Reveal in OS",
     "save": "[fr] 保存",
     "cancel": "[fr] キャンセル",
+    "discard": "Ignorer",
+    "confirm": "Confirmer",
     "copy_relative_path": "[fr] Copy Relative Path"
   },
   "ai": {
@@ -117,8 +119,9 @@
       "custom_section": "Personnalisé",
       "delete_custom": "Supprimer le thème",
       "save_custom_theme": "Enregistrer sous...",
-      "save_custom_theme_title": "Enregistrer le thème",
-      "theme_name_label": "Nom du thème :"
+      "save_custom_theme_title": "Enregistrer le thème personnalisé",
+      "theme_name_label": "Nom du thème :",
+      "duplicate": "Dupliquer..."
     },
     "font": {
       "size": "Taille de la police",
@@ -190,10 +193,15 @@
       }
     ],
     "workspace": {
-      "max_depth": "Profondeur maximale d'analyse",
-      "ignored_directories": "Répertoires ignorés",
-      "ignored_directories_hint": "Liste des répertoires séparés par des virgules à exclure de l'analyse (ex: .git, node_modules, .terraform)",
-      "visible_extensions": "Extensions visibles"
+      "max_depth": "Profondeur max. d'analyse",
+      "ignored_directories": "[fr] Ignored Directories",
+      "ignored_directories_hint": "Liste séparée par des virgules des répertoires à exclure de l'analyse (ex., .git, node_modules, .terraform)",
+      "visible_extensions": "Extensions visibles",
+      "no_extension_label": "Sans extension",
+      "no_extension_warning_title": "Avertissement",
+      "no_extension_warning": "Il n'y a aucune garantie que les fichiers sans extension puissent être affichés correctement comme Markdown. De plus, l'application peut planter en raison d'un comportement inattendu. Êtes-vous sûr de vouloir activer cela?",
+      "extensionless_excludes": "[fr] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[fr] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[fr] App Updates",

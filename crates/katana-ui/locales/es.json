@@ -95,6 +95,8 @@
     "reveal_in_os": "[es] Reveal in OS",
     "save": "[es] 保存",
     "cancel": "[es] キャンセル",
+    "discard": "Descartar",
+    "confirm": "Confirmar",
     "copy_relative_path": "[es] Copy Relative Path"
   },
   "ai": {
@@ -118,7 +120,8 @@
       "delete_custom": "Eliminar tema",
       "save_custom_theme": "Guardar como tema...",
       "save_custom_theme_title": "Guardar tema personalizado",
-      "theme_name_label": "Nombre del tema:"
+      "theme_name_label": "Nombre del tema:",
+      "duplicate": "Duplicar..."
     },
     "font": {
       "size": "Tamaño de Fuente",
@@ -191,9 +194,14 @@
     ],
     "workspace": {
       "max_depth": "Profundidad máxima de escaneo",
-      "ignored_directories": "Directorios ignorados",
-      "ignored_directories_hint": "Lista separada por comas de directorios a excluir del escaneo (p. ej., .git, node_modules, .terraform)",
-      "visible_extensions": "Extensiones visibles"
+      "ignored_directories": "[es] Ignored Directories",
+      "ignored_directories_hint": "Lista de directorios separados por comas a excluir del escaneo (ej., .git, node_modules, .terraform)",
+      "visible_extensions": "Extensiones visibles",
+      "no_extension_label": "Sin extensión",
+      "no_extension_warning_title": "Advertencia",
+      "no_extension_warning": "No hay garantía de que los archivos sin extensiones se puedan mostrar correctamente como Markdown. Además, la aplicación puede bloquearse debido a un comportamiento inesperado. ¿Está seguro de que desea habilitar esto?",
+      "extensionless_excludes": "[es] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[es] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[es] App Updates",

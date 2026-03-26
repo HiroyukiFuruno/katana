@@ -127,9 +127,11 @@
     "rename": "名前の変更...",
     "delete": "削除",
     "copy_path": "パスのコピー",
-    "reveal_in_os": "OSの機能で表示する",
     "save": "保存",
     "cancel": "キャンセル",
+    "discard": "破棄",
+    "confirm": "確認",
+    "reveal_in_os": "OSの機能で表示する",
     "copy_relative_path": "相対パスのコピー"
   },
   "ai": {
@@ -153,7 +155,8 @@
       "delete_custom": "カスタムテーマを削除",
       "save_custom_theme": "カスタムテーマとして保存...",
       "save_custom_theme_title": "カスタムテーマの保存",
-      "theme_name_label": "テーマ名:"
+      "theme_name_label": "テーマ名:",
+      "duplicate": "複製..."
     },
     "font": {
       "size": "フォントサイズ",
@@ -191,10 +194,15 @@
       "preview_background": "プレビュー背景"
     },
     "workspace": {
-      "max_depth": "最大スキャン階層",
+      "max_depth": "最大ディレクトリスキャン深度",
       "ignored_directories": "除外ディレクトリ",
-      "ignored_directories_hint": "スキャンから除外するディレクトリのカンマ区切りリスト（例: .git, node_modules, .terraform）",
-      "visible_extensions": "表示対象の拡張子"
+      "ignored_directories_hint": "例: node_modules, target, .git",
+      "visible_extensions": "表示対象の拡張子",
+      "no_extension_label": "拡張子なし",
+      "no_extension_warning_title": "警告",
+      "no_extension_warning": "markdownとして正しく表示できる保証はありません。またappが想定しない動作でクラッシュする可能性があります。本当に有効にしますか。",
+      "extensionless_excludes": "表示除外ファイル（拡張子完全一致）",
+      "extensionless_excludes_hint": "「拡張子なし」有効時に除外するファイル名リストを追加します（例: .DS_Store, .gitignore）。"
     },
     "tabs": [
       {
@@ -241,8 +249,8 @@
     },
     "behavior": {
       "section_title": "動作",
-      "confirm_close_dirty_tab": "未保存のタブを閉じる前に確認する",
-      "scroll_sync": "スクロールの同期",
+      "confirm_close_dirty_tab": "未保存タブを閉じる前に確認",
+      "scroll_sync": "スクロール同期",
       "auto_save": "自動保存",
       "auto_save_interval": "自動保存間隔",
       "seconds": "秒",

@@ -95,6 +95,8 @@
     "reveal_in_os": "[zh-CN] Reveal in OS",
     "save": "[zh-CN] 保存",
     "cancel": "[zh-CN] キャンセル",
+    "discard": "丢弃",
+    "confirm": "确认",
     "copy_relative_path": "[zh-CN] Copy Relative Path"
   },
   "ai": {
@@ -118,7 +120,8 @@
       "delete_custom": "删除主题",
       "save_custom_theme": "另存为自定义主题...",
       "save_custom_theme_title": "保存自定义主题",
-      "theme_name_label": "主题名称："
+      "theme_name_label": "主题名称:",
+      "duplicate": "复制..."
     },
     "font": {
       "size": "字体大小",
@@ -156,10 +159,15 @@
       "preview_background": "预览背景"
     },
     "workspace": {
-      "max_depth": "最大扫描深度",
-      "ignored_directories": "忽略的目录",
-      "ignored_directories_hint": "要从扫描中排除的目录列表（以逗号分隔，如 .git, node_modules, .terraform）",
-      "visible_extensions": "可见扩展名"
+      "max_depth": "最大目录扫描深度",
+      "ignored_directories": "[zh-CN] Ignored Directories",
+      "ignored_directories_hint": "例: node_modules, target, .git",
+      "visible_extensions": "显示的扩展名",
+      "no_extension_label": "无扩展名",
+      "no_extension_warning_title": "警告",
+      "no_extension_warning": "不能保证没有扩展名的文件能正确显示为 Markdown。此外，应用程序可能会因意外行为而崩溃。确定要启用吗？",
+      "extensionless_excludes": "[zh-CN] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[zh-CN] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "tabs": [
       {

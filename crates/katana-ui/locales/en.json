@@ -130,6 +130,8 @@
     "reveal_in_os": "Reveal in OS",
     "save": "Save",
     "cancel": "Cancel",
+    "discard": "Discard",
+    "confirm": "Confirm",
     "copy_relative_path": "Copy Relative Path"
   },
   "ai": {
@@ -153,7 +155,8 @@
       "delete_custom": "Delete Custom Theme",
       "save_custom_theme": "Save as Custom Theme...",
       "save_custom_theme_title": "Save Custom Theme",
-      "theme_name_label": "Theme Name:"
+      "theme_name_label": "Theme Name:",
+      "duplicate": "Duplicate..."
     },
     "font": {
       "size": "Font Size",
@@ -191,10 +194,15 @@
       "preview_background": "Preview Background"
     },
     "workspace": {
-      "max_depth": "Max Scan Depth",
+      "max_depth": "Max Directory Scan Depth",
       "ignored_directories": "Ignored Directories",
-      "ignored_directories_hint": "Comma-separated list of directories to exclude from scanning (e.g., .git, node_modules, .terraform)",
-      "visible_extensions": "Visible Extensions"
+      "ignored_directories_hint": "e.g. node_modules, target, .git",
+      "visible_extensions": "Visible Extensions",
+      "no_extension_label": "No Extension",
+      "no_extension_warning_title": "Warning",
+      "no_extension_warning": "There is no guarantee that files without extensions can be displayed correctly as Markdown. Furthermore, the application may crash due to unexpected behavior. Are you sure you want to enable this?",
+      "extensionless_excludes": "Ignored Extensionless Files",
+      "extensionless_excludes_hint": "List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "tabs": [
       {

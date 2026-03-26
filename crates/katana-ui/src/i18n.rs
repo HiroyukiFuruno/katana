@@ -311,6 +311,12 @@ pub struct ActionMessages {
     pub cancel: String,
     #[serde(default = "default_action_discard")]
     pub discard: String,
+    #[serde(default = "default_action_confirm")]
+    pub confirm: String,
+}
+
+fn default_action_confirm() -> String {
+    "Confirm".to_string()
 }
 
 fn default_action_new_file() -> String {
@@ -428,6 +434,12 @@ pub struct SettingsThemeMessages {
     pub save_custom_theme_title: String,
     #[serde(default = "default_theme_name_label")]
     pub theme_name_label: String,
+    #[serde(default = "default_duplicate")]
+    pub duplicate: String,
+}
+
+fn default_duplicate() -> String {
+    "Duplicate...".to_string()
 }
 
 fn default_custom_section() -> String {
@@ -487,6 +499,33 @@ pub struct SettingsWorkspaceMessages {
     pub ignored_directories_hint: String,
     #[serde(default = "default_visible_extensions_msg")]
     pub visible_extensions: String,
+    #[serde(default = "default_no_extension_label")]
+    pub no_extension_label: String,
+    #[serde(default = "default_no_extension_warning_title")]
+    pub no_extension_warning_title: String,
+    #[serde(default = "default_no_extension_warning")]
+    pub no_extension_warning: String,
+    #[serde(default = "default_extensionless_excludes")]
+    pub extensionless_excludes: String,
+    #[serde(default = "default_extensionless_excludes_hint")]
+    pub extensionless_excludes_hint: String,
+}
+
+fn default_extensionless_excludes() -> String {
+    "Ignored Extensionless Files".to_string()
+}
+fn default_extensionless_excludes_hint() -> String {
+    "Comma-separated list of exact file names to ignore when 'No Extension' is enabled (e.g., .DS_Store, .gitignore).".to_string()
+}
+
+fn default_no_extension_label() -> String {
+    "No Extension".to_string()
+}
+fn default_no_extension_warning_title() -> String {
+    "Warning".to_string()
+}
+fn default_no_extension_warning() -> String {
+    "There is no guarantee that files without extensions can be displayed correctly as Markdown. Furthermore, the application may crash due to unexpected behavior. Are you sure you want to enable this?".to_string()
 }
 
 fn default_visible_extensions_msg() -> String {
@@ -766,6 +805,18 @@ mod tests {
     }
 
     #[test]
+    fn test_default_extensionless_excludes() {
+        assert_eq!(
+            super::default_extensionless_excludes(),
+            "Ignored Extensionless Files"
+        );
+        assert_eq!(
+            super::default_extensionless_excludes_hint(),
+            "Comma-separated list of exact file names to ignore when 'No Extension' is enabled (e.g., .DS_Store, .gitignore)."
+        );
+    }
+
+    #[test]
     fn test_export_menu_keys_exist() {
         // Red phase: testing that export menu strings are present
         let msgs = super::get();
@@ -821,5 +872,23 @@ mod tests {
             "Save Custom Theme"
         );
         assert_eq!(super::default_theme_name_label(), "Theme Name:");
+    }
+}
+
+#[cfg(test)]
+mod additional_coverage_tests {
+    use super::*;
+
+    #[test]
+    fn test_i18n_defaults_coverage() {
+        assert_eq!(default_action_confirm(), "Confirm");
+        assert_eq!(default_action_discard(), "Discard");
+        assert_eq!(default_duplicate(), "Duplicate...");
+        assert_eq!(default_no_extension_label(), "No Extension");
+        assert_eq!(default_no_extension_warning_title(), "Warning");
+        assert_eq!(
+            default_no_extension_warning(),
+            "There is no guarantee that files without extensions can be displayed correctly as Markdown. Furthermore, the application may crash due to unexpected behavior. Are you sure you want to enable this?"
+        );
     }
 }
