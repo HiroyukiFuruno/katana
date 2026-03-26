@@ -36,6 +36,7 @@ git branch -a | grep {base_branch}
 
 > [!IMPORTANT]
 > **Before creating any PR, you MUST execute a self-review (via the `self-review` skill) and self-correct any detected issues.**
+> This explicitly includes checking for violations against `docs/coding-rules.md` and `docs/coding-rules.ja.md`.
 > Do NOT create a PR containing code that has not been proactively reviewed and fixed by you.
 
 ### 1. Verify Template Existence

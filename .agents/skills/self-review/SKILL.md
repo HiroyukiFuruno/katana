@@ -40,7 +40,7 @@ with:
 
 ## 1. Coding Standards Check
 
-Verify compliance with the rules defined in `docs/coding-rules.ja.md`.
+Verify compliance with the rules defined in `docs/coding-rules.md` (and `docs/coding-rules.ja.md`).
 
 ### Automated (enforced by `make check`)
 - `cargo fmt --check` — formatting
