@@ -113,7 +113,12 @@
       "dark_section": "어두운 테마",
       "light_section": "밝은 테마",
       "custom_colors": "사용자 지정 색상",
-      "reset_custom": "프리셋으로 초기화"
+      "reset_custom": "프리셋으로 초기화",
+      "custom_section": "사용자 지정",
+      "delete_custom": "테마 삭제",
+      "save_custom_theme": "사용자 지정 테마로 저장...",
+      "save_custom_theme_title": "테마 저장",
+      "theme_name_label": "테마 이름:"
     },
     "font": {
       "size": "글꼴 크기",

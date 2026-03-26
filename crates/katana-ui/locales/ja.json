@@ -148,7 +148,12 @@
       "dark_section": "ダーク",
       "light_section": "ライト",
       "custom_colors": "カスタムカラー",
-      "reset_custom": "プリセットに戻す"
+      "reset_custom": "プリセットに戻す",
+      "custom_section": "カスタム",
+      "delete_custom": "カスタムテーマを削除",
+      "save_custom_theme": "カスタムテーマとして保存...",
+      "save_custom_theme_title": "カスタムテーマの保存",
+      "theme_name_label": "テーマ名:"
     },
     "font": {
       "size": "フォントサイズ",

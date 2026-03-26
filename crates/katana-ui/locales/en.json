@@ -148,7 +148,12 @@
       "dark_section": "Dark",
       "light_section": "Light",
       "custom_colors": "Custom Colours",
-      "reset_custom": "Reset to Preset"
+      "reset_custom": "Reset to Preset",
+      "custom_section": "Custom",
+      "delete_custom": "Delete Custom Theme",
+      "save_custom_theme": "Save as Custom Theme...",
+      "save_custom_theme_title": "Save Custom Theme",
+      "theme_name_label": "Theme Name:"
     },
     "font": {
       "size": "Font Size",

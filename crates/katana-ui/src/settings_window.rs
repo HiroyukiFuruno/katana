@@ -396,6 +396,58 @@ fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut SettingsServic
     }
     render_preset_group(ui, settings, &light_presets);
 
+    // Render Custom Themes if any
+    let custom_themes = settings.settings().theme.custom_themes.clone();
+    if !custom_themes.is_empty() {
+        ui.add_space(SECTION_SPACING);
+        ui.label(
+            egui::RichText::new(crate::i18n::get().settings.theme.custom_section.clone()).weak(),
+        );
+        for (idx, custom_theme) in custom_themes.iter().enumerate() {
+            let is_selected = settings.settings().theme.custom_color_overrides.as_ref()
+                == Some(&custom_theme.colors);
+            let bg_color = theme_bridge::rgb_to_color32(custom_theme.colors.background);
+            let accent_color = theme_bridge::rgb_to_color32(custom_theme.colors.accent);
+
+            ui.horizontal(|ui| {
+                let (rect, _) = ui.allocate_exact_size(
+                    egui::vec2(PRESET_SWATCH_SIZE, PRESET_SWATCH_SIZE),
+                    egui::Sense::hover(),
+                );
+                let corner = PRESET_SWATCH_SIZE / SWATCH_CORNER_DIVISOR;
+                ui.painter().rect_filled(rect, corner, bg_color);
+                ui.painter()
+                    .circle_filled(rect.center(), corner, accent_color);
+
+                if ui
+                    .selectable_label(is_selected, &custom_theme.name)
+                    .clicked()
+                    && !is_selected
+                {
+                    settings.settings_mut().theme.custom_color_overrides =
+                        Some(custom_theme.colors.clone());
+                    let _ = settings.save();
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add(egui::Button::image(
+                            crate::Icon::Remove.ui_image(ui, crate::icon::IconSize::Medium),
+                        ))
+                        .on_hover_text(crate::i18n::get().settings.theme.delete_custom.clone())
+                        .clicked()
+                    {
+                        settings.settings_mut().theme.custom_themes.remove(idx);
+                        if is_selected {
+                            settings.settings_mut().theme.custom_color_overrides = None;
+                        }
+                        let _ = settings.save();
+                    }
+                });
+            });
+        }
+    }
+
     ui.add_space(SUBSECTION_SPACING);
 
     let toggle_text = if show_more {
@@ -541,13 +593,87 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     }
 
     ui.add_space(SUBSECTION_SPACING);
-    if settings.settings().theme.custom_color_overrides.is_some()
-        && ui
-            .button(crate::i18n::get().settings.theme.reset_custom.clone())
-            .clicked()
-    {
-        settings.settings_mut().theme.custom_color_overrides = None;
-        let _ = settings.save();
+    ui.horizontal(|ui| {
+        if settings.settings().theme.custom_color_overrides.is_some()
+            && ui
+                .button(crate::i18n::get().settings.theme.reset_custom.clone())
+                .clicked()
+        {
+            settings.settings_mut().theme.custom_color_overrides = None;
+            let _ = settings.save();
+        }
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let limit_reached = settings.settings().theme.custom_themes.len()
+                >= katana_platform::settings::MAX_CUSTOM_THEMES;
+            ui.add_enabled_ui(!limit_reached, |ui| {
+                let save_btn =
+                    ui.button(crate::i18n::get().settings.theme.save_custom_theme.clone());
+                if save_btn.clicked() {
+                    ui.data_mut(|d| d.insert_temp(egui::Id::new("show_save_theme_modal"), true));
+                }
+            });
+        });
+    });
+
+    let modal_id = egui::Id::new("show_save_theme_modal");
+    let show_modal = ui.data(|d| d.get_temp::<bool>(modal_id).unwrap_or(false));
+    if show_modal {
+        let mut close = false;
+        egui::Window::new(
+            crate::i18n::get()
+                .settings
+                .theme
+                .save_custom_theme_title
+                .clone(),
+        )
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ui.ctx(), |ui| {
+            let name_id = egui::Id::new("custom_theme_name_input");
+            let mut name = ui.data(|d| d.get_temp::<String>(name_id).unwrap_or_default());
+
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::get().settings.theme.theme_name_label.clone());
+                let re = ui.text_edit_singleline(&mut name);
+                re.request_focus();
+                if re.changed() {
+                    ui.data_mut(|d| d.insert_temp(name_id, name.clone()));
+                }
+            });
+
+            ui.add_space(SUBSECTION_SPACING);
+            ui.horizontal(|ui| {
+                if ui
+                    .button(crate::i18n::get().action.cancel.clone())
+                    .clicked()
+                {
+                    close = true;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(crate::i18n::get().action.save.clone()).clicked()
+                        && !name.is_empty()
+                    {
+                        let mut theme_colors = settings.settings().effective_theme_colors();
+                        theme_colors.name = name.clone();
+                        settings.settings_mut().theme.custom_themes.push(
+                            katana_platform::settings::CustomTheme {
+                                name: name.clone(),
+                                colors: theme_colors,
+                            },
+                        );
+                        let _ = settings.save();
+                        close = true;
+                    }
+                });
+            });
+        });
+
+        if close {
+            ui.data_mut(|d| d.insert_temp(modal_id, false));
+            ui.data_mut(|d| d.remove::<String>(egui::Id::new("custom_theme_name_input")));
+        }
     }
 }
 

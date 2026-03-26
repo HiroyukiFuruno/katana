@@ -113,7 +113,12 @@
       "dark_section": "Dunkel",
       "light_section": "Hell",
       "custom_colors": "Benutzerdefinierte Farben",
-      "reset_custom": "Auf Voreinstellungen zurücksetzen"
+      "reset_custom": "Auf Voreinstellungen zurücksetzen",
+      "custom_section": "Benutzerdefiniert",
+      "delete_custom": "Theme löschen",
+      "save_custom_theme": "Als Theme speichern...",
+      "save_custom_theme_title": "Theme speichern",
+      "theme_name_label": "Theme-Name:"
     },
     "font": {
       "size": "Schriftgröße",

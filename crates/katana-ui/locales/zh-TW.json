@@ -113,7 +113,12 @@
       "dark_section": "深色",
       "light_section": "淺色",
       "custom_colors": "自訂顏色",
-      "reset_custom": "重設為預設"
+      "reset_custom": "重設為預設",
+      "custom_section": "自訂",
+      "delete_custom": "刪除主題",
+      "save_custom_theme": "另存為自訂主題...",
+      "save_custom_theme_title": "儲存自訂主題",
+      "theme_name_label": "主題名稱："
     },
     "font": {
       "size": "字體大小",

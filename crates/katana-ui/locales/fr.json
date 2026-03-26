@@ -113,7 +113,12 @@
       "dark_section": "Sombre",
       "light_section": "Clair",
       "custom_colors": "Couleurs personnalisées",
-      "reset_custom": "Réinitialiser"
+      "reset_custom": "Réinitialiser",
+      "custom_section": "Personnalisé",
+      "delete_custom": "Supprimer le thème",
+      "save_custom_theme": "Enregistrer sous...",
+      "save_custom_theme_title": "Enregistrer le thème",
+      "theme_name_label": "Nom du thème :"
     },
     "font": {
       "size": "Taille de la police",

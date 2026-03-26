@@ -113,7 +113,12 @@
       "dark_section": "Oscuro",
       "light_section": "Claro",
       "custom_colors": "Colores Personalizados",
-      "reset_custom": "Restablecer a Preajuste"
+      "reset_custom": "Restablecer a Preajuste",
+      "custom_section": "Personalizado",
+      "delete_custom": "Eliminar tema",
+      "save_custom_theme": "Guardar como tema...",
+      "save_custom_theme_title": "Guardar tema personalizado",
+      "theme_name_label": "Nombre del tema:"
     },
     "font": {
       "size": "Tamaño de Fuente",

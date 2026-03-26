@@ -113,7 +113,12 @@
       "dark_section": "深色",
       "light_section": "浅色",
       "custom_colors": "自定义颜色",
-      "reset_custom": "重置为预设"
+      "reset_custom": "重置为预设",
+      "custom_section": "自定义",
+      "delete_custom": "删除主题",
+      "save_custom_theme": "另存为自定义主题...",
+      "save_custom_theme_title": "保存自定义主题",
+      "theme_name_label": "主题名称："
     },
     "font": {
       "size": "字体大小",

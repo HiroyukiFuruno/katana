@@ -418,6 +418,36 @@ pub struct SettingsThemeMessages {
     pub light_section: String,
     pub custom_colors: String,
     pub reset_custom: String,
+    #[serde(default = "default_custom_section")]
+    pub custom_section: String,
+    #[serde(default = "default_delete_custom")]
+    pub delete_custom: String,
+    #[serde(default = "default_save_custom_theme")]
+    pub save_custom_theme: String,
+    #[serde(default = "default_save_custom_theme_title")]
+    pub save_custom_theme_title: String,
+    #[serde(default = "default_theme_name_label")]
+    pub theme_name_label: String,
+}
+
+fn default_custom_section() -> String {
+    "Custom".to_string()
+}
+
+fn default_delete_custom() -> String {
+    "Delete Custom Theme".to_string()
+}
+
+fn default_save_custom_theme() -> String {
+    "Save as Custom Theme...".to_string()
+}
+
+fn default_save_custom_theme_title() -> String {
+    "Save Custom Theme".to_string()
+}
+
+fn default_theme_name_label() -> String {
+    "Theme Name:".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -776,5 +806,20 @@ mod tests {
             super::default_visible_extensions_msg(),
             "Visible Extensions"
         );
+    }
+
+    #[test]
+    fn test_default_custom_theme_messages() {
+        assert_eq!(super::default_custom_section(), "Custom");
+        assert_eq!(super::default_delete_custom(), "Delete Custom Theme");
+        assert_eq!(
+            super::default_save_custom_theme(),
+            "Save as Custom Theme..."
+        );
+        assert_eq!(
+            super::default_save_custom_theme_title(),
+            "Save Custom Theme"
+        );
+        assert_eq!(super::default_theme_name_label(), "Theme Name:");
     }
 }

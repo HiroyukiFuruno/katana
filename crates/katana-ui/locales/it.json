@@ -113,7 +113,12 @@
       "dark_section": "Scuro",
       "light_section": "Chiaro",
       "custom_colors": "Colori Personalizzati",
-      "reset_custom": "Ripristina Preset"
+      "reset_custom": "Ripristina Preset",
+      "custom_section": "Personalizzato",
+      "delete_custom": "Elimina tema",
+      "save_custom_theme": "Salva come tema...",
+      "save_custom_theme_title": "Salva Tema",
+      "theme_name_label": "Nome Tema:"
     },
     "font": {
       "size": "Dimensione Carattere",

@@ -102,6 +102,14 @@ pub struct ExtraSetting {
     pub value: String,
 }
 
+pub const MAX_CUSTOM_THEMES: usize = 10;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CustomTheme {
+    pub name: String,
+    pub colors: ThemeColors,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeSettings {
     #[serde(default = "default_theme")]
@@ -110,6 +118,8 @@ pub struct ThemeSettings {
     pub preset: ThemePreset,
     #[serde(default)]
     pub custom_color_overrides: Option<ThemeColors>,
+    #[serde(default)]
+    pub custom_themes: Vec<CustomTheme>,
 }
 
 impl Default for ThemeSettings {
@@ -118,6 +128,7 @@ impl Default for ThemeSettings {
             theme: default_theme(),
             preset: ThemePreset::default(),
             custom_color_overrides: None,
+            custom_themes: Vec::new(),
         }
     }
 }
