@@ -95,6 +95,8 @@
     "reveal_in_os": "[de] Reveal in OS",
     "save": "[de] 保存",
     "cancel": "[de] キャンセル",
+    "discard": "Verwerfen",
+    "confirm": "Bestätigen",
     "copy_relative_path": "[de] Copy Relative Path"
   },
   "ai": {
@@ -113,7 +115,13 @@
       "dark_section": "Dunkel",
       "light_section": "Hell",
       "custom_colors": "Benutzerdefinierte Farben",
-      "reset_custom": "Auf Voreinstellungen zurücksetzen"
+      "reset_custom": "Auf Voreinstellungen zurücksetzen",
+      "custom_section": "Benutzerdefiniert",
+      "delete_custom": "Theme löschen",
+      "save_custom_theme": "Als Theme speichern...",
+      "save_custom_theme_title": "Benutzerdefiniertes Theme speichern",
+      "theme_name_label": "Theme-Name:",
+      "duplicate": "Duplizieren..."
     },
     "font": {
       "size": "Schriftgröße",
@@ -178,12 +186,22 @@
       {
         "key": "updates",
         "name": "Aktualisierungen"
+      },
+      {
+        "key": "behavior",
+        "name": "Verhalten"
       }
     ],
     "workspace": {
-      "max_depth": "Max. Scantiefe",
-      "ignored_directories": "Ignorierte Verzeichnisse",
-      "ignored_directories_hint": "Kommagetrennte Liste von Verzeichnissen, die ausgeschlossen werden sollen (z. B. .git, node_modules, .terraform)"
+      "max_depth": "Max. Suchtiefe",
+      "ignored_directories": "[de] Ignored Directories",
+      "ignored_directories_hint": "Kommaseparierte Liste von Verzeichnissen, die von der Suche ausgeschlossen werden sollen (z.B. .git, node_modules, .terraform)",
+      "visible_extensions": "Sichtbare Erweiterungen",
+      "no_extension_label": "Keine Erweiterung",
+      "no_extension_warning_title": "Warnung",
+      "no_extension_warning": "Es gibt keine Garantie, dass Dateien ohne Erweiterungen als Markdown korrekt angezeigt werden können. Darüber hinaus kann die Anwendung aufgrund unerwarteten Verhaltens abstürzen. Sind Sie sicher, dass Sie dies aktivieren möchten?",
+      "extensionless_excludes": "[de] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[de] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[de] App Updates",
@@ -193,6 +211,18 @@
       "weekly": "[de] Weekly",
       "monthly": "[de] Monthly",
       "check_now": "[de] Check for Updates Now"
+    },
+    "behavior": {
+      "section_title": "Verhalten",
+      "confirm_close_dirty_tab": "Vor dem Schließen nicht gespeicherter Tabs bestätigen",
+      "scroll_sync": "Editor- und Vorschau-Scroll synchronisieren",
+      "auto_save": "Automatisch speichern",
+      "auto_save_interval": "Automatisches Speicherintervall",
+      "seconds": "Sekunden",
+      "close_confirm_title": "Nicht gespeicherte Änderungen",
+      "close_confirm_msg": "'{name}' hat nicht gespeicherte Änderungen. Verwerfen?",
+      "close_confirm_discard": "Verwerfen",
+      "close_confirm_cancel": "Abbrechen"
     }
   },
   "tab": {

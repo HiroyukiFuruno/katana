@@ -81,6 +81,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub updates: UpdateSettings,
 
+    /// Behavior / system-default settings (nesting).
+    #[serde(default)]
+    pub behavior: BehaviorSettings,
+
     /// Terms of service accepted version (None = not accepted).
     #[serde(default)]
     pub terms_accepted_version: Option<String>,
@@ -98,6 +102,14 @@ pub struct ExtraSetting {
     pub value: String,
 }
 
+pub const MAX_CUSTOM_THEMES: usize = 10;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CustomTheme {
+    pub name: String,
+    pub colors: ThemeColors,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeSettings {
     #[serde(default = "default_theme")]
@@ -106,6 +118,10 @@ pub struct ThemeSettings {
     pub preset: ThemePreset,
     #[serde(default)]
     pub custom_color_overrides: Option<ThemeColors>,
+    #[serde(default)]
+    pub custom_themes: Vec<CustomTheme>,
+    #[serde(default)]
+    pub active_custom_theme: Option<String>,
 }
 
 impl Default for ThemeSettings {
@@ -114,6 +130,8 @@ impl Default for ThemeSettings {
             theme: default_theme(),
             preset: ThemePreset::default(),
             custom_color_overrides: None,
+            custom_themes: Vec::new(),
+            active_custom_theme: None,
         }
     }
 }
@@ -182,8 +200,33 @@ pub struct WorkspaceSettings {
     /// Maximum depth for recursive directory scanning.
     #[serde(default = "default_max_depth")]
     pub max_depth: usize,
+    /// Visible extensions in the workspace tree.
+    #[serde(default = "default_visible_extensions")]
+    pub visible_extensions: Vec<String>,
+
+    /// Excluded exact file names when "no extension" files are visible.
+    #[serde(default = "default_extensionless_excludes")]
+    pub extensionless_excludes: Vec<String>,
 }
 
+fn default_visible_extensions() -> Vec<String> {
+    vec![
+        "md".to_string(),
+        "markdown".to_string(),
+        "mdx".to_string(),
+        "txt".to_string(),
+        "adr".to_string(),
+    ]
+}
+
+fn default_extensionless_excludes() -> Vec<String> {
+    vec![
+        ".DS_Store".to_string(),
+        ".gitignore".to_string(),
+        ".gitattributes".to_string(),
+        "Makefile".to_string(),
+    ]
+}
 /// Default maximum recursion depth for workspace scanning.
 pub const DEFAULT_MAX_DEPTH: usize = 10;
 
@@ -216,7 +259,9 @@ impl Default for WorkspaceSettings {
             open_tabs: vec![],
             active_tab_idx: None,
             ignored_directories: default_ignored_directories(),
-            max_depth: default_max_depth(),
+            max_depth: DEFAULT_MAX_DEPTH,
+            visible_extensions: default_visible_extensions(),
+            extensionless_excludes: default_extensionless_excludes(),
         }
     }
 }
@@ -287,6 +332,41 @@ pub struct UpdateSettings {
     pub skipped_version: Option<String>,
 }
 
+/// Default auto-save interval in seconds.
+const DEFAULT_AUTO_SAVE_INTERVAL_SECS: f64 = 5.0;
+
+fn default_auto_save_interval_secs() -> f64 {
+    DEFAULT_AUTO_SAVE_INTERVAL_SECS
+}
+
+/// Application behavior settings controlling system-level defaults.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehaviorSettings {
+    /// Show a confirmation dialog when closing a tab with unsaved changes.
+    #[serde(default = "crate::settings::default_true")]
+    pub confirm_close_dirty_tab: bool,
+    /// Synchronise scroll position between editor and preview in split view.
+    #[serde(default = "crate::settings::default_true")]
+    pub scroll_sync_enabled: bool,
+    /// Enable automatic saving of dirty documents.
+    #[serde(default)]
+    pub auto_save: bool,
+    /// Interval in seconds between auto-save triggers.
+    #[serde(default = "default_auto_save_interval_secs")]
+    pub auto_save_interval_secs: f64,
+}
+
+impl Default for BehaviorSettings {
+    fn default() -> Self {
+        Self {
+            confirm_close_dirty_tab: true,
+            scroll_sync_enabled: true,
+            auto_save: false,
+            auto_save_interval_secs: DEFAULT_AUTO_SAVE_INTERVAL_SECS,
+        }
+    }
+}
+
 fn default_version() -> String {
     "0.2.0".to_string()
 }
@@ -335,6 +415,7 @@ impl Default for AppSettings {
             performance: PerformanceSettings::default(),
             export: ExportSettings::default(),
             updates: UpdateSettings::default(),
+            behavior: BehaviorSettings::default(),
             terms_accepted_version: None,
             language: default_language(),
             extra: Vec::new(),
@@ -548,6 +629,16 @@ mod tests {
     }
 
     #[test]
+    fn test_workspace_settings_default_deserialization() {
+        let json = "{}";
+        let ws: WorkspaceSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(ws.max_depth, DEFAULT_MAX_DEPTH);
+        assert!(!ws.visible_extensions.is_empty());
+        assert!(!ws.extensionless_excludes.is_empty());
+        assert!(!ws.ignored_directories.is_empty());
+    }
+
+    #[test]
     fn test_app_settings_default_values() {
         let s = AppSettings::default();
         assert_eq!(s.theme.theme, "dark");
@@ -558,6 +649,46 @@ mod tests {
         assert_eq!(s.language, "en");
         assert!(s.workspace.last_workspace.is_none());
         assert!(s.workspace.paths.is_empty());
+        // Behavior defaults
+        assert!(s.behavior.confirm_close_dirty_tab);
+        assert!(s.behavior.scroll_sync_enabled);
+        assert!(!s.behavior.auto_save);
+        assert_eq!(s.behavior.auto_save_interval_secs, 5.0);
+    }
+
+    #[test]
+    fn test_behavior_settings_defaults() {
+        let b = BehaviorSettings::default();
+        assert!(b.confirm_close_dirty_tab);
+        assert!(b.scroll_sync_enabled);
+        assert!(!b.auto_save);
+        assert_eq!(b.auto_save_interval_secs, 5.0);
+    }
+
+    #[test]
+    fn test_behavior_settings_serde_roundtrip() {
+        let b = BehaviorSettings {
+            confirm_close_dirty_tab: false,
+            scroll_sync_enabled: false,
+            auto_save: true,
+            auto_save_interval_secs: 10.0,
+        };
+        let json = serde_json::to_string(&b).unwrap();
+        let loaded: BehaviorSettings = serde_json::from_str(&json).unwrap();
+        assert!(!loaded.confirm_close_dirty_tab);
+        assert!(!loaded.scroll_sync_enabled);
+        assert!(loaded.auto_save);
+        assert_eq!(loaded.auto_save_interval_secs, 10.0);
+    }
+
+    #[test]
+    fn test_behavior_settings_serde_missing_fields_use_defaults() {
+        let json = "{}";
+        let loaded: BehaviorSettings = serde_json::from_str(json).unwrap();
+        assert!(loaded.confirm_close_dirty_tab);
+        assert!(loaded.scroll_sync_enabled);
+        assert!(!loaded.auto_save);
+        assert_eq!(loaded.auto_save_interval_secs, 5.0);
     }
 
     #[test]
@@ -709,6 +840,42 @@ mod tests {
         assert_eq!(loaded.theme.theme, "custom");
         assert!((loaded.font.size - DEFAULT_FONT_SIZE).abs() < f32::EPSILON);
         assert_eq!(loaded.language, "en");
+    }
+
+    #[test]
+    fn test_behavior_settings_fractional_auto_save_interval() {
+        let mut b = BehaviorSettings::default();
+        b.auto_save_interval_secs = 5.1;
+
+        let json = serde_json::to_string(&b).unwrap();
+        // Ensure standard string serialization maintains precision and dec places.
+        assert!(
+            json.contains("5.1"),
+            "Should serialize as float with exactly 1 decimal representation for 0.1s"
+        );
+
+        let parsed: BehaviorSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            parsed.auto_save_interval_secs, 5.1,
+            "Must roundtrip 0.1 float boundaries precisely to support egui interval sliding"
+        );
+
+        // Edge boundary testing
+        b.auto_save_interval_secs = 0.0;
+        let parsed: BehaviorSettings =
+            serde_json::from_str(&serde_json::to_string(&b).unwrap()).unwrap();
+        assert_eq!(
+            parsed.auto_save_interval_secs, 0.0,
+            "Zero boundary strict matching"
+        );
+
+        b.auto_save_interval_secs = 300.0;
+        let parsed: BehaviorSettings =
+            serde_json::from_str(&serde_json::to_string(&b).unwrap()).unwrap();
+        assert_eq!(
+            parsed.auto_save_interval_secs, 300.0,
+            "Max boundary strict matching"
+        );
     }
 
     #[test]

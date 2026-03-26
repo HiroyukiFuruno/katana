@@ -95,6 +95,8 @@
     "reveal_in_os": "[zh-TW] Reveal in OS",
     "save": "[zh-TW] 保存",
     "cancel": "[zh-TW] キャンセル",
+    "discard": "丟棄",
+    "confirm": "確認",
     "copy_relative_path": "[zh-TW] Copy Relative Path"
   },
   "ai": {
@@ -113,7 +115,13 @@
       "dark_section": "深色",
       "light_section": "淺色",
       "custom_colors": "自訂顏色",
-      "reset_custom": "重設為預設"
+      "reset_custom": "重設為預設",
+      "custom_section": "自訂",
+      "delete_custom": "刪除主題",
+      "save_custom_theme": "另存為自訂主題...",
+      "save_custom_theme_title": "儲存自訂主題",
+      "theme_name_label": "主題名稱:",
+      "duplicate": "複製..."
     },
     "font": {
       "size": "字體大小",
@@ -178,12 +186,22 @@
       {
         "key": "updates",
         "name": "更新"
+      },
+      {
+        "key": "behavior",
+        "name": "行為"
       }
     ],
     "workspace": {
-      "max_depth": "最大掃描深度",
-      "ignored_directories": "忽略的目錄",
-      "ignored_directories_hint": "以逗號分隔的目錄清單（例如 .git, node_modules, .terraform）"
+      "max_depth": "最大目錄掃描深度",
+      "ignored_directories": "[zh-TW] Ignored Directories",
+      "ignored_directories_hint": "例: node_modules, target, .git",
+      "visible_extensions": "顯示的副檔名",
+      "no_extension_label": "無副檔名",
+      "no_extension_warning_title": "警告",
+      "no_extension_warning": "不能保證沒有副檔名的檔案能正確顯示為 Markdown。此外，應用程式可能會因意外行為而崩潰。確定要啟用嗎？",
+      "extensionless_excludes": "[zh-TW] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[zh-TW] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[zh-TW] App Updates",
@@ -193,6 +211,18 @@
       "weekly": "[zh-TW] Weekly",
       "monthly": "[zh-TW] Monthly",
       "check_now": "[zh-TW] Check for Updates Now"
+    },
+    "behavior": {
+      "section_title": "行為",
+      "confirm_close_dirty_tab": "關閉未儲存的分頁前確認",
+      "scroll_sync": "同步編輯器和預覽捲動",
+      "auto_save": "自動儲存",
+      "auto_save_interval": "自動儲存間隔",
+      "seconds": "秒",
+      "close_confirm_title": "未儲存的變更",
+      "close_confirm_msg": "'{name}' 有未儲存的變更。是否捨棄？",
+      "close_confirm_discard": "捨棄",
+      "close_confirm_cancel": "取消"
     }
   },
   "tab": {

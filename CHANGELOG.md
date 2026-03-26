@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to KatanA DesktopThis file records the major changes to KatanA Desktop.
+All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
+
+## [0.7.6] - Unreleased
 
 ## [0.7.5] - 2026-03-26 05:43:00 (UTC)
 

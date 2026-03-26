@@ -2576,7 +2576,7 @@ fn test_integration_tree_context_menu_actions() {
     harness.step();
     let state = harness.state_mut().app_state_mut();
     assert!(state.create_fs_node_modal_state.is_some());
-    let (parent, name, is_dir) = state.create_fs_node_modal_state.as_ref().unwrap();
+    let (parent, name, _, is_dir) = state.create_fs_node_modal_state.as_ref().unwrap();
     assert_eq!(*parent, temp_dir);
     assert!(name.is_empty());
     assert!(!*is_dir);
@@ -3202,5 +3202,49 @@ fn test_regression_update_dialog_does_not_stretch_vertically() {
     assert!(
         height < 200.0,
         "Update dialog height ({height:.0}px) exceeds 200px — vertical stretch bug!"
+    );
+}
+
+#[test]
+fn test_integration_auto_save_interval_precision_preserved_by_ui() {
+    let mut harness = setup_harness();
+    harness.step();
+
+    // Open Settings directly to Behavior tab
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ToggleSettings);
+    harness.state_mut().app_state_mut().active_settings_tab =
+        katana_ui::app_state::SettingsTab::Behavior;
+    harness.step();
+    harness.step();
+
+    // Inject a fractional 0.1s step value into the state, just like a user typing it.
+    harness
+        .state_mut()
+        .app_state_mut()
+        .settings
+        .settings_mut()
+        .behavior
+        .auto_save_interval_secs = 5.1;
+
+    // Run the UI rendering loop multiple times.
+    // IF the egui::Slider or DragValue lacked `.min_decimals(1)` or `.step_by(0.1)`,
+    // it would truncate the float (e.g., to 5.0) and save it back during the render pass!
+    for _ in 0..5 {
+        harness.step();
+    }
+
+    let final_val = harness
+        .state_mut()
+        .app_state_mut()
+        .settings
+        .settings()
+        .behavior
+        .auto_save_interval_secs;
+    assert_eq!(
+        final_val,
+        5.1,
+        "Strict IT Check: The Settings UI MUST preserve exactly 1 decimal of precision (0.1 step) for the Auto-save interval and must NOT round it to integers."
     );
 }

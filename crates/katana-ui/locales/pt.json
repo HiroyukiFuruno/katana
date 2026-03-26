@@ -95,6 +95,8 @@
     "reveal_in_os": "[pt] Reveal in OS",
     "save": "[pt] 保存",
     "cancel": "[pt] キャンセル",
+    "discard": "Descartar",
+    "confirm": "Confirmar",
     "copy_relative_path": "[pt] Copy Relative Path"
   },
   "ai": {
@@ -113,7 +115,13 @@
       "dark_section": "Escuro",
       "light_section": "Claro",
       "custom_colors": "Cores Personalizadas",
-      "reset_custom": "Restaurar Predefinições"
+      "reset_custom": "Restaurar Predefinições",
+      "custom_section": "Personalizado",
+      "delete_custom": "Excluir tema",
+      "save_custom_theme": "Salvar como tema...",
+      "save_custom_theme_title": "Salvar Tema Personalizado",
+      "theme_name_label": "Nome do Tema:",
+      "duplicate": "Duplicar..."
     },
     "font": {
       "size": "Tamanho da Fonte",
@@ -178,12 +186,22 @@
       {
         "key": "updates",
         "name": "Atualizações"
+      },
+      {
+        "key": "behavior",
+        "name": "Comportamento"
       }
     ],
     "workspace": {
-      "max_depth": "Profundidade máx. de digitalização",
-      "ignored_directories": "Diretórios ignorados",
-      "ignored_directories_hint": "Lista de diretórios a excluir, separados por vírgulas (ex: .git, node_modules, .terraform)"
+      "max_depth": "Profundidade Máx de Busca",
+      "ignored_directories": "[pt] Ignored Directories",
+      "ignored_directories_hint": "Lista de diretórios separados por vírgula para excluir da busca (ex., .git, node_modules, .terraform)",
+      "visible_extensions": "Extensões Visíveis",
+      "no_extension_label": "Sem Extensão",
+      "no_extension_warning_title": "Aviso",
+      "no_extension_warning": "Não há garantia de que arquivos sem extensões possam ser exibidos corretamente como Markdown. Além disso, o aplicativo pode travar devido a um comportamento inesperado. Tem certeza de que deseja ativar isso?",
+      "extensionless_excludes": "[pt] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[pt] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[pt] App Updates",
@@ -193,6 +211,18 @@
       "weekly": "[pt] Weekly",
       "monthly": "[pt] Monthly",
       "check_now": "[pt] Check for Updates Now"
+    },
+    "behavior": {
+      "section_title": "Comportamento",
+      "confirm_close_dirty_tab": "Confirmar antes de fechar abas não salvas",
+      "scroll_sync": "Sincronizar rolagem do editor e da visualização",
+      "auto_save": "Salvamento automático",
+      "auto_save_interval": "Intervalo de salvamento automático",
+      "seconds": "segundos",
+      "close_confirm_title": "Alterações não salvas",
+      "close_confirm_msg": "'{name}' tem alterações não salvas. Descartar?",
+      "close_confirm_discard": "Descartar",
+      "close_confirm_cancel": "Cancelar"
     }
   },
   "tab": {

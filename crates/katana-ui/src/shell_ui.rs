@@ -13,6 +13,7 @@ use eframe::egui;
 use crate::{
     app_state::{AppAction, AppState, ScrollSource, ViewMode},
     preview_pane::{DownloadRequest, PreviewPane},
+    widgets::StyledComboBox,
 };
 
 const INVISIBLE_LABEL_SIZE: f32 = 0.1;
@@ -1204,6 +1205,45 @@ pub(crate) fn render_view_mode_bar(
             if is_split && (is_split == prev_is_split) {
                 ui.separator();
 
+                // Toggle split direction.
+                let current_dir = state.active_split_direction();
+                let (dir_icon, dir_tip) = match current_dir {
+                    katana_platform::SplitDirection::Horizontal => (
+                        crate::icon::Icon::SplitHorizontal,
+                        crate::i18n::get().split_toggle.vertical.clone(),
+                    ),
+                    katana_platform::SplitDirection::Vertical => (
+                        crate::icon::Icon::SplitVertical,
+                        crate::i18n::get().split_toggle.horizontal.clone(),
+                    ),
+                };
+                let icon_size = crate::icon::IconSize::Medium;
+                let resp_dir = ui
+                    .add(egui::Button::image(
+                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
+                    ))
+                    .on_hover_text(dir_tip);
+
+                resp_dir.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Button,
+                        true,
+                        "Toggle Split Direction",
+                    )
+                });
+
+                if resp_dir.clicked() {
+                    let new_dir = match current_dir {
+                        katana_platform::SplitDirection::Horizontal => {
+                            katana_platform::SplitDirection::Vertical
+                        }
+                        katana_platform::SplitDirection::Vertical => {
+                            katana_platform::SplitDirection::Horizontal
+                        }
+                    };
+                    state.set_active_split_direction(new_dir);
+                }
+
                 // Toggle pane order.
                 let current_order = state.active_pane_order();
                 let (order_text, order_tip) = match current_order {
@@ -1231,43 +1271,27 @@ pub(crate) fn render_view_mode_bar(
                     state.set_active_pane_order(new_order);
                 }
 
-                // Toggle split direction.
-                let current_dir = state.active_split_direction();
-                let (dir_icon, dir_tip) = match current_dir {
-                    katana_platform::SplitDirection::Horizontal => (
-                        crate::icon::Icon::SplitHorizontal,
-                        crate::i18n::get().split_toggle.vertical.clone(),
-                    ),
-                    katana_platform::SplitDirection::Vertical => (
-                        crate::icon::Icon::SplitVertical,
-                        crate::i18n::get().split_toggle.horizontal.clone(),
-                    ),
-                };
-                let icon_size = crate::icon::IconSize::Medium;
-                let resp = ui
-                    .add(egui::Button::image(
-                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
-                    ))
-                    .on_hover_text(dir_tip);
+                ui.separator();
 
-                resp.widget_info(|| {
-                    egui::WidgetInfo::labeled(
-                        egui::WidgetType::Button,
-                        true,
-                        "Toggle Split Direction",
+                let mut is_on = state
+                    .scroll_sync_override
+                    .unwrap_or(state.settings.settings().behavior.scroll_sync_enabled);
+
+                const TOGGLE_LABEL_SPACING: f32 = 8.0;
+
+                let resp = ui.add(
+                    crate::widgets::LabeledToggle::new(
+                        crate::i18n::get().settings.behavior.scroll_sync.clone(),
+                        &mut is_on,
                     )
-                });
+                    .position(crate::widgets::TogglePosition::Right)
+                    .alignment(crate::widgets::ToggleAlignment::Attached(
+                        TOGGLE_LABEL_SPACING,
+                    )),
+                );
 
                 if resp.clicked() {
-                    let new_dir = match current_dir {
-                        katana_platform::SplitDirection::Horizontal => {
-                            katana_platform::SplitDirection::Vertical
-                        }
-                        katana_platform::SplitDirection::Vertical => {
-                            katana_platform::SplitDirection::Horizontal
-                        }
-                    };
-                    state.set_active_split_direction(new_dir);
+                    state.scroll_sync_override = Some(is_on);
                 }
             }
         },
@@ -1671,8 +1695,9 @@ fn render_tree_context_menu(
                 ui.close();
             }
         }
-    } else if let Some(entry) = entry {
-        if entry.is_markdown() && ui.button(msg.open.clone()).clicked() {
+    } else if entry.is_some() {
+        #[allow(clippy::collapsible_if)]
+        if ui.button(msg.open.clone()).clicked() {
             *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
             ui.close();
         }
@@ -1935,7 +1960,7 @@ pub(crate) fn render_file_entry(
         });
     }
 
-    if resp.clicked() && entry.is_markdown() {
+    if resp.clicked() {
         *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
     }
 }
@@ -1996,6 +2021,11 @@ fn render_horizontal_split(
         PaneOrder::PreviewFirst => egui::SidePanel::left(panel_id),
     };
 
+    let scroll_sync = app
+        .state
+        .scroll_sync_override
+        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
+
     panel_side
         .resizable(true)
         .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
@@ -2010,7 +2040,7 @@ fn render_horizontal_split(
                     pane,
                     &mut app.state,
                     &mut app.pending_action,
-                    true,
+                    scroll_sync,
                     &mut scroll_state,
                 );
             }
@@ -2026,7 +2056,7 @@ fn render_horizontal_split(
     egui::CentralPanel::default()
         .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
         .show(ctx, |ui| {
-            render_editor_content(ui, &mut app.state, &mut app.pending_action, true);
+            render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
         });
 
     download_req
@@ -2063,6 +2093,10 @@ fn render_vertical_split(
 
     // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
     let show_preview_top = pane_order == PaneOrder::PreviewFirst;
+    let scroll_sync = app
+        .state
+        .scroll_sync_override
+        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
 
     if show_preview_top {
         egui::TopBottomPanel::top(panel_id)
@@ -2081,7 +2115,7 @@ fn render_vertical_split(
                         pane,
                         &mut app.state,
                         &mut app.pending_action,
-                        true,
+                        scroll_sync,
                         &mut scroll_state,
                     );
                 }
@@ -2098,7 +2132,7 @@ fn render_vertical_split(
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
             .show(ctx, |ui| {
-                render_editor_content(ui, &mut app.state, &mut app.pending_action, true);
+                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
             });
     } else {
         egui::TopBottomPanel::bottom(panel_id)
@@ -2117,7 +2151,7 @@ fn render_vertical_split(
                         pane,
                         &mut app.state,
                         &mut app.pending_action,
-                        true,
+                        scroll_sync,
                         &mut scroll_state,
                     );
                 }
@@ -2130,7 +2164,7 @@ fn render_vertical_split(
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
             .show(ctx, |ui| {
-                render_editor_content(ui, &mut app.state, &mut app.pending_action, true);
+                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
             });
     }
 
@@ -2414,10 +2448,9 @@ impl KatanaApp {
                                                 .map(|(_, name)| name.as_str())
                                                 .unwrap_or("English");
 
-                                            egui::ComboBox::from_id_salt("terms_lang_select")
-                                                .selected_text(current_name)
+                                            StyledComboBox::new("terms_lang_select", current_name)
                                                 .width(Self::TERMS_LANG_SELECT_WIDTH)
-                                                .show_ui(ui, |ui| {
+                                                .show(ui, |ui| {
                                                     for (code, name) in
                                                         crate::i18n::supported_languages()
                                                     {
@@ -2527,6 +2560,32 @@ impl eframe::App for KatanaApp {
         if self.needs_splash {
             self.splash_start = Some(std::time::Instant::now());
             self.needs_splash = false;
+        }
+
+        // --- Auto-Save Timer ---
+        let auto_save_enabled = self.state.settings.settings().behavior.auto_save;
+        let auto_save_interval = self
+            .state
+            .settings
+            .settings()
+            .behavior
+            .auto_save_interval_secs;
+        if auto_save_enabled && auto_save_interval > 0.0 {
+            let now = std::time::Instant::now();
+            if let Some(last) = self.state.last_auto_save {
+                if now.duration_since(last).as_secs_f64() >= auto_save_interval {
+                    if let Some(doc) = self.state.active_document() {
+                        if doc.is_dirty {
+                            self.pending_action = crate::app_state::AppAction::SaveDocument;
+                        }
+                    }
+                    self.state.last_auto_save = Some(now);
+                }
+            } else {
+                self.state.last_auto_save = Some(now);
+            }
+        } else {
+            self.state.last_auto_save = None;
         }
 
         // Pre-calculate splash state to prevent flickering of the background UI.
@@ -4511,7 +4570,9 @@ fn render_create_fs_node_modal(
     let mut close = false;
     let mut do_create = false;
 
-    if let Some((parent_dir, mut name, is_dir)) = state.create_fs_node_modal_state.take() {
+    if let Some((parent_dir, mut name, mut selected_ext, is_dir)) =
+        state.create_fs_node_modal_state.take()
+    {
         let title = if is_dir {
             crate::i18n::get().dialog.new_directory_title.clone()
         } else {
@@ -4533,6 +4594,25 @@ fn render_create_fs_node_modal(
                             .desired_width(MODAL_INPUT_WIDTH),
                     );
                     re.request_focus();
+
+                    if !is_dir {
+                        if let Some(ref mut ext) = selected_ext {
+                            const EXT_COMBOBOX_WIDTH: f32 = 80.0;
+                            let options = state
+                                .settings
+                                .settings()
+                                .workspace
+                                .visible_extensions
+                                .clone();
+                            crate::widgets::StyledComboBox::new("new_file_ext", ext.as_str())
+                                .width(EXT_COMBOBOX_WIDTH)
+                                .show(ui, |ui| {
+                                    for opt in &options {
+                                        ui.selectable_value(ext, opt.clone(), opt);
+                                    }
+                                });
+                        }
+                    }
 
                     if re.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         do_create = true;
@@ -4560,7 +4640,21 @@ fn render_create_fs_node_modal(
         }
 
         if do_create && !name.is_empty() {
-            let target_path = parent_dir.join(&name);
+            let actual_name = if !is_dir {
+                if let Some(ref ext) = selected_ext {
+                    if name.ends_with(&format!(".{}", ext)) {
+                        name.clone()
+                    } else {
+                        format!("{}.{}", name, ext)
+                    }
+                } else {
+                    name.clone()
+                }
+            } else {
+                name.clone()
+            };
+
+            let target_path = parent_dir.join(&actual_name);
             let res = if is_dir {
                 std::fs::create_dir(&target_path)
             } else {
@@ -4579,7 +4673,7 @@ fn render_create_fs_node_modal(
         }
 
         if !close {
-            state.create_fs_node_modal_state = Some((parent_dir, name, is_dir));
+            state.create_fs_node_modal_state = Some((parent_dir, name, selected_ext, is_dir));
         }
     }
 }

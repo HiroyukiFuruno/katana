@@ -95,6 +95,8 @@
     "reveal_in_os": "[ko] Reveal in OS",
     "save": "[ko] 保存",
     "cancel": "[ko] キャンセル",
+    "discard": "버리기",
+    "confirm": "확인",
     "copy_relative_path": "[ko] Copy Relative Path"
   },
   "ai": {
@@ -113,7 +115,13 @@
       "dark_section": "어두운 테마",
       "light_section": "밝은 테마",
       "custom_colors": "사용자 지정 색상",
-      "reset_custom": "프리셋으로 초기화"
+      "reset_custom": "프리셋으로 초기화",
+      "custom_section": "사용자 지정",
+      "delete_custom": "테마 삭제",
+      "save_custom_theme": "사용자 지정 테마로 저장...",
+      "save_custom_theme_title": "사용자 지정 테마 저장",
+      "theme_name_label": "테마 이름:",
+      "duplicate": "복제..."
     },
     "font": {
       "size": "글꼴 크기",
@@ -178,12 +186,22 @@
       {
         "key": "updates",
         "name": "업데이트"
+      },
+      {
+        "key": "behavior",
+        "name": "동작"
       }
     ],
     "workspace": {
-      "max_depth": "최대 스캔 깊이",
-      "ignored_directories": "무시할 디렉토리",
-      "ignored_directories_hint": "쉼표로 구분된 디렉토리 목록 (예: .git, node_modules, .terraform)"
+      "max_depth": "최대 디렉토리 스캔 깊이",
+      "ignored_directories": "[ko] Ignored Directories",
+      "ignored_directories_hint": "예: node_modules, target, .git",
+      "visible_extensions": "표시 대상 확장자",
+      "no_extension_label": "확장자 없음",
+      "no_extension_warning_title": "경고",
+      "no_extension_warning": "확장자가 없는 파일이 마크다운으로 올바르게 표시된다는 보장이 없습니다. 또한 예상치 못한 동작으로 인해 앱이 충돌할 수 있습니다. 정말 활성화하시겠습니까?",
+      "extensionless_excludes": "[ko] Ignored Extensionless Files",
+      "extensionless_excludes_hint": "[ko] List of exact file names to ignore when 'No Extension' is enabled (e.g. .DS_Store, .gitignore)."
     },
     "updates": {
       "section_title": "[ko] App Updates",
@@ -193,6 +211,18 @@
       "weekly": "[ko] Weekly",
       "monthly": "[ko] Monthly",
       "check_now": "[ko] Check for Updates Now"
+    },
+    "behavior": {
+      "section_title": "동작",
+      "confirm_close_dirty_tab": "저장되지 않은 탭을 닫기 전에 확인",
+      "scroll_sync": "스크롤 동기화",
+      "auto_save": "자동 저장",
+      "auto_save_interval": "자동 저장 간격",
+      "seconds": "초",
+      "close_confirm_title": "저장되지 않은 변경 사항",
+      "close_confirm_msg": "'{name}'에 저장되지 않은 변경 사항이 있습니다. 삭제하시겠습니까?",
+      "close_confirm_discard": "삭제",
+      "close_confirm_cancel": "취소"
     }
   },
   "tab": {

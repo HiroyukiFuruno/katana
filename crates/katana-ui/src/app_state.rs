@@ -74,6 +74,8 @@ pub enum SettingsTab {
     Workspace,
     /// Application update settings.
     Updates,
+    /// Behavior / system-default settings.
+    Behavior,
 }
 
 impl SettingsTab {
@@ -81,7 +83,7 @@ impl SettingsTab {
     pub const fn section(&self) -> SettingsSection {
         match self {
             Self::Theme | Self::Font | Self::Layout => SettingsSection::Appearance,
-            Self::Workspace | Self::Updates => SettingsSection::Behavior,
+            Self::Workspace | Self::Updates | Self::Behavior => SettingsSection::Behavior,
         }
     }
 }
@@ -91,7 +93,11 @@ impl SettingsSection {
     pub const fn tabs(&self) -> &[SettingsTab] {
         match self {
             Self::Appearance => &[SettingsTab::Theme, SettingsTab::Font, SettingsTab::Layout],
-            Self::Behavior => &[SettingsTab::Workspace, SettingsTab::Updates],
+            Self::Behavior => &[
+                SettingsTab::Workspace,
+                SettingsTab::Updates,
+                SettingsTab::Behavior,
+            ],
         }
     }
 }
@@ -118,6 +124,8 @@ pub enum AppAction {
     RemoveWorkspace(String),
     /// Close a tab.
     CloseDocument(usize),
+    /// Force-close a tab without confirmation (used after user confirms discard).
+    ForceCloseDocument(usize),
     /// Update the buffer of the active document.
     UpdateBuffer(String),
     /// Replace a specific range of text in the active document.
@@ -296,12 +304,18 @@ pub struct AppState {
     /// Cache for the last window title set to prevent redundant viewport commands.
     pub last_window_title: String,
 
-    /// Modal state for creating a new file or directory: `Some((parent_dir, new_name, is_dir))`
-    pub create_fs_node_modal_state: Option<(std::path::PathBuf, String, bool)>,
+    /// Modal state for creating a new file or directory: `Some((parent_dir, new_name, selected_extension, is_dir))`
+    pub create_fs_node_modal_state: Option<(std::path::PathBuf, String, Option<String>, bool)>,
     /// Modal state for renaming a file or directory: `Some((target_path, new_name))`
     pub rename_modal_state: Option<(std::path::PathBuf, String)>,
     /// Modal state for deleting a file or directory: `Some(target_path)`
     pub delete_modal_state: Option<std::path::PathBuf>,
+    /// Index of tab awaiting close confirmation (dirty-tab dialog).
+    pub pending_close_confirm: Option<usize>,
+    /// Temporary per-session override to disable scroll sync (e.g. via toolbar button).
+    pub scroll_sync_override: Option<bool>,
+    /// Timestamp of the last auto-save (or last edit), for auto-save interval tracking.
+    pub last_auto_save: Option<std::time::Instant>,
 }
 
 /// Indicates the source of a scroll operation. Used to prevent chain reactions.
@@ -374,6 +388,9 @@ impl AppState {
             create_fs_node_modal_state: None,
             rename_modal_state: None,
             delete_modal_state: None,
+            pending_close_confirm: None,
+            scroll_sync_override: None,
+            last_auto_save: None,
         }
     }
 
@@ -531,6 +548,7 @@ mod tests {
         assert_eq!(SettingsTab::Layout.section(), SettingsSection::Appearance);
         assert_eq!(SettingsTab::Workspace.section(), SettingsSection::Behavior);
         assert_eq!(SettingsTab::Updates.section(), SettingsSection::Behavior);
+        assert_eq!(SettingsTab::Behavior.section(), SettingsSection::Behavior);
 
         assert_eq!(
             SettingsSection::Appearance.tabs(),
@@ -538,7 +556,11 @@ mod tests {
         );
         assert_eq!(
             SettingsSection::Behavior.tabs(),
-            &[SettingsTab::Workspace, SettingsTab::Updates]
+            &[
+                SettingsTab::Workspace,
+                SettingsTab::Updates,
+                SettingsTab::Behavior
+            ]
         );
     }
 

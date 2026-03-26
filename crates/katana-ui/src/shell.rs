@@ -327,6 +327,8 @@ impl KatanaApp {
                 &path_clone,
                 &settings.ignored_directories,
                 settings.max_depth,
+                &settings.visible_extensions,
+                &settings.extensionless_excludes,
                 new_token,
                 &in_memory_dirs,
             );
@@ -478,6 +480,8 @@ impl KatanaApp {
                 &root,
                 &settings.ignored_directories,
                 settings.max_depth,
+                &settings.visible_extensions,
+                &settings.extensionless_excludes,
                 new_token,
                 &in_memory_dirs,
             );
@@ -620,6 +624,30 @@ impl KatanaApp {
         if let Err(e) = self.state.settings.save() {
             tracing::warn!("Failed to save settings after removing workspace: {e}");
         }
+    }
+
+    pub(crate) fn force_close_document(&mut self, idx: usize) {
+        if idx < self.state.open_documents.len() {
+            let closed_doc = self.state.open_documents.remove(idx);
+            self.state.push_recently_closed(closed_doc.path);
+            self.state.active_doc_idx = if self.state.open_documents.is_empty() {
+                None
+            } else {
+                Some(
+                    self.state
+                        .active_doc_idx
+                        .unwrap_or(0)
+                        .saturating_sub(if self.state.active_doc_idx == Some(idx) {
+                            1
+                        } else {
+                            0
+                        })
+                        .min(self.state.open_documents.len().saturating_sub(1)),
+                )
+            };
+        }
+        self.save_workspace_state();
+        self.cleanup_closed_tab_previews();
     }
 
     pub(crate) fn save_workspace_state(&mut self) {
@@ -771,27 +799,26 @@ impl KatanaApp {
             }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
             AppAction::CloseDocument(idx) => {
-                if idx < self.state.open_documents.len() {
-                    let closed_doc = self.state.open_documents.remove(idx);
-                    self.state.push_recently_closed(closed_doc.path);
-                    self.state.active_doc_idx = if self.state.open_documents.is_empty() {
-                        None
-                    } else {
-                        Some(
-                            self.state
-                                .active_doc_idx
-                                .unwrap_or(0)
-                                .saturating_sub(if self.state.active_doc_idx == Some(idx) {
-                                    1
-                                } else {
-                                    0
-                                })
-                                .min(self.state.open_documents.len().saturating_sub(1)),
-                        )
-                    };
+                // A1: If confirm_close_dirty_tab is enabled and the doc is dirty,
+                // show a confirmation dialog instead of closing immediately.
+                let should_confirm = self
+                    .state
+                    .settings
+                    .settings()
+                    .behavior
+                    .confirm_close_dirty_tab
+                    && idx < self.state.open_documents.len()
+                    && self.state.open_documents[idx].is_dirty;
+
+                if should_confirm {
+                    self.state.pending_close_confirm = Some(idx);
+                } else {
+                    self.force_close_document(idx);
                 }
-                self.save_workspace_state();
-                self.cleanup_closed_tab_previews();
+            }
+            AppAction::ForceCloseDocument(idx) => {
+                self.state.pending_close_confirm = None;
+                self.force_close_document(idx);
             }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
             AppAction::ReplaceText { span, replacement } => {
@@ -1003,10 +1030,18 @@ impl KatanaApp {
                 }
             }
             AppAction::RequestNewFile(path) => {
-                self.state.create_fs_node_modal_state = Some((path, String::new(), false));
+                let ext = self
+                    .state
+                    .settings
+                    .settings()
+                    .workspace
+                    .visible_extensions
+                    .first()
+                    .cloned();
+                self.state.create_fs_node_modal_state = Some((path, String::new(), ext, false));
             }
             AppAction::RequestNewDirectory(path) => {
-                self.state.create_fs_node_modal_state = Some((path, String::new(), true));
+                self.state.create_fs_node_modal_state = Some((path, String::new(), None, true));
             }
             AppAction::RequestRename(path) => {
                 let name = path
