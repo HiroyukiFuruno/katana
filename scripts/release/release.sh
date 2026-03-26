@@ -146,7 +146,7 @@ fi
 # ── 3.8 Archive OpenSpec Changes ───────────────────────────────────────────────
 info "Archiving OpenSpec changes for v${VERSION}..."
 VERSION_DASHED=$(echo "$VERSION" | tr '.' '-')
-for CHANGE_DIR in openspec/changes/v${VERSION_DASHED}-*; do
+for CHANGE_DIR in openspec/changes/v${VERSION_DASHED}-*(N); do
     if [[ -d "$CHANGE_DIR" ]]; then
         CHANGE_NAME=$(basename "$CHANGE_DIR")
         ARCHIVE_DIR="openspec/changes/archive/$(date +%Y-%m-%d)-${CHANGE_NAME}"
