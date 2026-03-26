@@ -1205,28 +1205,44 @@ pub(crate) fn render_view_mode_bar(
             if is_split && (is_split == prev_is_split) {
                 ui.separator();
 
-                let mut is_on = state
-                    .scroll_sync_override
-                    .unwrap_or(state.settings.settings().behavior.scroll_sync_enabled);
+                // Toggle split direction.
+                let current_dir = state.active_split_direction();
+                let (dir_icon, dir_tip) = match current_dir {
+                    katana_platform::SplitDirection::Horizontal => (
+                        crate::icon::Icon::SplitHorizontal,
+                        crate::i18n::get().split_toggle.vertical.clone(),
+                    ),
+                    katana_platform::SplitDirection::Vertical => (
+                        crate::icon::Icon::SplitVertical,
+                        crate::i18n::get().split_toggle.horizontal.clone(),
+                    ),
+                };
+                let icon_size = crate::icon::IconSize::Medium;
+                let resp_dir = ui
+                    .add(egui::Button::image(
+                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
+                    ))
+                    .on_hover_text(dir_tip);
 
-                // Right to left layout: emit rightmost element first (the label)
-                let label_response = ui
-                    .add(
-                        egui::Label::new(crate::i18n::get().settings.behavior.scroll_sync.clone())
-                            .sense(egui::Sense::click()),
+                resp_dir.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Button,
+                        true,
+                        "Toggle Split Direction",
                     )
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                });
 
-                // Then emit the switch to its left
-                let toggle_response = crate::widgets::toggle_switch(ui, &mut is_on);
-
-                if toggle_response.clicked() || label_response.clicked() {
-                    if label_response.clicked() {
-                        is_on = !is_on;
-                    }
-                    state.scroll_sync_override = Some(is_on);
+                if resp_dir.clicked() {
+                    let new_dir = match current_dir {
+                        katana_platform::SplitDirection::Horizontal => {
+                            katana_platform::SplitDirection::Vertical
+                        }
+                        katana_platform::SplitDirection::Vertical => {
+                            katana_platform::SplitDirection::Horizontal
+                        }
+                    };
+                    state.set_active_split_direction(new_dir);
                 }
-                ui.separator();
 
                 // Toggle pane order.
                 let current_order = state.active_pane_order();
@@ -1255,43 +1271,30 @@ pub(crate) fn render_view_mode_bar(
                     state.set_active_pane_order(new_order);
                 }
 
-                // Toggle split direction.
-                let current_dir = state.active_split_direction();
-                let (dir_icon, dir_tip) = match current_dir {
-                    katana_platform::SplitDirection::Horizontal => (
-                        crate::icon::Icon::SplitHorizontal,
-                        crate::i18n::get().split_toggle.vertical.clone(),
-                    ),
-                    katana_platform::SplitDirection::Vertical => (
-                        crate::icon::Icon::SplitVertical,
-                        crate::i18n::get().split_toggle.horizontal.clone(),
-                    ),
-                };
-                let icon_size = crate::icon::IconSize::Medium;
-                let resp = ui
-                    .add(egui::Button::image(
-                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
-                    ))
-                    .on_hover_text(dir_tip);
+                ui.separator();
 
-                resp.widget_info(|| {
-                    egui::WidgetInfo::labeled(
-                        egui::WidgetType::Button,
-                        true,
-                        "Toggle Split Direction",
+                let mut is_on = state
+                    .scroll_sync_override
+                    .unwrap_or(state.settings.settings().behavior.scroll_sync_enabled);
+
+                // Right to left layout: emit rightmost element first (the label)
+                let label_response = ui
+                    .add(
+                        egui::Label::new(
+                            crate::i18n::get().settings.behavior.scroll_sync.clone(),
+                        )
+                        .sense(egui::Sense::click()),
                     )
-                });
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                if resp.clicked() {
-                    let new_dir = match current_dir {
-                        katana_platform::SplitDirection::Horizontal => {
-                            katana_platform::SplitDirection::Vertical
-                        }
-                        katana_platform::SplitDirection::Vertical => {
-                            katana_platform::SplitDirection::Horizontal
-                        }
-                    };
-                    state.set_active_split_direction(new_dir);
+                // Then emit the switch to its left
+                let toggle_response = crate::widgets::toggle_switch(ui, &mut is_on);
+
+                if toggle_response.clicked() || label_response.clicked() {
+                    if label_response.clicked() {
+                        is_on = !is_on;
+                    }
+                    state.scroll_sync_override = Some(is_on);
                 }
             }
         },
