@@ -28,8 +28,9 @@ fn invisible_label(text: &str) -> egui::RichText {
 use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
     FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
-    RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_INTER_ITEM_SPACING,
-    TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
+    RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_DROP_ANIMATION_TIME,
+    TAB_DROP_INDICATOR_WIDTH, TAB_INTER_ITEM_SPACING, TAB_NAV_BUTTONS_AREA_WIDTH,
+    TAB_TOOLTIP_SHOW_DELAY_SECS, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
 };
 use crate::theme_bridge;
 use katana_platform::{PaneOrder, SplitDirection};
@@ -809,7 +810,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
 
     let mut close_idx: Option<usize> = None;
     let mut tab_action: Option<AppAction> = None;
-    let mut dragged_source: Option<(usize, egui::Pos2)> = None;
+    let mut dragged_source: Option<(usize, f32)> = None;
     let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
 
     let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
@@ -832,6 +833,9 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
             .id_salt("tab_scroll")
             .show(ui, |ui| {
+                let mut current_hovered_drop_x = None;
+                let mut dragging_ghost_info = None;
+
                 ui.horizontal(|ui| {
                     for (idx, doc) in state.open_documents.iter().enumerate() {
                         let is_active = state.active_doc_idx == Some(idx);
@@ -844,7 +848,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                         };
                         let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
 
-                        let resp = ui
+                        let (title_resp, close_resp) = ui
                             .push_id(format!("tab_{idx}"), |ui| {
                                 ui.set_max_width(if doc.is_pinned {
                                     PINNED_TAB_MAX_WIDTH
@@ -852,30 +856,97 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                     MAX_TAB_WIDTH
                                 });
                                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-                                let inner_resp = ui.selectable_label(is_active, &title);
-                                ui.interact(
-                                    inner_resp.rect,
-                                    inner_resp.id,
-                                    egui::Sense::click_and_drag(),
-                                )
+
+                                let t_resp = ui.add(egui::Button::selectable(is_active, &title));
+                                let c_resp = ui.add(egui::Button::image_and_text(
+                                    crate::Icon::Close.ui_image(ui, crate::icon::IconSize::Small),
+                                    invisible_label("x"),
+                                ));
+                                (t_resp, c_resp)
                             })
                             .inner;
 
-                        tab_rects.push((idx, resp.rect));
-                        // Task 3.7: Only scroll when navigated via left/right buttons.
-                        if is_active && should_scroll {
-                            resp.scroll_to_me(Some(egui::Align::Center));
+                        let full_tab_rect = title_resp.rect.union(close_resp.rect);
+                        tab_rects.push((idx, full_tab_rect));
+
+                        let tab_interact = ui.interact(
+                            full_tab_rect,
+                            egui::Id::new("tab_interact").with(idx),
+                            egui::Sense::click_and_drag(),
+                        );
+
+                        let mut clicked_tab = tab_interact.clicked();
+                        if close_resp.clicked() {
+                            close_idx = Some(idx);
+                            clicked_tab = false;
                         }
-                        if resp.drag_stopped() {
-                            if let Some(pos) = ui.input(|i| i.pointer.hover_pos()) {
-                                dragged_source = Some((idx, pos));
+
+                        let is_being_dragged = ui.ctx().is_being_dragged(tab_interact.id);
+                        if is_being_dragged {
+                            if let Some(pointer_pos) = ui.ctx().pointer_interact_pos() {
+                                let press_origin = ui
+                                    .input(|i| i.pointer.press_origin())
+                                    .unwrap_or(pointer_pos);
+                                let drag_offset = pointer_pos - press_origin;
+                                let ghost_rect = full_tab_rect.translate(drag_offset);
+
+                                // Save the ghost center X for the exact moment of drop!
+                                ui.memory_mut(|mem| {
+                                    mem.data.insert_temp(
+                                        egui::Id::new("drag_ghost_x").with(idx),
+                                        ghost_rect.center().x,
+                                    )
+                                });
+
+                                // Auto-scroll the horizontal scroll area to ensure the dragged tab is visible
+                                ui.scroll_to_rect(ghost_rect, None);
+
+                                // 1. Render ghost tab following the cursor
+                                egui::Area::new(egui::Id::new("tab_ghost").with(idx))
+                                    .fixed_pos(ghost_rect.min)
+                                    .order(egui::Order::Tooltip)
+                                    .show(ui.ctx(), |ui| {
+                                        ui.set_max_width(if doc.is_pinned {
+                                            PINNED_TAB_MAX_WIDTH
+                                        } else {
+                                            MAX_TAB_WIDTH
+                                        });
+                                        ui.style_mut().wrap_mode =
+                                            Some(egui::TextWrapMode::Truncate);
+
+                                        ui.horizontal(|ui| {
+                                            ui.spacing_mut().item_spacing.x = 0.0;
+                                            ui.add(egui::Button::selectable(is_active, &title));
+                                            ui.add(egui::Button::image_and_text(
+                                                crate::Icon::Close
+                                                    .ui_image(ui, crate::icon::IconSize::Small),
+                                                invisible_label("x"),
+                                            ));
+                                        });
+                                    });
+
+                                dragging_ghost_info = Some((ghost_rect, full_tab_rect.y_range()));
                             }
                         }
 
-                        let clicked = resp.clicked();
-                        let resp = resp.on_hover_text(&tooltip_path);
+                        // Task 3.7: Only scroll when navigated via left/right buttons.
+                        if is_active && should_scroll {
+                            tab_interact.scroll_to_me(Some(egui::Align::Center));
+                        }
 
-                        resp.context_menu(|ui| {
+                        // Retrieve the saved ghost_x purely from memory because pointer input might be cleared
+                        if tab_interact.drag_stopped() {
+                            if let Some(ghost_x) = ui.memory(|mem| {
+                                mem.data
+                                    .get_temp::<f32>(egui::Id::new("drag_ghost_x").with(idx))
+                            }) {
+                                dragged_source = Some((idx, ghost_x));
+                            }
+                        }
+
+                        let tab_interact = tab_interact.on_hover_text(&tooltip_path);
+
+                        tab_interact.context_menu(|ui| {
                             let i18n = crate::i18n::get();
 
                             if ui.button(&i18n.tab.close).clicked() {
@@ -917,20 +988,57 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                             }
                         });
 
-                        if clicked && !is_active {
+                        if clicked_tab && !is_active {
                             tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
                         }
 
-                        if ui
-                            .add(egui::Button::image_and_text(
-                                crate::Icon::Close.ui_image(ui, crate::icon::IconSize::Small),
-                                invisible_label("x"),
-                            ))
-                            .clicked()
-                        {
-                            close_idx = Some(idx);
-                        }
                         ui.add_space(TAB_INTER_ITEM_SPACING);
+                    }
+
+                    let mut drop_points = Vec::new();
+                    if !tab_rects.is_empty() {
+                        for i in 0..tab_rects.len() {
+                            if i == 0 {
+                                drop_points.push((0, tab_rects[i].1.left()));
+                            } else {
+                                let prev_right = tab_rects[i - 1].1.right();
+                                let current_left = tab_rects[i].1.left();
+                                drop_points.push((i, (prev_right + current_left) / 2.0));
+                            }
+                        }
+                        drop_points.push((tab_rects.len(), tab_rects.last().unwrap().1.right()));
+                    }
+
+                    if let Some((ghost_rect, y_range)) = dragging_ghost_info {
+                        let mut best_dist = f32::MAX;
+                        let mut best_x = None;
+
+                        for (_insert_idx, x) in &drop_points {
+                            let dist = (ghost_rect.center().x - x).abs();
+                            if dist < best_dist {
+                                best_dist = dist;
+                                best_x = Some(*x);
+                            }
+                        }
+                        if let Some(x) = best_x {
+                            current_hovered_drop_x = Some((x, y_range));
+                        }
+                    }
+
+                    // Draw animated (lerp) insertion marker
+                    if let Some((target_x, y_range)) = current_hovered_drop_x {
+                        let indicator_id = egui::Id::new("tab_drop_indicator");
+                        let animated_x = ui.ctx().animate_value_with_time(
+                            indicator_id,
+                            target_x,
+                            TAB_DROP_ANIMATION_TIME,
+                        );
+
+                        let stroke = egui::Stroke::new(
+                            TAB_DROP_INDICATOR_WIDTH,
+                            ui.visuals().selection.bg_fill,
+                        );
+                        ui.painter().vline(animated_x, y_range, stroke);
                     }
                 });
             });
@@ -993,14 +1101,35 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
         }
     });
 
-    if let Some((src_idx, drop_pos)) = dragged_source {
-        for (target_idx, rect) in &tab_rects {
-            if rect.contains(drop_pos) && src_idx != *target_idx {
-                tab_action = Some(AppAction::ReorderDocument {
-                    from: src_idx,
-                    to: *target_idx,
-                });
-                break;
+    if let Some((src_idx, ghost_center_x)) = dragged_source {
+        let mut drop_points = Vec::new();
+        if !tab_rects.is_empty() {
+            for i in 0..tab_rects.len() {
+                if i == 0 {
+                    drop_points.push((0, tab_rects[i].1.left()));
+                } else {
+                    let prev_right = tab_rects[i - 1].1.right();
+                    let current_left = tab_rects[i].1.left();
+                    drop_points.push((i, (prev_right + current_left) / 2.0));
+                }
+            }
+            drop_points.push((tab_rects.len(), tab_rects.last().unwrap().1.right()));
+        }
+
+        let mut best_dist = f32::MAX;
+        let mut best_insert_idx = None;
+
+        for (insert_idx, x) in drop_points {
+            let dist = (ghost_center_x - x).abs();
+            if dist < best_dist {
+                best_dist = dist;
+                best_insert_idx = Some(insert_idx);
+            }
+        }
+
+        if let Some(to) = best_insert_idx {
+            if src_idx != to && src_idx + 1 != to {
+                tab_action = Some(AppAction::ReorderDocument { from: src_idx, to });
             }
         }
     }

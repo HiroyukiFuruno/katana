@@ -35,6 +35,12 @@ pub(crate) const TAB_NAV_BUTTONS_AREA_WIDTH: f32 = 80.0;
 /// Inter-tab spacing provided on the right side of each tab (px).
 pub(crate) const TAB_INTER_ITEM_SPACING: f32 = 4.0;
 
+/// Lerp animation duration for the tab drop indicator line (seconds).
+pub(crate) const TAB_DROP_ANIMATION_TIME: f32 = 0.1;
+
+/// Width of the vertical line indicating where a tab will be dropped (px).
+pub(crate) const TAB_DROP_INDICATOR_WIDTH: f32 = 2.5;
+
 /// Initial number of visible rows for the text editor TextEdit.
 pub(crate) const EDITOR_INITIAL_VISIBLE_ROWS: usize = 40;
 

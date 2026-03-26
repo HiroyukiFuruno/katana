@@ -46,17 +46,17 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 3. タブ双方向移動の修正とUI/UX改善
 
-- [ ] 3.1 左→右ドラッグ移動が機能しない原因を特定（配列境界チェック）
-- [ ] 3.2 双方向ドラッグ移動のロジックを修正
-- [ ] 3.3 移動中のスナップアニメーション（egui `lerp`）を統一実装
-- [ ] 3.4 ユーザーへのUIスナップショット（動画等）の提示および動作報告
-- [ ] 3.5 ユーザーからのフィードバックに基づくUIの微調整および改善実装
+- [x] 3.1 左→右ドラッグ移動が機能しない原因を特定（配列境界チェック）
+- [x] 3.2 双方向ドラッグ移動のロジックを修正
+- [x] 3.3 移動中のスナップアニメーション（egui `lerp`）を統一実装
+- [x] 3.4 ユーザーへのUIスナップショット（動画等）の提示および動作報告
+- [x] 3.5 ユーザーからのフィードバックに基づくUIの微調整および改善実装
 
 ### Definition of Done (DoD)
 
-- [ ] 左→右・右→左双方向のドラッグ移動が正常動作する
-- [ ] `make check` が exit code 0 で通過
-- [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+- [x] 左→右・右→左双方向のドラッグ移動が正常動作する
+- [x] `make check` が exit code 0 で通過
+- [x] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
 
 ---
 
@@ -71,8 +71,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 4.7 グループ情報のワークスペース単位永続化（設定ファイルへの読み書き）
 - [ ] 4.8 ワークスペース切り替え時のグループ状態切り替え実装
 - [ ] 4.9 グループのバージョンフィールドを設定スキーマに追加（後方互換性）
-- [ ] 4.10 ユーザーへのUIスナップショット（画像等）の提示および動作報告
-- [ ] 4.11 ユーザーからのフィードバックに基づくUIの微調整および改善実装
+- [ ] 4.10 グループは伸縮してすることで複数のタブを表示・非表示できる。
+- [ ] 4.11 ユーザーへのUIスナップショット（画像等）の提示および動作報告
+- [ ] 4.12 ユーザーからのフィードバックに基づくUIの微調整および改善実装
 
 ### Definition of Done (DoD)
 
