@@ -100,13 +100,12 @@ pub(crate) fn render_settings_window(
     let mut open = state.show_settings;
     egui::Window::new(crate::i18n::get().settings.title.clone())
         .open(&mut open)
-        .fixed_size(egui::vec2(
-            SETTINGS_WINDOW_DEFAULT_WIDTH,
-            SETTINGS_WINDOW_DEFAULT_HEIGHT,
-        ))
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
+            ui.set_min_width(SETTINGS_WINDOW_DEFAULT_WIDTH);
+            ui.set_min_height(SETTINGS_WINDOW_DEFAULT_HEIGHT);
+            
             egui::SidePanel::left("settings_left_panel")
                 .resizable(false)
                 .min_width(SETTINGS_SIDE_PANEL_DEFAULT_WIDTH)
@@ -166,16 +165,6 @@ pub(crate) fn render_settings_window(
             }
 
             egui::CentralPanel::default().show_inside(ui, |ui| {
-                let expected_width = if show_preview {
-                    SETTINGS_WINDOW_DEFAULT_WIDTH
-                        - SETTINGS_SIDE_PANEL_DEFAULT_WIDTH
-                        - SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH
-                } else {
-                    SETTINGS_WINDOW_DEFAULT_WIDTH - SETTINGS_SIDE_PANEL_DEFAULT_WIDTH
-                };
-                ui.set_min_width(expected_width);
-                ui.set_min_height(ui.available_height());
-                
                 let tab_messages = &crate::i18n::get().settings.tabs;
                 let title = match state.active_settings_tab {
                     SettingsTab::Theme => tab_messages
