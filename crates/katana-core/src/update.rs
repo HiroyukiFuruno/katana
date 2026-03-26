@@ -78,15 +78,16 @@ pub fn check_for_updates(
 }
 
 /// Downloads a file from the given URL to the destination path.
-pub fn download_update<F>(
+pub fn download_update<P: AsRef<std::path::Path>, F>(
+    // Changed signature
     url: &str,
-    dest_path: &std::path::Path,
+    dest_path: P, // Changed signature
     mut on_progress: F,
 ) -> anyhow::Result<()>
+// Changed return type
 where
-    F: FnMut(u64, Option<u64>),
+    F: FnMut(UpdateProgress), // Changed signature
 {
-    use std::io::{Read, Write};
     let response = ureq::get(url)
         .set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION")))
         .call()?;
@@ -104,24 +105,30 @@ where
     loop {
         let bytes_read = reader.read(&mut buffer)?;
         if bytes_read == 0 {
-            break;
+            break; // EOF
         }
+        use std::io::Write;
         out_file.write_all(&buffer[..bytes_read])?;
         downloaded += bytes_read as u64;
-        on_progress(downloaded, total_size);
+        on_progress(UpdateProgress::Downloading {
+            downloaded,
+            total: total_size,
+        });
     }
 
     Ok(())
 }
 
 /// Extracts a ZIP archive into the destination directory.
-pub fn extract_update<F>(
-    zip_path: &std::path::Path,
-    extract_to_dir: &std::path::Path,
+pub fn extract_update<P: AsRef<std::path::Path>, D: AsRef<std::path::Path>, F>(
+    // Changed signature
+    zip_path: P,       // Changed signature
+    extract_to_dir: D, // Changed signature
     mut on_progress: F,
 ) -> anyhow::Result<()>
+// Changed return type
 where
-    F: FnMut(usize, usize),
+    F: FnMut(UpdateProgress), // Changed signature
 {
     let file = std::fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -130,7 +137,7 @@ where
     for i in 0..total_files {
         let mut file = archive.by_index(i)?;
         let outpath = match file.enclosed_name() {
-            Some(path) => extract_to_dir.join(path),
+            Some(path) => extract_to_dir.as_ref().join(path), // Changed to use AsRef
             None => continue,
         };
 
@@ -155,7 +162,10 @@ where
         }
 
         // Notify progress (1-indexed)
-        on_progress(i + 1, total_files);
+        on_progress(UpdateProgress::Extracting {
+            current: i + 1,
+            total: total_files,
+        }); // Changed call
     }
 
     Ok(())
@@ -165,6 +175,7 @@ where
 #[derive(Debug)]
 pub struct UpdatePreparation {
     pub temp_dir: tempfile::TempDir,
+    pub app_bundle_path: std::path::PathBuf, // Added for stub
     pub script_path: std::path::PathBuf,
 }
 
@@ -174,23 +185,25 @@ pub fn prepare_update<F>(
     target_app_path: &std::path::Path,
     mut on_progress: F,
 ) -> anyhow::Result<UpdatePreparation>
+// Changed return type
 where
     F: FnMut(UpdateProgress),
 {
     let temp_dir = tempfile::tempdir()?;
 
     let zip_path = temp_dir.path().join("update.zip");
-    download_update(download_url, &zip_path, |downloaded, total| {
-        on_progress(UpdateProgress::Downloading { downloaded, total });
+    download_update(download_url, &zip_path, |progress| {
+        // Changed call
+        on_progress(progress);
     })?;
 
     let extract_dir = temp_dir.path().join("extracted");
     std::fs::create_dir_all(&extract_dir)?;
-    extract_update(&zip_path, &extract_dir, |current, total| {
-        on_progress(UpdateProgress::Extracting { current, total });
+    extract_update(&zip_path, &extract_dir, |progress| {
+        // Changed call
+        on_progress(progress);
     })?;
 
-    // Find the .app bundle in the extracted directory
     // Typically it's "KatanA.app" inside the root of the zip.
     let app_name = target_app_path
         .file_name()
@@ -209,6 +222,7 @@ where
 
     Ok(UpdatePreparation {
         temp_dir,
+        app_bundle_path: extracted_app_path, // Added
         script_path,
     })
 }
@@ -334,9 +348,9 @@ mod tests {
 
     #[test]
     fn test_is_newer_version() {
-        assert_eq!(is_newer_version("0.6.4", "v0.7.0"), true);
-        assert_eq!(is_newer_version("v0.6.4", "v0.6.4"), false);
-        assert_eq!(is_newer_version("0.7.0", "v0.6.4"), false);
+        assert!(is_newer_version("0.6.4", "v0.7.0"));
+        assert!(!is_newer_version("v0.6.4", "v0.6.4"));
+        assert!(!is_newer_version("0.7.0", "v0.6.4"));
     }
 
     #[test]
@@ -452,7 +466,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let dest = temp_dir.path().join("update.zip");
 
-        download_update(&url, &dest, |_, _| {}).unwrap();
+        download_update(&url, &dest, |_| {}).unwrap();
         assert!(dest.exists());
         assert_eq!(std::fs::read(&dest).unwrap(), b"mock zip payload");
     }
@@ -471,16 +485,16 @@ mod tests {
             let mut zip = zip::ZipWriter::new(file);
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Stored);
-            zip.start_file("hello.txt", options.clone()).unwrap();
+            zip.start_file("hello.txt", options).unwrap();
             zip.write_all(b"Hello from ZIP").unwrap();
-            zip.add_directory("somedir/", options.clone()).unwrap();
+            zip.add_directory("somedir/", options).unwrap();
             // Create a file with a relative path resolving outside the root, triggering `enclosed_name() == None`
             zip.start_file("../outside.txt", options).unwrap();
             zip.write_all(b"Should be skipped").unwrap();
             zip.finish().unwrap();
         }
 
-        extract_update(&zip_path, &extract_dir, |_, _| {}).unwrap();
+        extract_update(&zip_path, &extract_dir, |_| {}).unwrap();
 
         let extracted_file = extract_dir.join("hello.txt");
         assert!(extracted_file.exists());

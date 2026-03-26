@@ -14,6 +14,7 @@
 ### 1.3 CHANGELOG 更新
 
 - `CHANGELOG.md` に v0.7.2 エントリを追加（EN）
+- [x] v0.7.3 アップデートプロセスの改修 (Task 4)
 - `CHANGELOG.ja.md` に v0.7.2 エントリを追加（JA）
 
 ## 2. リリース

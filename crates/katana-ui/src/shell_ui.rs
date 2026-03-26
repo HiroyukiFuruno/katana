@@ -4292,7 +4292,7 @@ fn render_update_window(
     // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
     match &state.update_phase {
         Some(UpdatePhase::Downloading { progress }) => {
-            Modal::new("katana_update_progress", &msgs.title).show_body_only(ctx, |ui| {
+            Modal::new("katana_update_dialog_v6", &msgs.title).show_body_only(ctx, |ui| {
                 ui.add_space(SPACING_SMALL);
                 ui.add(
                     egui::ProgressBar::new(*progress)
@@ -4305,7 +4305,7 @@ fn render_update_window(
             return;
         }
         Some(UpdatePhase::Installing { progress }) => {
-            Modal::new("katana_update_progress", &msgs.title).show_body_only(ctx, |ui| {
+            Modal::new("katana_update_dialog_v6", &msgs.title).show_body_only(ctx, |ui| {
                 ui.add_space(SPACING_SMALL);
                 ui.add(
                     egui::ProgressBar::new(*progress)
@@ -4318,7 +4318,7 @@ fn render_update_window(
             return;
         }
         Some(UpdatePhase::ReadyToRelaunch) => {
-            let action = Modal::new("katana_update_relaunch", &msgs.title).show(
+            let action = Modal::new("katana_update_dialog_v6", &msgs.title).show(
                 ctx,
                 |ui| {
                     ui.add_space(SPACING_LARGE);
@@ -4451,7 +4451,12 @@ fn render_update_window(
         );
         if let Some(action) = action {
             *pending_action = action;
-            *open = false;
+            if matches!(
+                *pending_action,
+                AppAction::DismissUpdate | AppAction::SkipVersion(_)
+            ) {
+                *open = false;
+            }
         }
     } else {
         // Up to date — OK button to close
