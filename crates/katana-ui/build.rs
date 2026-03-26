@@ -16,6 +16,22 @@ fn main() {
         println!("cargo:rustc-env=KATANA_RUSTC_VERSION={version}");
     }
 
+    // Capture build profile and Git commit hash for KATANA_BUILD
+    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "dev".to_string());
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+    {
+        if output.status.success() {
+            let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            println!("cargo:rustc-env=KATANA_BUILD={}-{}", profile, hash);
+        } else {
+            println!("cargo:rustc-env=KATANA_BUILD={}", profile);
+        }
+    } else {
+        println!("cargo:rustc-env=KATANA_BUILD={}", profile);
+    }
+
     if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "macos" {
         println!("cargo:rerun-if-changed=src/macos_menu.m");
         println!("cargo:rerun-if-changed=Info.plist");

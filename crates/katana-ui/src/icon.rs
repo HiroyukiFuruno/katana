@@ -75,6 +75,9 @@ define_icons! {
     Copy            => "copy",
     ExpandAll       => "expand_all",
     CollapseAll     => "collapse_all",
+    Github          => "github",
+    Heart           => "heart",
+    Bug             => "bug",
 }
 
 /// Predefined icon sizes for consistent rendering across the UI.
@@ -184,7 +187,7 @@ mod tests {
 
     #[test]
     fn all_icons_list_covers_every_variant() {
-        assert_eq!(ALL_ICONS.len(), 38);
+        assert_eq!(ALL_ICONS.len(), 41);
     }
 
     #[test]

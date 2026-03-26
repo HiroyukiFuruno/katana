@@ -4002,9 +4002,24 @@ fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui:
                 SECTION_HEADER_SIZE,
                 SECTION_HEADER_BOTTOM,
             );
-            about_link_row(ui, &i18n_about.source_code, info.repository);
-            about_link_row(ui, &i18n_about.documentation, info.docs_url);
-            about_link_row(ui, &i18n_about.report_issue, info.issues_url);
+            about_link_row(
+                ui,
+                &i18n_about.source_code,
+                info.repository,
+                crate::Icon::Github,
+            );
+            about_link_row(
+                ui,
+                &i18n_about.documentation,
+                info.docs_url,
+                crate::Icon::Document,
+            );
+            about_link_row(
+                ui,
+                &i18n_about.report_issue,
+                info.issues_url,
+                crate::Icon::Bug,
+            );
             ui.add_space(SECTION_SPACING);
 
             // ── 7. Support / Sponsor ──
@@ -4017,7 +4032,12 @@ fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui:
             if info.sponsor_url.is_empty() {
                 about_row(ui, &i18n_about.sponsor, &i18n_about.coming_soon);
             } else {
-                about_link_row(ui, &i18n_about.sponsor, info.sponsor_url);
+                about_link_row(
+                    ui,
+                    &i18n_about.sponsor,
+                    info.sponsor_url,
+                    crate::Icon::Heart,
+                );
             }
             ui.add_space(SECTION_SPACING);
         });
@@ -4041,16 +4061,14 @@ fn about_row(ui: &mut egui::Ui, label: &str, value: &str) {
 }
 
 /// Link row: label on the left, clickable short text on the right.
-fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str) {
+fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str, icon: crate::Icon) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(label).weak());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
                 .add(
-                    egui::Button::image(
-                        crate::Icon::ExternalLink.ui_image(ui, crate::icon::IconSize::Small),
-                    )
-                    .frame(false),
+                    egui::Button::image(icon.ui_image(ui, crate::icon::IconSize::Small))
+                        .frame(false),
                 )
                 .on_hover_text(url)
                 .clicked()

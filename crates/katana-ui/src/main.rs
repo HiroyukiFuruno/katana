@@ -149,7 +149,8 @@ fn main() -> eframe::Result<()> {
             .with_title("KatanA")
             .with_icon(load_icon())
             .with_inner_size(initial_window_size())
-            .with_min_inner_size(min_window_size()),
+            .with_min_inner_size(min_window_size())
+            .with_maximized(true),
         centered: true,
         ..Default::default()
     };
