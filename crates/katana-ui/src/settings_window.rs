@@ -149,14 +149,21 @@ pub(crate) fn render_settings_window(
                         });
                 });
 
-            egui::SidePanel::right("settings_right_panel")
-                .resizable(false)
-                .min_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
-                .max_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
-                .show_inside(ui, |ui| {
-                    section_header(ui, &crate::i18n::get().settings.preview.title);
-                    preview_pane.show(ui);
-                });
+            let show_preview = matches!(
+                state.active_settings_tab,
+                SettingsTab::Theme | SettingsTab::Font | SettingsTab::Layout
+            );
+
+            if show_preview {
+                egui::SidePanel::right("settings_right_panel")
+                    .resizable(false)
+                    .min_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
+                    .max_width(SETTINGS_PREVIEW_PANEL_DEFAULT_WIDTH)
+                    .show_inside(ui, |ui| {
+                        section_header(ui, &crate::i18n::get().settings.preview.title);
+                        preview_pane.show(ui);
+                    });
+            }
 
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 let tab_messages = &crate::i18n::get().settings.tabs;
@@ -240,7 +247,8 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
             .size(SETTINGS_HEADER_FONT_SIZE),
     )
     .default_open(true)
-    .id_salt("settings_grp_appearance");
+    .id_salt("settings_grp_appearance")
+    .icon(egui_commonmark::ui_components::centering::AccordionIcon::paint_optically_centered);
 
     if let Some(force_open) = state.settings_tree_force_open {
         appearance_header = appearance_header.open(Some(force_open));
@@ -289,7 +297,8 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
             .size(SETTINGS_HEADER_FONT_SIZE),
     )
     .default_open(true)
-    .id_salt("settings_grp_system");
+    .id_salt("settings_grp_system")
+    .icon(egui_commonmark::ui_components::centering::AccordionIcon::paint_optically_centered);
 
     if let Some(force_open) = state.settings_tree_force_open {
         system_header = system_header.open(Some(force_open));
