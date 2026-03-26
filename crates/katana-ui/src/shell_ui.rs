@@ -4291,17 +4291,27 @@ fn render_update_window(
 
     // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
     match &state.update_phase {
-        Some(UpdatePhase::Downloading) => {
+        Some(UpdatePhase::Downloading { progress }) => {
             Modal::new("katana_update_progress", &msgs.title).show_body_only(ctx, |ui| {
-                ui.add(egui::Spinner::new());
+                ui.add_space(SPACING_SMALL);
+                ui.add(
+                    egui::ProgressBar::new(*progress)
+                        .animate(true)
+                        .text(format!("{:.0}%", progress * 100.0)),
+                );
                 ui.add_space(SPACING_MEDIUM);
                 ui.label(&msgs.downloading);
             });
             return;
         }
-        Some(UpdatePhase::Installing) => {
+        Some(UpdatePhase::Installing { progress }) => {
             Modal::new("katana_update_progress", &msgs.title).show_body_only(ctx, |ui| {
-                ui.add(egui::Spinner::new());
+                ui.add_space(SPACING_SMALL);
+                ui.add(
+                    egui::ProgressBar::new(*progress)
+                        .animate(true)
+                        .text(format!("{:.0}%", progress * 100.0)),
+                );
                 ui.add_space(SPACING_MEDIUM);
                 ui.label(&msgs.installing);
             });

@@ -108,7 +108,13 @@ pub(crate) struct ExportTask {
     pub open_on_complete: bool,
 }
 
+pub enum UpdateInstallEvent {
+    Progress(katana_core::update::UpdateProgress),
+    Finished(Result<katana_core::update::UpdatePreparation, String>),
+}
+
 pub struct KatanaApp {
+    /// The global application state object. Contains all reactive data models.
     pub(crate) state: AppState,
     pub(crate) fs: FilesystemService,
     pub(crate) pending_action: AppAction,
@@ -121,8 +127,7 @@ pub struct KatanaApp {
     /// Receiver for background update checks.
     pub(crate) update_rx:
         Option<std::sync::mpsc::Receiver<Result<Option<katana_core::update::ReleaseInfo>, String>>>,
-    pub(crate) update_install_rx:
-        Option<std::sync::mpsc::Receiver<Result<katana_core::update::UpdatePreparation, String>>>,
+    pub(crate) update_install_rx: Option<std::sync::mpsc::Receiver<UpdateInstallEvent>>,
     /// Active background export tasks.
     pub(crate) export_tasks: Vec<ExportTask>,
     /// Queue for aggressively opening multiple documents without freezing UI
@@ -1053,7 +1058,8 @@ impl KatanaApp {
             AppAction::InstallUpdate => {
                 if let Some(release) = &self.state.update_available {
                     self.state.checking_for_updates = true;
-                    self.state.update_phase = Some(crate::app_state::UpdatePhase::Downloading);
+                    self.state.update_phase =
+                        Some(crate::app_state::UpdatePhase::Downloading { progress: 0.0 });
                     let exe_path = std::env::current_exe().unwrap();
                     let target_app_path = if exe_path.to_string_lossy().contains("MacOS") {
                         const MACOS_BUNDLE_LEVELS: usize = 3;
@@ -1071,10 +1077,16 @@ impl KatanaApp {
                     self.update_install_rx = Some(rx);
 
                     std::thread::spawn(move || {
-                        let res =
-                            katana_core::update::prepare_update(&download_url, &target_app_path)
-                                .map_err(|e| e.to_string());
-                        let _ = tx.send(res);
+                        let tx_clone = tx.clone();
+                        let res = katana_core::update::prepare_update(
+                            &download_url,
+                            &target_app_path,
+                            move |progress| {
+                                let _ = tx_clone.send(UpdateInstallEvent::Progress(progress));
+                            },
+                        )
+                        .map_err(|e| e.to_string());
+                        let _ = tx.send(UpdateInstallEvent::Finished(res));
                     });
                 }
             }
@@ -1432,33 +1444,60 @@ impl KatanaApp {
     }
 
     /// Polls for update installation completion.
-    pub(crate) fn poll_update_install(&mut self, _ctx: &egui::Context) {
+    pub(crate) fn poll_update_install(&mut self, ctx: &egui::Context) {
         if let Some(rx) = &self.update_install_rx {
-            match rx.try_recv() {
-                Ok(Ok(prep)) => {
-                    self.state.checking_for_updates = false;
-                    self.state.update_phase = Some(crate::app_state::UpdatePhase::ReadyToRelaunch);
-                    self.pending_relaunch = Some(prep);
-                    self.show_update_dialog = true;
-                    self.update_install_rx = None;
-                }
-                Ok(Err(err)) => {
-                    self.state.checking_for_updates = false;
-                    self.state.update_phase = None;
-                    self.state.update_check_error = Some(err);
-                    self.show_update_dialog = true;
-                    self.update_install_rx = None;
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    // Still in progress — update phase to Installing if downloading is done
-                    if self.state.update_phase == Some(crate::app_state::UpdatePhase::Downloading) {
-                        self.state.update_phase = Some(crate::app_state::UpdatePhase::Installing);
+            while let Ok(event) = rx.try_recv() {
+                match event {
+                    UpdateInstallEvent::Progress(prog) => {
+                        match prog {
+                            katana_core::update::UpdateProgress::Downloading {
+                                downloaded,
+                                total,
+                            } => {
+                                let progress = if let Some(t) = total {
+                                    if t > 0 {
+                                        downloaded as f32 / t as f32
+                                    } else {
+                                        0.0
+                                    }
+                                } else {
+                                    // Indeterminate progress if no Content-Length
+                                    0.0
+                                };
+                                self.state.update_phase =
+                                    Some(crate::app_state::UpdatePhase::Downloading { progress });
+                            }
+                            katana_core::update::UpdateProgress::Extracting { current, total } => {
+                                let progress = if total > 0 {
+                                    current as f32 / total as f32
+                                } else {
+                                    0.0
+                                };
+                                self.state.update_phase =
+                                    Some(crate::app_state::UpdatePhase::Installing { progress });
+                            }
+                        }
+                        ctx.request_repaint();
                     }
-                }
-                Err(_) => {
-                    self.state.checking_for_updates = false;
-                    self.state.update_phase = None;
-                    self.update_install_rx = None;
+                    UpdateInstallEvent::Finished(Ok(prep)) => {
+                        self.state.checking_for_updates = false;
+                        self.state.update_phase =
+                            Some(crate::app_state::UpdatePhase::ReadyToRelaunch);
+                        self.pending_relaunch = Some(prep);
+                        self.show_update_dialog = true;
+                        self.update_install_rx = None;
+                        ctx.request_repaint();
+                        break;
+                    }
+                    UpdateInstallEvent::Finished(Err(err)) => {
+                        self.state.checking_for_updates = false;
+                        self.state.update_phase = None;
+                        self.state.update_check_error = Some(err);
+                        self.show_update_dialog = true;
+                        self.update_install_rx = None;
+                        ctx.request_repaint();
+                        break;
+                    }
                 }
             }
         }

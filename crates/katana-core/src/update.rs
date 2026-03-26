@@ -8,6 +8,12 @@ pub struct ReleaseInfo {
     pub download_url: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateProgress {
+    Downloading { downloaded: u64, total: Option<u64> },
+    Extracting { current: usize, total: usize },
+}
+
 /// Parses the semver versions (stripping 'v' prefix if present)
 /// and returns true if `upstream` is strictly greater than `current`.
 pub fn is_newer_version(current: &str, upstream: &str) -> bool {
@@ -72,24 +78,86 @@ pub fn check_for_updates(
 }
 
 /// Downloads a file from the given URL to the destination path.
-pub fn download_update(url: &str, dest_path: &std::path::Path) -> anyhow::Result<()> {
+pub fn download_update<F>(
+    url: &str,
+    dest_path: &std::path::Path,
+    mut on_progress: F,
+) -> anyhow::Result<()>
+where
+    F: FnMut(u64, Option<u64>),
+{
+    use std::io::{Read, Write};
     let response = ureq::get(url)
         .set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION")))
         .call()?;
+
+    let total_size = response
+        .header("Content-Length")
+        .and_then(|s| s.parse().ok());
     let mut reader = response.into_reader();
     let mut out_file = std::fs::File::create(dest_path)?;
-    std::io::copy(&mut reader, &mut out_file)?;
+
+    const DOWNLOAD_BUFFER_SIZE: usize = 65536;
+    let mut buffer = [0; DOWNLOAD_BUFFER_SIZE]; // 64KB buffer
+    let mut downloaded = 0;
+
+    loop {
+        let bytes_read = reader.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        out_file.write_all(&buffer[..bytes_read])?;
+        downloaded += bytes_read as u64;
+        on_progress(downloaded, total_size);
+    }
+
     Ok(())
 }
 
 /// Extracts a ZIP archive into the destination directory.
-pub fn extract_update(
+pub fn extract_update<F>(
     zip_path: &std::path::Path,
     extract_to_dir: &std::path::Path,
-) -> anyhow::Result<()> {
+    mut on_progress: F,
+) -> anyhow::Result<()>
+where
+    F: FnMut(usize, usize),
+{
     let file = std::fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
-    archive.extract(extract_to_dir)?;
+    let total_files = archive.len();
+
+    for i in 0..total_files {
+        let mut file = archive.by_index(i)?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => extract_to_dir.join(path),
+            None => continue,
+        };
+
+        if (*file.name()).ends_with('/') {
+            std::fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p)?;
+                }
+            }
+            let mut outfile = std::fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Some(mode) = file.unix_mode() {
+                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
+            }
+        }
+
+        // Notify progress (1-indexed)
+        on_progress(i + 1, total_files);
+    }
+
     Ok(())
 }
 
@@ -101,18 +169,26 @@ pub struct UpdatePreparation {
 }
 
 /// Prepares the update by downloading, extracting, and generating the relauncher script.
-pub fn prepare_update(
+pub fn prepare_update<F>(
     download_url: &str,
     target_app_path: &std::path::Path,
-) -> anyhow::Result<UpdatePreparation> {
+    mut on_progress: F,
+) -> anyhow::Result<UpdatePreparation>
+where
+    F: FnMut(UpdateProgress),
+{
     let temp_dir = tempfile::tempdir()?;
 
     let zip_path = temp_dir.path().join("update.zip");
-    download_update(download_url, &zip_path)?;
+    download_update(download_url, &zip_path, |downloaded, total| {
+        on_progress(UpdateProgress::Downloading { downloaded, total });
+    })?;
 
     let extract_dir = temp_dir.path().join("extracted");
     std::fs::create_dir_all(&extract_dir)?;
-    extract_update(&zip_path, &extract_dir)?;
+    extract_update(&zip_path, &extract_dir, |current, total| {
+        on_progress(UpdateProgress::Extracting { current, total });
+    })?;
 
     // Find the .app bundle in the extracted directory
     // Typically it's "KatanA.app" inside the root of the zip.
@@ -376,7 +452,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let dest = temp_dir.path().join("update.zip");
 
-        download_update(&url, &dest).unwrap();
+        download_update(&url, &dest, |_, _| {}).unwrap();
         assert!(dest.exists());
         assert_eq!(std::fs::read(&dest).unwrap(), b"mock zip payload");
     }
@@ -397,11 +473,14 @@ mod tests {
                 .compression_method(zip::CompressionMethod::Stored);
             zip.start_file("hello.txt", options.clone()).unwrap();
             zip.write_all(b"Hello from ZIP").unwrap();
-            zip.add_directory("somedir/", options).unwrap();
+            zip.add_directory("somedir/", options.clone()).unwrap();
+            // Create a file with a relative path resolving outside the root, triggering `enclosed_name() == None`
+            zip.start_file("../outside.txt", options).unwrap();
+            zip.write_all(b"Should be skipped").unwrap();
             zip.finish().unwrap();
         }
 
-        extract_update(&zip_path, &extract_dir).unwrap();
+        extract_update(&zip_path, &extract_dir, |_, _| {}).unwrap();
 
         let extracted_file = extract_dir.join("hello.txt");
         assert!(extracted_file.exists());
@@ -445,7 +524,7 @@ mod tests {
         });
 
         let target_app = std::path::Path::new("/Applications/KatanA.app");
-        let prep = prepare_update(&url, target_app).expect("prepare_update should succeed");
+        let prep = prepare_update(&url, target_app, |_| {}).expect("prepare_update should succeed");
 
         assert!(prep.script_path.exists());
         let content = std::fs::read_to_string(&prep.script_path).unwrap();
@@ -488,7 +567,7 @@ mod tests {
         });
 
         let target_app = std::path::Path::new("/Applications/KatanA.app");
-        let res = prepare_update(&url, target_app);
+        let res = prepare_update(&url, target_app, |_| {});
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),

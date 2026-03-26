@@ -40,12 +40,12 @@ pub struct TabSplitState {
 }
 
 /// Current phase of the update installation process.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UpdatePhase {
-    /// Downloading the update ZIP from GitHub.
-    Downloading,
-    /// Extracting and installing the update.
-    Installing,
+    /// Downloading the update ZIP from GitHub (0.0 - 1.0).
+    Downloading { progress: f32 },
+    /// Extracting and installing the update (0.0 - 1.0).
+    Installing { progress: f32 },
     /// Ready to relaunch — waiting for user confirmation.
     ReadyToRelaunch,
 }
