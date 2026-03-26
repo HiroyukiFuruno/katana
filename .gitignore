@@ -65,6 +65,7 @@ Temporary Items
 /.github/prompts/opsx-*.md
 /.github/skills/openspec-*/
 /.opencode
+.obsidian/
 
 # Documentation
 docs/blog
