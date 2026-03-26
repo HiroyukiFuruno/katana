@@ -13,6 +13,7 @@ use eframe::egui;
 use crate::{
     app_state::{AppAction, AppState, ScrollSource, ViewMode},
     preview_pane::{DownloadRequest, PreviewPane},
+    widgets::StyledComboBox,
 };
 
 const INVISIBLE_LABEL_SIZE: f32 = 0.1;
@@ -2414,10 +2415,9 @@ impl KatanaApp {
                                                 .map(|(_, name)| name.as_str())
                                                 .unwrap_or("English");
 
-                                            egui::ComboBox::from_id_salt("terms_lang_select")
-                                                .selected_text(current_name)
+                                            StyledComboBox::new("terms_lang_select", current_name)
                                                 .width(Self::TERMS_LANG_SELECT_WIDTH)
-                                                .show_ui(ui, |ui| {
+                                                .show(ui, |ui| {
                                                     for (code, name) in
                                                         crate::i18n::supported_languages()
                                                     {

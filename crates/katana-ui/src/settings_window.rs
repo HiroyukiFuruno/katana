@@ -7,6 +7,7 @@
 use crate::app_state::{AppAction, SettingsTab};
 use crate::preview_pane::PreviewPane;
 use crate::theme_bridge;
+use crate::widgets::StyledComboBox;
 use katana_platform::settings::{SettingsService, MAX_FONT_SIZE, MIN_FONT_SIZE};
 use katana_platform::theme::{Rgb, ThemeColors, ThemeMode, ThemePreset};
 use katana_platform::{PaneOrder, SplitDirection};
@@ -917,27 +918,29 @@ fn render_updates_tab(
         use katana_platform::settings::UpdateInterval;
         let mut changed = false;
 
-        egui::ComboBox::from_id_salt("update_interval")
-            .selected_text(match interval {
-                UpdateInterval::Never => &update_msgs.never,
-                UpdateInterval::Daily => &update_msgs.daily,
-                UpdateInterval::Weekly => &update_msgs.weekly,
-                UpdateInterval::Monthly => &update_msgs.monthly,
-            })
-            .show_ui(ui, |ui| {
-                changed |= ui
-                    .selectable_value(&mut interval, UpdateInterval::Never, &update_msgs.never)
-                    .changed();
-                changed |= ui
-                    .selectable_value(&mut interval, UpdateInterval::Daily, &update_msgs.daily)
-                    .changed();
-                changed |= ui
-                    .selectable_value(&mut interval, UpdateInterval::Weekly, &update_msgs.weekly)
-                    .changed();
-                changed |= ui
-                    .selectable_value(&mut interval, UpdateInterval::Monthly, &update_msgs.monthly)
-                    .changed();
-            });
+        StyledComboBox::new(
+            "update_interval",
+            match interval {
+                UpdateInterval::Never => update_msgs.never.as_str(),
+                UpdateInterval::Daily => update_msgs.daily.as_str(),
+                UpdateInterval::Weekly => update_msgs.weekly.as_str(),
+                UpdateInterval::Monthly => update_msgs.monthly.as_str(),
+            },
+        )
+        .show(ui, |ui| {
+            changed |= ui
+                .selectable_value(&mut interval, UpdateInterval::Never, &update_msgs.never)
+                .changed();
+            changed |= ui
+                .selectable_value(&mut interval, UpdateInterval::Daily, &update_msgs.daily)
+                .changed();
+            changed |= ui
+                .selectable_value(&mut interval, UpdateInterval::Weekly, &update_msgs.weekly)
+                .changed();
+            changed |= ui
+                .selectable_value(&mut interval, UpdateInterval::Monthly, &update_msgs.monthly)
+                .changed();
+        });
 
         if changed {
             settings.settings_mut().updates.interval = interval;
