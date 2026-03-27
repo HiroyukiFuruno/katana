@@ -157,7 +157,7 @@
       "save_custom_theme_title": "儲存自訂主題",
       "theme_name_label": "主題名稱:",
       "duplicate": "建立複本...",
-      "ui_contrast_offset": "介面對比偏移",
+      "ui_contrast_offset": "介面對比偏移 (Alpha)",
       "reset_contrast": "重設"
     },
     "font": {
@@ -200,6 +200,9 @@
       "section_system": "系統",
       "section_code": "程式碼",
       "section_preview": "預覽",
+      "group_basic": "基礎",
+      "group_text": "字體與排版",
+      "group_ui_elements": "UI 元素",
       "title_bar_text": "標題列文字",
       "active_file_highlight": "作用中檔案反白",
       "success_text": "成功文字",

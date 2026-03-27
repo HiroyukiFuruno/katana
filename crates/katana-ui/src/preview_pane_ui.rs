@@ -53,12 +53,18 @@ pub(crate) fn show_section(
                 // Retrieve the preview-specific text colour from the cached ThemeColors.
                 // egui::Visuals::override_text_color was global to all UI,
                 // so we use preview.text to achieve independent colour assignment.
-                let text_color = ui.ctx().data(|d| {
+                let theme_colors = ui.ctx().data(|d| {
                     d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
                         "katana_theme_colors",
                     ))
-                    .map(|tc| crate::theme_bridge::rgb_to_color32(tc.preview.text))
                 });
+                let text_color = theme_colors
+                    .as_ref()
+                    .map(|tc| crate::theme_bridge::rgb_to_color32(tc.preview.text));
+                let hover_bg_color = theme_colors.as_ref().map(|tc| {
+                    crate::theme_bridge::rgba_to_color32(tc.preview.hover_line_background)
+                });
+
                 let md_path_owned = md_file_path.to_path_buf();
 
                 let binding = move |ui: &mut egui::Ui, html: &str| {
@@ -74,7 +80,8 @@ pub(crate) fn show_section(
                     .syntax_theme_light(preset.syntax_theme_light)
                     .heading_offset(heading_offset)
                     .render_html_fn(Some(&binding))
-                    .render_math_fn(Some(&math_binding));
+                    .render_math_fn(Some(&math_binding))
+                    .hover_bg_color(hover_bg_color);
 
                 if let Some(idx) = scroll_to_heading_index {
                     viewer = viewer.scroll_to_heading_index(idx);
@@ -1130,9 +1137,6 @@ pub fn render_math(ui: &mut egui::Ui, tex: &str, is_inline: bool) {
 /// `egui_commonmark::CommonMarkViewer`. `pulldown-cmark` identifies HTML blocks
 /// per CommonMark spec and passes them to this handler. This means we no longer
 /// need custom regex-based HTML block extraction in `split_into_sections`.
-/// Vertical spacing (in points) added before and after each HTML block.
-const HTML_BLOCK_VERTICAL_SPACING: f32 = 1.0;
-
 fn render_html_block(
     ui: &mut egui::Ui,
     html: &str,
@@ -1143,7 +1147,7 @@ fn render_html_block(
     let ctx = ui.ctx().clone();
     let block_rect = egui::Rect::from_min_size(
         egui::pos2(ui.max_rect().left(), ui.next_widget_position().y),
-        egui::vec2(ui.max_rect().width(), 0.0),
+        egui::vec2(ui.max_rect().width(), ui.available_height()),
     );
 
     ui.scope_builder(
@@ -1152,7 +1156,10 @@ fn render_html_block(
             .layout(egui::Layout::top_down(egui::Align::Min)),
         |block_ui| {
             block_ui.set_clip_rect(clip_rect);
-            block_ui.add_space(HTML_BLOCK_VERTICAL_SPACING);
+
+            // Adjust margin: shift text 2px up and reduce top padding by 5px
+            const HTML_BLOCK_MARGIN_TOP_ADJUST: f32 = -7.0;
+            block_ui.add_space(HTML_BLOCK_MARGIN_TOP_ADJUST);
 
             let resolved_html = katana_core::preview::resolve_html_image_paths(html, md_file_path);
             let base_dir = md_file_path.parent().unwrap_or(std::path::Path::new("."));
@@ -1173,7 +1180,9 @@ fn render_html_block(
                 }
             }
 
-            block_ui.add_space(HTML_BLOCK_VERTICAL_SPACING);
+            // Adjust margin: reduce bottom padding by 5px (with 2px offset applied)
+            const HTML_BLOCK_MARGIN_BOTTOM_ADJUST: f32 = -3.0;
+            block_ui.add_space(HTML_BLOCK_MARGIN_BOTTOM_ADJUST);
         },
     );
 }

@@ -157,7 +157,7 @@
       "save_custom_theme_title": "Guardar tema personalizado",
       "theme_name_label": "Nombre del tema:",
       "duplicate": "Duplicar...",
-      "ui_contrast_offset": "Contraste de UI",
+      "ui_contrast_offset": "Contraste de UI (Alfa)",
       "reset_contrast": "Restablecer"
     },
     "font": {
@@ -200,6 +200,9 @@
       "section_system": "Sistema",
       "section_code": "Código",
       "section_preview": "Vista previa",
+      "group_basic": "Básicos",
+      "group_text": "Texto y Tipografía",
+      "group_ui_elements": "Elementos de interfaz",
       "title_bar_text": "Texto de la barra de título",
       "active_file_highlight": "Resaltado de archivo activo",
       "success_text": "Texto de éxito",

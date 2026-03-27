@@ -157,7 +157,7 @@
       "save_custom_theme_title": "カスタムテーマの保存",
       "theme_name_label": "テーマ名:",
       "duplicate": "複製...",
-      "ui_contrast_offset": "UI透過度補正 (アルファ値オフセット)",
+      "ui_contrast_offset": "透過度一括補正",
       "reset_contrast": "リセット"
     },
     "font": {
@@ -200,6 +200,9 @@
       "section_system": "システム",
       "section_code": "コード",
       "section_preview": "プレビュー",
+      "group_basic": "基本",
+      "group_text": "テキスト・タイポグラフィ",
+      "group_ui_elements": "UIコンポーネント",
       "title_bar_text": "タイトルバー",
       "active_file_highlight": "アクティブファイル",
       "success_text": "成功テキスト",

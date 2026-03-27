@@ -629,6 +629,12 @@ pub struct SettingsColorMessages {
     pub section_code: String,
     #[serde(default = "default_section_preview")]
     pub section_preview: String,
+    #[serde(default = "default_group_basic")]
+    pub group_basic: String,
+    #[serde(default = "default_group_text")]
+    pub group_text: String,
+    #[serde(default = "default_group_ui_elements")]
+    pub group_ui_elements: String,
     #[serde(default = "default_highlight")]
     pub highlight: String,
     #[serde(default = "default_code_text")]
@@ -693,6 +699,15 @@ fn default_section_code() -> String {
 }
 fn default_section_preview() -> String {
     "Preview".to_string()
+}
+fn default_group_basic() -> String {
+    "Basic".to_string()
+}
+fn default_group_text() -> String {
+    "Text & Typography".to_string()
+}
+fn default_group_ui_elements() -> String {
+    "UI Elements".to_string()
 }
 fn default_code_text() -> String {
     "Code Text".to_string()

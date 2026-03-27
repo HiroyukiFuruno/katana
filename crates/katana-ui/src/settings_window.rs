@@ -12,8 +12,6 @@ use katana_platform::settings::{SettingsService, MAX_FONT_SIZE, MIN_FONT_SIZE};
 use katana_platform::theme::{Rgb, Rgba, ThemeColors, ThemeMode, ThemePreset};
 use katana_platform::{PaneOrder, SplitDirection};
 
-const COLOR_ALPHA_INDEX: usize = 3;
-
 // ── Window layout constants ──────────────────────────────────────────
 
 const SETTINGS_WINDOW_DEFAULT_WIDTH: f32 = 1000.0;
@@ -364,6 +362,32 @@ fn render_theme_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
     render_theme_preset_selector(ui, settings);
     ui.add_space(SECTION_SPACING);
 
+    let mut offset = settings.settings().theme.ui_contrast_offset;
+    ui.label(&crate::i18n::get().settings.theme.ui_contrast_offset);
+    ui.horizontal(|ui| {
+        let slider = egui::Slider::new(&mut offset, -100.0..=100.0)
+            .suffix("%")
+            .show_value(true)
+            .fixed_decimals(0);
+
+        let mut changed = crate::settings_window::add_styled_slider(ui, slider).changed();
+
+        if ui
+            .button(&crate::i18n::get().settings.theme.reset_contrast)
+            .clicked()
+        {
+            offset = 0.0;
+            changed = true;
+        }
+
+        if changed {
+            settings.settings_mut().theme.ui_contrast_offset = offset;
+            let _ = settings.save();
+        }
+    });
+
+    ui.add_space(SECTION_SPACING);
+
     egui::CollapsingHeader::new(
         egui::RichText::new(crate::i18n::get().settings.theme.custom_colors.clone())
             .strong()
@@ -558,228 +582,248 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     }
 
     let system_settings = vec![
-        ColorSettingDef {
-            label: &color_i18n.background,
-            prop: ColorPropType::Rgb(|c| c.system.background, |c, r| c.system.background = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.panel_background,
-            prop: ColorPropType::Rgb(
-                |c| c.system.panel_background,
-                |c, r| c.system.panel_background = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.file_tree_text,
-            prop: ColorPropType::Rgb(
-                |c| c.system.file_tree_text,
-                |c, r| c.system.file_tree_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.title_bar_text,
-            prop: ColorPropType::Rgb(
-                |c| c.system.title_bar_text,
-                |c, r| c.system.title_bar_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.text,
-            prop: ColorPropType::Rgb(|c| c.system.text, |c, r| c.system.text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.text_secondary,
-            prop: ColorPropType::Rgb(
-                |c| c.system.text_secondary,
-                |c, r| c.system.text_secondary = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.success_text,
-            prop: ColorPropType::Rgb(|c| c.system.success_text, |c, r| c.system.success_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.warning_text,
-            prop: ColorPropType::Rgb(|c| c.system.warning_text, |c, r| c.system.warning_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.error_text,
-            prop: ColorPropType::Rgb(|c| c.system.error_text, |c, r| c.system.error_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.text_secondary,
-            prop: ColorPropType::Rgb(
-                |c| c.system.text_secondary,
-                |c, r| c.system.text_secondary = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.success_text,
-            prop: ColorPropType::Rgb(|c| c.system.success_text, |c, r| c.system.success_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.warning_text,
-            prop: ColorPropType::Rgb(|c| c.system.warning_text, |c, r| c.system.warning_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.error_text,
-            prop: ColorPropType::Rgb(|c| c.system.error_text, |c, r| c.system.error_text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.accent,
-            prop: ColorPropType::Rgb(|c| c.system.accent, |c, r| c.system.accent = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.selection,
-            prop: ColorPropType::Rgb(|c| c.system.selection, |c, r| c.system.selection = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.file_tree_text,
-            prop: ColorPropType::Rgb(
-                |c| c.system.file_tree_text,
-                |c, r| c.system.file_tree_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.active_file_highlight,
-            prop: ColorPropType::Rgba(
-                |c| c.system.active_file_highlight,
-                |c, r| c.system.active_file_highlight = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.border,
-            prop: ColorPropType::Rgb(|c| c.system.border, |c, r| c.system.border = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.button_background,
-            prop: ColorPropType::Rgba(
-                |c| c.system.button_background,
-                |c, r| c.system.button_background = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.button_active_background,
-            prop: ColorPropType::Rgba(
-                |c| c.system.button_active_background,
-                |c, r| c.system.button_active_background = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.splash_background,
-            prop: ColorPropType::Rgb(
-                |c| c.system.splash_background,
-                |c, r| c.system.splash_background = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.splash_progress,
-            prop: ColorPropType::Rgb(
-                |c| c.system.splash_progress,
-                |c, r| c.system.splash_progress = r,
-            ),
-        },
+        (
+            &color_i18n.group_basic,
+            vec![
+                ColorSettingDef {
+                    label: &color_i18n.background,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.background,
+                        |c, r| c.system.background = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.panel_background,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.panel_background,
+                        |c, r| c.system.panel_background = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.splash_background,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.splash_background,
+                        |c, r| c.system.splash_background = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.splash_progress,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.splash_progress,
+                        |c, r| c.system.splash_progress = r,
+                    ),
+                },
+            ],
+        ),
+        (
+            &color_i18n.group_text,
+            vec![
+                ColorSettingDef {
+                    label: &color_i18n.text,
+                    prop: ColorPropType::Rgb(|c| c.system.text, |c, r| c.system.text = r),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.text_secondary,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.text_secondary,
+                        |c, r| c.system.text_secondary = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.success_text,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.success_text,
+                        |c, r| c.system.success_text = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.warning_text,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.warning_text,
+                        |c, r| c.system.warning_text = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.error_text,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.error_text,
+                        |c, r| c.system.error_text = r,
+                    ),
+                },
+            ],
+        ),
+        (
+            &color_i18n.group_ui_elements,
+            vec![
+                ColorSettingDef {
+                    label: &color_i18n.title_bar_text,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.title_bar_text,
+                        |c, r| c.system.title_bar_text = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.file_tree_text,
+                    prop: ColorPropType::Rgb(
+                        |c| c.system.file_tree_text,
+                        |c, r| c.system.file_tree_text = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.accent,
+                    prop: ColorPropType::Rgb(|c| c.system.accent, |c, r| c.system.accent = r),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.selection,
+                    prop: ColorPropType::Rgb(|c| c.system.selection, |c, r| c.system.selection = r),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.border,
+                    prop: ColorPropType::Rgb(|c| c.system.border, |c, r| c.system.border = r),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.button_background,
+                    prop: ColorPropType::Rgba(
+                        |c| c.system.button_background,
+                        |c, r| c.system.button_background = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.button_active_background,
+                    prop: ColorPropType::Rgba(
+                        |c| c.system.button_active_background,
+                        |c, r| c.system.button_active_background = r,
+                    ),
+                },
+                ColorSettingDef {
+                    label: &color_i18n.active_file_highlight,
+                    prop: ColorPropType::Rgba(
+                        |c| c.system.active_file_highlight,
+                        |c, r| c.system.active_file_highlight = r,
+                    ),
+                },
+            ],
+        ),
     ];
 
-    let code_settings = [
-        ColorSettingDef {
-            label: &color_i18n.code_background,
-            prop: ColorPropType::Rgb(|c| c.code.background, |c, r| c.code.background = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.code_text,
-            prop: ColorPropType::Rgb(|c| c.code.text, |c, r| c.code.text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.highlight,
-            prop: ColorPropType::Rgb(|c| c.code.selection, |c, r| c.code.selection = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.line_number_text,
-            prop: ColorPropType::Rgb(
-                |c| c.code.line_number_text,
-                |c, r| c.code.line_number_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.line_number_active_text,
-            prop: ColorPropType::Rgb(
-                |c| c.code.line_number_active_text,
-                |c, r| c.code.line_number_active_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.current_line_background,
-            prop: ColorPropType::Rgba(
-                |c| c.code.current_line_background,
-                |c, r| c.code.current_line_background = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.hover_line_background,
-            prop: ColorPropType::Rgba(
-                |c| c.code.hover_line_background,
-                |c, r| c.code.hover_line_background = r,
-            ),
-        },
+    let code_settings = vec![(
+        &color_i18n.group_basic,
+        vec![
+            ColorSettingDef {
+                label: &color_i18n.code_background,
+                prop: ColorPropType::Rgb(|c| c.code.background, |c, r| c.code.background = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.code_text,
+                prop: ColorPropType::Rgb(|c| c.code.text, |c, r| c.code.text = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.highlight,
+                prop: ColorPropType::Rgb(|c| c.code.selection, |c, r| c.code.selection = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.line_number_text,
+                prop: ColorPropType::Rgb(
+                    |c| c.code.line_number_text,
+                    |c, r| c.code.line_number_text = r,
+                ),
+            },
+            ColorSettingDef {
+                label: &color_i18n.line_number_active_text,
+                prop: ColorPropType::Rgb(
+                    |c| c.code.line_number_active_text,
+                    |c, r| c.code.line_number_active_text = r,
+                ),
+            },
+            ColorSettingDef {
+                label: &color_i18n.current_line_background,
+                prop: ColorPropType::Rgba(
+                    |c| c.code.current_line_background,
+                    |c, r| c.code.current_line_background = r,
+                ),
+            },
+            ColorSettingDef {
+                label: &color_i18n.hover_line_background,
+                prop: ColorPropType::Rgba(
+                    |c| c.code.hover_line_background,
+                    |c, r| c.code.hover_line_background = r,
+                ),
+            },
+        ],
+    )];
+
+    let preview_settings = vec![(
+        &color_i18n.group_basic,
+        vec![
+            ColorSettingDef {
+                label: &color_i18n.preview_background,
+                prop: ColorPropType::Rgb(|c| c.preview.background, |c, r| c.preview.background = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.preview_text,
+                prop: ColorPropType::Rgb(|c| c.preview.text, |c, r| c.preview.text = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.warning_text,
+                prop: ColorPropType::Rgb(
+                    |c| c.preview.warning_text,
+                    |c, r| c.preview.warning_text = r,
+                ),
+            },
+            ColorSettingDef {
+                label: &color_i18n.highlight,
+                prop: ColorPropType::Rgb(|c| c.preview.selection, |c, r| c.preview.selection = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.border,
+                prop: ColorPropType::Rgb(|c| c.preview.border, |c, r| c.preview.border = r),
+            },
+            ColorSettingDef {
+                label: &color_i18n.fullscreen_overlay,
+                prop: ColorPropType::Rgba(
+                    |c| c.preview.fullscreen_overlay,
+                    |c, r| c.preview.fullscreen_overlay = r,
+                ),
+            },
+            ColorSettingDef {
+                label: &color_i18n.hover_line_background,
+                prop: ColorPropType::Rgba(
+                    |c| c.preview.hover_line_background,
+                    |c, r| c.preview.hover_line_background = r,
+                ),
+            },
+        ],
+    )];
+
+    let sections = vec![
+        (&color_i18n.section_system, system_settings),
+        (&color_i18n.section_code, code_settings),
+        (&color_i18n.section_preview, preview_settings),
     ];
 
-    let preview_settings = [
-        ColorSettingDef {
-            label: &color_i18n.preview_background,
-            prop: ColorPropType::Rgb(|c| c.preview.background, |c, r| c.preview.background = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.preview_text,
-            prop: ColorPropType::Rgb(|c| c.preview.text, |c, r| c.preview.text = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.warning_text,
-            prop: ColorPropType::Rgb(
-                |c| c.preview.warning_text,
-                |c, r| c.preview.warning_text = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.highlight,
-            prop: ColorPropType::Rgb(|c| c.preview.selection, |c, r| c.preview.selection = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.border,
-            prop: ColorPropType::Rgb(|c| c.preview.border, |c, r| c.preview.border = r),
-        },
-        ColorSettingDef {
-            label: &color_i18n.fullscreen_overlay,
-            prop: ColorPropType::Rgba(
-                |c| c.preview.fullscreen_overlay,
-                |c, r| c.preview.fullscreen_overlay = r,
-            ),
-        },
-        ColorSettingDef {
-            label: &color_i18n.hover_line_background,
-            prop: ColorPropType::Rgba(
-                |c| c.preview.hover_line_background,
-                |c, r| c.preview.hover_line_background = r,
-            ),
-        },
-    ];
-
-    let sections = [
-        (&color_i18n.section_system, &system_settings[..]),
-        (&color_i18n.section_code, &code_settings[..]),
-        (&color_i18n.section_preview, &preview_settings[..]),
-    ];
-
-    for (section_name, settings_list) in sections {
-        render_color_section_header(ui, section_name);
-        egui::Grid::new(section_name)
-            .num_columns(2)
-            .spacing(egui::vec2(SECTION_SPACING, SUBSECTION_SPACING))
-            .show(ui, |ui| {
-                for def in settings_list {
-                    changed |= render_color_row(ui, &mut new_colors, def.label, &def.prop);
-                }
-            });
+    for (section_name, grouped_settings) in sections {
+        egui::CollapsingHeader::new(
+            egui::RichText::new(section_name.clone())
+                .strong()
+                .size(SECTION_HEADER_SIZE),
+        )
+        .default_open(true)
+        .show(ui, |ui| {
+            ui.add_space(SUBSECTION_SPACING);
+            for (group_name, settings_list) in grouped_settings {
+                ui.add_space(SUBSECTION_SPACING);
+                egui::CollapsingHeader::new(group_name.clone())
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.add_space(SUBSECTION_SPACING);
+                        for def in settings_list {
+                            changed |= render_color_row(ui, &mut new_colors, def.label, &def.prop);
+                            ui.add_space(SUBSECTION_SPACING);
+                        }
+                    });
+            }
+        });
+        ui.add_space(SECTION_SPACING);
     }
 
     if changed {
@@ -921,17 +965,6 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     }
 }
 
-/// Renders a section heading label for the colour editor.
-fn render_color_section_header(ui: &mut egui::Ui, label: &str) {
-    ui.add_space(SUBSECTION_SPACING);
-    ui.label(
-        egui::RichText::new(label)
-            .strong()
-            .size(SECTION_HEADER_SIZE),
-    );
-    ui.add_space(SECTION_HEADER_MARGIN);
-}
-
 /// Renders a single colour picker row inside a Grid, returning `true` if changed.
 pub(crate) enum ColorPropType {
     Rgb(fn(&ThemeColors) -> Rgb, fn(&mut ThemeColors, Rgb)),
@@ -944,33 +977,21 @@ fn render_color_row(
     label: &str,
     prop: &ColorPropType,
 ) -> bool {
-    ui.add_sized(
-        egui::vec2(COLOR_GRID_LABEL_WIDTH, 0.0),
-        egui::Label::new(label),
-    );
-
     let mut changed = false;
     match prop {
         ColorPropType::Rgb(get, apply) => {
             let original_rgb = get(new_colors);
-            let r = f32::from(original_rgb.r) / COLOUR_CHANNEL_MAX;
-            let g = f32::from(original_rgb.g) / COLOUR_CHANNEL_MAX;
-            let b = f32::from(original_rgb.b) / COLOUR_CHANNEL_MAX;
-            let mut color_arr = std::array::from_fn(|i| {
-                if i == 0 {
-                    r
-                } else if i == 1 {
-                    g
-                } else {
-                    b
-                }
-            });
-            if ui.color_edit_button_rgb(&mut color_arr).changed() {
-                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let mut color = egui::Color32::from_rgb(original_rgb.r, original_rgb.g, original_rgb.b);
+            let response = crate::widgets::LabeledColorPicker::new(label)
+                .label_width(COLOR_GRID_LABEL_WIDTH)
+                .spacing(SECTION_SPACING)
+                .show_rgb(ui, &mut color);
+
+            if response.changed() {
                 let new_rgb = Rgb {
-                    r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
-                    g: (color_arr[1] * COLOUR_CHANNEL_MAX) as u8,
-                    b: (color_arr[2] * COLOUR_CHANNEL_MAX) as u8,
+                    r: color.r(),
+                    g: color.g(),
+                    b: color.b(),
                 };
                 apply(new_colors, new_rgb);
                 changed = true;
@@ -978,22 +999,24 @@ fn render_color_row(
         }
         ColorPropType::Rgba(get, apply) => {
             let original_rgba = get(new_colors);
-            let mut color_arr = [
+            let mut color = egui::Rgba::from_rgba_unmultiplied(
                 f32::from(original_rgba.r) / COLOUR_CHANNEL_MAX,
                 f32::from(original_rgba.g) / COLOUR_CHANNEL_MAX,
                 f32::from(original_rgba.b) / COLOUR_CHANNEL_MAX,
                 f32::from(original_rgba.a) / COLOUR_CHANNEL_MAX,
-            ];
-            if ui
-                .color_edit_button_rgba_unmultiplied(&mut color_arr)
-                .changed()
-            {
+            );
+            let response = crate::widgets::LabeledColorPicker::new(label)
+                .label_width(COLOR_GRID_LABEL_WIDTH)
+                .spacing(SECTION_SPACING)
+                .show_rgba(ui, &mut color);
+
+            if response.changed() {
                 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                 let new_rgba = Rgba {
-                    r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
-                    g: (color_arr[1] * COLOUR_CHANNEL_MAX) as u8,
-                    b: (color_arr[2] * COLOUR_CHANNEL_MAX) as u8,
-                    a: (color_arr[COLOR_ALPHA_INDEX] * COLOUR_CHANNEL_MAX) as u8,
+                    r: (color.r() * COLOUR_CHANNEL_MAX) as u8,
+                    g: (color.g() * COLOUR_CHANNEL_MAX) as u8,
+                    b: (color.b() * COLOUR_CHANNEL_MAX) as u8,
+                    a: (color.a() * COLOUR_CHANNEL_MAX) as u8,
                 };
                 apply(new_colors, new_rgba);
                 changed = true;
@@ -1001,7 +1024,6 @@ fn render_color_row(
         }
     }
 
-    ui.end_row();
     changed
 }
 

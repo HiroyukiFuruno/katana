@@ -157,7 +157,7 @@
       "save_custom_theme_title": "Benutzerdefiniertes Theme speichern",
       "theme_name_label": "Theme-Name:",
       "duplicate": "Duplizieren...",
-      "ui_contrast_offset": "UI-Kontrast",
+      "ui_contrast_offset": "UI-Kontrast (Alpha-Offset)",
       "reset_contrast": "Zurücksetzen"
     },
     "font": {
@@ -200,6 +200,9 @@
       "section_system": "Systemfarben",
       "section_code": "Code",
       "section_preview": "Vorschau",
+      "group_basic": "Basis",
+      "group_text": "Text & Typografie",
+      "group_ui_elements": "UI-Elemente",
       "title_bar_text": "Titelleiste",
       "active_file_highlight": "Datei markieren",
       "success_text": "Erfolg",

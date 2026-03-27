@@ -157,7 +157,7 @@
       "save_custom_theme_title": "保存自定义主题",
       "theme_name_label": "主题名称:",
       "duplicate": "复制...",
-      "ui_contrast_offset": "界面对比度偏移",
+      "ui_contrast_offset": "界面对比度偏移 (Alpha)",
       "reset_contrast": "重置"
     },
     "font": {
@@ -200,6 +200,9 @@
       "section_system": "系统",
       "section_code": "代码",
       "section_preview": "预览",
+      "group_basic": "基础",
+      "group_text": "文本和排版",
+      "group_ui_elements": "UI元素",
       "title_bar_text": "标题栏文本",
       "active_file_highlight": "活动文件高亮",
       "success_text": "成功文本",
