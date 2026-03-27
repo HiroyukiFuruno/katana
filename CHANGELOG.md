@@ -2,6 +2,24 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.7.8] - 2026-03-27 13:03:25 (UTC)
+
+### 🚀 Features
+
+- **Theme Contrast Offset**: Introduced a `ui_contrast_offset` slider in the Appearance settings, allowing fine-grained control over UI contrast limits.
+- **Cache Management**: Added a dedicated 'Clear HTTP Cache' button within the System settings tab for on-demand cache directory purging.
+
+### 🎨 UI/UX
+
+- **Settings Layout Alignment**: Vertically centered and right-aligned color swatches in the Custom Themes grid, improving visual consistency and scanability across all settings panes.
+
+### 🔧 Miscellaneous
+
+- **Internal**: Enforced absolute source code sanitization across the entire crate workspace by strictly prohibiting all Japanese comments and unescaped characters outside of locale definitions.
+- **Internal**: Upgraded the generic AST Linter infrastructure with `ignore::WalkBuilder` for parallelized recursive directory scanning, significantly improving CI inspection speed.
+- **Ops**: Restructured OpenSpec workflow documents and configuration models within the repository layout.
+
+
 ## [0.7.7] - 2026-03-27 08:30:00 (UTC)
 
 ### 🎨 UI/UX
