@@ -256,7 +256,7 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
         .iter()
         .find(|t| t.key == appearance_key)
         .map(|t| t.name.clone())
-        .unwrap_or_else(|| "外観".to_string());
+        .unwrap_or_else(|| "Appearance".to_string());
 
     let mut appearance_header = egui::CollapsingHeader::new(
         egui::RichText::new(title)
@@ -306,7 +306,7 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
         .iter()
         .find(|t| t.key == system_key)
         .map(|t| t.name.clone())
-        .unwrap_or_else(|| "システム".to_string());
+        .unwrap_or_else(|| "System".to_string());
 
     let mut system_header = egui::CollapsingHeader::new(
         egui::RichText::new(title)
