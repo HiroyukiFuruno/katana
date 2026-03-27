@@ -2,6 +2,23 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.7.7] - 2026-03-27 08:30:00 (UTC)
+
+### 🎨 UI/UX
+
+- **Theme Contrast Baseline**: Standardize code and preview hover/current-line background colors to an alpha baseline of 50 across all 30+ Dark themes for optimal visibility.
+- **Preview Rendering**: Fix additive blending (white-out) issues when rendering semi-transparent markdown highlights by transitioning to unmultiplied RGBA structures in the egui_commonmark pipeline.
+- **Color Settings Architecture**: Overhaul the theme settings architecture by introducing `ColorSettingDef` schemas, resolving rigid hardcoded color mappings and dynamically exposing multi-layered themes (System/Code/Preview) directly to the UI.
+
+### 🐛 Bug Fixes
+
+- **Image Cache Directory Deletion**: Resolve severe macOS filesystem conflicts (`os error 66`) during HTTP cache clearances. Replaced the error-prone root directory deletion with safe, recursive internal content deletion strategies.
+
+### 🔧 Miscellaneous
+
+- **Internal**: Introduce the `ast_linter_no_hardcoded_colors` strict AST Lint rule within `katana-linter` to entirely eradicate unmanageable hardcoded coloration from the UI codebase, maintaining 100% test coverage limits.
+- **Ops**: Bake OpenSpec change auto-archival into the official pipeline for seamless transitions.
+
 ## [0.7.6] - 2026-03-26 21:20:00 (UTC)
 
 ### 🚀 Features
