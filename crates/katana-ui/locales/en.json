@@ -156,7 +156,9 @@
       "save_custom_theme": "Save as Custom Theme...",
       "save_custom_theme_title": "Save Custom Theme",
       "theme_name_label": "Theme Name:",
-      "duplicate": "Duplicate..."
+      "duplicate": "Duplicate...",
+      "ui_contrast_offset": "UI Contrast (Alpha Offset)",
+      "reset_contrast": "Reset"
     },
     "font": {
       "size": "Font Size",
@@ -190,8 +192,29 @@
       "accent": "Accent",
       "border": "Border",
       "selection": "Selection",
-      "code_background": "Code Background",
-      "preview_background": "Preview Background"
+      "code_background": "Background",
+      "preview_background": "Background",
+      "code_text": "Text",
+      "preview_text": "Text",
+      "highlight": "Highlight",
+      "section_system": "System",
+      "section_code": "Code",
+      "section_preview": "Preview",
+      "title_bar_text": "Title Bar",
+      "active_file_highlight": "Active File",
+      "success_text": "Success Text",
+      "warning_text": "Warning Text",
+      "error_text": "Error Text",
+      "button_background": "Button Background",
+      "button_active_background": "Active Button",
+      "splash_background": "Splash Background",
+      "splash_progress": "Splash Progress",
+      "fullscreen_overlay": "Fullscreen Overlay",
+      "line_number_text": "Line Number",
+      "line_number_active_text": "Active Line Number",
+      "current_line_background": "Current Line",
+      "hover_line_background": "Hover Line",
+      "file_tree_text": "File Tree Text"
     },
     "workspace": {
       "max_depth": "Max Directory Scan Depth",
@@ -257,7 +280,10 @@
       "close_confirm_title": "Unsaved Changes",
       "close_confirm_msg": "'{name}' has unsaved changes. Discard them?",
       "close_confirm_discard": "Discard",
-      "close_confirm_cancel": "Cancel"
+      "close_confirm_cancel": "Cancel",
+      "clear_http_cache": "Clear All Caches",
+      "cache_retention_days": "Cache Retention Days",
+      "days_suffix": " days"
     }
   },
   "tab": {

@@ -259,7 +259,7 @@ impl SystemFontLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use egui::{Color32, FontId};
+    use egui::FontId;
     use std::fs;
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -375,7 +375,7 @@ mod tests {
                 let galley = ui.painter().layout_no_wrap(
                     "🌍".to_owned(),
                     FontId::new(24.0, FontFamily::Name(APPLE_COLOR_EMOJI_FONT_NAME.into())),
-                    Color32::WHITE,
+                    crate::theme_bridge::WHITE,
                 );
                 glyph = galley
                     .rows
@@ -446,7 +446,7 @@ mod tests {
                 let galley = ui.painter().layout_no_wrap(
                     text.clone(),
                     FontId::proportional(font_size),
-                    Color32::WHITE,
+                    crate::theme_bridge::WHITE,
                 );
                 eng_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'L').copied();
                 jpn_glyph = galley.rows[0]
@@ -520,7 +520,7 @@ mod tests {
                 let galley = ui.painter().layout_no_wrap(
                     text.clone(),
                     FontId::monospace(14.0),
-                    Color32::WHITE,
+                    crate::theme_bridge::WHITE,
                 );
                 eng_glyph = galley.rows[0].glyphs.iter().find(|g| g.chr == 'c').copied();
                 jpn_glyph = galley.rows[0]
@@ -531,7 +531,11 @@ mod tests {
 
                 let shapes = vec![egui::epaint::ClippedShape {
                     clip_rect: egui::Rect::EVERYTHING,
-                    shape: egui::epaint::Shape::galley(egui::Pos2::ZERO, galley, Color32::WHITE),
+                    shape: egui::epaint::Shape::galley(
+                        egui::Pos2::ZERO,
+                        galley,
+                        crate::theme_bridge::WHITE,
+                    ),
                 }];
                 primitives = ctx.tessellate(shapes, 1.0);
             });
@@ -607,7 +611,7 @@ mod tests {
                     0.0,
                     egui::TextFormat::simple(
                         egui::TextStyle::Monospace.resolve(ui.style()),
-                        Color32::WHITE,
+                        crate::theme_bridge::WHITE,
                     ),
                 );
                 job.wrap.max_width = 800.0;
@@ -628,7 +632,11 @@ mod tests {
 
                 let shapes = vec![egui::epaint::ClippedShape {
                     clip_rect: egui::Rect::EVERYTHING,
-                    shape: egui::epaint::Shape::galley(egui::Pos2::ZERO, galley, Color32::WHITE),
+                    shape: egui::epaint::Shape::galley(
+                        egui::Pos2::ZERO,
+                        galley,
+                        crate::theme_bridge::WHITE,
+                    ),
                 }];
                 primitives = ctx.tessellate(shapes, 1.0);
             });
@@ -733,7 +741,7 @@ mod tests {
                         shape: egui::epaint::Shape::galley(
                             egui::Pos2::ZERO,
                             galley,
-                            Color32::WHITE,
+                            crate::theme_bridge::WHITE,
                         ),
                     }];
                     primitives = ctx.tessellate(shapes, 1.0);

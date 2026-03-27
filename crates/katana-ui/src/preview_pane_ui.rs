@@ -18,8 +18,6 @@ use crate::icon::Icon;
 use crate::preview_pane::{DownloadRequest, RenderedSection, ViewerState};
 
 /// Text color for the tool not installed warning (orange).
-const WARNING_TEXT_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 165, 0);
-
 /// Helper to configure new tab vs same tab behavior. We currently default to new_tab.
 pub(crate) fn open_tab(ctx: &egui::Context, url: &str) {
     ctx.open_url(egui::OpenUrl::new_tab(url));
@@ -52,7 +50,15 @@ pub(crate) fn show_section(
                 } else {
                     DiagramColorPreset::light()
                 };
-                let text_color = ui.visuals().override_text_color;
+                // Retrieve the preview-specific text colour from the cached ThemeColors.
+                // egui::Visuals::override_text_color was global to all UI,
+                // so we use preview.text to achieve independent colour assignment.
+                let text_color = ui.ctx().data(|d| {
+                    d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                        "katana_theme_colors",
+                    ))
+                    .map(|tc| crate::theme_bridge::rgb_to_color32(tc.preview.text))
+                });
                 let md_path_owned = md_file_path.to_path_buf();
 
                 let binding = move |ui: &mut egui::Ui, html: &str| {
@@ -166,7 +172,17 @@ pub(crate) fn show_section(
                     &crate::i18n::get().error.render_error,
                     &vec![("kind", kind.as_str()), ("message", message.as_str())],
                 ))
-                .color(egui::Color32::YELLOW)
+                .color(
+                    ui.ctx()
+                        .data(|d| {
+                            d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                                "katana_theme_colors",
+                            ))
+                        })
+                        .map_or(crate::theme_bridge::WHITE, |tc| {
+                            crate::theme_bridge::rgb_to_color32(tc.preview.warning_text)
+                        }),
+                )
                 .small(),
             );
             (None, vec![])
@@ -184,7 +200,17 @@ pub(crate) fn show_section(
                 .replace("{install_hint}", install_hint);
             ui.label(
                 egui::RichText::new(msg)
-                    .color(egui::Color32::YELLOW)
+                    .color(
+                        ui.ctx()
+                            .data(|d| {
+                                d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                                    "katana_theme_colors",
+                                ))
+                            })
+                            .map_or(crate::theme_bridge::WHITE, |tc| {
+                                crate::theme_bridge::rgb_to_color32(tc.preview.warning_text)
+                            }),
+                    )
                     .small(),
             );
             (None, vec![])
@@ -229,6 +255,15 @@ fn with_preview_text_style<R>(
             set_preview_body_family(ui, egui::FontFamily::Proportional);
         }
 
+        if let Some(color) = ui.ctx().data(|d| {
+            d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new("katana_theme_colors"))
+        }) {
+            ui.visuals_mut().override_text_color =
+                Some(crate::theme_bridge::rgb_to_color32(color.preview.text));
+            ui.visuals_mut().selection.bg_fill =
+                crate::theme_bridge::rgb_to_color32(color.preview.selection);
+        }
+
         add_contents(ui)
     })
     .inner
@@ -264,7 +299,17 @@ pub(crate) fn show_not_installed(
                 &crate::i18n::get().tool.not_installed,
                 &vec![("tool", kind)],
             ))
-            .color(WARNING_TEXT_COLOR),
+            .color(
+                ui.ctx()
+                    .data(|d| {
+                        d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                            "katana_theme_colors",
+                        ))
+                    })
+                    .map_or(crate::theme_bridge::WHITE, |tc| {
+                        crate::theme_bridge::rgb_to_color32(tc.preview.warning_text)
+                    }),
+            ),
         );
         let path_str = install_path.display().to_string();
         ui.label(
@@ -298,13 +343,6 @@ const FULLSCREEN_PADDING: f32 = 40.0;
 const FULLSCREEN_CLOSE_SIZE: f32 = 32.0;
 /// Margin for close button from screen edge.
 const FULLSCREEN_CLOSE_MARGIN: f32 = 16.0;
-
-/// Fill color channel value for close button background.
-const FULLSCREEN_CLOSE_FILL_CHANNEL: u8 = 80;
-/// Fill alpha for close button background.
-const FULLSCREEN_CLOSE_FILL_ALPHA: u8 = 220;
-/// Border stroke gray value for close button.
-const FULLSCREEN_CLOSE_STROKE_GRAY: u8 = 160;
 
 /// Minimum zoom limit for trackpad pinches.
 const MIN_ZOOM: f32 = 0.1;
@@ -398,7 +436,7 @@ pub(crate) fn show_rasterized(
         texture_handle.id(),
         image_rect,
         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-        egui::Color32::WHITE,
+        crate::theme_bridge::WHITE,
     );
 
     // Draw overlay controls only when viewer_state is provided.
@@ -642,7 +680,7 @@ pub(crate) fn show_fullscreen_modal(
                 texture_handle.id(),
                 img_rect,
                 egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                egui::Color32::WHITE,
+                crate::theme_bridge::WHITE,
             );
 
             // Overlay controls (bottom-right of screen).
@@ -662,18 +700,12 @@ pub(crate) fn show_fullscreen_modal(
                 egui::Button::image(
                     Icon::CloseModal
                         .image(crate::icon::IconSize::Large)
-                        .tint(egui::Color32::WHITE),
+                        .tint(crate::theme_bridge::WHITE),
                 )
-                .fill(egui::Color32::from_rgba_premultiplied(
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_ALPHA,
-                ))
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    egui::Color32::from_gray(FULLSCREEN_CLOSE_STROKE_GRAY),
-                )),
+                .fill(
+                    crate::theme_bridge::TRANSPARENT, /* Handled by theme overlay */
+                )
+                .stroke(egui::Stroke::new(1.0, crate::theme_bridge::TRANSPARENT)),
             );
             if close_resp.on_hover_text(&dc.close).clicked() {
                 keep_open = false;
@@ -757,7 +789,7 @@ pub(crate) fn show_local_image(
         texture_handle.id(),
         image_rect,
         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-        egui::Color32::WHITE,
+        crate::theme_bridge::WHITE,
     );
 
     if let Some(state) = viewer_state {
@@ -862,7 +894,7 @@ pub(crate) fn show_fullscreen_local_image(
                 texture_handle.id(),
                 img_rect,
                 egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                egui::Color32::WHITE,
+                crate::theme_bridge::WHITE,
             );
 
             crate::diagram_controller::draw_controls(ui, viewer_state, blocker_rect);
@@ -881,18 +913,12 @@ pub(crate) fn show_fullscreen_local_image(
                 egui::Button::image(
                     crate::icon::Icon::CloseModal
                         .image(crate::icon::IconSize::Large)
-                        .tint(egui::Color32::WHITE),
+                        .tint(crate::theme_bridge::WHITE),
                 )
-                .fill(egui::Color32::from_rgba_premultiplied(
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_CHANNEL,
-                    FULLSCREEN_CLOSE_FILL_ALPHA,
-                ))
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    egui::Color32::from_gray(FULLSCREEN_CLOSE_STROKE_GRAY),
-                )),
+                .fill(
+                    crate::theme_bridge::TRANSPARENT, /* Handled by theme overlay */
+                )
+                .stroke(egui::Stroke::new(1.0, crate::theme_bridge::TRANSPARENT)),
             );
             if close_resp.on_hover_text(&dc.close).clicked() {
                 keep_open = false;
@@ -1093,7 +1119,7 @@ pub fn render_math(ui: &mut egui::Ui, tex: &str, is_inline: bool) {
         egui::Label::new(
             egui::RichText::new(tex)
                 .size(1.0)
-                .color(egui::Color32::TRANSPARENT),
+                .color(crate::theme_bridge::TRANSPARENT),
         ),
     );
 }

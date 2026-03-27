@@ -1,3 +1,7 @@
+pub mod v0_1_2;
+pub mod v0_1_3_to_0_1_4;
+pub mod v0_1_4_to_0_2_0;
+
 use serde_json::Value;
 
 /// Strategy pattern for migrating settings JSON across versions.

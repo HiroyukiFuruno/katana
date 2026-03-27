@@ -141,3 +141,23 @@ fn ast_linter_no_unoptimized_performance() {
         lint_performance,
     );
 }
+
+#[test]
+fn ast_linter_no_unused_theme_colors() {
+    let all_violations = katana_linter::rules::theme::lint_unused_theme_colors(workspace_root());
+    panic_with_violations(
+        "unused-theme-colors",
+        "Fix: A theme color property is defined in `ThemeColors` but never accessed in UI code. Please use it or remove it.",
+        &all_violations,
+    );
+}
+
+#[test]
+fn ast_linter_no_hardcoded_colors() {
+    let all_violations = katana_linter::rules::theme::lint_no_hardcoded_colors(workspace_root());
+    panic_with_violations(
+        "hardcoded-colors",
+        "Fix: A hardcoded UI color was found. Map it to a property in `ThemeColors` and use `theme_bridge::rgb_to_color32`.",
+        &all_violations,
+    );
+}

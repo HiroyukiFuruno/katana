@@ -13,7 +13,7 @@ const BUTTON_SIZE: f32 = 28.0;
 /// Margin from container edge to overlay buttons.
 const MARGIN: f32 = 8.0;
 /// Semi-transparent background for overlay buttons.
-const BG: egui::Color32 = egui::Color32::from_rgba_premultiplied(40, 40, 40, 200);
+const BG: egui::Color32 = crate::theme_bridge::TRANSPARENT;
 /// Gap between grid buttons.
 const GAP: f32 = 2.0;
 /// Number of columns/rows in the control grid.

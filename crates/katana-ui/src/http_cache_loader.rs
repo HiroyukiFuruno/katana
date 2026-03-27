@@ -166,12 +166,20 @@ impl BytesLoader for PersistentHttpLoader {
 
     fn forget_all(&self) {
         self.cache.lock().clear();
-        if let Err(err) = std::fs::remove_dir_all(&self.cache_dir) {
-            if err.kind() != std::io::ErrorKind::NotFound {
-                tracing::warn!(
-                    "Failed to clear HTTP image cache directory {}: {err}",
-                    self.cache_dir.display()
-                );
+
+        // macOS "Directory not empty" (os error 66) is often caused by Spotlight or Finder
+        // trying to index the directory while `remove_dir_all` attempts to delete the root folder.
+        // To safely clear the cache, we only delete its contents and keep the root directory intact.
+        if let Ok(entries) = std::fs::read_dir(&self.cache_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Err(err) = std::fs::remove_dir_all(&path) {
+                        tracing::warn!("Failed to clear cache subdir {}: {err}", path.display());
+                    }
+                } else if let Err(err) = std::fs::remove_file(&path) {
+                    tracing::warn!("Failed to delete cache file {}: {err}", path.display());
+                }
             }
         }
     }
@@ -551,8 +559,9 @@ mod tests {
 
         loader.forget_all();
         assert!(loader.cache.lock().is_empty());
-        // cache_dir itself should be removed
-        assert!(!tmp.path().exists());
+        // cache_dir itself should be KEPT, but its contents should be removed
+        assert!(tmp.path().exists());
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
     }
 
     #[test]
@@ -729,5 +738,49 @@ mod tests {
         #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);
         std::fs::set_permissions(&cache_dir, perms).expect("chmod restore");
+    }
+
+    #[test]
+    fn forget_all_handles_subdirs_and_clears_safely() {
+        let tmp = TempDir::new().expect("tempdir");
+        let loader = PersistentHttpLoader::new(tmp.path().to_path_buf());
+
+        // Create a dummy subdirectory inside the cache directory
+        let subdir = tmp.path().join("dummy_subdir");
+        std::fs::create_dir(&subdir).expect("mkdir");
+        let file_in_subdir = subdir.join("nested.bin");
+        std::fs::write(&file_in_subdir, b"nested").expect("write nested");
+
+        // Execute forget_all
+        loader.forget_all();
+
+        // Ensure the subdir was deleted
+        assert!(!subdir.exists(), "subdirectory should have been deleted");
+
+        // Ensure the root cache_dir still exists
+        assert!(tmp.path().exists(), "root cache_dir should NOT be deleted");
+    }
+
+    #[test]
+    fn forget_all_warns_on_failed_subdir_deletion() {
+        let tmp = TempDir::new().expect("tempdir");
+        let loader = PersistentHttpLoader::new(tmp.path().to_path_buf());
+
+        let subdir = tmp.path().join("protected_subdir");
+        std::fs::create_dir(&subdir).expect("mkdir");
+
+        // Make the PARENT directory read-only so remove_dir_all will fail when trying to delete it
+        let mut perms = std::fs::metadata(tmp.path()).expect("meta").permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(tmp.path(), perms).expect("chmod");
+
+        // Calling forget_all should hit the Err branch for remove_dir_all
+        loader.forget_all();
+
+        // Restore permissions so the TempDir can be cleaned up
+        let mut perms = std::fs::metadata(tmp.path()).expect("meta").permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        std::fs::set_permissions(tmp.path(), perms).expect("chmod restore");
     }
 }

@@ -9,8 +9,10 @@ use crate::preview_pane::PreviewPane;
 use crate::theme_bridge;
 use crate::widgets::StyledComboBox;
 use katana_platform::settings::{SettingsService, MAX_FONT_SIZE, MIN_FONT_SIZE};
-use katana_platform::theme::{Rgb, ThemeColors, ThemeMode, ThemePreset};
+use katana_platform::theme::{Rgb, Rgba, ThemeColors, ThemeMode, ThemePreset};
 use katana_platform::{PaneOrder, SplitDirection};
+
+const COLOR_ALPHA_INDEX: usize = 3;
 
 // ── Window layout constants ──────────────────────────────────────────
 
@@ -383,7 +385,7 @@ fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut SettingsServic
     const VISIBLE_PRESET_COUNT: usize = 5;
 
     ui.label(egui::RichText::new(crate::i18n::get().settings.theme.dark_section.clone()).weak());
-    let all_presets = ThemePreset::all();
+    let all_presets = ThemePreset::builtins();
     let mut dark_presets: Vec<&ThemePreset> = all_presets
         .iter()
         .filter(|it| it.colors().mode == ThemeMode::Dark)
@@ -415,8 +417,8 @@ fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut SettingsServic
         for (idx, custom_theme) in custom_themes.iter().enumerate() {
             let is_selected = settings.settings().theme.custom_color_overrides.as_ref()
                 == Some(&custom_theme.colors);
-            let bg_color = theme_bridge::rgb_to_color32(custom_theme.colors.background);
-            let accent_color = theme_bridge::rgb_to_color32(custom_theme.colors.accent);
+            let bg_color = theme_bridge::rgb_to_color32(custom_theme.colors.system.background);
+            let accent_color = theme_bridge::rgb_to_color32(custom_theme.colors.system.accent);
 
             ui.horizontal(|ui| {
                 let (rect, _) = ui.allocate_exact_size(
@@ -498,8 +500,8 @@ fn render_preset_group(
     for preset in presets {
         let is_selected = settings.settings().theme.preset == **preset;
         let colors = preset.colors();
-        let bg_color = theme_bridge::rgb_to_color32(colors.background);
-        let accent_color = theme_bridge::rgb_to_color32(colors.accent);
+        let bg_color = theme_bridge::rgb_to_color32(colors.system.background);
+        let accent_color = theme_bridge::rgb_to_color32(colors.system.accent);
 
         ui.horizontal(|ui| {
             // Colour swatch
@@ -514,7 +516,7 @@ fn render_preset_group(
 
             let response = ui.selectable_label(is_selected, preset.display_name());
             if response.clicked() && !is_selected {
-                settings.settings_mut().theme.preset = (*preset).clone();
+                settings.settings_mut().theme.preset = **preset;
                 settings.settings_mut().theme.custom_color_overrides = None;
                 settings.settings_mut().theme.active_custom_theme = None;
                 let _ = settings.save();
@@ -545,94 +547,240 @@ fn render_preset_group(
 
 fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService) {
     let current_colors = settings.settings().effective_theme_colors();
-
-    let color_fields: Vec<(&str, &String, Rgb)> = vec![
-        (
-            "settings_color_background",
-            &crate::i18n::get().settings.color.background,
-            current_colors.background,
-        ),
-        (
-            "settings_color_panel_background",
-            &crate::i18n::get().settings.color.panel_background,
-            current_colors.panel_background,
-        ),
-        (
-            "settings_color_text",
-            &crate::i18n::get().settings.color.text,
-            current_colors.text,
-        ),
-        (
-            "settings_color_text_secondary",
-            &crate::i18n::get().settings.color.text_secondary,
-            current_colors.text_secondary,
-        ),
-        (
-            "settings_color_accent",
-            &crate::i18n::get().settings.color.accent,
-            current_colors.accent,
-        ),
-        (
-            "settings_color_border",
-            &crate::i18n::get().settings.color.border,
-            current_colors.border,
-        ),
-        (
-            "settings_color_selection",
-            &crate::i18n::get().settings.color.selection,
-            current_colors.selection,
-        ),
-        (
-            "settings_color_code_background",
-            &crate::i18n::get().settings.color.code_background,
-            current_colors.code_background,
-        ),
-        (
-            "settings_color_preview_background",
-            &crate::i18n::get().settings.color.preview_background,
-            current_colors.preview_background,
-        ),
-    ];
+    let color_i18n = &crate::i18n::get().settings.color;
 
     let mut changed = false;
     let mut new_colors = current_colors.clone();
 
-    egui::Grid::new("color_editor_grid")
-        .num_columns(2)
-        .spacing(egui::vec2(SECTION_SPACING, SUBSECTION_SPACING))
-        .show(ui, |ui| {
-            for (key, label, original_rgb) in &color_fields {
-                ui.add_sized(
-                    egui::vec2(COLOR_GRID_LABEL_WIDTH, 0.0),
-                    egui::Label::new(*label),
-                );
-                let r = f32::from(original_rgb.r) / COLOUR_CHANNEL_MAX;
-                let g = f32::from(original_rgb.g) / COLOUR_CHANNEL_MAX;
-                let b = f32::from(original_rgb.b) / COLOUR_CHANNEL_MAX;
-                let mut color_arr = std::array::from_fn(|i| {
-                    if i == 0 {
-                        r
-                    } else if i == 1 {
-                        g
-                    } else {
-                        b
-                    }
-                });
-                if ui.color_edit_button_rgb(&mut color_arr).changed() {
-                    // Colour channel values are clamped to [0.0, 1.0] by the colour picker;
-                    // multiplying by 255 always yields a valid u8.
-                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                    let new_rgb = Rgb {
-                        r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
-                        g: (color_arr[1] * COLOUR_CHANNEL_MAX) as u8,
-                        b: (color_arr[2] * COLOUR_CHANNEL_MAX) as u8,
-                    };
-                    apply_color_to_theme(&mut new_colors, key, new_rgb);
-                    changed = true;
+    struct ColorSettingDef<'a> {
+        label: &'a String,
+        prop: ColorPropType,
+    }
+
+    let system_settings = vec![
+        ColorSettingDef {
+            label: &color_i18n.background,
+            prop: ColorPropType::Rgb(|c| c.system.background, |c, r| c.system.background = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.panel_background,
+            prop: ColorPropType::Rgb(
+                |c| c.system.panel_background,
+                |c, r| c.system.panel_background = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.file_tree_text,
+            prop: ColorPropType::Rgb(
+                |c| c.system.file_tree_text,
+                |c, r| c.system.file_tree_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.title_bar_text,
+            prop: ColorPropType::Rgb(
+                |c| c.system.title_bar_text,
+                |c, r| c.system.title_bar_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.text,
+            prop: ColorPropType::Rgb(|c| c.system.text, |c, r| c.system.text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.text_secondary,
+            prop: ColorPropType::Rgb(
+                |c| c.system.text_secondary,
+                |c, r| c.system.text_secondary = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.success_text,
+            prop: ColorPropType::Rgb(|c| c.system.success_text, |c, r| c.system.success_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.warning_text,
+            prop: ColorPropType::Rgb(|c| c.system.warning_text, |c, r| c.system.warning_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.error_text,
+            prop: ColorPropType::Rgb(|c| c.system.error_text, |c, r| c.system.error_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.text_secondary,
+            prop: ColorPropType::Rgb(
+                |c| c.system.text_secondary,
+                |c, r| c.system.text_secondary = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.success_text,
+            prop: ColorPropType::Rgb(|c| c.system.success_text, |c, r| c.system.success_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.warning_text,
+            prop: ColorPropType::Rgb(|c| c.system.warning_text, |c, r| c.system.warning_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.error_text,
+            prop: ColorPropType::Rgb(|c| c.system.error_text, |c, r| c.system.error_text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.accent,
+            prop: ColorPropType::Rgb(|c| c.system.accent, |c, r| c.system.accent = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.selection,
+            prop: ColorPropType::Rgb(|c| c.system.selection, |c, r| c.system.selection = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.file_tree_text,
+            prop: ColorPropType::Rgb(
+                |c| c.system.file_tree_text,
+                |c, r| c.system.file_tree_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.active_file_highlight,
+            prop: ColorPropType::Rgba(
+                |c| c.system.active_file_highlight,
+                |c, r| c.system.active_file_highlight = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.border,
+            prop: ColorPropType::Rgb(|c| c.system.border, |c, r| c.system.border = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.button_background,
+            prop: ColorPropType::Rgba(
+                |c| c.system.button_background,
+                |c, r| c.system.button_background = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.button_active_background,
+            prop: ColorPropType::Rgba(
+                |c| c.system.button_active_background,
+                |c, r| c.system.button_active_background = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.splash_background,
+            prop: ColorPropType::Rgb(
+                |c| c.system.splash_background,
+                |c, r| c.system.splash_background = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.splash_progress,
+            prop: ColorPropType::Rgb(
+                |c| c.system.splash_progress,
+                |c, r| c.system.splash_progress = r,
+            ),
+        },
+    ];
+
+    let code_settings = [
+        ColorSettingDef {
+            label: &color_i18n.code_background,
+            prop: ColorPropType::Rgb(|c| c.code.background, |c, r| c.code.background = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.code_text,
+            prop: ColorPropType::Rgb(|c| c.code.text, |c, r| c.code.text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.highlight,
+            prop: ColorPropType::Rgb(|c| c.code.selection, |c, r| c.code.selection = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.line_number_text,
+            prop: ColorPropType::Rgb(
+                |c| c.code.line_number_text,
+                |c, r| c.code.line_number_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.line_number_active_text,
+            prop: ColorPropType::Rgb(
+                |c| c.code.line_number_active_text,
+                |c, r| c.code.line_number_active_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.current_line_background,
+            prop: ColorPropType::Rgba(
+                |c| c.code.current_line_background,
+                |c, r| c.code.current_line_background = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.hover_line_background,
+            prop: ColorPropType::Rgba(
+                |c| c.code.hover_line_background,
+                |c, r| c.code.hover_line_background = r,
+            ),
+        },
+    ];
+
+    let preview_settings = [
+        ColorSettingDef {
+            label: &color_i18n.preview_background,
+            prop: ColorPropType::Rgb(|c| c.preview.background, |c, r| c.preview.background = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.preview_text,
+            prop: ColorPropType::Rgb(|c| c.preview.text, |c, r| c.preview.text = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.warning_text,
+            prop: ColorPropType::Rgb(
+                |c| c.preview.warning_text,
+                |c, r| c.preview.warning_text = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.highlight,
+            prop: ColorPropType::Rgb(|c| c.preview.selection, |c, r| c.preview.selection = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.border,
+            prop: ColorPropType::Rgb(|c| c.preview.border, |c, r| c.preview.border = r),
+        },
+        ColorSettingDef {
+            label: &color_i18n.fullscreen_overlay,
+            prop: ColorPropType::Rgba(
+                |c| c.preview.fullscreen_overlay,
+                |c, r| c.preview.fullscreen_overlay = r,
+            ),
+        },
+        ColorSettingDef {
+            label: &color_i18n.hover_line_background,
+            prop: ColorPropType::Rgba(
+                |c| c.preview.hover_line_background,
+                |c, r| c.preview.hover_line_background = r,
+            ),
+        },
+    ];
+
+    let sections = [
+        (&color_i18n.section_system, &system_settings[..]),
+        (&color_i18n.section_code, &code_settings[..]),
+        (&color_i18n.section_preview, &preview_settings[..]),
+    ];
+
+    for (section_name, settings_list) in sections {
+        render_color_section_header(ui, section_name);
+        egui::Grid::new(section_name)
+            .num_columns(2)
+            .spacing(egui::vec2(SECTION_SPACING, SUBSECTION_SPACING))
+            .show(ui, |ui| {
+                for def in settings_list {
+                    changed |= render_color_row(ui, &mut new_colors, def.label, &def.prop);
                 }
-                ui.end_row();
-            }
-        });
+            });
+    }
 
     if changed {
         settings.settings_mut().theme.custom_color_overrides = Some(new_colors);
@@ -773,19 +921,88 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     }
 }
 
-fn apply_color_to_theme(colors: &mut ThemeColors, field_key: &str, rgb: Rgb) {
-    match field_key {
-        "settings_color_background" => colors.background = rgb,
-        "settings_color_panel_background" => colors.panel_background = rgb,
-        "settings_color_text" => colors.text = rgb,
-        "settings_color_text_secondary" => colors.text_secondary = rgb,
-        "settings_color_accent" => colors.accent = rgb,
-        "settings_color_border" => colors.border = rgb,
-        "settings_color_selection" => colors.selection = rgb,
-        "settings_color_code_background" => colors.code_background = rgb,
-        "settings_color_preview_background" => colors.preview_background = rgb,
-        _ => {}
+/// Renders a section heading label for the colour editor.
+fn render_color_section_header(ui: &mut egui::Ui, label: &str) {
+    ui.add_space(SUBSECTION_SPACING);
+    ui.label(
+        egui::RichText::new(label)
+            .strong()
+            .size(SECTION_HEADER_SIZE),
+    );
+    ui.add_space(SECTION_HEADER_MARGIN);
+}
+
+/// Renders a single colour picker row inside a Grid, returning `true` if changed.
+pub(crate) enum ColorPropType {
+    Rgb(fn(&ThemeColors) -> Rgb, fn(&mut ThemeColors, Rgb)),
+    Rgba(fn(&ThemeColors) -> Rgba, fn(&mut ThemeColors, Rgba)),
+}
+
+fn render_color_row(
+    ui: &mut egui::Ui,
+    new_colors: &mut ThemeColors,
+    label: &str,
+    prop: &ColorPropType,
+) -> bool {
+    ui.add_sized(
+        egui::vec2(COLOR_GRID_LABEL_WIDTH, 0.0),
+        egui::Label::new(label),
+    );
+
+    let mut changed = false;
+    match prop {
+        ColorPropType::Rgb(get, apply) => {
+            let original_rgb = get(new_colors);
+            let r = f32::from(original_rgb.r) / COLOUR_CHANNEL_MAX;
+            let g = f32::from(original_rgb.g) / COLOUR_CHANNEL_MAX;
+            let b = f32::from(original_rgb.b) / COLOUR_CHANNEL_MAX;
+            let mut color_arr = std::array::from_fn(|i| {
+                if i == 0 {
+                    r
+                } else if i == 1 {
+                    g
+                } else {
+                    b
+                }
+            });
+            if ui.color_edit_button_rgb(&mut color_arr).changed() {
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                let new_rgb = Rgb {
+                    r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
+                    g: (color_arr[1] * COLOUR_CHANNEL_MAX) as u8,
+                    b: (color_arr[2] * COLOUR_CHANNEL_MAX) as u8,
+                };
+                apply(new_colors, new_rgb);
+                changed = true;
+            }
+        }
+        ColorPropType::Rgba(get, apply) => {
+            let original_rgba = get(new_colors);
+            let mut color_arr = [
+                f32::from(original_rgba.r) / COLOUR_CHANNEL_MAX,
+                f32::from(original_rgba.g) / COLOUR_CHANNEL_MAX,
+                f32::from(original_rgba.b) / COLOUR_CHANNEL_MAX,
+                f32::from(original_rgba.a) / COLOUR_CHANNEL_MAX,
+            ];
+            if ui
+                .color_edit_button_rgba_unmultiplied(&mut color_arr)
+                .changed()
+            {
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                let new_rgba = Rgba {
+                    r: (color_arr[0] * COLOUR_CHANNEL_MAX) as u8,
+                    g: (color_arr[1] * COLOUR_CHANNEL_MAX) as u8,
+                    b: (color_arr[2] * COLOUR_CHANNEL_MAX) as u8,
+                    a: (color_arr[COLOR_ALPHA_INDEX] * COLOUR_CHANNEL_MAX) as u8,
+                };
+                apply(new_colors, new_rgba);
+                changed = true;
+            }
+        }
     }
+
+    ui.end_row();
+    changed
 }
 
 // ── Font tab ──────────────────────────────────────────────
@@ -889,7 +1106,7 @@ pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>)
     ui.visuals_mut().widgets.active.bg_fill = selection_color;
     ui.visuals_mut().widgets.hovered.bg_fill = selection_color;
     // Semi-transparent selection color for the unfilled portion of the rail.
-    ui.visuals_mut().widgets.inactive.bg_fill = egui::Color32::from_rgba_unmultiplied(
+    ui.visuals_mut().widgets.inactive.bg_fill = crate::theme_bridge::from_rgba_unmultiplied(
         selection_color.r(),
         selection_color.g(),
         selection_color.b(),
@@ -1381,7 +1598,7 @@ fn render_behavior_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState
                 &mut display_val,
                 AUTO_SAVE_INTERVAL_MIN..=AUTO_SAVE_INTERVAL_MAX,
             )
-            .show_value(false) // テキストは別で表示
+            .show_value(false) // Text is displayed separately
             .step_by(AUTO_SAVE_INTERVAL_STEP)
             .min_decimals(1)
             .max_decimals(1)
@@ -1390,7 +1607,7 @@ fn render_behavior_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState
 
             let slider_response = add_styled_slider(ui, slider);
 
-            // 横に別コンポーネントとしてテキスト部分を配置
+            // Place text portion as a separate component alongside
             let drag_response = ui.add(
                 egui::DragValue::new(&mut display_val)
                     .speed(AUTO_SAVE_INTERVAL_STEP)
@@ -1400,7 +1617,7 @@ fn render_behavior_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState
             );
 
             if slider_response.changed() || drag_response.changed() {
-                // DragValueやSliderが変更されたら保存
+                // Save when DragValue or Slider changes
                 settings.settings_mut().behavior.auto_save_interval_secs = display_val;
                 let _ = settings.save();
             }

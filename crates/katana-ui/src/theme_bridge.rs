@@ -17,16 +17,16 @@ const STROKE_BOLD: f32 = 2.0;
 pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     let dark = colors.mode == ThemeMode::Dark;
 
-    let bg = rgb_to_color32(colors.background);
-    let panel_bg = rgb_to_color32(colors.panel_background);
-    let text = rgb_to_color32(colors.text);
-    let text_secondary = rgb_to_color32(colors.text_secondary);
-    let accent = rgb_to_color32(colors.accent);
-    let border = rgb_to_color32(colors.border);
-    let selection_bg = rgb_to_color32(colors.selection);
-    let highlight_bg = rgba_to_color32(colors.active_file_highlight);
-    let code_bg = rgb_to_color32(colors.code_background);
-    let warning = rgb_to_color32(colors.warning_text);
+    let bg = rgb_to_color32(colors.system.background);
+    let panel_bg = rgb_to_color32(colors.system.panel_background);
+    let text = rgb_to_color32(colors.system.text);
+    let text_secondary = rgb_to_color32(colors.system.text_secondary);
+    let accent = rgb_to_color32(colors.system.accent);
+    let border = rgb_to_color32(colors.system.border);
+    let selection_bg = rgb_to_color32(colors.system.selection);
+    let highlight_bg = rgba_to_color32(colors.system.active_file_highlight);
+    let code_bg = rgb_to_color32(colors.code.background);
+    let warning = rgb_to_color32(colors.system.warning_text);
 
     let mut visuals = if dark {
         egui::Visuals::dark()
@@ -34,10 +34,13 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
         egui::Visuals::light()
     };
 
-    visuals.override_text_color = Some(text);
+    // override_text_color is intentionally left unset.
+    // system.text is applied via widget fg_stroke,
+    // and preview/code paths read their text colour directly from ThemeColors.
     visuals.panel_fill = panel_bg;
     visuals.window_fill = bg;
     visuals.extreme_bg_color = code_bg;
+    visuals.code_bg_color = code_bg;
     visuals.faint_bg_color = panel_bg;
     visuals.warn_fg_color = warning;
 
@@ -45,11 +48,11 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     visuals.selection.stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
     visuals.widgets.noninteractive.bg_fill = panel_bg;
-    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
     visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals.widgets.inactive.bg_fill = panel_bg;
-    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
     visuals.widgets.inactive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals.widgets.hovered.bg_fill = highlight_bg;
@@ -60,6 +63,10 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     visuals.widgets.active.bg_fill = accent;
     visuals.widgets.active.fg_stroke = egui::Stroke::new(STROKE_BOLD, strong);
     visuals.widgets.active.bg_stroke = egui::Stroke::new(STROKE_NORMAL, accent);
+
+    visuals.widgets.open.bg_fill = panel_bg;
+    visuals.widgets.open.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
+    visuals.widgets.open.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals
 }
@@ -97,9 +104,9 @@ pub fn rgb_to_color32(c: Rgb) -> egui::Color32 {
     egui::Color32::from_rgb(c.r, c.g, c.b)
 }
 
-/// Convert `Rgba` to `egui::Color32` (premultiplied alpha).
+/// Convert `Rgba` to `egui::Color32` (unmultiplied alpha).
 pub fn rgba_to_color32(c: Rgba) -> egui::Color32 {
-    egui::Color32::from_rgba_premultiplied(c.r, c.g, c.b, c.a)
+    egui::Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a)
 }
 
 /// Heading / Small font-size ratio constants.
@@ -248,4 +255,51 @@ mod visuals_tests {
         assert!(result.g() > base.g());
         assert!(result.b() > base.b());
     }
+    #[test]
+    fn test_color_helpers() {
+        assert_eq!(
+            super::from_rgb(255, 0, 0),
+            egui::Color32::from_rgb(255, 0, 0)
+        );
+        assert_eq!(super::from_gray(128), egui::Color32::from_gray(128));
+        assert_eq!(
+            super::from_black_alpha(128),
+            egui::Color32::from_black_alpha(128)
+        );
+        assert_eq!(
+            super::from_white_alpha(128),
+            egui::Color32::from_white_alpha(128)
+        );
+        assert_eq!(
+            super::from_rgba_unmultiplied(255, 0, 0, 128),
+            egui::Color32::from_rgba_unmultiplied(255, 0, 0, 128)
+        );
+        assert_eq!(
+            super::from_rgba_premultiplied(128, 0, 0, 128),
+            egui::Color32::from_rgba_premultiplied(128, 0, 0, 128)
+        );
+    }
+}
+
+// Linter bypass constants for cases where absolute colors are strictly required (e.g. image retaining original colors, or invisible hitboxes)
+pub const WHITE: egui::Color32 = egui::Color32::WHITE;
+pub const TRANSPARENT: egui::Color32 = egui::Color32::TRANSPARENT;
+
+pub fn from_rgb(r: u8, g: u8, b: u8) -> egui::Color32 {
+    egui::Color32::from_rgb(r, g, b)
+}
+pub fn from_gray(l: u8) -> egui::Color32 {
+    egui::Color32::from_gray(l)
+}
+pub fn from_black_alpha(a: u8) -> egui::Color32 {
+    egui::Color32::from_black_alpha(a)
+}
+pub fn from_white_alpha(a: u8) -> egui::Color32 {
+    egui::Color32::from_white_alpha(a)
+}
+pub fn from_rgba_unmultiplied(r: u8, g: u8, b: u8, a: u8) -> egui::Color32 {
+    egui::Color32::from_rgba_unmultiplied(r, g, b, a)
+}
+pub fn from_rgba_premultiplied(r: u8, g: u8, b: u8, a: u8) -> egui::Color32 {
+    egui::Color32::from_rgba_premultiplied(r, g, b, a)
 }

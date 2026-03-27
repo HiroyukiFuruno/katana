@@ -121,7 +121,9 @@
       "save_custom_theme": "另存為自訂主題...",
       "save_custom_theme_title": "儲存自訂主題",
       "theme_name_label": "主題名稱:",
-      "duplicate": "複製..."
+      "duplicate": "複製...",
+      "ui_contrast_offset": "[zh-TW] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[zh-TW] Reset"
     },
     "font": {
       "size": "字體大小",
@@ -155,8 +157,29 @@
       "accent": "強調",
       "border": "邊框",
       "selection": "選擇",
-      "code_background": "程式碼背景",
-      "preview_background": "預覽背景"
+      "code_background": "背景",
+      "preview_background": "背景",
+      "code_text": "文字",
+      "preview_text": "文字",
+      "highlight": "標記",
+      "section_system": "系統",
+      "section_code": "程式碼",
+      "section_preview": "預覽",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "tabs": [
       {
@@ -222,7 +245,10 @@
       "close_confirm_title": "未儲存的變更",
       "close_confirm_msg": "'{name}' 有未儲存的變更。是否捨棄？",
       "close_confirm_discard": "捨棄",
-      "close_confirm_cancel": "取消"
+      "close_confirm_cancel": "取消",
+      "clear_http_cache": "[zh-TW] Clear All Caches",
+      "cache_retention_days": "[zh-TW] Cache Retention Days",
+      "days_suffix": "[zh-TW]  days"
     }
   },
   "tab": {

@@ -1,4 +1,4 @@
-use super::migration::MigrationStrategy;
+use super::MigrationStrategy;
 use serde_json::{json, Value};
 
 /// Migrates settings from v0.1.2 (flat structure) to v0.1.3 (hierarchical).

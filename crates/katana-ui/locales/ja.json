@@ -156,7 +156,9 @@
       "save_custom_theme": "カスタムテーマとして保存...",
       "save_custom_theme_title": "カスタムテーマの保存",
       "theme_name_label": "テーマ名:",
-      "duplicate": "複製..."
+      "duplicate": "複製...",
+      "ui_contrast_offset": "UI透過度補正 (アルファ値オフセット)",
+      "reset_contrast": "リセット"
     },
     "font": {
       "size": "フォントサイズ",
@@ -190,8 +192,29 @@
       "accent": "アクセント",
       "border": "ボーダー",
       "selection": "選択",
-      "code_background": "コード背景",
-      "preview_background": "プレビュー背景"
+      "code_background": "背景",
+      "preview_background": "背景",
+      "code_text": "テキスト",
+      "preview_text": "テキスト",
+      "highlight": "ハイライト",
+      "section_system": "システム",
+      "section_code": "コード",
+      "section_preview": "プレビュー",
+      "title_bar_text": "タイトルバー",
+      "active_file_highlight": "アクティブファイル",
+      "success_text": "成功テキスト",
+      "warning_text": "警告テキスト",
+      "error_text": "エラーテキスト",
+      "button_background": "ボタン背景",
+      "button_active_background": "アクティブボタン",
+      "splash_background": "スプラッシュ背景",
+      "splash_progress": "スプラッシュ進行",
+      "fullscreen_overlay": "全画面枠",
+      "line_number_text": "行番号",
+      "line_number_active_text": "アクティブ行番号",
+      "current_line_background": "カレント行背景",
+      "hover_line_background": "ホバー行背景",
+      "file_tree_text": "ファイルツリー・テキスト"
     },
     "workspace": {
       "max_depth": "最大ディレクトリスキャン深度",
@@ -257,7 +280,10 @@
       "close_confirm_title": "未保存の変更",
       "close_confirm_msg": "'{name}' に未保存の変更があります。破棄しますか？",
       "close_confirm_discard": "破棄",
-      "close_confirm_cancel": "キャンセル"
+      "close_confirm_cancel": "キャンセル",
+      "clear_http_cache": "すべてのキャッシュをクリア",
+      "cache_retention_days": "キャッシュ保持日数",
+      "days_suffix": " 日"
     }
   },
   "tab": {

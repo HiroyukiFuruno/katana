@@ -121,7 +121,9 @@
       "save_custom_theme": "Salva come tema...",
       "save_custom_theme_title": "Salva tema personalizzato",
       "theme_name_label": "Nome del tema:",
-      "duplicate": "Duplica..."
+      "duplicate": "Duplica...",
+      "ui_contrast_offset": "[it] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[it] Reset"
     },
     "font": {
       "size": "Dimensione Carattere",
@@ -155,8 +157,29 @@
       "accent": "Accento",
       "border": "Bordo",
       "selection": "Selezione",
-      "code_background": "Sfondo Codice",
-      "preview_background": "Sfondo Anteprima"
+      "code_background": "Sfondo",
+      "preview_background": "Sfondo",
+      "code_text": "Testo",
+      "preview_text": "Testo",
+      "highlight": "Evidenzia",
+      "section_system": "",
+      "section_code": "",
+      "section_preview": "",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "tabs": [
       {
@@ -222,7 +245,10 @@
       "close_confirm_title": "Modifiche non salvate",
       "close_confirm_msg": "'{name}' ha modifiche non salvate. Eliminarle?",
       "close_confirm_discard": "Elimina",
-      "close_confirm_cancel": "Annulla"
+      "close_confirm_cancel": "Annulla",
+      "clear_http_cache": "[it] Clear All Caches",
+      "cache_retention_days": "[it] Cache Retention Days",
+      "days_suffix": "[it]  days"
     }
   },
   "tab": {

@@ -436,6 +436,17 @@ pub struct SettingsThemeMessages {
     pub theme_name_label: String,
     #[serde(default = "default_duplicate")]
     pub duplicate: String,
+    #[serde(default = "default_ui_contrast_offset")]
+    pub ui_contrast_offset: String,
+    #[serde(default = "default_reset_contrast")]
+    pub reset_contrast: String,
+}
+
+fn default_ui_contrast_offset() -> String {
+    "UI Contrast (Alpha Offset)".to_string()
+}
+fn default_reset_contrast() -> String {
+    "Reset".to_string()
 }
 
 fn default_duplicate() -> String {
@@ -568,6 +579,25 @@ pub struct SettingsBehaviorMessages {
     pub close_confirm_discard: String,
     /// Confirmation dialog cancel button.
     pub close_confirm_cancel: String,
+
+    #[serde(default = "default_clear_http_cache")]
+    pub clear_http_cache: String,
+
+    #[serde(default = "default_cache_retention_days")]
+    pub cache_retention_days: String,
+
+    #[serde(default = "default_days_suffix")]
+    pub days_suffix: String,
+}
+
+fn default_clear_http_cache() -> String {
+    "Clear All Caches".to_string()
+}
+fn default_cache_retention_days() -> String {
+    "Cache Retention Days".to_string()
+}
+fn default_days_suffix() -> String {
+    " days".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -593,6 +623,82 @@ pub struct SettingsColorMessages {
     pub selection: String,
     pub code_background: String,
     pub preview_background: String,
+    #[serde(default = "default_section_system")]
+    pub section_system: String,
+    #[serde(default = "default_section_code")]
+    pub section_code: String,
+    #[serde(default = "default_section_preview")]
+    pub section_preview: String,
+    #[serde(default = "default_highlight")]
+    pub highlight: String,
+    #[serde(default = "default_code_text")]
+    pub code_text: String,
+    #[serde(default = "default_preview_text")]
+    pub preview_text: String,
+
+    #[serde(default = "d_title_bar_text")]
+    pub title_bar_text: String,
+
+    #[serde(default = "d_active_file_highlight")]
+    pub active_file_highlight: String,
+    #[serde(default = "d_file_tree_text")]
+    pub file_tree_text: String,
+
+    #[serde(default = "d_success_text")]
+    pub success_text: String,
+
+    #[serde(default = "d_warning_text")]
+    pub warning_text: String,
+
+    #[serde(default = "d_error_text")]
+    pub error_text: String,
+
+    #[serde(default = "d_button_bg")]
+    pub button_background: String,
+
+    #[serde(default = "d_button_active")]
+    pub button_active_background: String,
+
+    #[serde(default = "d_splash_bg")]
+    pub splash_background: String,
+
+    #[serde(default = "d_splash_prog")]
+    pub splash_progress: String,
+
+    #[serde(default = "d_fullscreen")]
+    pub fullscreen_overlay: String,
+
+    #[serde(default = "d_line_num")]
+    pub line_number_text: String,
+
+    #[serde(default = "d_line_num_act")]
+    pub line_number_active_text: String,
+
+    #[serde(default = "d_curr_bg")]
+    pub current_line_background: String,
+
+    #[serde(default = "d_hover_bg")]
+    pub hover_line_background: String,
+}
+
+fn default_highlight() -> String {
+    "Highlight".to_string()
+}
+
+fn default_section_system() -> String {
+    "System".to_string()
+}
+fn default_section_code() -> String {
+    "Code".to_string()
+}
+fn default_section_preview() -> String {
+    "Preview".to_string()
+}
+fn default_code_text() -> String {
+    "Code Text".to_string()
+}
+fn default_preview_text() -> String {
+    "Preview Text".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -762,6 +868,11 @@ mod tests {
     }
 
     #[test]
+    fn test_i18n_default_color_values() {
+        assert_eq!(default_highlight(), "Highlight");
+    }
+
+    #[test]
     fn test_get_fallback_to_en() {
         // Test that an unsupported language defaults to 'en' dictionary without failing.
         set_language("unsupported-lang-code");
@@ -890,5 +1001,85 @@ mod additional_coverage_tests {
             default_no_extension_warning(),
             "There is no guarantee that files without extensions can be displayed correctly as Markdown. Furthermore, the application may crash due to unexpected behavior. Are you sure you want to enable this?"
         );
+        // Color section defaults
+        assert_eq!(default_section_system(), "System");
+        assert_eq!(default_section_code(), "Code");
+        assert_eq!(default_section_preview(), "Preview");
+        assert_eq!(default_code_text(), "Code Text");
+        assert_eq!(default_preview_text(), "Preview Text");
+    }
+}
+fn d_title_bar_text() -> String {
+    "Title Bar Text".to_string()
+}
+fn d_active_file_highlight() -> String {
+    "Active File".to_string()
+}
+fn d_success_text() -> String {
+    "Success Text".to_string()
+}
+fn d_warning_text() -> String {
+    "Warning Text".to_string()
+}
+fn d_error_text() -> String {
+    "Error Text".to_string()
+}
+fn d_button_bg() -> String {
+    "Button Background".to_string()
+}
+fn d_button_active() -> String {
+    "Active Button".to_string()
+}
+fn d_splash_bg() -> String {
+    "Splash Background".to_string()
+}
+fn d_splash_prog() -> String {
+    "Splash Progress".to_string()
+}
+fn d_fullscreen() -> String {
+    "Fullscreen Overlay".to_string()
+}
+fn d_line_num() -> String {
+    "Line Number".to_string()
+}
+fn d_line_num_act() -> String {
+    "Active Line Num".to_string()
+}
+fn d_curr_bg() -> String {
+    "Current Line".to_string()
+}
+fn d_hover_bg() -> String {
+    "Hover Line".to_string()
+}
+fn d_file_tree_text() -> String {
+    "File Tree Text".to_string()
+}
+
+#[cfg(test)]
+mod tests_defaults {
+    use super::*;
+
+    #[test]
+    fn test_i18n_settings_color_defaults() {
+        assert_eq!(d_title_bar_text(), "Title Bar Text");
+        assert_eq!(d_active_file_highlight(), "Active File");
+        assert_eq!(d_success_text(), "Success Text");
+        assert_eq!(d_warning_text(), "Warning Text");
+        assert_eq!(d_error_text(), "Error Text");
+        assert_eq!(d_button_bg(), "Button Background");
+        assert_eq!(d_button_active(), "Active Button");
+        assert_eq!(d_splash_bg(), "Splash Background");
+        assert_eq!(d_splash_prog(), "Splash Progress");
+        assert_eq!(d_fullscreen(), "Fullscreen Overlay");
+        assert_eq!(d_line_num(), "Line Number");
+        assert_eq!(d_line_num_act(), "Active Line Num");
+        assert_eq!(d_curr_bg(), "Current Line");
+        assert_eq!(d_hover_bg(), "Hover Line");
+        assert_eq!(d_file_tree_text(), "File Tree Text");
+        assert_eq!(default_ui_contrast_offset(), "UI Contrast (Alpha Offset)");
+        assert_eq!(default_reset_contrast(), "Reset");
+        assert_eq!(default_clear_http_cache(), "Clear All Caches");
+        assert_eq!(default_cache_retention_days(), "Cache Retention Days");
+        assert_eq!(default_days_suffix(), " days");
     }
 }

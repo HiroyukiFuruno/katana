@@ -121,7 +121,9 @@
       "save_custom_theme": "Enregistrer sous...",
       "save_custom_theme_title": "Enregistrer le thème personnalisé",
       "theme_name_label": "Nom du thème :",
-      "duplicate": "Dupliquer..."
+      "duplicate": "Dupliquer...",
+      "ui_contrast_offset": "[fr] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[fr] Reset"
     },
     "font": {
       "size": "Taille de la police",
@@ -155,8 +157,29 @@
       "accent": "Accentuation",
       "border": "Bordure",
       "selection": "Sélection",
-      "code_background": "Arrière-plan du code",
-      "preview_background": "Arrière-plan de l'aperçu"
+      "code_background": "Arrière-plan",
+      "preview_background": "Arrière-plan",
+      "code_text": "Texte",
+      "preview_text": "Texte",
+      "highlight": "Surbrillance",
+      "section_system": "Système",
+      "section_code": "",
+      "section_preview": "Aperçu",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "tabs": [
       {
@@ -222,7 +245,10 @@
       "close_confirm_title": "Modifications non enregistrées",
       "close_confirm_msg": "'{name}' a des modifications non enregistrées. Les supprimer ?",
       "close_confirm_discard": "Supprimer",
-      "close_confirm_cancel": "Annuler"
+      "close_confirm_cancel": "Annuler",
+      "clear_http_cache": "[fr] Clear All Caches",
+      "cache_retention_days": "[fr] Cache Retention Days",
+      "days_suffix": "[fr]  days"
     }
   },
   "tab": {

@@ -23,7 +23,7 @@ const SPLASH_REPAINT_INTERVAL_MS: u64 = 32;
 fn invisible_label(text: &str) -> egui::RichText {
     egui::RichText::new(text)
         .size(INVISIBLE_LABEL_SIZE)
-        .color(egui::Color32::TRANSPARENT)
+        .color(crate::theme_bridge::TRANSPARENT)
 }
 
 use crate::shell::{
@@ -163,14 +163,23 @@ pub(crate) fn render_status_bar(
             };
 
             let (color, icon) = match kind {
-                Some(crate::app_state::StatusType::Error) => {
-                    (egui::Color32::RED, Some(crate::Icon::Error))
-                }
+                Some(crate::app_state::StatusType::Error) => (
+                    ui.ctx()
+                        .data(|d| {
+                            d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                                "katana_theme_colors",
+                            ))
+                        })
+                        .map_or(crate::theme_bridge::WHITE, |tc| {
+                            crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                        }),
+                    Some(crate::Icon::Error),
+                ),
                 Some(crate::app_state::StatusType::Warning) => {
                     (ui.visuals().warn_fg_color, Some(crate::Icon::Warning))
                 }
                 Some(crate::app_state::StatusType::Success) => (
-                    egui::Color32::from_rgb(0, STATUS_SUCCESS_GREEN, 0),
+                    crate::theme_bridge::from_rgb(0, STATUS_SUCCESS_GREEN, 0),
                     Some(crate::Icon::Success),
                 ),
                 Some(crate::app_state::StatusType::Info) => {
@@ -278,9 +287,9 @@ pub(crate) fn render_workspace_panel(
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let icon_bg = if ui.visuals().dark_mode {
-                            egui::Color32::TRANSPARENT
+                            crate::theme_bridge::TRANSPARENT
                         } else {
-                            egui::Color32::from_gray(LIGHT_MODE_ICON_BG) // Always gray for icons in light mode
+                            crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG) // Always gray for icons in light mode
                         };
 
                         if !state.settings.settings().workspace.paths.is_empty() {
@@ -344,7 +353,7 @@ pub(crate) fn render_workspace_panel(
                             if ui.visuals().dark_mode {
                                 ui.visuals().selection.bg_fill
                             } else {
-                                egui::Color32::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
+                                crate::theme_bridge::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
                                 // Darker gray when active in light mode
                             }
                         } else {
@@ -390,7 +399,15 @@ pub(crate) fn render_workspace_panel(
                         let text_color = if is_valid_regex {
                             ui.visuals().text_color()
                         } else {
-                            egui::Color32::RED
+                            ui.ctx()
+                                .data(|d| {
+                                    d.get_temp::<katana_platform::theme::ThemeColors>(
+                                        egui::Id::new("katana_theme_colors"),
+                                    )
+                                })
+                                .map_or(crate::theme_bridge::WHITE, |tc| {
+                                    crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                                })
                         };
                         ui.add(
                             egui::TextEdit::singleline(&mut state.filter_query)
@@ -718,9 +735,9 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     let has_doc = state.active_document().is_some();
 
     let icon_bg = if ui.visuals().dark_mode {
-        egui::Color32::TRANSPARENT
+        crate::theme_bridge::TRANSPARENT
     } else {
-        egui::Color32::from_gray(LIGHT_MODE_ICON_BG)
+        crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG)
     };
 
     if overlay_ui
@@ -781,7 +798,7 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
             if ui.visuals().dark_mode {
                 ui.visuals().selection.bg_fill
             } else {
-                egui::Color32::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
+                crate::theme_bridge::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
             }
         } else {
             icon_bg
@@ -1055,9 +1072,9 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
 
         let nav_enabled = doc_count > 1;
         let icon_bg = if ui.visuals().dark_mode {
-            egui::Color32::TRANSPARENT
+            crate::theme_bridge::TRANSPARENT
         } else {
-            egui::Color32::from_gray(LIGHT_MODE_ICON_BG)
+            crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG)
         };
 
         if ui
@@ -1167,7 +1184,7 @@ pub(crate) fn render_view_mode_bar(
                 const COLOR_SUCCESS_G: u8 = 200;
                 let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
                 let badge_text = egui::RichText::new(badge_str)
-                    .color(egui::Color32::from_rgb(0, COLOR_SUCCESS_G, 100))
+                    .color(crate::theme_bridge::from_rgb(0, COLOR_SUCCESS_G, 100))
                     .strong();
 
                 if ui
@@ -1313,6 +1330,48 @@ pub(crate) fn render_editor_content(
     if let Some(doc) = state.active_document() {
         let mut buffer = doc.buffer.clone();
 
+        let (
+            code_bg,
+            code_text,
+            code_selection,
+            current_line_bg,
+            hover_line_bg,
+            ln_text,
+            ln_active_text,
+        ) = ui.ctx().data(|d| {
+            if let Some(tc) = d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                "katana_theme_colors",
+            )) {
+                (
+                    crate::theme_bridge::rgb_to_color32(tc.code.background),
+                    crate::theme_bridge::rgb_to_color32(tc.code.text),
+                    Some(crate::theme_bridge::rgb_to_color32(tc.code.selection)),
+                    Some(crate::theme_bridge::rgba_to_color32(
+                        tc.code.current_line_background,
+                    )),
+                    Some(crate::theme_bridge::rgba_to_color32(
+                        tc.code.hover_line_background,
+                    )),
+                    Some(crate::theme_bridge::rgb_to_color32(
+                        tc.code.line_number_text,
+                    )),
+                    Some(crate::theme_bridge::rgb_to_color32(
+                        tc.code.line_number_active_text,
+                    )),
+                )
+            } else {
+                (
+                    ui.visuals().extreme_bg_color,
+                    ui.visuals().text_color(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            }
+        });
+
         let mut scroll_area = egui::ScrollArea::vertical().id_salt("editor_scroll");
 
         let consuming_preview = sync_scroll && state.scroll_source == ScrollSource::Preview;
@@ -1321,231 +1380,257 @@ pub(crate) fn render_editor_content(
                 .vertical_scroll_offset(state.scroll_fraction * state.editor_max_scroll.max(1.0));
         }
 
-        let output = scroll_area.show(ui, |ui| {
-            ui.horizontal_top(|ui| {
-                const LINE_NUMBER_MARGIN: f32 = 40.0;
-                const LINE_NUMBER_PAD_RIGHT: f32 = 8.0;
-                let left_margin = LINE_NUMBER_MARGIN;
-                let (ln_rect, _) =
-                    ui.allocate_exact_size(egui::vec2(left_margin, 0.0), egui::Sense::hover());
-                let text_output = egui::TextEdit::multiline(&mut buffer)
-                    .font(egui::TextStyle::Monospace)
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS)
-                    .margin(egui::Margin {
-                        left: 0,
-                        right: LINE_NUMBER_MARGIN as i8,
-                        top: 0,
-                        bottom: 0,
-                    })
-                    .frame(false)
-                    .show(ui);
-                let response = text_output.response;
-                let galley = text_output.galley;
+        let output = egui::Frame::NONE.fill(code_bg).show(ui, |ui| {
+            ui.style_mut().visuals.override_text_color = Some(code_text);
+            ui.style_mut().visuals.extreme_bg_color = code_bg;
+            if let Some(sel) = code_selection {
+                ui.style_mut().visuals.selection.bg_fill = sel;
+            }
 
-                if response.clicked() {
+            scroll_area.show(ui, |ui| {
+                ui.horizontal_top(|ui| {
+                    const LINE_NUMBER_MARGIN: f32 = 40.0;
+                    const LINE_NUMBER_PAD_RIGHT: f32 = 8.0;
+                    let left_margin = LINE_NUMBER_MARGIN;
+                    let (ln_rect, _) =
+                        ui.allocate_exact_size(egui::vec2(left_margin, 0.0), egui::Sense::hover());
+                    let text_output = egui::TextEdit::multiline(&mut buffer)
+                        .font(egui::TextStyle::Monospace)
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS)
+                        .margin(egui::Margin {
+                            left: 0,
+                            right: LINE_NUMBER_MARGIN as i8,
+                            top: 0,
+                            bottom: 0,
+                        })
+                        .frame(false)
+                        .show(ui);
+                    let response = text_output.response;
+                    let galley = text_output.galley;
+
+                    if response.clicked() {
+                        if let Some(c) = text_output.cursor_range {
+                            let char_idx = c.primary.index;
+                            let line = galley
+                                .text()
+                                .chars()
+                                .take(char_idx)
+                                .filter(|&ch| ch == '\n')
+                                .count();
+                            state.scroll_to_line = Some(line);
+                        }
+                    }
+
+                    let mut current_cursor_y = None;
                     if let Some(c) = text_output.cursor_range {
                         let char_idx = c.primary.index;
-                        let line = galley
+                        let paragraph = galley
                             .text()
                             .chars()
                             .take(char_idx)
                             .filter(|&ch| ch == '\n')
                             .count();
-                        state.scroll_to_line = Some(line);
-                    }
-                }
+                        state.active_editor_line = Some(paragraph);
 
-                let mut current_cursor_y = None;
-                if let Some(c) = text_output.cursor_range {
-                    let char_idx = c.primary.index;
-                    let paragraph = galley
-                        .text()
-                        .chars()
-                        .take(char_idx)
-                        .filter(|&ch| ch == '\n')
-                        .count();
-                    state.active_editor_line = Some(paragraph);
+                        let cursor_rect = galley.pos_from_cursor(c.primary);
+                        current_cursor_y = Some(cursor_rect.min.y);
 
-                    let cursor_rect = galley.pos_from_cursor(c.primary);
-                    current_cursor_y = Some(cursor_rect.min.y);
-
-                    let min_y = cursor_rect.min.y;
-                    let max_y = cursor_rect.max.y;
-
-                    let highlight_rect = egui::Rect::from_min_max(
-                        egui::pos2(ln_rect.min.x, response.rect.min.y + min_y),
-                        egui::pos2(response.rect.max.x, response.rect.min.y + max_y),
-                    );
-
-                    const HIGHLIGHT_ALPHA: u8 = 15;
-                    let highlight_color = if ui.visuals().dark_mode {
-                        egui::Color32::from_white_alpha(HIGHLIGHT_ALPHA)
-                    } else {
-                        egui::Color32::from_black_alpha(HIGHLIGHT_ALPHA)
-                    };
-                    ui.painter()
-                        .rect_filled(highlight_rect, 1.0, highlight_color);
-                } else {
-                    state.active_editor_line = None;
-                }
-
-                // Hover highlights from preview pane
-                const HOVER_HIGHLIGHT_ALPHA: u8 = 10;
-                let hover_color = if ui.visuals().dark_mode {
-                    egui::Color32::from_white_alpha(HOVER_HIGHLIGHT_ALPHA)
-                } else {
-                    egui::Color32::from_black_alpha(HOVER_HIGHLIGHT_ALPHA)
-                };
-
-                for line_range in &state.hovered_preview_lines {
-                    let mut current_line = 0;
-                    let mut start_char = None;
-                    let mut end_char = None;
-
-                    for (char_idx, c) in buffer.chars().enumerate() {
-                        if current_line == line_range.start && start_char.is_none() {
-                            start_char = Some(char_idx);
-                        }
-                        if current_line == line_range.end + 1 {
-                            end_char = Some(char_idx.saturating_sub(1));
-                            break;
-                        }
-                        if c == '\n' {
-                            current_line += 1;
-                        }
-                    }
-                    if start_char.is_some() && end_char.is_none() {
-                        end_char = Some(buffer.chars().count().saturating_sub(1));
-                    }
-
-                    if let (Some(start_idx), Some(end_idx)) = (start_char, end_char) {
-                        let cursor_start = egui::text::CCursor {
-                            index: start_idx,
-                            prefer_next_row: false,
-                        };
-                        // Ensure we don't highlight beyond the actual characters
-                        let cursor_end = egui::text::CCursor {
-                            index: end_idx.saturating_sub(1),
-                            prefer_next_row: false,
-                        };
-
-                        let pos_start = galley.pos_from_cursor(cursor_start);
-                        let pos_end = galley.pos_from_cursor(cursor_end);
+                        let min_y = cursor_rect.min.y;
+                        let max_y = cursor_rect.max.y;
 
                         let highlight_rect = egui::Rect::from_min_max(
-                            egui::pos2(ln_rect.min.x, response.rect.min.y + pos_start.min.y),
-                            egui::pos2(response.rect.max.x, response.rect.min.y + pos_end.max.y),
+                            egui::pos2(ln_rect.min.x, response.rect.min.y + min_y),
+                            egui::pos2(response.rect.max.x, response.rect.min.y + max_y),
                         );
-                        ui.painter().rect_filled(highlight_rect, 1.0, hover_color);
+
+                        const HIGHLIGHT_ALPHA: u8 = 15;
+                        let highlight_color = current_line_bg.unwrap_or_else(|| {
+                            if ui.visuals().dark_mode {
+                                crate::theme_bridge::from_white_alpha(HIGHLIGHT_ALPHA)
+                            } else {
+                                crate::theme_bridge::from_black_alpha(HIGHLIGHT_ALPHA)
+                            }
+                        });
+                        ui.painter()
+                            .rect_filled(highlight_rect, 1.0, highlight_color);
+                    } else {
+                        state.active_editor_line = None;
                     }
-                }
 
-                // Draw line numbers
-                let clip_rect = ui.clip_rect().expand(100.0);
-                let mut p = 0;
-                let mut is_start_of_para = true;
-
-                for row in &galley.rows {
-                    let top_y = row.rect().min.y;
-                    let y = response.rect.min.y + top_y;
-                    let is_visible = is_start_of_para
-                        && y <= clip_rect.max.y
-                        && (y + row.rect().height()) >= clip_rect.min.y;
-
-                    if is_visible {
-                        let is_current = current_cursor_y == Some(top_y);
-                        let text = format!("{}", p + 1);
-                        let color = if is_current {
-                            ui.visuals().text_color()
+                    // Hover highlights from preview pane
+                    const HOVER_HIGHLIGHT_ALPHA: u8 = 10;
+                    let hover_color = hover_line_bg.unwrap_or_else(|| {
+                        if ui.visuals().dark_mode {
+                            crate::theme_bridge::from_white_alpha(HOVER_HIGHLIGHT_ALPHA)
                         } else {
-                            ui.visuals().weak_text_color()
-                        };
-                        let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+                            crate::theme_bridge::from_black_alpha(HOVER_HIGHLIGHT_ALPHA)
+                        }
+                    });
 
-                        let label_rect = egui::Rect::from_min_size(
-                            egui::pos2(ln_rect.min.x, y),
-                            egui::vec2(left_margin - LINE_NUMBER_PAD_RIGHT, row.rect().height()),
-                        );
-                        let mut text_rt = egui::RichText::new(text).color(color).font(font_id);
-                        if is_current {
-                            text_rt = text_rt.strong();
+                    for line_range in &state.hovered_preview_lines {
+                        let mut current_line = 0;
+                        let mut start_char = None;
+                        let mut end_char = None;
+
+                        for (char_idx, c) in buffer.chars().enumerate() {
+                            if current_line == line_range.start && start_char.is_none() {
+                                start_char = Some(char_idx);
+                            }
+                            if current_line == line_range.end + 1 {
+                                end_char = Some(char_idx.saturating_sub(1));
+                                break;
+                            }
+                            if c == '\n' {
+                                current_line += 1;
+                            }
+                        }
+                        if start_char.is_some() && end_char.is_none() {
+                            end_char = Some(buffer.chars().count().saturating_sub(1));
                         }
 
-                        let label_for_measuring =
-                            egui::Label::new(text_rt.clone()).selectable(false);
-                        // align right
-                        let galley_ln = label_for_measuring.layout_in_ui(ui);
-                        let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
-                        let tight_rect = egui::Rect::from_min_size(
-                            label_rect.min + egui::vec2(offset_x, 0.0),
-                            galley_ln.1.rect.size(),
-                        );
+                        if let (Some(start_idx), Some(end_idx)) = (start_char, end_char) {
+                            let cursor_start = egui::text::CCursor {
+                                index: start_idx,
+                                prefer_next_row: false,
+                            };
+                            // Ensure we don't highlight beyond the actual characters
+                            let cursor_end = egui::text::CCursor {
+                                index: end_idx.saturating_sub(1),
+                                prefer_next_row: false,
+                            };
 
-                        let resp = ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
-                        if resp.clicked() {
-                            state.scroll_to_line = Some(p);
-                        }
-                        if resp.hovered() {
-                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                        }
+                            let pos_start = galley.pos_from_cursor(cursor_start);
+                            let pos_end = galley.pos_from_cursor(cursor_end);
 
-                        ui.put(tight_rect, egui::Label::new(text_rt).selectable(false));
-                    }
-
-                    is_start_of_para = row.ends_with_newline;
-                    if row.ends_with_newline {
-                        p += 1;
-                    }
-                }
-
-                if response.changed() {
-                    *action = AppAction::UpdateBuffer(buffer.clone());
-                }
-
-                if let Some(target_line) = state.scroll_to_line.take() {
-                    let mut current_line = 0;
-                    let mut target_char = None;
-                    for (char_idx, c) in buffer.chars().enumerate() {
-                        if current_line == target_line && target_char.is_none() {
-                            target_char = Some(char_idx);
-                            break;
-                        }
-                        if c == '\n' {
-                            current_line += 1;
+                            let highlight_rect = egui::Rect::from_min_max(
+                                egui::pos2(ln_rect.min.x, response.rect.min.y + pos_start.min.y),
+                                egui::pos2(
+                                    response.rect.max.x,
+                                    response.rect.min.y + pos_end.max.y,
+                                ),
+                            );
+                            ui.painter().rect_filled(highlight_rect, 1.0, hover_color);
                         }
                     }
-                    if let Some(idx) = target_char {
-                        let cursor = egui::text::CCursor {
-                            index: idx,
-                            prefer_next_row: false,
-                        };
-                        let pos = galley.pos_from_cursor(cursor);
-                        let rect = egui::Rect::from_min_max(
-                            egui::pos2(response.rect.min.x, response.rect.min.y + pos.min.y),
-                            egui::pos2(response.rect.max.x, response.rect.min.y + pos.max.y),
-                        );
-                        ui.scroll_to_rect(rect, Some(egui::Align::Center));
-                    }
-                }
 
-                response
+                    // Draw line numbers
+                    let clip_rect = ui.clip_rect().expand(100.0);
+                    let mut p = 0;
+                    let mut is_start_of_para = true;
+
+                    for row in &galley.rows {
+                        let top_y = row.rect().min.y;
+                        let y = response.rect.min.y + top_y;
+                        let is_visible = is_start_of_para
+                            && y <= clip_rect.max.y
+                            && (y + row.rect().height()) >= clip_rect.min.y;
+
+                        if is_visible {
+                            let is_current = current_cursor_y == Some(top_y);
+                            let text = format!("{}", p + 1);
+                            let color = if is_current {
+                                ln_active_text.unwrap_or_else(|| ui.visuals().text_color())
+                            } else {
+                                const LINE_NUMBER_INACTIVE_ALPHA: f32 = 0.3;
+                                ln_text.unwrap_or_else(|| {
+                                    ui.visuals()
+                                        .text_color()
+                                        .linear_multiply(LINE_NUMBER_INACTIVE_ALPHA)
+                                })
+                            };
+                            let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+
+                            let label_rect = egui::Rect::from_min_size(
+                                egui::pos2(ln_rect.min.x, y),
+                                egui::vec2(
+                                    left_margin - LINE_NUMBER_PAD_RIGHT,
+                                    row.rect().height(),
+                                ),
+                            );
+                            let mut text_rt = egui::RichText::new(text).color(color).font(font_id);
+                            if is_current {
+                                text_rt = text_rt.strong();
+                            }
+
+                            let label_for_measuring =
+                                egui::Label::new(text_rt.clone()).selectable(false);
+                            // align right
+                            let galley_ln = label_for_measuring.layout_in_ui(ui);
+                            let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
+                            let tight_rect = egui::Rect::from_min_size(
+                                label_rect.min + egui::vec2(offset_x, 0.0),
+                                galley_ln.1.rect.size(),
+                            );
+
+                            let resp =
+                                ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
+                            if resp.clicked() {
+                                state.scroll_to_line = Some(p);
+                            }
+                            if resp.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            ui.put(tight_rect, egui::Label::new(text_rt).selectable(false));
+                        }
+
+                        is_start_of_para = row.ends_with_newline;
+                        if row.ends_with_newline {
+                            p += 1;
+                        }
+                    }
+
+                    if response.changed() {
+                        *action = AppAction::UpdateBuffer(buffer.clone());
+                    }
+
+                    if let Some(target_line) = state.scroll_to_line.take() {
+                        let mut current_line = 0;
+                        let mut target_char = None;
+                        for (char_idx, c) in buffer.chars().enumerate() {
+                            if current_line == target_line && target_char.is_none() {
+                                target_char = Some(char_idx);
+                                break;
+                            }
+                            if c == '\n' {
+                                current_line += 1;
+                            }
+                        }
+                        if let Some(idx) = target_char {
+                            let cursor = egui::text::CCursor {
+                                index: idx,
+                                prefer_next_row: false,
+                            };
+                            let pos = galley.pos_from_cursor(cursor);
+                            let rect = egui::Rect::from_min_max(
+                                egui::pos2(response.rect.min.x, response.rect.min.y + pos.min.y),
+                                egui::pos2(response.rect.max.x, response.rect.min.y + pos.max.y),
+                            );
+                            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                        }
+                    }
+                    response
+                })
+                .inner
             })
-            .inner
         });
 
         if sync_scroll {
-            let max_scroll = (output.content_size.y - output.inner_rect.height()).max(0.0);
+            let max_scroll =
+                (output.inner.content_size.y - output.inner.inner_rect.height()).max(0.0);
             state.editor_max_scroll = max_scroll;
 
             if consuming_preview {
                 state.scroll_source = ScrollSource::Neither;
                 if max_scroll > 0.0 {
-                    state.scroll_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                    state.scroll_fraction =
+                        (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
                 }
             } else {
                 if max_scroll > 0.0 {
-                    let current_fraction = (output.state.offset.y / max_scroll).clamp(0.0, 1.0);
+                    let current_fraction =
+                        (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
                     let diff = (current_fraction - state.scroll_fraction).abs();
                     if diff > SCROLL_SYNC_DEAD_ZONE {
                         state.scroll_fraction = current_fraction;
@@ -2000,8 +2085,9 @@ fn render_horizontal_split(
         app.state
             .settings
             .settings()
-            .effective_theme_colors()
-            .preview_background,
+            .rendered_theme_colors()
+            .preview
+            .background,
     );
     let active_path = app.state.active_document().map(|d| d.path.clone());
     let mut scroll_state = (
@@ -2074,8 +2160,9 @@ fn render_vertical_split(
         app.state
             .settings
             .settings()
-            .effective_theme_colors()
-            .preview_background,
+            .rendered_theme_colors()
+            .preview
+            .background,
     );
     let active_path = app.state.active_document().map(|d| d.path.clone());
     let mut scroll_state = (
@@ -2180,8 +2267,9 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
             app.state
                 .settings
                 .settings()
-                .effective_theme_colors()
-                .preview_background,
+                .rendered_theme_colors()
+                .preview
+                .background,
         ),
     );
     let active_path = app.state.active_document().map(|d| d.path.clone());
@@ -2597,10 +2685,15 @@ impl eframe::App for KatanaApp {
         let splash_is_opaque = self.splash_start.is_some() && splash_opacity >= 1.0;
 
         // Apply theme colours to egui Visuals (only when the palette changed)
-        let theme_colors = self.state.settings.settings().effective_theme_colors();
+        let theme_colors = self.state.settings.settings().rendered_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
             let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
+            // Cache the full ThemeColors in the context so that each
+            // rendering path (preview/code) can access its own colours independently.
+            ctx.data_mut(|d| {
+                d.insert_temp(egui::Id::new("katana_theme_colors"), theme_colors.clone());
+            });
             // Disable floating scrollbar animation — egui's animate_bool_responsive
             // for floating scrollbar hover detection triggers continuous repaints (~90fps).
             ctx.style_mut(|s| s.spacing.scroll.floating = false);
@@ -2768,7 +2861,8 @@ impl eframe::App for KatanaApp {
             egui::TopBottomPanel::top("app_title_bar").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.centered_and_justified(|ui| {
-                        let title_color = theme_bridge::rgb_to_color32(theme_colors.title_bar_text);
+                        let title_color =
+                            theme_bridge::rgb_to_color32(theme_colors.system.title_bar_text);
                         ui.label(egui::RichText::new(&title_text).small().color(title_color));
                     });
                 });
@@ -3030,9 +3124,13 @@ impl eframe::App for KatanaApp {
                         #[allow(deprecated)]
                         let content_rect = ctx.screen_rect();
                         let bg_color = if is_dark {
-                            egui::Color32::from_rgb(SPLASH_BG_DARK, SPLASH_BG_DARK, SPLASH_BG_DARK)
+                            crate::theme_bridge::from_rgb(
+                                SPLASH_BG_DARK,
+                                SPLASH_BG_DARK,
+                                SPLASH_BG_DARK,
+                            )
                         } else {
-                            egui::Color32::from_rgb(
+                            crate::theme_bridge::from_rgb(
                                 SPLASH_BG_LIGHT,
                                 SPLASH_BG_LIGHT,
                                 SPLASH_BG_LIGHT,
@@ -3042,9 +3140,9 @@ impl eframe::App for KatanaApp {
                         ui.painter().rect_filled(content_rect, 1.0, fill_color);
 
                         let text_color = if is_dark {
-                            egui::Color32::WHITE
+                            crate::theme_bridge::WHITE
                         } else {
-                            egui::Color32::BLACK
+                            crate::theme_bridge::TRANSPARENT
                         }
                         .gamma_multiply(opacity);
 
@@ -3115,19 +3213,21 @@ impl eframe::App for KatanaApp {
 
                                 // Add a little visual flair to the progress bar by tinting it based on the theme
                                 if !is_dark {
-                                    ui.visuals_mut().selection.bg_fill = egui::Color32::from_rgb(
-                                        SPLASH_PROGRESS_BG_LIGHT,
-                                        SPLASH_PROGRESS_BG_LIGHT,
-                                        SPLASH_PROGRESS_BG_LIGHT,
-                                    )
-                                    .gamma_multiply(opacity);
+                                    ui.visuals_mut().selection.bg_fill =
+                                        crate::theme_bridge::from_rgb(
+                                            SPLASH_PROGRESS_BG_LIGHT,
+                                            SPLASH_PROGRESS_BG_LIGHT,
+                                            SPLASH_PROGRESS_BG_LIGHT,
+                                        )
+                                        .gamma_multiply(opacity);
                                 } else {
-                                    ui.visuals_mut().selection.bg_fill = egui::Color32::from_rgb(
-                                        SPLASH_PROGRESS_BG_DARK,
-                                        SPLASH_PROGRESS_BG_DARK,
-                                        SPLASH_PROGRESS_BG_DARK,
-                                    )
-                                    .gamma_multiply(opacity);
+                                    ui.visuals_mut().selection.bg_fill =
+                                        crate::theme_bridge::from_rgb(
+                                            SPLASH_PROGRESS_BG_DARK,
+                                            SPLASH_PROGRESS_BG_DARK,
+                                            SPLASH_PROGRESS_BG_DARK,
+                                        )
+                                        .gamma_multiply(opacity);
                                 }
                                 ui.add(progress_bar);
                             });
@@ -4194,13 +4294,29 @@ pub(crate) fn render_search_modal(
             let include_color = if include_valid {
                 ui.visuals().text_color()
             } else {
-                egui::Color32::RED
+                ui.ctx()
+                    .data(|d| {
+                        d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                            "katana_theme_colors",
+                        ))
+                    })
+                    .map_or(crate::theme_bridge::WHITE, |tc| {
+                        crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                    })
             };
 
             let exclude_color = if exclude_valid {
                 ui.visuals().text_color()
             } else {
-                egui::Color32::RED
+                ui.ctx()
+                    .data(|d| {
+                        d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                            "katana_theme_colors",
+                        ))
+                    })
+                    .map_or(crate::theme_bridge::WHITE, |tc| {
+                        crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                    })
             };
 
             ui.add(
@@ -4451,7 +4567,18 @@ fn render_update_window(
             Modal::new("katana_update_dialog_v6", &msgs.title).show(
                 ctx,
                 |ui| {
-                    ui.colored_label(egui::Color32::RED, msgs.failed_to_check.clone());
+                    ui.colored_label(
+                        ui.ctx()
+                            .data(|d| {
+                                d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
+                                    "katana_theme_colors",
+                                ))
+                            })
+                            .map_or(crate::theme_bridge::WHITE, |tc| {
+                                crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                            }),
+                        msgs.failed_to_check.clone(),
+                    );
                     ui.add_space(SPACING_SMALL);
                     ui.label(&err);
                 },

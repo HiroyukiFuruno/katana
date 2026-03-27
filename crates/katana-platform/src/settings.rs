@@ -2,623 +2,36 @@
 //!
 //! Settings are loaded from and saved to a JSON file via `JsonFileRepository`.
 //! For tests, `InMemoryRepository` provides a no-op backend.
+//!
+//! ## Module structure
+//!
+//! | Module | Responsibility |
+//! |---|---|
+//! | `types` | All struct, enum, and constant type definitions |
+//! | `defaults` | Serde default functions + Default impls |
+//! | `impls` | `AppSettings` method implementations |
+//! | `repository` | `SettingsRepository` trait + JSON/InMemory implementations |
+//! | `service` | `SettingsService` (business logic) |
+//! | `migration/` | Schema migration (trait + versioned strategies) |
 
-use crate::theme::{ThemeColors, ThemePreset};
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
+pub mod defaults;
+pub mod impls;
 pub mod migration;
-pub mod migration_0_1_2;
-pub mod migration_0_1_3_to_0_1_4;
-pub mod migration_0_1_4_to_0_2_0;
-use migration::MigrationRunner;
-
-/// Split direction for editor/preview layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum SplitDirection {
-    /// Editor on left, preview on right.
-    #[default]
-    Horizontal,
-    /// Editor on top, preview on bottom.
-    Vertical,
-}
-
-/// Position of the Table of Contents panel in the workspace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum TocPosition {
-    /// Left side of the workspace.
-    #[default]
-    Left,
-    /// Right side of the workspace.
-    Right,
-}
-
-/// Pane order within the split view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum PaneOrder {
-    /// Editor first (left or top), preview second.
-    #[default]
-    EditorFirst,
-    /// Preview first (left or top), editor second.
-    PreviewFirst,
-}
-
-const DEFAULT_FONT_SIZE: f32 = 14.0;
-/// Minimum allowed font size in pixels.
-pub const MIN_FONT_SIZE: f32 = 8.0;
-/// Maximum allowed font size in pixels.
-pub const MAX_FONT_SIZE: f32 = 32.0;
-
-/// Application-level settings persisted to disk.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSettings {
-    /// Version string for schema migration.
-    #[serde(default = "default_version")]
-    pub version: String,
-    /// Theme settings (nesting).
-    #[serde(default)]
-    pub theme: ThemeSettings,
-    /// Font settings (nesting).
-    #[serde(default)]
-    pub font: FontSettings,
-    /// Layout settings (nesting).
-    #[serde(default)]
-    pub layout: LayoutSettings,
-
-    /// Workspace settings (nesting).
-    #[serde(default)]
-    pub workspace: WorkspaceSettings,
-
-    /// Performance and advanced tuning (nesting).
-    #[serde(default)]
-    pub performance: PerformanceSettings,
-
-    /// Export settings (nesting).
-    #[serde(default)]
-    pub export: ExportSettings,
-
-    /// Application update settings (nesting).
-    #[serde(default)]
-    pub updates: UpdateSettings,
-
-    /// Behavior / system-default settings (nesting).
-    #[serde(default)]
-    pub behavior: BehaviorSettings,
-
-    /// Terms of service accepted version (None = not accepted).
-    #[serde(default)]
-    pub terms_accepted_version: Option<String>,
-    /// UI language ("en" or "ja", etc).
-    #[serde(default = "default_language")]
-    pub language: String,
-    /// Additional key-value settings for future use.
-    #[serde(default)]
-    pub extra: Vec<ExtraSetting>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ExtraSetting {
-    pub key: String,
-    pub value: String,
-}
-
-pub const MAX_CUSTOM_THEMES: usize = 10;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct CustomTheme {
-    pub name: String,
-    pub colors: ThemeColors,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThemeSettings {
-    #[serde(default = "default_theme")]
-    pub theme: String,
-    #[serde(default)]
-    pub preset: ThemePreset,
-    #[serde(default)]
-    pub custom_color_overrides: Option<ThemeColors>,
-    #[serde(default)]
-    pub custom_themes: Vec<CustomTheme>,
-    #[serde(default)]
-    pub active_custom_theme: Option<String>,
-}
-
-impl Default for ThemeSettings {
-    fn default() -> Self {
-        Self {
-            theme: default_theme(),
-            preset: ThemePreset::default(),
-            custom_color_overrides: None,
-            custom_themes: Vec::new(),
-            active_custom_theme: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FontSettings {
-    #[serde(default = "default_font_size")]
-    pub size: f32,
-    #[serde(default = "default_font_family")]
-    pub family: String,
-}
-
-impl Default for FontSettings {
-    fn default() -> Self {
-        Self {
-            size: default_font_size(),
-            family: default_font_family(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayoutSettings {
-    #[serde(default)]
-    pub split_direction: SplitDirection,
-    #[serde(default)]
-    pub pane_order: PaneOrder,
-    #[serde(default = "crate::settings::default_true")]
-    pub toc_visible: bool,
-    #[serde(default)]
-    pub toc_position: TocPosition,
-}
-
-impl Default for LayoutSettings {
-    fn default() -> Self {
-        Self {
-            split_direction: Default::default(),
-            pane_order: Default::default(),
-            toc_visible: true,
-            toc_position: Default::default(),
-        }
-    }
-}
-
-pub(crate) fn default_true() -> bool {
-    true
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceSettings {
-    /// ID of the last opened workspace root path, restored on next launch.
-    #[serde(default)]
-    pub last_workspace: Option<String>,
-    /// Workspace directory paths.
-    #[serde(default)]
-    pub paths: Vec<String>,
-    /// Previously opened document tabs.
-    #[serde(default)]
-    pub open_tabs: Vec<String>,
-    /// Index of the actively selected tab.
-    #[serde(default)]
-    pub active_tab_idx: Option<usize>,
-    /// Directories to ignore during workspace scanning.
-    #[serde(default = "default_ignored_directories")]
-    pub ignored_directories: Vec<String>,
-    /// Maximum depth for recursive directory scanning.
-    #[serde(default = "default_max_depth")]
-    pub max_depth: usize,
-    /// Visible extensions in the workspace tree.
-    #[serde(default = "default_visible_extensions")]
-    pub visible_extensions: Vec<String>,
-
-    /// Excluded exact file names when "no extension" files are visible.
-    #[serde(default = "default_extensionless_excludes")]
-    pub extensionless_excludes: Vec<String>,
-}
-
-fn default_visible_extensions() -> Vec<String> {
-    vec![
-        "md".to_string(),
-        "markdown".to_string(),
-        "mdx".to_string(),
-        "txt".to_string(),
-        "adr".to_string(),
-    ]
-}
-
-fn default_extensionless_excludes() -> Vec<String> {
-    vec![
-        ".DS_Store".to_string(),
-        ".gitignore".to_string(),
-        ".gitattributes".to_string(),
-        "Makefile".to_string(),
-    ]
-}
-/// Default maximum recursion depth for workspace scanning.
-pub const DEFAULT_MAX_DEPTH: usize = 10;
-
-/// Default list of directory names to ignore during workspace scanning.
-pub const DEFAULT_IGNORED_DIRECTORIES: &[&str] = &[
-    ".git",
-    ".terraform",
-    "node_modules",
-    "target",
-    ".idea",
-    ".vscode",
-];
-
-fn default_ignored_directories() -> Vec<String> {
-    DEFAULT_IGNORED_DIRECTORIES
-        .iter()
-        .map(|&s| s.to_string())
-        .collect()
-}
-
-fn default_max_depth() -> usize {
-    DEFAULT_MAX_DEPTH
-}
-
-impl Default for WorkspaceSettings {
-    fn default() -> Self {
-        Self {
-            last_workspace: None,
-            paths: vec![],
-            open_tabs: vec![],
-            active_tab_idx: None,
-            ignored_directories: default_ignored_directories(),
-            max_depth: DEFAULT_MAX_DEPTH,
-            visible_extensions: default_visible_extensions(),
-            extensionless_excludes: default_extensionless_excludes(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceSettings {
-    /// Number of concurrent diagram renders.
-    pub diagram_concurrency: usize,
-}
-
-const DEFAULT_DIAGRAM_CONCURRENCY: usize = 4;
-
-impl Default for PerformanceSettings {
-    fn default() -> Self {
-        Self {
-            // Default 4 workers, reduces dynamically upon errors like OOM
-            diagram_concurrency: DEFAULT_DIAGRAM_CONCURRENCY,
-        }
-    }
-}
-
-/// Export-related settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportSettings {
-    /// Directory for HTML export output. Defaults to the system temp directory.
-    #[serde(default = "default_html_output_dir")]
-    pub html_output_dir: String,
-}
-
-fn default_html_output_dir() -> String {
-    std::env::temp_dir().to_string_lossy().to_string()
-}
-
-impl Default for ExportSettings {
-    fn default() -> Self {
-        Self {
-            html_output_dir: default_html_output_dir(),
-        }
-    }
-}
-
-/// Interval for checking for application updates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum UpdateInterval {
-    /// Skip automatic updates
-    Never,
-    /// Check for updates daily
-    #[default]
-    Daily,
-    /// Check for updates weekly
-    Weekly,
-    /// Check for updates monthly
-    Monthly,
-}
-
-/// Auto-updater configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateSettings {
-    /// The interval at which the app should check for updates.
-    #[serde(default)]
-    pub interval: UpdateInterval,
-    /// The last time an update check was performed (UNIX timestamp in seconds).
-    #[serde(default)]
-    pub last_checked_timestamp_sec: Option<u64>,
-    /// Version tag the user explicitly chose to skip (e.g. "v0.8.0").
-    /// Auto-check will suppress notifications for this version.
-    #[serde(default)]
-    pub skipped_version: Option<String>,
-}
-
-/// Default auto-save interval in seconds.
-const DEFAULT_AUTO_SAVE_INTERVAL_SECS: f64 = 5.0;
-
-fn default_auto_save_interval_secs() -> f64 {
-    DEFAULT_AUTO_SAVE_INTERVAL_SECS
-}
-
-/// Application behavior settings controlling system-level defaults.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BehaviorSettings {
-    /// Show a confirmation dialog when closing a tab with unsaved changes.
-    #[serde(default = "crate::settings::default_true")]
-    pub confirm_close_dirty_tab: bool,
-    /// Synchronise scroll position between editor and preview in split view.
-    #[serde(default = "crate::settings::default_true")]
-    pub scroll_sync_enabled: bool,
-    /// Enable automatic saving of dirty documents.
-    #[serde(default)]
-    pub auto_save: bool,
-    /// Interval in seconds between auto-save triggers.
-    #[serde(default = "default_auto_save_interval_secs")]
-    pub auto_save_interval_secs: f64,
-}
-
-impl Default for BehaviorSettings {
-    fn default() -> Self {
-        Self {
-            confirm_close_dirty_tab: true,
-            scroll_sync_enabled: true,
-            auto_save: false,
-            auto_save_interval_secs: DEFAULT_AUTO_SAVE_INTERVAL_SECS,
-        }
-    }
-}
-
-fn default_version() -> String {
-    "0.2.0".to_string()
-}
-
-fn default_theme() -> String {
-    "dark".to_string()
-}
-
-fn default_font_size() -> f32 {
-    DEFAULT_FONT_SIZE
-}
-
-fn default_font_family() -> String {
-    "monospace".to_string()
-}
-
-fn default_language() -> String {
-    "en".to_string()
-}
-
-/// Selects the initial theme preset based on the OS dark/light mode setting.
-///
-/// Called only on first launch. Returns `KatanaDark` when the OS is in dark mode
-/// (or when detection is unavailable), and `KatanaLight` otherwise.
-fn select_initial_preset() -> ThemePreset {
-    select_preset_for_mode(crate::os_theme::is_dark_mode())
-}
-
-/// Pure helper: selects the preset for a given dark-mode query result.
-/// Factored out to allow unit testing of both branches without OS dependency.
-fn select_preset_for_mode(is_dark: Option<bool>) -> ThemePreset {
-    match is_dark {
-        Some(false) => ThemePreset::KatanaLight,
-        _ => ThemePreset::KatanaDark, // dark mode or unknown -> dark by default
-    }
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            version: default_version(),
-            theme: ThemeSettings::default(),
-            font: FontSettings::default(),
-            layout: LayoutSettings::default(),
-            workspace: WorkspaceSettings::default(),
-            performance: PerformanceSettings::default(),
-            export: ExportSettings::default(),
-            updates: UpdateSettings::default(),
-            behavior: BehaviorSettings::default(),
-            terms_accepted_version: None,
-            language: default_language(),
-            extra: Vec::new(),
-        }
-    }
-}
-
-impl AppSettings {
-    /// Returns the effective theme colours.
-    ///
-    /// If the user has custom overrides, those are returned;
-    /// otherwise the selected preset's palette is used.
-    pub fn effective_theme_colors(&self) -> ThemeColors {
-        self.theme
-            .custom_color_overrides
-            .clone()
-            .unwrap_or_else(|| self.theme.preset.colors())
-    }
-
-    /// Sets font size, clamping to the allowed range [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].
-    pub fn set_font_size(&mut self, size: f32) {
-        self.font.size = size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
-    }
-
-    /// Returns the font size clamped to [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].
-    ///
-    /// Useful after deserialization where the raw value may be out of range.
-    pub fn clamped_font_size(&self) -> f32 {
-        self.font.size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE)
-    }
-}
-
-// ── Repository trait ──
-
-/// Marker identifying whether settings were loaded from a persisted file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SettingsLoadOrigin {
-    /// No settings file existed; defaults were used.
-    FirstLaunch,
-    /// Settings file was read (even if partially corrupt).
-    Persisted,
-}
-
-/// Minimal interface for loading and saving settings.
-pub trait SettingsRepository: Send {
-    fn load(&self) -> AppSettings;
-    fn save(&self, settings: &AppSettings) -> anyhow::Result<()>;
-    /// Returns the load origin for detecting first launch.
-    fn load_origin(&self) -> SettingsLoadOrigin {
-        // Default: assume persisted to avoid false positives in tests.
-        SettingsLoadOrigin::Persisted
-    }
-}
-
-// ── JSON file repository ──
-
-/// Persists settings as a JSON file on disk.
-pub struct JsonFileRepository {
-    path: PathBuf,
-}
-
-impl JsonFileRepository {
-    /// Create a repository targeting the given file path.
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-
-    /// Create a repository using the platform-standard config directory.
-    ///
-    /// On macOS: `~/Library/Application Support/KatanA/settings.json`
-    pub fn with_default_path() -> Self {
-        let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        Self::new(base.join("KatanA").join("settings.json"))
-    }
-}
-
-impl SettingsRepository for JsonFileRepository {
-    fn load(&self) -> AppSettings {
-        match std::fs::read_to_string(&self.path) {
-            Ok(json_str) => {
-                let parsed: Result<serde_json::Value, _> = serde_json::from_str(&json_str);
-                match parsed {
-                    Ok(mut value) => {
-                        let mut runner = MigrationRunner::new();
-                        runner.add_strategy(Box::new(migration_0_1_2::Migration0_1_2));
-                        runner.add_strategy(Box::new(migration_0_1_3_to_0_1_4::Migration013To014));
-                        runner.add_strategy(Box::new(migration_0_1_4_to_0_2_0::Migration014To020));
-                        value = runner.migrate(value);
-                        serde_json::from_value(value).unwrap_or_default()
-                    }
-                    Err(_) => AppSettings::default(),
-                }
-            }
-            Err(_) => AppSettings::default(),
-        }
-    }
-
-    fn save(&self, settings: &AppSettings) -> anyhow::Result<()> {
-        // Ensure the parent directory exists. filter(|p| !p.as_os_str().is_empty())
-        // skips the no-op case when the path has no parent component.
-        if let Some(parent) = self.path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            std::fs::create_dir_all(parent)?;
-        }
-        let json = serde_json::to_string_pretty(settings)?;
-        std::fs::write(&self.path, json)?;
-        tracing::info!("Settings saved to {}", self.path.display());
-        Ok(())
-    }
-
-    fn load_origin(&self) -> SettingsLoadOrigin {
-        // If the settings file does not exist, this is a first launch.
-        if self.path.exists() {
-            SettingsLoadOrigin::Persisted
-        } else {
-            SettingsLoadOrigin::FirstLaunch
-        }
-    }
-}
-
-// ── In-memory repository (for tests) ──
-
-/// No-op repository that never touches the filesystem.
-pub struct InMemoryRepository;
-
-impl SettingsRepository for InMemoryRepository {
-    fn load(&self) -> AppSettings {
-        AppSettings::default()
-    }
-
-    fn save(&self, _settings: &AppSettings) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
-
-// ── Service ──
-
-/// Platform settings service.
-pub struct SettingsService {
-    settings: AppSettings,
-    repository: Box<dyn SettingsRepository>,
-    /// `true` when the settings were first loaded without an existing settings file.
-    is_first_launch: bool,
-}
-
-impl SettingsService {
-    /// Create a new service backed by the given repository, loading initial settings.
-    pub fn new(repository: Box<dyn SettingsRepository>) -> Self {
-        let is_first_launch = repository.load_origin() == SettingsLoadOrigin::FirstLaunch;
-        let settings = repository.load();
-        Self {
-            settings,
-            repository,
-            is_first_launch,
-        }
-    }
-
-    pub fn settings(&self) -> &AppSettings {
-        &self.settings
-    }
-
-    pub fn settings_mut(&mut self) -> &mut AppSettings {
-        &mut self.settings
-    }
-
-    /// Persist current settings via the repository.
-    pub fn save(&self) -> anyhow::Result<()> {
-        self.repository.save(&self.settings)
-    }
-
-    /// Applies the OS-default theme preset on first launch only.
-    ///
-    /// If this is not a first launch (settings file already existed), this is a no-op
-    /// to respect the user's saved theme preference.
-    pub fn apply_os_default_theme(&mut self) {
-        if !self.is_first_launch {
-            return; // Existing users keep their saved preset unchanged.
-        }
-        let preset = select_initial_preset();
-        self.settings.theme.preset = preset.clone();
-        self.settings.theme.theme = preset.colors().mode.to_theme_string();
-    }
-
-    /// Applies the OS-default language on first launch.
-    pub fn apply_os_default_language(&mut self, detected_lang: Option<String>) {
-        if !self.is_first_launch {
-            return;
-        }
-        if let Some(lang) = detected_lang {
-            self.settings.language = lang;
-        }
-    }
-}
-
-impl Default for SettingsService {
-    fn default() -> Self {
-        Self::new(Box::new(InMemoryRepository))
-    }
-}
+pub mod repository;
+pub mod service;
+pub mod types;
+
+// Public API re-exports to preserve `use crate::settings::*` compatibility.
+pub use defaults::default_true;
+pub use repository::{InMemoryRepository, JsonFileRepository, SettingsRepository};
+pub use service::SettingsService;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::Rgb;
+    use crate::theme::{Rgb, ThemeColors, ThemeMode, ThemePreset};
+    use defaults::select_preset_for_mode;
     use tempfile::TempDir;
 
     #[test]
@@ -644,7 +57,7 @@ mod tests {
         assert_eq!(s.theme.theme, "dark");
         assert_eq!(s.theme.preset, ThemePreset::KatanaDark);
         assert!(s.theme.custom_color_overrides.is_none());
-        assert!((s.font.size - DEFAULT_FONT_SIZE).abs() < f32::EPSILON);
+        assert!((s.font.size - 14.0).abs() < f32::EPSILON);
         assert_eq!(s.font.family, "monospace");
         assert_eq!(s.language, "en");
         assert!(s.workspace.last_workspace.is_none());
@@ -702,7 +115,7 @@ mod tests {
     fn test_effective_theme_colors_uses_custom_when_set() {
         let mut s = AppSettings::default();
         let mut custom = ThemePreset::Nord.colors();
-        custom.background = Rgb {
+        custom.system.background = Rgb {
             r: 10,
             g: 20,
             b: 30,
@@ -778,7 +191,6 @@ mod tests {
     #[test]
     fn test_json_file_repository_with_default_path() {
         let repo = JsonFileRepository::with_default_path();
-        // Just ensure it doesn't panic and path ends with settings.json
         assert!(repo.path.ends_with("settings.json"));
     }
 
@@ -838,7 +250,7 @@ mod tests {
         let json = r#"{"theme": {"theme": "custom"}}"#;
         let loaded: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(loaded.theme.theme, "custom");
-        assert!((loaded.font.size - DEFAULT_FONT_SIZE).abs() < f32::EPSILON);
+        assert!((loaded.font.size - 14.0).abs() < f32::EPSILON);
         assert_eq!(loaded.language, "en");
     }
 
@@ -848,7 +260,6 @@ mod tests {
         b.auto_save_interval_secs = 5.1;
 
         let json = serde_json::to_string(&b).unwrap();
-        // Ensure standard string serialization maintains precision and dec places.
         assert!(
             json.contains("5.1"),
             "Should serialize as float with exactly 1 decimal representation for 0.1s"
@@ -880,16 +291,12 @@ mod tests {
 
     #[test]
     fn test_json_file_repository_save_bare_filename_no_parent() {
-        // PathBuf::from("settings.json").parent() returns Some("") which is
-        // still handled by create_dir_all(""), covering the closing brace of
-        // the if-let block.
         let tmp = TempDir::new().unwrap();
         let cwd = std::env::current_dir().unwrap();
         std::env::set_current_dir(tmp.path()).unwrap();
 
         let repo = JsonFileRepository::new(std::path::PathBuf::from("bare.json"));
         let settings = AppSettings::default();
-        // This exercises the parent="" path inside save()
         repo.save(&settings).unwrap();
         assert!(tmp.path().join("bare.json").exists());
 
@@ -898,12 +305,10 @@ mod tests {
 
     #[test]
     fn test_json_file_repository_save_create_dir_fails() {
-        // create_dir_all fails when the parent path component is an existing file
         let tmp = TempDir::new().unwrap();
         let blocker = tmp.path().join("blocker");
         std::fs::write(&blocker, "I am a file").unwrap();
 
-        // Try to create "blocker/nested/settings.json" — blocker is a file, not a dir
         let path = blocker.join("nested").join("settings.json");
         let repo = JsonFileRepository::new(path);
         let settings = AppSettings::default();
@@ -919,13 +324,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("settings.json");
 
-        // Save: change preset to Dracula
         let mut settings = AppSettings::default();
         settings.theme.preset = ThemePreset::Dracula;
         let repo = JsonFileRepository::new(path.clone());
         repo.save(&settings).unwrap();
 
-        // Restore: Dracula should be persisted
         let loaded = repo.load();
         assert_eq!(loaded.theme.preset, ThemePreset::Dracula);
         assert!(loaded.theme.custom_color_overrides.is_none());
@@ -936,11 +339,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("settings.json");
 
-        // Save custom colour overrides
         let mut settings = AppSettings::default();
         settings.theme.preset = ThemePreset::Nord;
         let mut custom = ThemePreset::Nord.colors();
-        custom.background = Rgb {
+        custom.system.background = Rgb {
             r: 10,
             g: 20,
             b: 30,
@@ -949,12 +351,11 @@ mod tests {
         let repo = JsonFileRepository::new(path.clone());
         repo.save(&settings).unwrap();
 
-        // Restore: custom colours should be persisted correctly
         let loaded = repo.load();
         assert_eq!(loaded.theme.preset, ThemePreset::Nord);
         assert_eq!(loaded.theme.custom_color_overrides, Some(custom));
         assert_eq!(
-            loaded.effective_theme_colors().background,
+            loaded.effective_theme_colors().system.background,
             Rgb {
                 r: 10,
                 g: 20,
@@ -977,8 +378,6 @@ mod tests {
 
     #[test]
     fn test_layout_settings_serde_backward_compat() {
-        // Existing JSON without split_direction/pane_order must deserialize
-        // to the default values so that existing users' settings are not broken.
         let json = r#"{"theme": {"theme": "dark"}}"#;
         let loaded: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(loaded.layout.split_direction, SplitDirection::Horizontal);
@@ -1022,10 +421,7 @@ mod tests {
 
     #[test]
     fn test_apply_os_default_theme_is_noop_for_existing_users() {
-        // InMemoryRepository defaults to Persisted, so apply_os_default_theme
-        // must not change the saved preset (user's choice is respected).
         let mut service = SettingsService::new(Box::new(InMemoryRepository));
-        // Manually set a non-default preset to verify it is NOT overwritten.
         service.settings_mut().theme.preset = ThemePreset::Dracula;
         service.apply_os_default_theme();
         assert_eq!(
@@ -1037,15 +433,12 @@ mod tests {
 
     #[test]
     fn test_apply_os_default_theme_on_first_launch_picks_katana_preset() {
-        // On first launch, apply_os_default_theme selects KatanaDark or KatanaLight
-        // depending on the OS theme (KatanaDark when unknown / non-macOS).
         let repo = FirstLaunchRepo {
-            preset: ThemePreset::KatanaDark, // initial value before apply
+            preset: ThemePreset::KatanaDark,
         };
         let mut service = SettingsService::new(Box::new(repo));
         service.apply_os_default_theme();
         let preset = &service.settings().theme.preset;
-        // Must be one of the two Katana presets — never a third-party preset.
         assert!(
             *preset == ThemePreset::KatanaDark || *preset == ThemePreset::KatanaLight,
             "first launch must yield KatanaDark or KatanaLight, got {preset:?}"
@@ -1054,13 +447,11 @@ mod tests {
 
     #[test]
     fn test_select_preset_for_mode_dark() {
-        // Explicit dark-mode input must yield KatanaDark.
         assert_eq!(select_preset_for_mode(Some(true)), ThemePreset::KatanaDark);
     }
 
     #[test]
     fn test_select_preset_for_mode_light() {
-        // Explicit light-mode input must yield KatanaLight.
         assert_eq!(
             select_preset_for_mode(Some(false)),
             ThemePreset::KatanaLight
@@ -1069,13 +460,11 @@ mod tests {
 
     #[test]
     fn test_select_preset_for_mode_unknown() {
-        // Unknown (None) falls back to KatanaDark.
         assert_eq!(select_preset_for_mode(None), ThemePreset::KatanaDark);
     }
 
     #[test]
     fn test_first_launch_repo_save_is_noop() {
-        // Covers the save() implementation of the test helper.
         let repo = FirstLaunchRepo {
             preset: ThemePreset::KatanaDark,
         };
@@ -1093,7 +482,6 @@ mod tests {
         service.apply_os_default_language(Some("fr".to_string()));
         assert_eq!(service.settings().language, "ja");
 
-        // None case
         service.apply_os_default_language(None);
         assert_eq!(service.settings().language, "ja");
     }
@@ -1105,12 +493,9 @@ mod tests {
         };
         let mut service = SettingsService::new(Box::new(repo));
 
-        // Test with None to ensure it does not overwrite
-        // Default AppSettings language is "en"
         service.apply_os_default_language(None);
         assert_eq!(service.settings().language, "en");
 
-        // Test with Some
         service.apply_os_default_language(Some("fr".to_string()));
         assert_eq!(service.settings().language, "fr");
     }
@@ -1131,9 +516,138 @@ mod tests {
 
     #[test]
     fn test_skipped_version_backward_compat() {
-        // Existing JSON without skipped_version must deserialize to None
         let json = r#"{"updates": {"interval": "Daily"}}"#;
         let loaded: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(loaded.updates.skipped_version, None);
+    }
+
+    #[test]
+    fn test_legacy_theme_colors_migration() {
+        let json = r#"{
+            "name": "Legacy Dark",
+            "mode": "Dark",
+            "background":             { "r": 30, "g": 30, "b": 30 },
+            "panel_background":       { "r": 37, "g": 37, "b": 38 },
+            "text":                   { "r": 212, "g": 212, "b": 212 },
+            "text_secondary":         { "r": 180, "g": 180, "b": 180 },
+            "accent":                 { "r": 86, "g": 156, "b": 214 },
+            "title_bar_text":         { "r": 180, "g": 180, "b": 180 },
+            "file_tree_text":         { "r": 220, "g": 220, "b": 220 },
+            "active_file_highlight":  { "r": 40, "g": 80, "b": 160, "a": 100 },
+            "warning_text":           { "r": 255, "g": 165, "b": 0 },
+            "border":                 { "r": 60, "g": 60, "b": 60 },
+            "selection":              { "r": 38, "g": 79, "b": 120 },
+            "code_background":        { "r": 25, "g": 25, "b": 40 },
+            "preview_background":     { "r": 35, "g": 35, "b": 50 }
+        }"#;
+        let colors: ThemeColors = serde_json::from_str(json).unwrap();
+        assert_eq!(colors.name, "Legacy Dark");
+        assert_eq!(colors.mode, ThemeMode::Dark);
+        assert_eq!(
+            colors.system.background,
+            Rgb {
+                r: 30,
+                g: 30,
+                b: 30
+            }
+        );
+        assert_eq!(
+            colors.code.background,
+            Rgb {
+                r: 25,
+                g: 25,
+                b: 40
+            }
+        );
+        assert_eq!(
+            colors.preview.background,
+            Rgb {
+                r: 35,
+                g: 35,
+                b: 50
+            }
+        );
+    }
+
+    #[test]
+    fn test_legacy_theme_colors_migration_light() {
+        let json = r#"{
+            "name": "Legacy Light",
+            "mode": "Light",
+            "background":             { "r": 255, "g": 255, "b": 255 },
+            "panel_background":       { "r": 240, "g": 240, "b": 240 },
+            "text":                   { "r": 30, "g": 30, "b": 30 },
+            "text_secondary":         { "r": 100, "g": 100, "b": 100 },
+            "accent":                 { "r": 0, "g": 122, "b": 204 },
+            "title_bar_text":         { "r": 50, "g": 50, "b": 50 },
+            "file_tree_text":         { "r": 40, "g": 40, "b": 40 },
+            "active_file_highlight":  { "r": 200, "g": 220, "b": 255, "a": 120 }
+        }"#;
+        let colors: ThemeColors = serde_json::from_str(json).unwrap();
+        assert_eq!(colors.name, "Legacy Light");
+        assert_eq!(colors.mode, ThemeMode::Light);
+        assert_eq!(
+            colors.system.success_text,
+            Rgb {
+                r: 20,
+                g: 160,
+                b: 20
+            }
+        );
+        assert_eq!(
+            colors.system.splash_background,
+            Rgb {
+                r: 240,
+                g: 240,
+                b: 240
+            }
+        );
+        assert_eq!(
+            colors.code.line_number_text,
+            Rgb {
+                r: 160,
+                g: 160,
+                b: 160
+            }
+        );
+        assert_eq!(
+            colors.system.warning_text,
+            Rgb {
+                r: 255,
+                g: 140,
+                b: 0
+            }
+        );
+        assert_eq!(
+            colors.code.background,
+            Rgb {
+                r: 30,
+                g: 30,
+                b: 30
+            }
+        );
+        assert_eq!(
+            colors.preview.background,
+            Rgb {
+                r: 35,
+                g: 35,
+                b: 35
+            }
+        );
+    }
+
+    #[test]
+    fn test_new_format_theme_colors_roundtrip() {
+        let preset = ThemePreset::KatanaDark;
+        let original = preset.colors();
+        let json = serde_json::to_string(&original).unwrap();
+        let roundtripped: ThemeColors = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, roundtripped);
+    }
+
+    #[test]
+    fn test_theme_mode_to_theme_string() {
+        assert_eq!(ThemeMode::Dark.to_theme_string(), "dark");
+        assert_eq!(ThemeMode::Light.to_theme_string(), "light");
     }
 }

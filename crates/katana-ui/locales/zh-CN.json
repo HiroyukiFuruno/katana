@@ -121,7 +121,9 @@
       "save_custom_theme": "另存为自定义主题...",
       "save_custom_theme_title": "保存自定义主题",
       "theme_name_label": "主题名称:",
-      "duplicate": "复制..."
+      "duplicate": "复制...",
+      "ui_contrast_offset": "[zh-CN] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[zh-CN] Reset"
     },
     "font": {
       "size": "字体大小",
@@ -155,8 +157,29 @@
       "accent": "强调",
       "border": "边框",
       "selection": "选择",
-      "code_background": "代码背景",
-      "preview_background": "预览背景"
+      "code_background": "背景",
+      "preview_background": "背景",
+      "code_text": "文本",
+      "preview_text": "文本",
+      "highlight": "高亮",
+      "section_system": "系统",
+      "section_code": "代码",
+      "section_preview": "预览",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "workspace": {
       "max_depth": "最大目录扫描深度",
@@ -222,7 +245,10 @@
       "close_confirm_title": "未保存的更改",
       "close_confirm_msg": "'{name}' 有未保存的更改。是否丢弃？",
       "close_confirm_discard": "丢弃",
-      "close_confirm_cancel": "取消"
+      "close_confirm_cancel": "取消",
+      "clear_http_cache": "[zh-CN] Clear All Caches",
+      "cache_retention_days": "[zh-CN] Cache Retention Days",
+      "days_suffix": "[zh-CN]  days"
     }
   },
   "tab": {

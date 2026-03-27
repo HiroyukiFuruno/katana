@@ -66,6 +66,34 @@ impl DefaultCacheService {
         std::fs::write(&self.persistent_path, json)?;
         Ok(())
     }
+
+    /// Clears all subdirectories in the Katana cache directory (e.g., http-image-cache, plantuml, tmp)
+    /// while preserving files in the root like `cache.json`.
+    pub fn clear_all_directories() {
+        let base = dirs::cache_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("KatanA");
+        Self::clear_all_directories_in(&base);
+    }
+
+    pub fn clear_all_directories_in(base: &std::path::Path) {
+        if let Ok(entries) = std::fs::read_dir(base) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let path = entry.path();
+                        // Best effort clear contents to prevent macOS directory not empty errors
+                        if let Ok(sub_entries) = std::fs::read_dir(&path) {
+                            for sub_entry in sub_entries.flatten() {
+                                let _ = std::fs::remove_file(sub_entry.path());
+                            }
+                        }
+                        let _ = std::fs::remove_dir_all(&path);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn read_guard<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
@@ -200,6 +228,33 @@ mod tests {
 
         // We just verify it doesn't crash, because the default path varies by OS
         assert_eq!(cache.get_persistent("non-existent"), None);
+    }
+
+    #[test]
+    fn test_clear_all_directories() {
+        let tmp = TempDir::new().unwrap();
+        let base = tmp.path();
+
+        // Create an empty dir
+        std::fs::create_dir(base.join("empty_dir")).unwrap();
+
+        // Create a dir with files
+        let full_dir = base.join("full_dir");
+        std::fs::create_dir(&full_dir).unwrap();
+        std::fs::write(full_dir.join("file.txt"), b"test").unwrap();
+
+        // Create a root file that should be ignored
+        let root_file = base.join("cache.json");
+        std::fs::write(&root_file, b"test").unwrap();
+
+        DefaultCacheService::clear_all_directories_in(base);
+
+        assert!(!base.join("empty_dir").exists());
+        assert!(!full_dir.exists());
+        assert!(root_file.exists());
+
+        // Cover dirs::cache_dir() invocation mapping
+        DefaultCacheService::clear_all_directories();
     }
 
     #[test]

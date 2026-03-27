@@ -121,7 +121,9 @@
       "save_custom_theme": "Als Theme speichern...",
       "save_custom_theme_title": "Benutzerdefiniertes Theme speichern",
       "theme_name_label": "Theme-Name:",
-      "duplicate": "Duplizieren..."
+      "duplicate": "Duplizieren...",
+      "ui_contrast_offset": "[de] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[de] Reset"
     },
     "font": {
       "size": "Schriftgröße",
@@ -155,8 +157,29 @@
       "accent": "Hervorhebung",
       "border": "Rahmen",
       "selection": "Auswahl",
-      "code_background": "Code-Hintergrund",
-      "preview_background": "Vorschau-Hintergrund"
+      "code_background": "Hintergrund",
+      "preview_background": "Hintergrund",
+      "code_text": "Text",
+      "preview_text": "Text",
+      "highlight": "Hervorheben",
+      "section_system": "",
+      "section_code": "",
+      "section_preview": "Vorschau",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "tabs": [
       {
@@ -222,7 +245,10 @@
       "close_confirm_title": "Nicht gespeicherte Änderungen",
       "close_confirm_msg": "'{name}' hat nicht gespeicherte Änderungen. Verwerfen?",
       "close_confirm_discard": "Verwerfen",
-      "close_confirm_cancel": "Abbrechen"
+      "close_confirm_cancel": "Abbrechen",
+      "clear_http_cache": "[de] Clear All Caches",
+      "cache_retention_days": "[de] Cache Retention Days",
+      "days_suffix": "[de]  days"
     }
   },
   "tab": {

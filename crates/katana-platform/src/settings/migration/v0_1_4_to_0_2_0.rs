@@ -1,4 +1,4 @@
-use crate::settings::migration::MigrationStrategy;
+use super::MigrationStrategy;
 use serde_json::{json, Value};
 
 /// Migrates settings from 0.1.4 to 0.2.0.

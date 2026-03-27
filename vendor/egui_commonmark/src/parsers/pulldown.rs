@@ -112,6 +112,8 @@ pub(crate) struct CommonMarkViewerInternal<'a> {
     hovered_spans: Option<&'a mut Vec<std::ops::Range<usize>>>,
     active_rects: Vec<(egui::Rect, std::ops::Range<usize>)>,
     block_states: Vec<(f32, std::ops::Range<usize>)>,
+    active_bg_color: Option<egui::Color32>,
+    hover_bg_color: Option<egui::Color32>,
 }
 
 impl<'a> CommonMarkViewerInternal<'a> {
@@ -121,6 +123,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
         heading_offset: usize,
         active_char_range: Option<std::ops::Range<usize>>,
         hovered_spans: Option<&'a mut Vec<std::ops::Range<usize>>>,
+        active_bg_color: Option<egui::Color32>,
+        hover_bg_color: Option<egui::Color32>,
     ) -> Self {
         Self {
             curr_table: 0,
@@ -151,6 +155,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
             hovered_spans,
             active_rects: Vec::new(),
             block_states: Vec::new(),
+            active_bg_color,
+            hover_bg_color,
         }
     }
 }
@@ -1529,11 +1535,13 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         if let Some(active) = &self.active_char_range {
                             if active.start <= span.end && active.end >= span.start {
                                 self.active_rects.push((rect, span.clone()));
-                                let highlight_color = if ui.visuals().dark_mode {
-                                    egui::Color32::from_white_alpha(15)
-                                } else {
-                                    egui::Color32::from_black_alpha(15)
-                                };
+                                let highlight_color = self.active_bg_color.unwrap_or_else(|| {
+                                    if ui.visuals().dark_mode {
+                                        egui::Color32::from_white_alpha(15)
+                                    } else {
+                                        egui::Color32::from_black_alpha(15)
+                                    }
+                                });
                                 ui.painter().rect_filled(rect, 1.0, highlight_color);
                             }
                         }
@@ -1541,11 +1549,13 @@ impl<'a> CommonMarkViewerInternal<'a> {
                             if let Some(pos) = ui.ctx().pointer_hover_pos() {
                                 if rect.contains(pos) {
                                     hovered.push(span.clone());
-                                    let hover_color = if ui.visuals().dark_mode {
-                                        egui::Color32::from_white_alpha(8)
-                                    } else {
-                                        egui::Color32::from_black_alpha(8)
-                                    };
+                                    let hover_color = self.hover_bg_color.unwrap_or_else(|| {
+                                        if ui.visuals().dark_mode {
+                                            egui::Color32::from_white_alpha(8)
+                                        } else {
+                                            egui::Color32::from_black_alpha(8)
+                                        }
+                                    });
                                     ui.painter().rect_filled(rect, 1.0, hover_color);
                                 }
                             }

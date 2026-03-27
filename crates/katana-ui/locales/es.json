@@ -121,7 +121,9 @@
       "save_custom_theme": "Guardar como tema...",
       "save_custom_theme_title": "Guardar tema personalizado",
       "theme_name_label": "Nombre del tema:",
-      "duplicate": "Duplicar..."
+      "duplicate": "Duplicar...",
+      "ui_contrast_offset": "[es] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[es] Reset"
     },
     "font": {
       "size": "Tamaño de Fuente",
@@ -155,8 +157,29 @@
       "accent": "Acento",
       "border": "Borde",
       "selection": "Selección",
-      "code_background": "Fondo de Código",
-      "preview_background": "Fondo de Vista Previa"
+      "code_background": "Fondo",
+      "preview_background": "Fondo",
+      "code_text": "Texto",
+      "preview_text": "Texto",
+      "highlight": "Resaltar",
+      "section_system": "Sistema",
+      "section_code": "Código",
+      "section_preview": "Vista previa",
+      "title_bar_text": "",
+      "active_file_highlight": "",
+      "success_text": "",
+      "warning_text": "",
+      "error_text": "",
+      "button_background": "",
+      "button_active_background": "",
+      "splash_background": "",
+      "splash_progress": "",
+      "fullscreen_overlay": "",
+      "line_number_text": "",
+      "line_number_active_text": "",
+      "current_line_background": "",
+      "hover_line_background": "",
+      "file_tree_text": ""
     },
     "tabs": [
       {
@@ -222,7 +245,10 @@
       "close_confirm_title": "Cambios sin guardar",
       "close_confirm_msg": "'{name}' tiene cambios sin guardar. ¿Descartarlos?",
       "close_confirm_discard": "Descartar",
-      "close_confirm_cancel": "Cancelar"
+      "close_confirm_cancel": "Cancelar",
+      "clear_http_cache": "[es] Clear All Caches",
+      "cache_retention_days": "[es] Cache Retention Days",
+      "days_suffix": "[es]  days"
     }
   },
   "tab": {
