@@ -2021,6 +2021,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                 } else if let Some(html_fn) = options.html_fn {
                     // Regular HTML block — delegate to the callback
                     html_fn(ui, &block);
+                    self.line.try_insert_end(ui);
                 }
             }
 

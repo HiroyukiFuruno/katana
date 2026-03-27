@@ -93,7 +93,7 @@ impl<'a> HtmlRenderer<'a> {
         let mut action: Option<LinkAction> = None;
         let mut inline_batch: Vec<&HtmlNode> = Vec::new();
 
-        for node in nodes {
+        for (i, node) in nodes.iter().enumerate() {
             if node.is_block() {
                 // Flush any pending inline elements
                 if let Some(a) = self.flush_inline_batch(&inline_batch) {
@@ -104,6 +104,14 @@ impl<'a> HtmlRenderer<'a> {
                 // Render the block element
                 if let Some(a) = self.render_block(node) {
                     action = Some(a);
+                }
+
+                if i < nodes.len() - 1 {
+                    self.ui.add_space(match node {
+                        HtmlNode::Heading { .. } => HEADING_BLOCK_MARGIN_Y,
+                        HtmlNode::Paragraph { .. } => PARAGRAPH_BLOCK_MARGIN_Y,
+                        _ => 0.0,
+                    });
                 }
             } else {
                 inline_batch.push(node);
@@ -120,7 +128,7 @@ impl<'a> HtmlRenderer<'a> {
 
     /// Renders a block-level node.
     fn render_block(&mut self, node: &HtmlNode) -> Option<LinkAction> {
-        let action = match node {
+        match node {
             HtmlNode::Paragraph { align, children } => match align {
                 Some(TextAlign::Center) => {
                     // Don't use vertical_centered here — it doesn't work for
@@ -168,15 +176,7 @@ impl<'a> HtmlRenderer<'a> {
                 None
             }
             _ => None, // Non-block nodes handled by inline path
-        };
-
-        self.ui.add_space(match node {
-            HtmlNode::Heading { .. } => HEADING_BLOCK_MARGIN_Y,
-            HtmlNode::Paragraph { .. } => PARAGRAPH_BLOCK_MARGIN_Y,
-            _ => 0.0,
-        });
-
-        action
+        }
     }
 
     fn batch_is_textual(batch: &[&HtmlNode]) -> bool {
@@ -369,11 +369,7 @@ impl<'a> HtmlRenderer<'a> {
         }
 
         // Allocate a full-width row in the parent so the cursor advances correctly.
-        let row_height = if memorized {
-            centered_rect.height()
-        } else {
-            new_size.y
-        };
+        let row_height = new_size.y;
         self.ui
             .allocate_space(egui::vec2(bounds.width(), row_height));
 
