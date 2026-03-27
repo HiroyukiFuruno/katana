@@ -2085,7 +2085,7 @@ fn render_horizontal_split(
         app.state
             .settings
             .settings()
-            .effective_theme_colors()
+            .rendered_theme_colors()
             .preview
             .background,
     );
@@ -2160,7 +2160,7 @@ fn render_vertical_split(
         app.state
             .settings
             .settings()
-            .effective_theme_colors()
+            .rendered_theme_colors()
             .preview
             .background,
     );
@@ -2267,7 +2267,7 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
             app.state
                 .settings
                 .settings()
-                .effective_theme_colors()
+                .rendered_theme_colors()
                 .preview
                 .background,
         ),
@@ -2685,7 +2685,7 @@ impl eframe::App for KatanaApp {
         let splash_is_opaque = self.splash_start.is_some() && splash_opacity >= 1.0;
 
         // Apply theme colours to egui Visuals (only when the palette changed)
-        let theme_colors = self.state.settings.settings().effective_theme_colors();
+        let theme_colors = self.state.settings.settings().rendered_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
             let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));

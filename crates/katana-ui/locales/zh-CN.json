@@ -121,7 +121,9 @@
       "save_custom_theme": "另存为自定义主题...",
       "save_custom_theme_title": "保存自定义主题",
       "theme_name_label": "主题名称:",
-      "duplicate": "复制..."
+      "duplicate": "复制...",
+      "ui_contrast_offset": "[zh-CN] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[zh-CN] Reset"
     },
     "font": {
       "size": "字体大小",
@@ -243,7 +245,10 @@
       "close_confirm_title": "未保存的更改",
       "close_confirm_msg": "'{name}' 有未保存的更改。是否丢弃？",
       "close_confirm_discard": "丢弃",
-      "close_confirm_cancel": "取消"
+      "close_confirm_cancel": "取消",
+      "clear_http_cache": "[zh-CN] Clear All Caches",
+      "cache_retention_days": "[zh-CN] Cache Retention Days",
+      "days_suffix": "[zh-CN]  days"
     }
   },
   "tab": {

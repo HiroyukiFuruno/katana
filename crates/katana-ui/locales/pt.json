@@ -121,7 +121,9 @@
       "save_custom_theme": "Salvar como tema...",
       "save_custom_theme_title": "Salvar Tema Personalizado",
       "theme_name_label": "Nome do Tema:",
-      "duplicate": "Duplicar..."
+      "duplicate": "Duplicar...",
+      "ui_contrast_offset": "[pt] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[pt] Reset"
     },
     "font": {
       "size": "Tamanho da Fonte",
@@ -243,7 +245,10 @@
       "close_confirm_title": "Alterações não salvas",
       "close_confirm_msg": "'{name}' tem alterações não salvas. Descartar?",
       "close_confirm_discard": "Descartar",
-      "close_confirm_cancel": "Cancelar"
+      "close_confirm_cancel": "Cancelar",
+      "clear_http_cache": "[pt] Clear All Caches",
+      "cache_retention_days": "[pt] Cache Retention Days",
+      "days_suffix": "[pt]  days"
     }
   },
   "tab": {

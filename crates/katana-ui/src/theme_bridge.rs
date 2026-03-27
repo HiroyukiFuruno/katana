@@ -104,9 +104,9 @@ pub fn rgb_to_color32(c: Rgb) -> egui::Color32 {
     egui::Color32::from_rgb(c.r, c.g, c.b)
 }
 
-/// Convert `Rgba` to `egui::Color32` (premultiplied alpha).
+/// Convert `Rgba` to `egui::Color32` (unmultiplied alpha).
 pub fn rgba_to_color32(c: Rgba) -> egui::Color32 {
-    egui::Color32::from_rgba_premultiplied(c.r, c.g, c.b, c.a)
+    egui::Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a)
 }
 
 /// Heading / Small font-size ratio constants.
@@ -254,6 +254,30 @@ mod visuals_tests {
         assert!(result.r() > base.r());
         assert!(result.g() > base.g());
         assert!(result.b() > base.b());
+    }
+    #[test]
+    fn test_color_helpers() {
+        assert_eq!(
+            super::from_rgb(255, 0, 0),
+            egui::Color32::from_rgb(255, 0, 0)
+        );
+        assert_eq!(super::from_gray(128), egui::Color32::from_gray(128));
+        assert_eq!(
+            super::from_black_alpha(128),
+            egui::Color32::from_black_alpha(128)
+        );
+        assert_eq!(
+            super::from_white_alpha(128),
+            egui::Color32::from_white_alpha(128)
+        );
+        assert_eq!(
+            super::from_rgba_unmultiplied(255, 0, 0, 128),
+            egui::Color32::from_rgba_unmultiplied(255, 0, 0, 128)
+        );
+        assert_eq!(
+            super::from_rgba_premultiplied(128, 0, 0, 128),
+            egui::Color32::from_rgba_premultiplied(128, 0, 0, 128)
+        );
     }
 }
 

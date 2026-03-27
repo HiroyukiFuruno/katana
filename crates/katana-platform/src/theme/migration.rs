@@ -296,6 +296,11 @@ where
                     } else {
                         LEGACY_FULLSCREEN_OVERLAY_LIGHT
                     },
+                    hover_line_background: if is_dark {
+                        LEGACY_HOVER_LINE_DARK
+                    } else {
+                        LEGACY_HOVER_LINE_LIGHT
+                    },
                 },
             })
         }

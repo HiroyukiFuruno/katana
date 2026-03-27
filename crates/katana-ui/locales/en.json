@@ -156,7 +156,9 @@
       "save_custom_theme": "Save as Custom Theme...",
       "save_custom_theme_title": "Save Custom Theme",
       "theme_name_label": "Theme Name:",
-      "duplicate": "Duplicate..."
+      "duplicate": "Duplicate...",
+      "ui_contrast_offset": "UI Contrast (Alpha Offset)",
+      "reset_contrast": "Reset"
     },
     "font": {
       "size": "Font Size",
@@ -278,7 +280,10 @@
       "close_confirm_title": "Unsaved Changes",
       "close_confirm_msg": "'{name}' has unsaved changes. Discard them?",
       "close_confirm_discard": "Discard",
-      "close_confirm_cancel": "Cancel"
+      "close_confirm_cancel": "Cancel",
+      "clear_http_cache": "Clear All Caches",
+      "cache_retention_days": "Cache Retention Days",
+      "days_suffix": " days"
     }
   },
   "tab": {

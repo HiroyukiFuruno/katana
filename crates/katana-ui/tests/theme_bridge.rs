@@ -82,7 +82,7 @@ fn rgba_to_color32_converts_correctly() {
     };
     assert_eq!(
         rgba_to_color32(c),
-        eframe::egui::Color32::from_rgba_premultiplied(40, 80, 160, 100)
+        eframe::egui::Color32::from_rgba_unmultiplied(40, 80, 160, 100)
     );
 }
 

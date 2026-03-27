@@ -156,7 +156,9 @@
       "save_custom_theme": "カスタムテーマとして保存...",
       "save_custom_theme_title": "カスタムテーマの保存",
       "theme_name_label": "テーマ名:",
-      "duplicate": "複製..."
+      "duplicate": "複製...",
+      "ui_contrast_offset": "UI透過度補正 (アルファ値オフセット)",
+      "reset_contrast": "リセット"
     },
     "font": {
       "size": "フォントサイズ",
@@ -278,7 +280,10 @@
       "close_confirm_title": "未保存の変更",
       "close_confirm_msg": "'{name}' に未保存の変更があります。破棄しますか？",
       "close_confirm_discard": "破棄",
-      "close_confirm_cancel": "キャンセル"
+      "close_confirm_cancel": "キャンセル",
+      "clear_http_cache": "すべてのキャッシュをクリア",
+      "cache_retention_days": "キャッシュ保持日数",
+      "days_suffix": " 日"
     }
   },
   "tab": {

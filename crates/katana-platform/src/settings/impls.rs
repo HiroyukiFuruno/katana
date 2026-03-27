@@ -16,6 +16,16 @@ impl AppSettings {
             .unwrap_or_else(|| self.theme.preset.colors())
     }
 
+    /// Returns the theme colours adjusted for rendering.
+    ///
+    /// This applies the `ui_contrast_offset` to all RGBa layers. Use this method
+    /// for UI generation, while `effective_theme_colors` should strictly be used
+    /// for data manipulation and the Settings Window to avoid corrupting user overrides.
+    pub fn rendered_theme_colors(&self) -> ThemeColors {
+        self.effective_theme_colors()
+            .with_contrast_offset(self.theme.ui_contrast_offset)
+    }
+
     /// Sets font size, clamping to the allowed range [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].
     pub fn set_font_size(&mut self, size: f32) {
         self.font.size = size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);

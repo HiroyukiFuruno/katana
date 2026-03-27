@@ -126,6 +126,9 @@ pub struct ThemeSettings {
     pub custom_themes: Vec<CustomTheme>,
     #[serde(default)]
     pub active_custom_theme: Option<String>,
+    /// Global contrast offset for RGBa layers (e.g. -100.0 to 100.0).
+    #[serde(default)]
+    pub ui_contrast_offset: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,6 +184,9 @@ pub struct WorkspaceSettings {
 pub struct PerformanceSettings {
     /// Number of concurrent diagram renders.
     pub diagram_concurrency: usize,
+    /// Number of days to retain HTTP image cache.
+    #[serde(default = "super::defaults::default_cache_retention")]
+    pub http_image_cache_retention_days: u32,
 }
 
 /// Export-related settings.

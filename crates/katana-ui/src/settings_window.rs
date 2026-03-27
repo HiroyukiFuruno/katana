@@ -755,6 +755,13 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
                 |c, r| c.preview.fullscreen_overlay = r,
             ),
         },
+        ColorSettingDef {
+            label: &color_i18n.hover_line_background,
+            prop: ColorPropType::Rgba(
+                |c| c.preview.hover_line_background,
+                |c, r| c.preview.hover_line_background = r,
+            ),
+        },
     ];
 
     let sections = [

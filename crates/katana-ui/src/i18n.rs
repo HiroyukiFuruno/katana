@@ -436,6 +436,17 @@ pub struct SettingsThemeMessages {
     pub theme_name_label: String,
     #[serde(default = "default_duplicate")]
     pub duplicate: String,
+    #[serde(default = "default_ui_contrast_offset")]
+    pub ui_contrast_offset: String,
+    #[serde(default = "default_reset_contrast")]
+    pub reset_contrast: String,
+}
+
+fn default_ui_contrast_offset() -> String {
+    "UI Contrast (Alpha Offset)".to_string()
+}
+fn default_reset_contrast() -> String {
+    "Reset".to_string()
 }
 
 fn default_duplicate() -> String {
@@ -568,6 +579,25 @@ pub struct SettingsBehaviorMessages {
     pub close_confirm_discard: String,
     /// Confirmation dialog cancel button.
     pub close_confirm_cancel: String,
+
+    #[serde(default = "default_clear_http_cache")]
+    pub clear_http_cache: String,
+
+    #[serde(default = "default_cache_retention_days")]
+    pub cache_retention_days: String,
+
+    #[serde(default = "default_days_suffix")]
+    pub days_suffix: String,
+}
+
+fn default_clear_http_cache() -> String {
+    "Clear All Caches".to_string()
+}
+fn default_cache_retention_days() -> String {
+    "Cache Retention Days".to_string()
+}
+fn default_days_suffix() -> String {
+    " days".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1023,4 +1053,33 @@ fn d_hover_bg() -> String {
 }
 fn d_file_tree_text() -> String {
     "File Tree Text".to_string()
+}
+
+#[cfg(test)]
+mod tests_defaults {
+    use super::*;
+
+    #[test]
+    fn test_i18n_settings_color_defaults() {
+        assert_eq!(d_title_bar_text(), "Title Bar Text");
+        assert_eq!(d_active_file_highlight(), "Active File");
+        assert_eq!(d_success_text(), "Success Text");
+        assert_eq!(d_warning_text(), "Warning Text");
+        assert_eq!(d_error_text(), "Error Text");
+        assert_eq!(d_button_bg(), "Button Background");
+        assert_eq!(d_button_active(), "Active Button");
+        assert_eq!(d_splash_bg(), "Splash Background");
+        assert_eq!(d_splash_prog(), "Splash Progress");
+        assert_eq!(d_fullscreen(), "Fullscreen Overlay");
+        assert_eq!(d_line_num(), "Line Number");
+        assert_eq!(d_line_num_act(), "Active Line Num");
+        assert_eq!(d_curr_bg(), "Current Line");
+        assert_eq!(d_hover_bg(), "Hover Line");
+        assert_eq!(d_file_tree_text(), "File Tree Text");
+        assert_eq!(default_ui_contrast_offset(), "UI Contrast (Alpha Offset)");
+        assert_eq!(default_reset_contrast(), "Reset");
+        assert_eq!(default_clear_http_cache(), "Clear All Caches");
+        assert_eq!(default_cache_retention_days(), "Cache Retention Days");
+        assert_eq!(default_days_suffix(), " days");
+    }
 }

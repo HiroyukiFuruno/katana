@@ -107,6 +107,8 @@ pub struct CommonMarkViewer<'f> {
     heading_offset: usize,
     active_char_range: Option<std::ops::Range<usize>>,
     hovered_spans: Option<&'f mut Vec<std::ops::Range<usize>>>,
+    active_bg_color: Option<egui::Color32>,
+    hover_bg_color: Option<egui::Color32>,
 }
 
 impl<'f> Default for CommonMarkViewer<'f> {
@@ -118,6 +120,8 @@ impl<'f> Default for CommonMarkViewer<'f> {
             heading_offset: 0,
             active_char_range: None,
             hovered_spans: None,
+            active_bg_color: None,
+            hover_bg_color: None,
         }
     }
 }
@@ -144,6 +148,16 @@ impl<'f> CommonMarkViewer<'f> {
 
     pub fn hovered_spans(mut self, spans: &'f mut Vec<std::ops::Range<usize>>) -> Self {
         self.hovered_spans = Some(spans);
+        self
+    }
+
+    pub fn active_bg_color(mut self, color: Option<egui::Color32>) -> Self {
+        self.active_bg_color = color;
+        self
+    }
+
+    pub fn hover_bg_color(mut self, color: Option<egui::Color32>) -> Self {
+        self.hover_bg_color = color;
         self
     }
 
@@ -288,6 +302,8 @@ impl<'f> CommonMarkViewer<'f> {
             self.heading_offset,
             self.active_char_range.clone(),
             self.hovered_spans,
+            self.active_bg_color,
+            self.hover_bg_color,
         ).show(
             ui,
             cache,
@@ -318,6 +334,8 @@ impl<'f> CommonMarkViewer<'f> {
                 self.heading_offset,
                 self.active_char_range.clone(),
                 self.hovered_spans,
+                self.active_bg_color,
+                self.hover_bg_color,
             ).show(
                 ui,
                 cache,
@@ -384,6 +402,8 @@ impl<'f> CommonMarkViewer<'f> {
             self.heading_offset,
             self.active_char_range.clone(),
             self.hovered_spans,
+            self.active_bg_color,
+            self.hover_bg_color,
         ).show(
             ui,
             cache,
@@ -422,6 +442,8 @@ impl<'f> CommonMarkViewer<'f> {
             self.heading_offset,
             self.active_char_range.clone(),
             self.hovered_spans,
+            self.active_bg_color,
+            self.hover_bg_color,
         ).show_scrollable(
             Id::new(source_id),
             ui,

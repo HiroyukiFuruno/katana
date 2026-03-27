@@ -121,7 +121,9 @@
       "save_custom_theme": "사용자 지정 테마로 저장...",
       "save_custom_theme_title": "사용자 지정 테마 저장",
       "theme_name_label": "테마 이름:",
-      "duplicate": "복제..."
+      "duplicate": "복제...",
+      "ui_contrast_offset": "[ko] UI Contrast (Alpha Offset)",
+      "reset_contrast": "[ko] Reset"
     },
     "font": {
       "size": "글꼴 크기",
@@ -243,7 +245,10 @@
       "close_confirm_title": "저장되지 않은 변경 사항",
       "close_confirm_msg": "'{name}'에 저장되지 않은 변경 사항이 있습니다. 삭제하시겠습니까?",
       "close_confirm_discard": "삭제",
-      "close_confirm_cancel": "취소"
+      "close_confirm_cancel": "취소",
+      "clear_http_cache": "[ko] Clear All Caches",
+      "cache_retention_days": "[ko] Cache Retention Days",
+      "days_suffix": "[ko]  days"
     }
   },
   "tab": {

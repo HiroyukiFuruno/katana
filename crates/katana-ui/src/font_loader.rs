@@ -259,7 +259,7 @@ impl SystemFontLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use egui::{Color32, FontId};
+    use egui::FontId;
     use std::fs;
     use std::sync::Arc;
     use tempfile::TempDir;

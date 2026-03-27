@@ -122,6 +122,7 @@ impl Default for ThemeSettings {
             custom_color_overrides: None,
             custom_themes: Vec::new(),
             active_custom_theme: None,
+            ui_contrast_offset: 0.0,
         }
     }
 }
@@ -165,6 +166,7 @@ impl Default for PerformanceSettings {
     fn default() -> Self {
         Self {
             diagram_concurrency: DEFAULT_DIAGRAM_CONCURRENCY,
+            http_image_cache_retention_days: default_cache_retention(),
         }
     }
 }
@@ -186,4 +188,10 @@ impl Default for BehaviorSettings {
             auto_save_interval_secs: DEFAULT_AUTO_SAVE_INTERVAL_SECS,
         }
     }
+}
+
+pub const DEFAULT_CACHE_RETENTION_DAYS: u32 = 7;
+
+pub fn default_cache_retention() -> u32 {
+    DEFAULT_CACHE_RETENTION_DAYS
 }

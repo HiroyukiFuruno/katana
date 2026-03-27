@@ -163,5 +163,12 @@ pub(crate) const AYU_LIGHT: PresetColorData = PresetColorData {
             b: 200,
             a: 200,
         },
+
+        hover_line_background: Rgba {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 20,
+        },
     },
 };
