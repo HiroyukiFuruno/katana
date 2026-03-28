@@ -157,7 +157,6 @@
       "save_custom_theme_title": "儲存自訂主題",
       "theme_name_label": "主題名稱:",
       "duplicate": "建立複本...",
-      "ui_contrast_offset": "介面對比偏移 (Alpha)",
       "reset_contrast": "重設"
     },
     "font": {
@@ -212,7 +211,6 @@
       "button_active_background": "按鈕作用中背景",
       "splash_background": "啟動頁背景",
       "splash_progress": "啟動頁進度",
-      "fullscreen_overlay": "全螢幕覆蓋",
       "line_number_text": "行號文字",
       "line_number_active_text": "作用中行號文字",
       "current_line_background": "目前行背景",

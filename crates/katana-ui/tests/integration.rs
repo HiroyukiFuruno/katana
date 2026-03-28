@@ -2645,11 +2645,19 @@ fn test_integration_ui_context_menu_close_others() {
 
     let tab_b = harness.query_all_by_label("b.md").next().unwrap();
 
-    // Fix Flaky: ensure popup correctly renders with harness.run_steps() to await all frames
+    // Fix Flaky: wait dynamically for popup to render (up to 100 frames)
     tab_b.click_secondary();
-    harness.run_steps(30); // 30 frames to guarantee rendering under heavy parallel CI load
 
-    // The localized label is "Close Others" because language is forced to "en"
+    let mut found = false;
+    for _ in 0..20 {
+        harness.run_steps(5);
+        if harness.query_all_by_label("Close Others").next().is_some() {
+            found = true;
+            break;
+        }
+    }
+
+    assert!(found, "Close Others context menu button failed to render");
     let btn = harness.get_by_label("Close Others");
     btn.click();
     harness.run_steps(20);

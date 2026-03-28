@@ -157,7 +157,6 @@
       "save_custom_theme_title": "保存自定义主题",
       "theme_name_label": "主题名称:",
       "duplicate": "复制...",
-      "ui_contrast_offset": "界面对比度偏移 (Alpha)",
       "reset_contrast": "重置"
     },
     "font": {
@@ -212,7 +211,6 @@
       "button_active_background": "按钮活动背景",
       "splash_background": "启动页背景",
       "splash_progress": "启动页进度",
-      "fullscreen_overlay": "全屏覆盖",
       "line_number_text": "行号文本",
       "line_number_active_text": "活动行号文本",
       "current_line_background": "当前行背景",

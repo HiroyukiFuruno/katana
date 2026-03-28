@@ -255,3 +255,59 @@ pub fn lint_no_hardcoded_colors(workspace_root: &Path) -> Vec<Violation> {
 
     violations
 }
+
+// ─────────────────────────────────────────────
+// Builder Enforcement Detection
+// ─────────────────────────────────────────────
+
+struct BuilderEnforcementVisitor<'a> {
+    file_path: &'a Path,
+    violations: Vec<Violation>,
+}
+
+impl<'a, 'ast> Visit<'ast> for BuilderEnforcementVisitor<'a> {
+    fn visit_expr_struct(&mut self, node: &'ast syn::ExprStruct) {
+        let path_str = node
+            .path
+            .segments
+            .iter()
+            .map(|seg| seg.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+
+        if path_str == "PresetColorData" {
+            let (line, col) = span_location(node.span());
+            self.violations.push(Violation {
+                file: self.file_path.to_path_buf(),
+                line,
+                column: col,
+                message: "Theme presets must use `ThemePresetBuilder::new(...)` instead of instantiating `PresetColorData` directly to enforce DRY design.".to_string(),
+            });
+        }
+        syn::visit::visit_expr_struct(self, node);
+    }
+}
+
+pub fn lint_theme_builder_enforcement(workspace_root: &Path) -> Vec<Violation> {
+    let presets_dir = workspace_root.join("crates/katana-platform/src/theme/presets");
+    let preset_files = collect_rs_files(&presets_dir);
+    let mut violations = Vec::new();
+
+    for file in preset_files {
+        // We only enforce this on individual preset files, not mod.rs which shouldn't have structs anyway.
+        if file.file_name().unwrap_or_default() == "mod.rs" {
+            continue;
+        }
+
+        if let Ok(ast) = parse_file(&file) {
+            let mut visitor = BuilderEnforcementVisitor {
+                file_path: &file,
+                violations: Vec::new(),
+            };
+            visitor.visit_file(&ast);
+            violations.extend(visitor.violations);
+        }
+    }
+
+    violations
+}

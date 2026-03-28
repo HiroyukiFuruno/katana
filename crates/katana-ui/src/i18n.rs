@@ -436,17 +436,6 @@ pub struct SettingsThemeMessages {
     pub theme_name_label: String,
     #[serde(default = "default_duplicate")]
     pub duplicate: String,
-    #[serde(default = "default_ui_contrast_offset")]
-    pub ui_contrast_offset: String,
-    #[serde(default = "default_reset_contrast")]
-    pub reset_contrast: String,
-}
-
-fn default_ui_contrast_offset() -> String {
-    "UI Contrast (Alpha Offset)".to_string()
-}
-fn default_reset_contrast() -> String {
-    "Reset".to_string()
 }
 
 fn default_duplicate() -> String {
@@ -670,9 +659,6 @@ pub struct SettingsColorMessages {
 
     #[serde(default = "d_splash_prog")]
     pub splash_progress: String,
-
-    #[serde(default = "d_fullscreen")]
-    pub fullscreen_overlay: String,
 
     #[serde(default = "d_line_num")]
     pub line_number_text: String,
@@ -1051,9 +1037,6 @@ fn d_splash_bg() -> String {
 fn d_splash_prog() -> String {
     "Splash Progress".to_string()
 }
-fn d_fullscreen() -> String {
-    "Fullscreen Overlay".to_string()
-}
 fn d_line_num() -> String {
     "Line Number".to_string()
 }
@@ -1085,16 +1068,25 @@ mod tests_defaults {
         assert_eq!(d_button_active(), "Active Button");
         assert_eq!(d_splash_bg(), "Splash Background");
         assert_eq!(d_splash_prog(), "Splash Progress");
-        assert_eq!(d_fullscreen(), "Fullscreen Overlay");
         assert_eq!(d_line_num(), "Line Number");
         assert_eq!(d_line_num_act(), "Active Line Num");
         assert_eq!(d_curr_bg(), "Current Line");
         assert_eq!(d_hover_bg(), "Hover Line");
         assert_eq!(d_file_tree_text(), "File Tree Text");
-        assert_eq!(default_ui_contrast_offset(), "UI Contrast (Alpha Offset)");
-        assert_eq!(default_reset_contrast(), "Reset");
         assert_eq!(default_clear_http_cache(), "Clear All Caches");
         assert_eq!(default_cache_retention_days(), "Cache Retention Days");
         assert_eq!(default_days_suffix(), " days");
+    }
+}
+
+#[cfg(test)]
+mod default_group_tests {
+    use super::*;
+
+    #[test]
+    fn test_custom_theme_group_defaults() {
+        assert_eq!(default_group_basic(), "Basic");
+        assert_eq!(default_group_text(), "Text & Typography");
+        assert_eq!(default_group_ui_elements(), "UI Elements");
     }
 }

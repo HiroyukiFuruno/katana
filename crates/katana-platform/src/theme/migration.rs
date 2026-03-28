@@ -43,26 +43,7 @@ const LEGACY_BUTTON_ACTIVE_LIGHT: Rgba = Rgba {
     b: 200,
     a: 100,
 };
-const LEGACY_SPLASH_BG_DARK: Rgb = Rgb {
-    r: 25,
-    g: 25,
-    b: 25,
-};
-const LEGACY_SPLASH_BG_LIGHT: Rgb = Rgb {
-    r: 240,
-    g: 240,
-    b: 240,
-};
-const LEGACY_SPLASH_PROGRESS_DARK: Rgb = Rgb {
-    r: 80,
-    g: 156,
-    b: 214,
-};
-const LEGACY_SPLASH_PROGRESS_LIGHT: Rgb = Rgb {
-    r: 0,
-    g: 120,
-    b: 212,
-};
+
 const LEGACY_LINE_NUMBER_DARK: Rgb = Rgb {
     r: 100,
     g: 100,
@@ -96,18 +77,6 @@ const LEGACY_HOVER_LINE_LIGHT: Rgba = Rgba {
     g: 0,
     b: 0,
     a: 10,
-};
-const LEGACY_FULLSCREEN_OVERLAY_DARK: Rgba = Rgba {
-    r: 40,
-    g: 40,
-    b: 40,
-    a: 200,
-};
-const LEGACY_FULLSCREEN_OVERLAY_LIGHT: Rgba = Rgba {
-    r: 200,
-    g: 200,
-    b: 200,
-    a: 200,
 };
 
 const LEGACY_DEFAULT_WARNING: Rgb = Rgb {
@@ -253,16 +222,6 @@ where
                     },
                     border: l.border,
                     selection: l.selection,
-                    splash_background: if is_dark {
-                        LEGACY_SPLASH_BG_DARK
-                    } else {
-                        LEGACY_SPLASH_BG_LIGHT
-                    },
-                    splash_progress: if is_dark {
-                        LEGACY_SPLASH_PROGRESS_DARK
-                    } else {
-                        LEGACY_SPLASH_PROGRESS_LIGHT
-                    },
                 },
                 code: CodeColors {
                     background: l.code_background,
@@ -291,11 +250,6 @@ where
                     warning_text: l.warning_text,
                     border: l.border,
                     selection: l.selection,
-                    fullscreen_overlay: if is_dark {
-                        LEGACY_FULLSCREEN_OVERLAY_DARK
-                    } else {
-                        LEGACY_FULLSCREEN_OVERLAY_LIGHT
-                    },
                     hover_line_background: if is_dark {
                         LEGACY_HOVER_LINE_DARK
                     } else {

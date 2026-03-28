@@ -1373,6 +1373,8 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         let spacing_total =
                             ui.spacing().item_spacing.x * (num_cols.saturating_sub(1) as f32);
                         let min_col = (table_width - spacing_total) / (num_cols as f32);
+                        
+                        let header_bg_idx = ui.painter().add(egui::Shape::Noop);
 
                         let _grid_res = egui::Grid::new(id)
                             .num_columns(num_cols)
@@ -1469,6 +1471,23 @@ impl<'a> CommonMarkViewerInternal<'a> {
                         // Draw vertical and horizontal separators
                         let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
                         let visual_rect = ui.min_rect();
+                        
+                        if let Some(y) = header_bottom_y {
+                            let header_bg_rect = egui::Rect::from_min_max(
+                                egui::pos2(visual_rect.left(), visual_rect.top()),
+                                egui::pos2(visual_rect.right(), y),
+                            );
+                            const TABLE_HEADER_ALPHA: f32 = 0.3;
+                            ui.painter().set(
+                                header_bg_idx,
+                                egui::Shape::rect_filled(
+                                    header_bg_rect,
+                                    0.0,
+                                    ui.visuals().selection.bg_fill.gamma_multiply(TABLE_HEADER_ALPHA),
+                                ),
+                            );
+                        }
+
                         for x in col_boundaries {
                             ui.painter().vline(x, visual_rect.y_range(), stroke);
                         }

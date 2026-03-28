@@ -597,14 +597,6 @@ mod tests {
             }
         );
         assert_eq!(
-            colors.system.splash_background,
-            Rgb {
-                r: 240,
-                g: 240,
-                b: 240
-            }
-        );
-        assert_eq!(
             colors.code.line_number_text,
             Rgb {
                 r: 160,

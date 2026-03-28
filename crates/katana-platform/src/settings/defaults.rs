@@ -122,7 +122,6 @@ impl Default for ThemeSettings {
             custom_color_overrides: None,
             custom_themes: Vec::new(),
             active_custom_theme: None,
-            ui_contrast_offset: 0.0,
         }
     }
 }

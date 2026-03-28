@@ -13,6 +13,10 @@ const STROKE_NORMAL: f32 = 1.0;
 const STROKE_MEDIUM: f32 = 1.5;
 const STROKE_BOLD: f32 = 2.0;
 
+pub(crate) const IMAGE_VIEWER_OVERLAY_ALPHA: u8 = 180;
+pub(crate) const IMAGE_VIEWER_OVERLAY_COLOR: egui::Color32 =
+    egui::Color32::from_black_alpha(IMAGE_VIEWER_OVERLAY_ALPHA);
+
 /// Converts a `ThemeColors` palette into an `egui::Visuals` struct.
 pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     let dark = colors.mode == ThemeMode::Dark;
@@ -47,12 +51,16 @@ pub fn visuals_from_theme(colors: &ThemeColors) -> egui::Visuals {
     visuals.selection.bg_fill = selection_bg;
     visuals.selection.stroke = egui::Stroke::new(STROKE_NORMAL, accent);
 
+    // Semantic grouping for UI sub-elements (scrollbars, inactive widget strokes).
+    // Aliases to `border` to prevent excessive setting fragmentation, while ensuring
+    // future decoupling is possible simply by unwiring this assignment.
+
     visuals.widgets.noninteractive.bg_fill = panel_bg;
     visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
     visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals.widgets.inactive.bg_fill = panel_bg;
-    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(STROKE_NORMAL, text_secondary);
     visuals.widgets.inactive.bg_stroke = egui::Stroke::new(STROKE_THIN, border);
 
     visuals.widgets.hovered.bg_fill = highlight_bg;

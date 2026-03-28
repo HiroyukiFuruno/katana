@@ -157,7 +157,6 @@
       "save_custom_theme_title": "Save Custom Theme",
       "theme_name_label": "Theme Name:",
       "duplicate": "Duplicate...",
-      "ui_contrast_offset": "UI Contrast (Alpha Offset)",
       "reset_contrast": "Reset"
     },
     "font": {
@@ -185,8 +184,8 @@
       "code_sample": "fn main() { println!(\"Hello!\"); }"
     },
     "color": {
-      "background": "Background",
-      "panel_background": "Panel Background",
+      "background": "Window Frame",
+      "panel_background": "Background",
       "text": "Text",
       "text_secondary": "Secondary Text",
       "accent": "Accent",
@@ -212,7 +211,6 @@
       "button_active_background": "Active Button",
       "splash_background": "Splash Background",
       "splash_progress": "Splash Progress",
-      "fullscreen_overlay": "Fullscreen Overlay",
       "line_number_text": "Line Number",
       "line_number_active_text": "Active Line Number",
       "current_line_background": "Current Line",

@@ -157,7 +157,6 @@
       "save_custom_theme_title": "カスタムテーマの保存",
       "theme_name_label": "テーマ名:",
       "duplicate": "複製...",
-      "ui_contrast_offset": "透過度一括補正",
       "reset_contrast": "リセット"
     },
     "font": {
@@ -185,8 +184,8 @@
       "code_sample": "fn main() { println!(\"こんにちは!\"); }"
     },
     "color": {
-      "background": "背景",
-      "panel_background": "パネル背景",
+      "background": "ウィンドウ枠",
+      "panel_background": "背景",
       "text": "テキスト",
       "text_secondary": "セカンダリテキスト",
       "accent": "アクセント",
@@ -196,7 +195,7 @@
       "preview_background": "背景",
       "code_text": "テキスト",
       "preview_text": "テキスト",
-      "highlight": "ハイライト",
+      "highlight": "選択範囲 / アクティブ要素",
       "section_system": "システム",
       "section_code": "コード",
       "section_preview": "プレビュー",
@@ -212,7 +211,6 @@
       "button_active_background": "アクティブボタン",
       "splash_background": "スプラッシュ背景",
       "splash_progress": "スプラッシュ進行",
-      "fullscreen_overlay": "全画面枠",
       "line_number_text": "行番号",
       "line_number_active_text": "アクティブ行番号",
       "current_line_background": "カレント行背景",

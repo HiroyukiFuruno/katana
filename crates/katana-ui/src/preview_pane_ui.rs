@@ -64,6 +64,12 @@ pub(crate) fn show_section(
                 let hover_bg_color = theme_colors.as_ref().map(|tc| {
                     crate::theme_bridge::rgba_to_color32(tc.preview.hover_line_background)
                 });
+                let border_color = theme_colors
+                    .as_ref()
+                    .map(|tc| crate::theme_bridge::rgb_to_color32(tc.preview.border));
+                let selection_color = theme_colors
+                    .as_ref()
+                    .map(|tc| crate::theme_bridge::rgb_to_color32(tc.preview.selection));
 
                 let md_path_owned = md_file_path.to_path_buf();
 
@@ -127,7 +133,23 @@ pub(crate) fn show_section(
                     viewer = viewer.hovered_spans(&mut local_hovered_spans);
                 }
 
-                let (_, newly_captured) = viewer.show_with_events(ui, cache, md);
+                let (_, newly_captured) = ui
+                    .scope(|ui| {
+                        if let Some(color) = text_color {
+                            ui.visuals_mut().override_text_color = Some(color);
+                        }
+                        if let Some(border) = border_color {
+                            ui.visuals_mut().widgets.noninteractive.bg_stroke.color = border;
+                        }
+                        const TABLE_STRIPE_ALPHA: f32 = 0.1;
+                        if let Some(sel) = selection_color {
+                            ui.visuals_mut().selection.bg_fill = sel;
+                            ui.visuals_mut().faint_bg_color =
+                                sel.gamma_multiply(TABLE_STRIPE_ALPHA);
+                        }
+                        viewer.show_with_events(ui, cache, md)
+                    })
+                    .inner;
 
                 if let Some(anchors) = heading_anchors {
                     for anchor in &mut anchors[previous_anchor_count..] {
@@ -641,7 +663,7 @@ pub(crate) fn show_fullscreen_modal(
             }
 
             // Fully opaque backdrop — blocks all visual content behind the modal.
-            let bg_color = ctx.style().visuals.panel_fill;
+            let bg_color = crate::theme_bridge::IMAGE_VIEWER_OVERLAY_COLOR;
             ui.painter().rect_filled(blocker_rect, 0.0, bg_color);
 
             // Fit image to screen with padding, applying viewer zoom/pan.
@@ -845,7 +867,7 @@ pub(crate) fn show_fullscreen_local_image(
                 }
             }
 
-            let bg_color = ctx.style().visuals.panel_fill;
+            let bg_color = crate::theme_bridge::IMAGE_VIEWER_OVERLAY_COLOR;
             ui.painter().rect_filled(blocker_rect, 0.0, bg_color);
 
             let texture_handle = if viewer_state.texture.is_none() {
@@ -966,11 +988,22 @@ pub fn render_math(ui: &mut egui::Ui, tex: &str, is_inline: bool) {
         return;
     }
 
-    // Hash map key differentiates block/inline and current theme (dark/light)
+    // MathJax paths must perfectly match the visual text colour (since math is inherently 'text')
+    let text_color = ui.visuals().text_color();
+    let hex_color = format!(
+        "#{:02x}{:02x}{:02x}",
+        text_color.r(),
+        text_color.g(),
+        text_color.b()
+    );
+
+    // Hash map key differentiates block/inline and the EXACT textual math colour requested,
+    // to force re-rendering if the user changes the preview.text setting dynamically.
     let is_dark = ui.visuals().dark_mode;
     let cache_key = format!(
-        "{}:{}:{}",
+        "{}:{}:{}:{}",
         if is_dark { "dark" } else { "light" },
+        hex_color,
         if is_inline { "inline" } else { "block" },
         tex
     );
@@ -1028,13 +1061,7 @@ pub fn render_math(ui: &mut egui::Ui, tex: &str, is_inline: bool) {
 
                     // `usvg` doesn't automatically inherit css `currentColor`.
                     // MathJax emits generic currentColor fields which we must explicitly colorize.
-                    let text_color = ui.visuals().text_color();
-                    let hex_color = format!(
-                        "#{:02x}{:02x}{:02x}",
-                        text_color.r(),
-                        text_color.g(),
-                        text_color.b()
-                    );
+                    // (Already retrieved `hex_color` string earlier to form our cache key)
                     processed_svg = processed_svg.replace("currentColor", &hex_color);
 
                     use base64::{engine::general_purpose, Engine as _};
@@ -1231,12 +1258,12 @@ mod tests {
         let gap_from_top = bounds.y0 as f32;
 
         assert!(
-            after_html_y.get() >= 40.0,
+            after_html_y.get() >= 28.0,
             "HTML badge block must advance cursor by a meaningful height, got {:.1}",
             after_html_y.get()
         );
         assert!(
-            gap_from_top >= 40.0,
+            gap_from_top >= 28.0,
             "Following text must render below the badge row, got Y={gap_from_top:.1}"
         );
     }

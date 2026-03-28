@@ -785,6 +785,7 @@ impl<'a> LabeledColorPicker<'a> {
         let right_rect = rect.translate(egui::vec2(0.0, self.offset_y));
         ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
                 // Force line height to exact row_height to perfectly center the button
                 ui.allocate_exact_size(egui::vec2(0.0, right_rect.height()), egui::Sense::hover());
                 egui::color_picker::color_edit_button_srgba(
@@ -798,7 +799,7 @@ impl<'a> LabeledColorPicker<'a> {
         .inner
     }
 
-    pub fn show_rgba(self, ui: &mut egui::Ui, color: &mut egui::Rgba) -> egui::Response {
+    pub fn show_rgba(self, ui: &mut egui::Ui, color: &mut egui::Color32) -> egui::Response {
         let available_w = ui.available_width();
         let row_height = COLOR_ROW_HEIGHT;
         let (rect, _response) =
@@ -815,9 +816,10 @@ impl<'a> LabeledColorPicker<'a> {
         let right_rect = rect.translate(egui::vec2(0.0, self.offset_y));
         ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
                 ui.allocate_exact_size(egui::vec2(0.0, right_rect.height()), egui::Sense::hover());
-                // For RGBA, we want alpha to be editable. Use OnlyBlend or BlendOrAdditive
-                egui::color_picker::color_edit_button_rgba(
+                // For RGBA, we want alpha to be editable. Use BlendOrAdditive with srgba (Color32)
+                egui::color_picker::color_edit_button_srgba(
                     ui,
                     color,
                     egui::color_picker::Alpha::BlendOrAdditive,
@@ -867,7 +869,11 @@ mod labeled_color_picker_tests {
 
     #[test]
     fn test_labeled_color_picker_layout_strict() {
-        let mut color = egui::Color32::from_rgb(255, 0, 128);
+        let mut color = crate::theme_bridge::rgb_to_color32(katana_platform::theme::Rgb {
+            r: 255,
+            g: 0,
+            b: 128,
+        });
         let ctx = Context::default();
         let _ = ctx.run(egui::RawInput::default(), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
@@ -897,7 +903,12 @@ mod labeled_color_picker_tests {
 
     #[test]
     fn test_labeled_color_picker_layout_rgba_strict() {
-        let mut color = egui::Rgba::from_rgba_unmultiplied(1.0, 0.0, 0.5, 0.8);
+        let mut color = crate::theme_bridge::rgba_to_color32(katana_platform::theme::Rgba {
+            r: 255,
+            g: 0,
+            b: 128,
+            a: 204,
+        });
         let ctx = Context::default();
         let _ = ctx.run(egui::RawInput::default(), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {

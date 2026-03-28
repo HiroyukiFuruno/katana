@@ -838,16 +838,15 @@ impl KatanaApp {
                 // Invalidate hashes so non-active tabs re-render on next switch
                 for tab in &mut self.tab_previews {
                     tab.hash = 0;
+                    for viewer in tab.pane.viewer_states.iter_mut() {
+                        viewer.texture = None;
+                    }
+                    tab.pane.fullscreen_viewer_state.texture = None;
                 }
-                // Re-read file from disk and re-render the active tab
+
+                // Re-render the active tab without reading from disk, to avoid wiping unsaved changes!
                 if let Some(doc) = self.state.active_document_mut() {
                     let path = doc.path.clone();
-                    // Reload content from disk so external edits are picked up
-                    if let Ok(content) = std::fs::read_to_string(&path) {
-                        doc.buffer = content;
-                        doc.is_dirty = false;
-                        doc.is_loaded = true;
-                    }
                     let src = doc.buffer.clone();
                     let concurrency = self
                         .state
@@ -1882,6 +1881,47 @@ mod tests {
         let mut app = make_app();
         app.process_action(&egui::Context::default(), AppAction::RefreshDiagrams);
         // No document -> does not crash
+    }
+
+    #[test]
+    fn process_action_refresh_diagrams_clears_texture_handles() {
+        let mut app = make_app();
+        let dir = make_temp_workspace();
+        let path = dir.path().join("test_textures.md");
+        std::fs::write(&path, "# Something").unwrap();
+        app.handle_select_document(path.clone(), true);
+
+        // Pre-populate realistic cached textures that would otherwise persist through a refresh
+        let ctx = egui::Context::default();
+        let dummy_img = egui::ColorImage::example();
+        let texture = ctx.load_texture("fake", dummy_img, egui::TextureOptions::LINEAR);
+
+        if let Some(tab) = app.tab_previews.iter_mut().find(|p| p.path == path) {
+            tab.pane
+                .viewer_states
+                .push(crate::preview_pane::ViewerState {
+                    zoom: 1.0,
+                    pan: egui::Vec2::ZERO,
+                    texture: Some(texture.clone()),
+                });
+            tab.pane.fullscreen_viewer_state.texture = Some(texture.clone());
+        } else {
+            panic!("Tab not found");
+        }
+
+        // Action!
+        app.process_action(&ctx, AppAction::RefreshDiagrams);
+
+        // Verify the texture caches are properly wiped so Egui recreates them!
+        let tab = app.tab_previews.iter().find(|p| p.path == path).unwrap();
+        assert!(
+            tab.pane.viewer_states[0].texture.is_none(),
+            "Texture cache inside viewer state must be cleared!"
+        );
+        assert!(
+            tab.pane.fullscreen_viewer_state.texture.is_none(),
+            "Fullscreen texture cache must be cleared!"
+        );
     }
 
     // process_action: ChangeLanguage (L255-257)

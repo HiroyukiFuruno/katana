@@ -163,6 +163,17 @@ fn ast_linter_no_hardcoded_colors() {
 }
 
 #[test]
+fn ast_linter_theme_builder_enforcement() {
+    let all_violations =
+        katana_linter::rules::theme::lint_theme_builder_enforcement(workspace_root());
+    panic_with_violations(
+        "theme-builder-enforcement",
+        "Fix: Theme presets must use `ThemePresetBuilder::new(...)` to enforce DRY design. Do not instantiate `PresetColorData` directly.",
+        &all_violations,
+    );
+}
+
+#[test]
 fn ast_linter_no_japanese_in_crates() {
     use ignore::WalkBuilder;
     let root = workspace_root().join("crates");

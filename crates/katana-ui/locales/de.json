@@ -157,7 +157,6 @@
       "save_custom_theme_title": "Benutzerdefiniertes Theme speichern",
       "theme_name_label": "Theme-Name:",
       "duplicate": "Duplizieren...",
-      "ui_contrast_offset": "UI-Kontrast (Alpha-Offset)",
       "reset_contrast": "Zurücksetzen"
     },
     "font": {
@@ -212,7 +211,6 @@
       "button_active_background": "Button-Aktivitäts-Hintergrund",
       "splash_background": "Splash Screen",
       "splash_progress": "Fortschritt",
-      "fullscreen_overlay": "Vollbild",
       "line_number_text": "Zeilen text",
       "line_number_active_text": "Aktive Zeile",
       "current_line_background": "Aktueller Code",

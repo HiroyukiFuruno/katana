@@ -34,7 +34,7 @@ const AUTO_SAVE_INTERVAL_STEP: f64 = 0.1;
 const SECTION_SPACING: f32 = 12.0;
 const SUBSECTION_SPACING: f32 = 6.0;
 const INNER_MARGIN: f32 = 12.0;
-const COLOUR_CHANNEL_MAX: f32 = 255.0;
+
 const FONT_SIZE_STEP: f64 = 1.0;
 /// Spacing between layout selectors (split direction / pane order) within the Layout tab.
 const LAYOUT_SELECTOR_SPACING: f32 = 4.0;
@@ -362,30 +362,6 @@ fn render_theme_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
     render_theme_preset_selector(ui, settings);
     ui.add_space(SECTION_SPACING);
 
-    let mut offset = settings.settings().theme.ui_contrast_offset;
-    ui.label(&crate::i18n::get().settings.theme.ui_contrast_offset);
-    ui.horizontal(|ui| {
-        let slider = egui::Slider::new(&mut offset, -100.0..=100.0)
-            .suffix("%")
-            .show_value(true)
-            .fixed_decimals(0);
-
-        let mut changed = crate::settings_window::add_styled_slider(ui, slider).changed();
-
-        if ui
-            .button(&crate::i18n::get().settings.theme.reset_contrast)
-            .clicked()
-        {
-            offset = 0.0;
-            changed = true;
-        }
-
-        if changed {
-            settings.settings_mut().theme.ui_contrast_offset = offset;
-            let _ = settings.save();
-        }
-    });
-
     ui.add_space(SECTION_SPACING);
 
     egui::CollapsingHeader::new(
@@ -583,7 +559,7 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
 
     let system_settings = vec![
         (
-            &color_i18n.group_basic,
+            Some(&color_i18n.group_basic),
             vec![
                 ColorSettingDef {
                     label: &color_i18n.background,
@@ -599,24 +575,10 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
                         |c, r| c.system.panel_background = r,
                     ),
                 },
-                ColorSettingDef {
-                    label: &color_i18n.splash_background,
-                    prop: ColorPropType::Rgb(
-                        |c| c.system.splash_background,
-                        |c, r| c.system.splash_background = r,
-                    ),
-                },
-                ColorSettingDef {
-                    label: &color_i18n.splash_progress,
-                    prop: ColorPropType::Rgb(
-                        |c| c.system.splash_progress,
-                        |c, r| c.system.splash_progress = r,
-                    ),
-                },
             ],
         ),
         (
-            &color_i18n.group_text,
+            Some(&color_i18n.group_text),
             vec![
                 ColorSettingDef {
                     label: &color_i18n.text,
@@ -653,7 +615,7 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
             ],
         ),
         (
-            &color_i18n.group_ui_elements,
+            Some(&color_i18n.group_ui_elements),
             vec![
                 ColorSettingDef {
                     label: &color_i18n.title_bar_text,
@@ -707,7 +669,7 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     ];
 
     let code_settings = vec![(
-        &color_i18n.group_basic,
+        None,
         vec![
             ColorSettingDef {
                 label: &color_i18n.code_background,
@@ -753,7 +715,7 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
     )];
 
     let preview_settings = vec![(
-        &color_i18n.group_basic,
+        None,
         vec![
             ColorSettingDef {
                 label: &color_i18n.preview_background,
@@ -777,13 +739,6 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
             ColorSettingDef {
                 label: &color_i18n.border,
                 prop: ColorPropType::Rgb(|c| c.preview.border, |c, r| c.preview.border = r),
-            },
-            ColorSettingDef {
-                label: &color_i18n.fullscreen_overlay,
-                prop: ColorPropType::Rgba(
-                    |c| c.preview.fullscreen_overlay,
-                    |c, r| c.preview.fullscreen_overlay = r,
-                ),
             },
             ColorSettingDef {
                 label: &color_i18n.hover_line_background,
@@ -810,17 +765,25 @@ fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut SettingsService)
         .default_open(true)
         .show(ui, |ui| {
             ui.add_space(SUBSECTION_SPACING);
-            for (group_name, settings_list) in grouped_settings {
+            for (group_opt, settings_list) in grouped_settings {
                 ui.add_space(SUBSECTION_SPACING);
-                egui::CollapsingHeader::new(group_name.clone())
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        ui.add_space(SUBSECTION_SPACING);
-                        for def in settings_list {
-                            changed |= render_color_row(ui, &mut new_colors, def.label, &def.prop);
+                if let Some(group_name) = group_opt {
+                    egui::CollapsingHeader::new(group_name.clone())
+                        .default_open(true)
+                        .show(ui, |ui| {
                             ui.add_space(SUBSECTION_SPACING);
-                        }
-                    });
+                            for def in settings_list {
+                                changed |=
+                                    render_color_row(ui, &mut new_colors, def.label, &def.prop);
+                                ui.add_space(SUBSECTION_SPACING);
+                            }
+                        });
+                } else {
+                    for def in settings_list {
+                        changed |= render_color_row(ui, &mut new_colors, def.label, &def.prop);
+                        ui.add_space(SUBSECTION_SPACING);
+                    }
+                }
             }
         });
         ui.add_space(SECTION_SPACING);
@@ -981,7 +944,7 @@ fn render_color_row(
     match prop {
         ColorPropType::Rgb(get, apply) => {
             let original_rgb = get(new_colors);
-            let mut color = egui::Color32::from_rgb(original_rgb.r, original_rgb.g, original_rgb.b);
+            let mut color = crate::theme_bridge::rgb_to_color32(original_rgb);
             let response = crate::widgets::LabeledColorPicker::new(label)
                 .label_width(COLOR_GRID_LABEL_WIDTH)
                 .spacing(SECTION_SPACING)
@@ -999,25 +962,15 @@ fn render_color_row(
         }
         ColorPropType::Rgba(get, apply) => {
             let original_rgba = get(new_colors);
-            let mut color = egui::Rgba::from_rgba_unmultiplied(
-                f32::from(original_rgba.r) / COLOUR_CHANNEL_MAX,
-                f32::from(original_rgba.g) / COLOUR_CHANNEL_MAX,
-                f32::from(original_rgba.b) / COLOUR_CHANNEL_MAX,
-                f32::from(original_rgba.a) / COLOUR_CHANNEL_MAX,
-            );
+            let mut color = crate::theme_bridge::rgba_to_color32(original_rgba);
             let response = crate::widgets::LabeledColorPicker::new(label)
                 .label_width(COLOR_GRID_LABEL_WIDTH)
                 .spacing(SECTION_SPACING)
                 .show_rgba(ui, &mut color);
 
             if response.changed() {
-                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                let new_rgba = Rgba {
-                    r: (color.r() * COLOUR_CHANNEL_MAX) as u8,
-                    g: (color.g() * COLOUR_CHANNEL_MAX) as u8,
-                    b: (color.b() * COLOUR_CHANNEL_MAX) as u8,
-                    a: (color.a() * COLOUR_CHANNEL_MAX) as u8,
-                };
+                let [r, g, b, a] = color.to_srgba_unmultiplied();
+                let new_rgba = Rgba { r, g, b, a };
                 apply(new_colors, new_rgba);
                 changed = true;
             }

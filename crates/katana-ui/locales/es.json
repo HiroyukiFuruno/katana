@@ -157,7 +157,6 @@
       "save_custom_theme_title": "Guardar tema personalizado",
       "theme_name_label": "Nombre del tema:",
       "duplicate": "Duplicar...",
-      "ui_contrast_offset": "Contraste de UI (Alfa)",
       "reset_contrast": "Restablecer"
     },
     "font": {
@@ -212,7 +211,6 @@
       "button_active_background": "Fondo de botón activo",
       "splash_background": "Fondo de inicio",
       "splash_progress": "Progreso de inicio",
-      "fullscreen_overlay": "Superposición a pantalla completa",
       "line_number_text": "Texto del número de línea",
       "line_number_active_text": "Texto de número de línea activo",
       "current_line_background": "Fondo de la línea actual",
