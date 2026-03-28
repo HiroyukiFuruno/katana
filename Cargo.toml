@@ -16,7 +16,7 @@ repository = "https://github.com/HiroyukiFuruno/KatanA"
 [workspace.dependencies]
 # UI
 eframe = { version = "0.33", features = ["default"] }
-egui = "0.33"
+egui = "0.34"
 egui_extras = { version = "0.33", features = ["image", "file", "http", "svg", "svg_text"] }
 egui_commonmark = { version = "0.22", default-features = false, features = ["better_syntax_highlighting", "load-images", "pulldown_cmark"] }
 headless_chrome = "1"
