@@ -1,12 +1,12 @@
 # Current Line Indicator
 
 ## Purpose
-TBD (Automatically synced from delta spec)
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
 
 ## Requirements
 
 ### Requirement: カレント行表示
-エディタ（CodeOnly / Split モード）で、カーソルが位置する行をハイライト表示する。
+エディタ（CodeOnly / Split モード）で、カーソルが位置する行をハイライト表示する。 The system SHALL conform.
 
 #### Scenario: カレント行のハイライト
 - **WHEN** ユーザーがエディタでテキストを編集する

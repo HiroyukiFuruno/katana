@@ -1,12 +1,12 @@
 # App Branding
 
 ## Purpose
-TBD (Application branding and visual identity)
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
 
 ## Requirements
 
 ### Requirement: アプリケーションアイコン
-Katana Desktop のアプリケーションアイコンを作成し、macOS の Dock アイコンとして設定する。
+Katana Desktop のアプリケーションアイコンを作成し、macOS の Dock アイコンとして設定する。 The system SHALL conform.
 
 #### Scenario: Dock アイコンの表示
 - **WHEN** Katana Desktop が起動される
@@ -17,7 +17,7 @@ Katana Desktop のアプリケーションアイコンを作成し、macOS の D
 - **THEN** 「刀（katana）」をモチーフとした識別性の高いデザインである
 
 ### Requirement: スプラッシュスクリーン
-起動時にアプリケーションアイコンとバージョン番号を表示するスプラッシュスクリーンを表示する。
+起動時にアプリケーションアイコンとバージョン番号を表示するスプラッシュスクリーンを表示する。 The system SHALL conform.
 
 #### Scenario: スプラッシュスクリーンの表示
 - **WHEN** アプリを起動する

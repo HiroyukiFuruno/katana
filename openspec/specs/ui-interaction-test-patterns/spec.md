@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: UI インタラクションテストはポインターイベントを使ってボタンクリックを simulate する
 統合テストは `egui::Event::PointerButton` のプレス・リリースペアを inject することで実際のユーザークリックを simulate しなければならない（SHALL）。`trigger_action` の直接呼び出しのみでは UI 層の検証として不十分である。

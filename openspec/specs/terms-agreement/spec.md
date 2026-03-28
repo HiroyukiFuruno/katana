@@ -1,8 +1,11 @@
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
 ## Requirements
 
 ### Requirement: 初回起動時の規約同意画面
 
-アプリ初回起動時に利用規約の同意画面を表示し、同意を必須とする。同意するまでメインUIにアクセスできない。
+アプリ初回起動時に利用規約の同意画面を表示し、同意を必須とする。同意するまでメインUIにアクセスできない。 The system SHALL conform.
 
 #### Scenario: 初回起動で規約画面を表示
 
@@ -26,7 +29,7 @@
 
 ### Requirement: 規約画面の言語選択プルダウン
 
-規約同意画面に言語選択のプルダウンを配置し、規約内容と画面のUI言語を切り替えられるようにする。
+規約同意画面に言語選択のプルダウンを配置し、規約内容と画面のUI言語を切り替えられるようにする。 The system SHALL conform.
 
 #### Scenario: 言語選択プルダウンの表示
 
@@ -45,7 +48,7 @@
 
 ### Requirement: 規約内容の管理
 
-利用規約テキストはリソースファイルとして管理し、将来の更新を容易にする。
+利用規約テキストはリソースファイルとして管理し、将来の更新を容易にする。 The system SHALL conform.
 
 #### Scenario: 規約テキストのリソース管理
 

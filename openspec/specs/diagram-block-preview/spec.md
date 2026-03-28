@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: Supported diagram block payloads are explicitly constrained
 The system SHALL accept only the following diagram payload formats in the MVP preview pipeline: raw Mermaid source in fenced `mermaid` blocks, raw PlantUML source including `@startuml` and `@enduml` in fenced `plantuml` blocks, and raw uncompressed Draw.io XML containing `<mxfile>` or `<mxGraphModel>` in fenced `drawio` blocks.

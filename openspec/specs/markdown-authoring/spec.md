@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: Markdown documents can be edited as local workspace files
 The system SHALL allow the active Markdown document to be edited in memory and saved back to its workspace file.

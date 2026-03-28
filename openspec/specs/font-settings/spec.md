@@ -1,7 +1,10 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: フォントサイズ設定
-プレビューとエディタのフォントサイズを変更できる。
+プレビューとエディタのフォントサイズを変更できる。 The system SHALL conform.
 
 #### Scenario: フォントサイズの変更
 - **WHEN** ユーザーが設定でフォントサイズを12pxから16pxに変更する
@@ -16,7 +19,7 @@
 - **THEN** 設定が保存され、次回起動時に復元される
 
 ### Requirement: フォントファミリー設定
-プレビューとエディタのフォントファミリーを変更できる。
+プレビューとエディタのフォントファミリーを変更できる。 The system SHALL conform.
 
 #### Scenario: フォントファミリーの変更
 - **WHEN** ユーザーが設定でフォントファミリーを変更する

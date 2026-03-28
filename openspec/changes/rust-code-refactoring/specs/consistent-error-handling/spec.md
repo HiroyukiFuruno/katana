@@ -1,6 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Standardized error handling pattern
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL implement a consistent error handling pattern using `thiserror` for custom error types and `anyhow` for error propagation.
 
@@ -10,6 +11,7 @@ The system SHALL implement a consistent error handling pattern using `thiserror`
 - **THEN** the error type implements `std::error::Error` and provides meaningful error messages
 
 ### Requirement: Error propagation with anyhow
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL use `anyhow` for error propagation throughout the codebase when appropriate.
 
@@ -21,6 +23,7 @@ The system SHALL use `anyhow` for error propagation throughout the codebase when
 ## MODIFIED Requirements
 
 ### Requirement: Error handling in diagram rendering
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved consistency with overall error handling approach
 
@@ -35,6 +38,7 @@ The system SHALL use `anyhow` for error propagation throughout the codebase when
 - **THEN** it returns a standardized error that indicates missing dependencies
 
 ### Requirement: Error handling in core modules
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved maintainability and consistency across components
 
@@ -44,6 +48,7 @@ The system SHALL use `anyhow` for error propagation throughout the codebase when
 - **THEN** it appropriately handles the error using standard error types and propagation
 
 ### Requirement: Error handling in plugin system
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved consistency with overall error handling approach
 
@@ -55,6 +60,7 @@ The system SHALL use `anyhow` for error propagation throughout the codebase when
 ## REMOVED Requirements
 
 ### Requirement: Inconsistent error handling approaches
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Obsoleted by consistent error handling standardization
 **Migration**: All existing error handling approaches are deprecated and replaced with this standard pattern

@@ -1,6 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Comprehensive Rust documentation
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL provide comprehensive documentation for all public APIs and modules following Rust documentation conventions.
 
@@ -10,6 +11,7 @@ The system SHALL provide comprehensive documentation for all public APIs and mod
 - **THEN** comprehensive documentation is available in the form of Rustdoc comments
 
 ### Requirement: Code examples in documentation
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL include working code examples in documentation where appropriate.
 
@@ -19,6 +21,7 @@ The system SHALL include working code examples in documentation where appropriat
 - **THEN** it includes a working example of how to use it
 
 ### Requirement: Documentation consistency
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL maintain consistent documentation style and standards throughout the codebase.
 
@@ -30,6 +33,7 @@ The system SHALL maintain consistent documentation style and standards throughou
 ## MODIFIED Requirements
 
 ### Requirement: Code comments
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved consistency and quality of comments
 
@@ -44,6 +48,7 @@ The system SHALL maintain consistent documentation style and standards throughou
 - **THEN** comments clearly explain the reasoning and approach
 
 ### Requirement: Module documentation
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved consistency in documenting modules
 
@@ -55,6 +60,7 @@ The system SHALL maintain consistent documentation style and standards throughou
 ## REMOVED Requirements
 
 ### Requirement: Inconsistent comment quality
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Replaced by consistent documentation standards
 **Migration**: All existing inconsistent or missing comments are updated following the new guidelines

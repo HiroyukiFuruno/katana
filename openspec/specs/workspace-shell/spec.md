@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: Workspace root can be opened as the application context
 The system SHALL allow the user to choose a local directory and load it as the active workspace root for the Katana session.

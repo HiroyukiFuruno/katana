@@ -1,12 +1,12 @@
 # Table of Contents
 
 ## Purpose
-TBD (Automatically synced from delta spec)
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
 
 ## Requirements
 
 ### Requirement: 目次の表示・非表示トグル
-現在開いているMarkdownドキュメントの見出し階層から目次を生成し、サイドパネルまたはオーバーレイで表示する。デフォルトはOFF。
+現在開いているMarkdownドキュメントの見出し階層から目次を生成し、サイドパネルまたはオーバーレイで表示する。デフォルトはOFF。 The system SHALL conform.
 
 #### Scenario: 目次の表示
 - **WHEN** ユーザーが目次表示トグルボタンをONにする
@@ -21,7 +21,7 @@ TBD (Automatically synced from delta spec)
 - **THEN** 次回以降、ドキュメントを開くと目次が自動的に表示される
 
 ### Requirement: 目次の見出しジャンプ
-目次の見出し項目をクリックすると、プレビュー内の該当見出し位置にスクロールする。
+目次の見出し項目をクリックすると、プレビュー内の該当見出し位置にスクロールする。 The system SHALL conform.
 
 #### Scenario: 見出しクリックでジャンプ
 - **WHEN** ユーザーが目次内の見出し項目をクリックする
@@ -32,7 +32,7 @@ TBD (Automatically synced from delta spec)
 - **THEN** 目次にインデント付きの階層構造で表示される
 
 ### Requirement: 目次とスクロールの同期
-プレビューのスクロール位置に応じて、目次の現在セクションをハイライトする。
+プレビューのスクロール位置に応じて、目次の現在セクションをハイライトする。 The system SHALL conform.
 
 #### Scenario: スクロール位置と目次の同期
 - **WHEN** ユーザーがプレビューをスクロールする

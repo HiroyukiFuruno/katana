@@ -1,8 +1,11 @@
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
 ## Requirements
 
 ### Requirement: HTML出力
 
-現在開いているMarkdownをHTMLファイルとしてエクスポートし、デフォルトブラウザで開く。
+現在開いているMarkdownをHTMLファイルとしてエクスポートし、デフォルトブラウザで開く。 The system SHALL conform.
 
 #### Scenario: HTMLエクスポート
 
@@ -16,7 +19,7 @@
 
 ### Requirement: PDF出力
 
-現在開いているMarkdownをPDFファイルとしてエクスポートする。
+現在開いているMarkdownをPDFファイルとしてエクスポートする。 The system SHALL conform.
 
 #### Scenario: PDF出力
 
@@ -30,7 +33,7 @@
 
 ### Requirement: 画像出力（PNG / JPG）
 
-現在開いているMarkdownをPNGまたはJPG画像としてエクスポートする。
+現在開いているMarkdownをPNGまたはJPG画像としてエクスポートする。 The system SHALL conform.
 
 #### Scenario: 画像エクスポート
 

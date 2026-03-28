@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: AST Linter execution on test suite
 The system SHALL systematically parse the project's source code into Abstract Syntax Trees (AST) using `syn` during the execution of standard unit tests (`cargo test`).

@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: リポジトリテキスト全般の英語記述標準化 (English language standard)
 リポジトリ直下の一般ドキュメント群（`README.md`、`CONTRIBUTING.md`）、ならびにコードベース全域に対するソースコードのコメントについては、すべて英語表記（English）にて記述しなければならない（MUST）。

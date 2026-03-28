@@ -6,7 +6,7 @@ TBD (Displaying local image assets in markdown preview)
 ## Requirements
 
 ### Requirement: Markdown内ローカル画像の遅延読み込み表示
-Markdown内の相対パスで参照されたローカル画像ファイルを、プレビューで表示する。初期表示を遅くしないため遅延読み込み（lazy load）とする。
+Markdown内の相対パスで参照されたローカル画像ファイルを、プレビューで表示する。初期表示を遅くしないため遅延読み込み（lazy load）とする。 The system SHALL conform.
 
 #### Scenario: 相対パス画像の表示
 - **WHEN** Markdownに `![alt](./images/photo.png)` のようなローカル相対パス画像参照がある

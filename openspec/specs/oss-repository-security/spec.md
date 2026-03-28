@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: The repository publishes a supported vulnerability reporting path
 The repository SHALL include a tracked security policy that tells reporters how to submit vulnerabilities without using public issues.

@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: The core exposes typed plugin extension points
 The system SHALL provide typed extension points for at least renderer enhancements, AI tools, and UI panel contributions.

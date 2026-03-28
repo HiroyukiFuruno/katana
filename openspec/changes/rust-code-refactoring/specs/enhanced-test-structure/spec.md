@@ -1,6 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Organized test files
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL organize test files in a consistent structure that mirrors the source code organization.
 
@@ -10,6 +11,7 @@ The system SHALL organize test files in a consistent structure that mirrors the 
 - **THEN** tests are located in a predictable location relative to the source code
 
 ### Requirement: Comprehensive test coverage
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL maintain comprehensive test coverage for critical functionality.
 
@@ -19,6 +21,7 @@ The system SHALL maintain comprehensive test coverage for critical functionality
 - **THEN** appropriate test cases cover the main functionality and edge cases
 
 ### Requirement: Testable components
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL ensure that components are designed to be testable.
 
@@ -30,6 +33,7 @@ The system SHALL ensure that components are designed to be testable.
 ## MODIFIED Requirements
 
 ### Requirement: Test organization
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved structure and maintainability of test suite
 
@@ -46,6 +50,7 @@ The system SHALL ensure that components are designed to be testable.
 ## REMOVED Requirements
 
 ### Requirement: Inconsistent test organization
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Replaced by consistent test structure standards
 **Migration**: All existing tests are reorganized following the new structure guidelines

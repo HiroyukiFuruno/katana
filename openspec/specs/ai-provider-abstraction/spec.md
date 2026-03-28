@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: AI requests are routed through a provider abstraction
 The system SHALL define a provider abstraction that accepts normalized AI generation requests and returns normalized results or errors.

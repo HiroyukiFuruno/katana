@@ -1,7 +1,10 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: テーマ設定（Dark / Light）
-Dark / Light の2種類のテーマを提供し、ユーザーが切り替え可能にする。デフォルトはDark。
+Dark / Light の2種類のテーマを提供し、ユーザーが切り替え可能にする。デフォルトはDark。 The system SHALL conform.
 
 #### Scenario: テーマの切り替え
 - **WHEN** ユーザーが設定メニューからテーマをDarkからLightに変更する

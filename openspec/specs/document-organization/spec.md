@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: `docs/` ディレクトリ配下からの計画・仕様の撤去と明確化
 `docs/` ディレクトリは、当リポジトリおよびプロジェクトの現在の利用方法および仕組みを説明するドキュメントのみを配置する場所としなければならない（MUST）。将来のロードマップや実装前の仕様（openspec等）は、すべて `docs/` ディレクトリから削除または移動させなければならない。

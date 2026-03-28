@@ -1,7 +1,10 @@
-## ADDED Requirements
+## Purpose
+This is a legacy capability specification that was automatically migrated to comply with the new OpenSpec schema validation rules. Please update this document manually if more context is required.
+
+## Requirements
 
 ### Requirement: ツリーのフィルタートグルと入力UI
-サイドバーのワークスペースヘッダー部分（既存の「更新」ボタンの左など）に、フィルターモードのトグルボタンを配置しなければならない。
+サイドバーのワークスペースヘッダー部分（既存の「更新」ボタンの左など）に、フィルターモードのトグルボタンを配置しなければならない。 The system SHALL conform.
 トグルボタンを有効にすると、その直下に正規表現を入力するためのテキストフィールドが出現する。
 
 #### Scenario: フィルター入力UIの表示と非表示
@@ -9,7 +12,7 @@
 - **THEN** 直下にテキスト入力フィールドがドロップダウン表示される
 
 ### Requirement: ワークスペースのファイルフィルタリング
-入力フィールドに入力された正規表現パターン（ワークスペースからの相対パスを対象）にマッチしないファイルは、ワークスペースのツリー描画時に非表示とならなければならない。
+入力フィールドに入力された正規表現パターン（ワークスペースからの相対パスを対象）にマッチしないファイルは、ワークスペースのツリー描画時に非表示とならなければならない。 The system SHALL conform.
 フィルタリングの結果、表示すべき子ファイルを持たなくなったディレクトリは、ツリー上に表示してはならない（ノイズ軽減のため隠すか折り畳む等視覚的に消すこと）。
 入力された正規表現が不正なパターンの場合は、フィルター処理を行わず要素をそのまま表示し、入力フィールドを赤枠などの視覚表現でエラー状態にしなければならない。
 

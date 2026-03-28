@@ -1,6 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Markdown rendering pipeline flexibility
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved extensibility of the Markdown rendering system
 
@@ -15,6 +16,7 @@
 - **THEN** they are all handled through the same consistent interface
 
 ### Requirement: Markdown rendering performance
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Improved efficiency of rendering operations
 
@@ -31,6 +33,7 @@
 ## ADDED Requirements
 
 ### Requirement: Renderer extensibility
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 The system SHALL support extensible diagram renderers that can be added without modifying core code.
 
@@ -42,6 +45,7 @@ The system SHALL support extensible diagram renderers that can be added without 
 ## REMOVED Requirements
 
 ### Requirement: Inflexible renderer architecture
+This requirement has been migrated and SHALL conform to legacy guidelines.
 
 **Reason**: Obsoleted by improved extensible renderer system
 **Migration**: All existing renderer implementations are updated to work with the new extensible architecture
