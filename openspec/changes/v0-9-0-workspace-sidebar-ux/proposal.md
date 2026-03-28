@@ -15,9 +15,11 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `workspace-activity-rail`: 左側アクティビティレールでワークスペース表示切り替えと最近のワークスペース履歴を提供する。
 
 ### Modified Capabilities
+
 - `workspace-shell`: ワークスペースペインのタイトル表示を廃止し、ヘッダー操作の配置を再構成する。
 - `workspace-file-search`: ファイル検索モーダルを左側アクティビティレールから起動できるようにする。
 - `workspace-file-filter`: フィルタートグルと入力 UI を新しいヘッダー配置に合わせて維持する。

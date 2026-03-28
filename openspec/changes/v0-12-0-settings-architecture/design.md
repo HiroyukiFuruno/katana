@@ -21,14 +21,17 @@ crates/katana-platform/src/settings/
 ### 2. コンポーネント設計
 
 #### `types`
+
 - セーブデータのキーとなる `AppSettings` を筆頭に、`WindowSettings`, `EditorSettings`, `TerminalSettings`, `ThemeSettings` など全ての関連する struct と enum の定義を一つにまとめます。
 - このファイル内には `impl` ブロックを一切定義せず、データの「形」だけを明確にします。
 
 #### `impls`
+
 - `types` で定義された構造体に対する `impl Default for ...` や、便利な生成メソッドなどを定義します。
 - これによって「設定のデフォルト状態」がこのファイルに完全にまとまるため、UI 側からのデフォルト値確認が容易になります。
 
 #### `migration`
+
 - デシリアライズに失敗した場合に、古いバージョン（例: 0.2.x や 0.3.x）のフォーマットから最新の構造へ安全にパース・引き上げるロジック群。
 - これまで `crates/katana-platform/src/` 配下に散らばっていたマイグレーションファイル群をまとめることで、プロジェクトルートが簡潔になり保守性が向上します。
 
