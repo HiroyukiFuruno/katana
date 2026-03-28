@@ -903,7 +903,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                         .ui_image(ui, crate::icon::IconSize::Small);
 
                                     const ICON_DEFAULT_SIZE: f32 = 16.0;
-                                    const PADDING_WIDTH_MULTIPLIER: f32 = 3.0;
+                                    const PADDING_WIDTH_MULTIPLIER: f32 = 3.5;
                                     const PADDING_HEIGHT_MULTIPLIER: f32 = 2.0;
                                     const TEXT_X_OFFSET_MULTIPLIER: f32 = 1.5;
                                     const Y_OFFSET_PIXELS: f32 = 1.0;
@@ -925,8 +925,9 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                         padding.x * PADDING_WIDTH_MULTIPLIER
                                             + img_size.x
                                             + text_size.x,
-                                        padding.y * PADDING_HEIGHT_MULTIPLIER
-                                            + img_size.y.max(text_size.y),
+                                        (padding.y * PADDING_HEIGHT_MULTIPLIER
+                                            + img_size.y.max(text_size.y))
+                                        .max(ui.spacing().interact_size.y),
                                     );
 
                                     let (rect, response) =
@@ -965,9 +966,9 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                             text_y,
                                         );
 
-                                        ui.put(
+                                        icon_img.paint_at(
+                                            ui,
                                             egui::Rect::from_min_size(icon_pos, img_size),
-                                            icon_img,
                                         );
 
                                         let text_color = if is_active {
