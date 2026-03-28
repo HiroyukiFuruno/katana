@@ -227,10 +227,6 @@ All notable changes to KatanA Desktop. This file records the major changes to Ka
 
 - Fix GitHub release creation by pushing the tag before creating the release
 
-### 🔧 System
-
-- Update Rust dependencies and resolve Linux lint errors
-
 ## [0.5.0] - 2026-03-22 09:16:29 (UTC)
 
 ### 🚀 Features
@@ -400,10 +396,6 @@ All notable changes to KatanA Desktop. This file records the major changes to Ka
 - Add missing tests to meet 100% coverage gate
 
 ## [0.1.4] - 2026-03-19 21:03:35 (UTC)
-
-### 🧪 Testing
-
-- Completely abolish UI image snapshot tests that were causing repository bloat and CI failures, and migrate to semantic assertions
 
 ## [0.1.3] - 2026-03-19 19:59:23 (UTC)
 
