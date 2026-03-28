@@ -158,7 +158,9 @@
       "theme_name_label": "Nom du thème :",
       "duplicate": "Dupliquer...",
       "reset_contrast": "Réinitialiser",
-      "ui_contrast_offset": "Décalage de contraste de l'interface"
+      "ui_contrast_offset": "Décalage de contraste de l'interface",
+      "show_more": "Afficher plus...",
+      "show_less": "Afficher moins..."
     },
     "font": {
       "size": "Taille de la police",

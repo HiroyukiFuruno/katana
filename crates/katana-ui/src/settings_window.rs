@@ -227,7 +227,11 @@ pub(crate) fn render_settings_window(
                                         triggered_action = Some(action);
                                     }
                                 }
-                                SettingsTab::Behavior => render_behavior_tab(ui, state),
+                                SettingsTab::Behavior => {
+                                    if let Some(action) = render_behavior_tab(ui, state) {
+                                        triggered_action = Some(action);
+                                    }
+                                }
                             }
                         });
                     });
@@ -505,10 +509,11 @@ fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut SettingsServic
 
     ui.add_space(SUBSECTION_SPACING);
 
+    let msgs = &crate::i18n::get().settings.theme;
     let toggle_text = if show_more {
-        "Show less..."
+        &msgs.show_less
     } else {
-        "Show more..."
+        &msgs.show_more
     };
     if ui.link(toggle_text).clicked() {
         show_more = !show_more;
@@ -1525,7 +1530,10 @@ fn render_updates_tab(
     None
 }
 
-fn render_behavior_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
+fn render_behavior_tab(
+    ui: &mut egui::Ui,
+    state: &mut crate::app_state::AppState,
+) -> Option<AppAction> {
     let behavior_msgs = &crate::i18n::get().settings.behavior;
     let settings = &mut state.settings;
 
@@ -1626,6 +1634,12 @@ fn render_behavior_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState
     }
 
     ui.add_space(SUBSECTION_SPACING);
+
+    if ui.button(&behavior_msgs.clear_http_cache).clicked() {
+        return Some(AppAction::ClearAllCaches);
+    }
+
+    None
 }
 
 #[cfg(test)]

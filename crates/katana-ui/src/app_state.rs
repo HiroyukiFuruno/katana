@@ -203,6 +203,10 @@ pub enum AppAction {
     DismissUpdate,
     /// Confirm relaunch after update is ready.
     ConfirmRelaunch,
+    /// Fetch and show release notes for the current version.
+    ShowReleaseNotes,
+    /// Clear all HTTP and locally saved application caches.
+    ClearAllCaches,
     /// No-op (used internally).
     None,
 }

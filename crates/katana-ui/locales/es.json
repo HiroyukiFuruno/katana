@@ -158,7 +158,9 @@
       "theme_name_label": "Nombre del tema:",
       "duplicate": "Duplicar...",
       "reset_contrast": "Restablecer",
-      "ui_contrast_offset": "Compensación de contraste de la interfaz"
+      "ui_contrast_offset": "Compensación de contraste de la interfaz",
+      "show_more": "Mostrar más...",
+      "show_less": "Mostrar menos..."
     },
     "font": {
       "size": "Tamaño de Fuente",

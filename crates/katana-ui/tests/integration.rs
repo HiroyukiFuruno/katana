@@ -43,6 +43,9 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
         // Pre-accept terms to bypass the blocking UI in integration tests.
         state.settings.settings_mut().terms_accepted_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
+        // Also pre-set previous app version so the release notes auto-show logic isn't triggered for tests.
+        state.settings.settings_mut().updates.previous_app_version =
+            Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
@@ -1365,6 +1368,8 @@ fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'sta
         );
         // Pre-accept terms to bypass the blocking UI in persistence tests.
         state.settings.settings_mut().terms_accepted_version =
+            Some(katana_ui::about_info::APP_VERSION.to_string());
+        state.settings.settings_mut().updates.previous_app_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");

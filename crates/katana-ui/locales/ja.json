@@ -18,7 +18,7 @@
     "show_all": "すべて表示",
     "help": "ヘルプ",
     "check_updates": "更新を確認...",
-    "release_notes": "リリースノート"
+    "release_notes": "ChangeLog"
   },
   "about": {
     "basic_info": "基本情報",
@@ -158,7 +158,9 @@
       "theme_name_label": "テーマ名:",
       "duplicate": "複製...",
       "reset_contrast": "リセット",
-      "ui_contrast_offset": "UIコントラスト補正"
+      "ui_contrast_offset": "UIコントラスト補正",
+      "show_more": "もっと表示...",
+      "show_less": "少なく表示..."
     },
     "font": {
       "size": "フォントサイズ",

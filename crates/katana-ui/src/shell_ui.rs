@@ -1214,29 +1214,37 @@ pub(crate) fn render_view_mode_bar(
                 ui.separator();
             }
 
+            // Omit View Mode controls for virtual tabs like ChangeLog since they are native documents
+            let is_changelog = state
+                .active_document()
+                .is_some_and(|doc| doc.path.to_string_lossy().starts_with("Katana://ChangeLog"));
+
+            let prev_is_split = prev == ViewMode::Split;
             let is_split = mode == ViewMode::Split;
-            if ui
-                .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
-                .clicked()
-                && !is_split
-            {
-                mode = ViewMode::Split;
+
+            if !is_changelog {
+                if ui
+                    .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
+                    .clicked()
+                    && !is_split
+                {
+                    mode = ViewMode::Split;
+                }
+
+                ui.selectable_value(
+                    &mut mode,
+                    ViewMode::CodeOnly,
+                    crate::i18n::get().view_mode.code.clone(),
+                );
+                ui.selectable_value(
+                    &mut mode,
+                    ViewMode::PreviewOnly,
+                    crate::i18n::get().view_mode.preview.clone(),
+                );
             }
 
-            ui.selectable_value(
-                &mut mode,
-                ViewMode::CodeOnly,
-                crate::i18n::get().view_mode.code.clone(),
-            );
-            ui.selectable_value(
-                &mut mode,
-                ViewMode::PreviewOnly,
-                crate::i18n::get().view_mode.preview.clone(),
-            );
-
             // Show split controls only while split mode is active.
-            let prev_is_split = prev == ViewMode::Split;
-            if is_split && (is_split == prev_is_split) {
+            if !is_changelog && is_split && (is_split == prev_is_split) {
                 ui.separator();
 
                 // Toggle split direction.
@@ -2330,6 +2338,7 @@ mod native_menu {
     pub const TAG_LANG_ES: i32 = 13;
     pub const TAG_LANG_IT: i32 = 14;
     pub const TAG_CHECK_UPDATES: i32 = 15;
+    pub const TAG_RELEASE_NOTES: i32 = 16;
 
     // These FFI symbols are linked from Objective-C (macos_menu.m) and called
     // only at runtime; the Rust compiler cannot see the call sites.
@@ -2354,6 +2363,7 @@ mod native_menu {
             show_all: *const std::ffi::c_char,
             check_updates: *const std::ffi::c_char,
             help: *const std::ffi::c_char,
+            release_notes: *const std::ffi::c_char,
         );
     }
 }
@@ -2404,6 +2414,7 @@ unsafe fn native_update_menu_strings(
     show_all: &str,
     check_updates: &str,
     help: &str,
+    release_notes: &str,
 ) {
     let f = std::ffi::CString::new(file).unwrap_or_default();
     let ow = std::ffi::CString::new(open_workspace).unwrap_or_default();
@@ -2418,6 +2429,7 @@ unsafe fn native_update_menu_strings(
     let sa = std::ffi::CString::new(show_all).unwrap_or_default();
     let cu = std::ffi::CString::new(check_updates).unwrap_or_default();
     let hlp = std::ffi::CString::new(help).unwrap_or_default();
+    let rn = std::ffi::CString::new(release_notes).unwrap_or_default();
     native_menu::katana_update_menu_strings(
         f.as_ptr(),
         ow.as_ptr(),
@@ -2432,6 +2444,7 @@ unsafe fn native_update_menu_strings(
         sa.as_ptr(),
         cu.as_ptr(),
         hlp.as_ptr(),
+        rn.as_ptr(),
     );
 }
 
@@ -2454,6 +2467,7 @@ pub fn update_native_menu_strings_from_i18n() {
             &msgs.menu.show_all,
             &msgs.menu.check_updates,
             &msgs.menu.help,
+            &msgs.menu.release_notes,
         );
     }
 }
@@ -2824,6 +2838,9 @@ impl eframe::App for KatanaApp {
                 native_menu::TAG_CHECK_UPDATES => {
                     self.pending_action = AppAction::CheckForUpdates;
                 }
+                native_menu::TAG_RELEASE_NOTES => {
+                    self.pending_action = AppAction::ShowReleaseNotes;
+                }
                 native_menu::TAG_SETTINGS => {
                     self.pending_action = AppAction::ToggleSettings;
                 }
@@ -2865,8 +2882,13 @@ impl eframe::App for KatanaApp {
             let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
             let title_text = match self.state.active_document() {
                 Some(doc) => {
+                    let fname = doc.file_name().unwrap_or("");
                     let rel = relative_full_path(&doc.path, ws_root_for_title.as_deref());
-                    format!("KatanA — {rel}")
+                    crate::shell_logic::format_window_title(
+                        fname,
+                        &rel,
+                        &crate::i18n::get().menu.release_notes,
+                    )
                 }
                 None => "KatanA".to_string(),
             };
@@ -2912,70 +2934,81 @@ impl eframe::App for KatanaApp {
             // Tab row + breadcrumbs + view mode row
             egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
                 render_tab_bar(ui, &mut self.state, &mut self.pending_action);
-                let active_doc_props = self.state.active_document().map(|d| d.path.clone());
-                if let Some(doc_path) = active_doc_props {
-                    let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
-                    let rel = relative_full_path(&doc_path, ws_root.as_deref());
-                    let mut breadcrumb_action = None;
-                    ui.horizontal(|ui| {
-                        let segments: Vec<&str> = rel.split('/').collect();
-                        let mut current_path = ws_root.clone().unwrap_or_default();
-                        for (i, seg) in segments.iter().enumerate() {
-                            if i > 0 {
-                                const CHEVRON_ICON_SIZE: f32 = 10.0;
-                                ui.add(
-                                    egui::Image::new(crate::Icon::ChevronRight.uri())
-                                        .tint(ui.visuals().text_color())
-                                        .max_height(CHEVRON_ICON_SIZE),
-                                );
-                            }
+                let active_doc_props = self.state.active_document();
+                if let Some(doc) = active_doc_props {
+                    let d_path = doc.path.to_string_lossy();
+                    let is_changelog = d_path.starts_with("Katana://ChangeLog");
 
-                            if ws_root.is_none() {
-                                ui.label(egui::RichText::new(*seg).small());
-                                continue;
-                            }
+                    if !is_changelog {
+                        let doc_path = doc.path.clone();
+                        let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+                        let rel = relative_full_path(&doc_path, ws_root.as_deref());
+                        let mut breadcrumb_action = None;
+                        ui.horizontal(|ui| {
+                            let segments: Vec<&str> = rel.split('/').collect();
+                            let mut current_path = ws_root.clone().unwrap_or_default();
+                            for (i, seg) in segments.iter().enumerate() {
+                                if i > 0 {
+                                    const CHEVRON_ICON_SIZE: f32 = 10.0;
+                                    ui.add(
+                                        egui::Image::new(crate::Icon::ChevronRight.uri())
+                                            .tint(ui.visuals().text_color())
+                                            .max_height(CHEVRON_ICON_SIZE),
+                                    );
+                                }
 
-                            current_path = current_path.join(seg);
-                            let is_last = i == segments.len() - 1;
+                                if ws_root.is_none() {
+                                    ui.label(egui::RichText::new(*seg).small());
+                                    continue;
+                                }
 
-                            // The doc_path_clone is only needed for the original `render_tree_entry` logic,
-                            // which is being replaced.
-                            // let doc_path_clone = doc_path.clone();
+                                current_path = current_path.join(seg);
+                                let is_last = i == segments.len() - 1;
 
-                            if is_last {
-                                // Last segment is the file itself, just render it as text
-                                ui.add(
-                                    egui::Label::new(egui::RichText::new(*seg).small())
-                                        .sense(egui::Sense::hover()),
-                                );
-                            } else {
-                                // Dropdown mini-workspace for Breadcrumbs
-                                ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
-                                    let mut ctx_action = crate::app_state::AppAction::None;
+                                // The doc_path_clone is only needed for the original `render_tree_entry` logic,
+                                // which is being replaced.
+                                // let doc_path_clone = doc_path.clone();
 
-                                    if let Some(ws) = &self.state.workspace {
-                                        if let Some(
-                                            katana_core::workspace::TreeEntry::Directory {
-                                                children,
-                                                ..
-                                            },
-                                        ) = find_node_in_tree(&ws.tree, &current_path)
-                                        {
-                                            render_breadcrumb_menu(ui, children, &mut ctx_action);
+                                if is_last {
+                                    // Last segment is the file itself, just render it as text
+                                    ui.add(
+                                        egui::Label::new(egui::RichText::new(*seg).small())
+                                            .sense(egui::Sense::hover()),
+                                    );
+                                } else {
+                                    // Dropdown mini-workspace for Breadcrumbs
+                                    ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
+                                        let mut ctx_action = crate::app_state::AppAction::None;
+
+                                        if let Some(ws) = &self.state.workspace {
+                                            if let Some(
+                                                katana_core::workspace::TreeEntry::Directory {
+                                                    children,
+                                                    ..
+                                                },
+                                            ) = find_node_in_tree(&ws.tree, &current_path)
+                                            {
+                                                render_breadcrumb_menu(
+                                                    ui,
+                                                    children,
+                                                    &mut ctx_action,
+                                                );
+                                            }
                                         }
-                                    }
 
-                                    if !matches!(ctx_action, crate::app_state::AppAction::None) {
-                                        breadcrumb_action = Some(ctx_action);
-                                        ui.close();
-                                    }
-                                });
+                                        if !matches!(ctx_action, crate::app_state::AppAction::None)
+                                        {
+                                            breadcrumb_action = Some(ctx_action);
+                                            ui.close();
+                                        }
+                                    });
+                                }
                             }
+                        });
+                        if let Some(a) = breadcrumb_action {
+                            self.pending_action = a;
                         }
-                    });
-                    if let Some(a) = breadcrumb_action {
-                        self.pending_action = a;
-                    }
+                    } // End if !is_changelog
                     render_view_mode_bar(ui, &mut self.state, &mut self.pending_action);
                 }
             });
@@ -2983,6 +3016,13 @@ impl eframe::App for KatanaApp {
             let mut download_req: Option<DownloadRequest> = None;
             let current_mode = self.state.active_view_mode();
             let is_split = current_mode == ViewMode::Split;
+            let mut is_changelog_tab = false;
+
+            if let Some(doc) = self.state.active_document() {
+                if doc.path.to_string_lossy().starts_with("Katana://ChangeLog") {
+                    is_changelog_tab = true;
+                }
+            }
 
             if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
                 if let Some(doc) = self.state.active_document() {
@@ -2993,29 +3033,35 @@ impl eframe::App for KatanaApp {
                 }
             }
 
-            if is_split {
-                let split_dir = self.state.active_split_direction();
-                let pane_order = self.state.active_pane_order();
-                download_req = render_split_mode(ctx, self, split_dir, pane_order);
-            }
+            if is_changelog_tab {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    crate::changelog::render_release_notes_tab(ui, &self.changelog_sections);
+                });
+            } else {
+                if is_split {
+                    let split_dir = self.state.active_split_direction();
+                    let pane_order = self.state.active_pane_order();
+                    download_req = render_split_mode(ctx, self, split_dir, pane_order);
+                }
 
-            if !is_split {
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-                    .show(ctx, |ui| match current_mode {
-                        ViewMode::CodeOnly => {
-                            render_editor_content(
-                                ui,
-                                &mut self.state,
-                                &mut self.pending_action,
-                                false,
-                            );
-                        }
-                        ViewMode::PreviewOnly => {
-                            render_preview_only(ui, self);
-                        }
-                        ViewMode::Split => {}
-                    });
+                if !is_split {
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
+                        .show(ctx, |ui| match current_mode {
+                            ViewMode::CodeOnly => {
+                                render_editor_content(
+                                    ui,
+                                    &mut self.state,
+                                    &mut self.pending_action,
+                                    false,
+                                );
+                            }
+                            ViewMode::PreviewOnly => {
+                                render_preview_only(ui, self);
+                            }
+                            ViewMode::Split => {}
+                        });
+                }
             }
 
             if let Some(req) = download_req {

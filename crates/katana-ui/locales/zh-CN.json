@@ -158,7 +158,9 @@
       "theme_name_label": "主题名称:",
       "duplicate": "复制...",
       "reset_contrast": "重置",
-      "ui_contrast_offset": "UI 对比度偏移"
+      "ui_contrast_offset": "UI 对比度偏移",
+      "show_more": "显示更多...",
+      "show_less": "显示更少..."
     },
     "font": {
       "size": "字体大小",

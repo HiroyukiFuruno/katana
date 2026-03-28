@@ -223,6 +223,10 @@ pub struct UpdateSettings {
     /// Auto-check will suppress notifications for this version.
     #[serde(default)]
     pub skipped_version: Option<String>,
+    /// The application version recorded during the previous launch.
+    /// Used to determine whether to show the release notes after an update.
+    #[serde(default)]
+    pub previous_app_version: Option<String>,
 }
 
 /// Application behavior settings controlling system-level defaults.
