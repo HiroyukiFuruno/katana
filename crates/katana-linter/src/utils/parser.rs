@@ -1,11 +1,11 @@
 use crate::{JsonNodeKind, Violation};
-use ignore::WalkBuilder;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
+/// Checks if a syn attribute contains `#[cfg(test)]`.
 pub fn has_cfg_test_attr(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
         if attr.path().is_ident("cfg") {
@@ -17,8 +17,9 @@ pub fn has_cfg_test_attr(attrs: &[syn::Attribute]) -> bool {
     })
 }
 
+/// Checks if a number corresponds to typical UI edge cases (0, 1, 2, 100, -1).
 pub fn is_allowed_number(value: f64) -> bool {
-    // 0, 1, 2, 100, -1 are commonly used in UI layouts or logic
+    // WHY: 0, 1, 2, 100, -1 are commonly used in UI layouts or logic
     (value - 0.0).abs() < f64::EPSILON
         || (value - 1.0).abs() < f64::EPSILON
         || (value - 2.0).abs() < f64::EPSILON
@@ -31,15 +32,10 @@ pub fn span_location(span: proc_macro2::Span) -> (usize, usize) {
     (span.start().line, span.start().column + 1)
 }
 
-pub fn locale_violation(file: &Path, message: impl Into<String>) -> Violation {
-    Violation {
-        file: file.to_path_buf(),
-        line: 0,
-        column: 0,
-        message: message.into(),
-    }
-}
-
+/// Parses a file path into a `syn::File` AST tree.
+///
+/// # Errors
+/// Returns a list of `Violation` if the file cannot be read or its syntax is invalid.
 pub fn parse_file(path: &Path) -> Result<syn::File, Vec<Violation>> {
     let source = std::fs::read_to_string(path).map_err(|err| {
         vec![Violation {
@@ -61,6 +57,10 @@ pub fn parse_file(path: &Path) -> Result<syn::File, Vec<Violation>> {
     })
 }
 
+/// Parses a custom locale JSON file into a `serde_json::Value`.
+///
+/// # Errors
+/// Returns a list of `Violation` if the file reading or JSON parsing fails.
 pub fn parse_json_file(path: &Path) -> Result<Value, Vec<Violation>> {
     let source = std::fs::read_to_string(path).map_err(|err| {
         vec![Violation {
@@ -81,59 +81,7 @@ pub fn parse_json_file(path: &Path) -> Result<Value, Vec<Violation>> {
     })
 }
 
-pub fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let walker = WalkBuilder::new(root)
-        .standard_filters(true)
-        .require_git(false)
-        .build();
-
-    for entry in walker.flatten() {
-        let path = entry.path();
-        if path.is_file()
-            && path.extension().is_some_and(|ext| ext == "rs")
-            && !path.components().any(|c| c.as_os_str() == "tests")
-        {
-            files.push(path.to_path_buf());
-        }
-    }
-
-    files.sort();
-    files
-}
-
-pub fn workspace_root() -> &'static Path {
-    use std::sync::OnceLock;
-    static ROOT: OnceLock<PathBuf> = OnceLock::new();
-    ROOT.get_or_init(|| {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(|it| it.parent())
-            .map(|it| it.to_path_buf())
-            .expect("Workspace root not found")
-    })
-}
-
-pub fn panic_with_violations(rule_name: &str, hint: &str, violations: &[Violation]) {
-    if violations.is_empty() {
-        return;
-    }
-
-    let report = violations
-        .iter()
-        .map(|it| it.to_string())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    panic!(
-        "\n\n🚨 AST Linter [{rule_name}]: Found {} violation(s):\n\n{}\n\n\
-        💡 {hint}\n\
-        📖 Details: See docs/coding-rules.md\n",
-        violations.len(),
-        report
-    );
-}
-
+/// Recursively flattens a JSON structure to collect paths and their value types (shapes).
 pub fn collect_json_shape(
     value: &Value,
     path: Option<&str>,
@@ -165,6 +113,7 @@ pub fn collect_json_shape(
     }
 }
 
+/// Flattens a JSON structure to collect paths mapping to their actual string values.
 pub fn collect_json_values(value: &Value, path: Option<&str>, out: &mut BTreeMap<String, String>) {
     match value {
         Value::Object(map) => {
@@ -192,6 +141,7 @@ pub fn collect_json_values(value: &Value, path: Option<&str>, out: &mut BTreeMap
     }
 }
 
+/// Extracts embedded `{placeholders}` for each key within the JSON object tree.
 pub fn collect_json_placeholders(
     value: &Value,
     path: Option<&str>,
@@ -223,6 +173,7 @@ pub fn collect_json_placeholders(
     }
 }
 
+/// Scans text to extract `{placeholder_name}` embedded parameter tags.
 pub fn extract_placeholders(text: &str) -> BTreeSet<String> {
     let mut placeholders = BTreeSet::new();
     let bytes = text.as_bytes();
@@ -248,6 +199,7 @@ pub fn extract_placeholders(text: &str) -> BTreeSet<String> {
     placeholders
 }
 
+/// Checks if a string acts like a valid template placeholder name.
 pub fn is_placeholder_name(candidate: &str) -> bool {
     let mut chars = candidate.chars();
     let Some(first) = chars.next() else {
@@ -258,6 +210,7 @@ pub fn is_placeholder_name(candidate: &str) -> bool {
         && chars.all(|char| char.is_ascii_alphanumeric() || char == '_')
 }
 
+/// Identifies non-standard strings like ui icons or typical symbols to avoid false positives.
 pub fn is_allowed_string(s: &str) -> bool {
     let trimmed = s.trim();
 
@@ -268,18 +221,18 @@ pub fn is_allowed_string(s: &str) -> bool {
     let chars: Vec<char> = trimmed.chars().collect();
     if chars.len() == 1 {
         let c = chars[0];
-        // Allow if it's not an ASCII alphabet (a-z, A-Z)
+        // WHY: Allow if it's not an ASCII alphabet (a-z, A-Z)
         if !c.is_ascii_alphabetic() {
             return true;
         }
-        // Allow single letter "x" (often used as close button in UI, etc.)
+        // WHY: Allow single letter "x" (often used as close button in UI, etc.)
         if c == 'x' || c == 'X' {
             return true;
         }
         return false;
     }
 
-    // All characters are non-alphabetic (symbol, emoji, number, or whitespace only)
+    // WHY: All characters are non-alphabetic (symbol, emoji, number, or whitespace only)
     if trimmed
         .chars()
         .all(|c| !c.is_alphabetic() || is_emoji_or_symbol(c))
@@ -290,6 +243,7 @@ pub fn is_allowed_string(s: &str) -> bool {
     false
 }
 
+/// Matches common emoji and block elements to permit them within strict string rules.
 pub fn is_emoji_or_symbol(c: char) -> bool {
     matches!(c,
         '\u{2000}'..='\u{2BFF}'
@@ -374,15 +328,12 @@ mod tests {
 
     #[test]
     fn extract_placeholders_handles_edge_cases() {
-        // Unclosed placeholder
         let set = extract_placeholders("Hello {unclosed");
         assert!(set.is_empty());
 
-        // Empty placeholder
         let set = extract_placeholders("Hello {}");
         assert!(set.is_empty());
 
-        // Valid placeholder
         let set = extract_placeholders("Hello {name}");
         assert_eq!(set.len(), 1);
         assert!(set.contains("name"));
