@@ -64,6 +64,13 @@ pub(crate) fn render_help_menu(ui: &mut egui::Ui, action: &mut AppAction) {
         *action = AppAction::ToggleAbout;
         ui.close();
     }
+    if ui
+        .button(crate::i18n::get().menu.release_notes.clone())
+        .clicked()
+    {
+        *action = AppAction::ShowReleaseNotes;
+        ui.close();
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -857,7 +864,22 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 ui.horizontal(|ui| {
                     for (idx, doc) in state.open_documents.iter().enumerate() {
                         let is_active = state.active_doc_idx == Some(idx);
-                        let filename = doc.file_name().unwrap_or("untitled").to_string();
+                        let original_filename = doc.file_name().unwrap_or("untitled");
+                        let is_changelog =
+                            doc.path.to_string_lossy().starts_with("Katana://ChangeLog");
+
+                        let filename = if is_changelog {
+                            original_filename.to_string()
+                        } else if original_filename.starts_with("CHANGELOG_v")
+                            && original_filename.ends_with(".md")
+                        {
+                            let ver = original_filename
+                                .trim_start_matches("CHANGELOG_v")
+                                .trim_end_matches(".md");
+                            format!("📄 {} {}", crate::i18n::get().menu.release_notes, ver)
+                        } else {
+                            original_filename.to_string()
+                        };
                         let dirty_suffix = if doc.is_dirty { " *" } else { "" };
                         let title = if doc.is_pinned {
                             format!("📌 {filename}{dirty_suffix}")
@@ -875,7 +897,19 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                 });
                                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
 
-                                let t_resp = ui.add(egui::Button::selectable(is_active, &title));
+                                let t_resp = if is_changelog {
+                                    ui.add(
+                                        egui::Button::image_and_text(
+                                            crate::Icon::Info
+                                                .ui_image(ui, crate::icon::IconSize::Small),
+                                            &title,
+                                        )
+                                        .selected(is_active),
+                                    )
+                                } else {
+                                    ui.add(egui::Button::selectable(is_active, &title))
+                                };
+
                                 let c_resp = ui.add(egui::Button::image_and_text(
                                     crate::Icon::Close.ui_image(ui, crate::icon::IconSize::Small),
                                     invisible_label("x"),
@@ -934,7 +968,19 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
 
                                         ui.horizontal(|ui| {
                                             ui.spacing_mut().item_spacing.x = 0.0;
-                                            ui.add(egui::Button::selectable(is_active, &title));
+                                            if is_changelog {
+                                                let btn = egui::Button::image_and_text(
+                                                    crate::Icon::Info.ui_image(
+                                                        ui,
+                                                        crate::icon::IconSize::Medium,
+                                                    ),
+                                                    &title,
+                                                )
+                                                .selected(is_active);
+                                                ui.add(btn);
+                                            } else {
+                                                ui.add(egui::Button::selectable(is_active, &title));
+                                            }
                                             ui.add(egui::Button::image_and_text(
                                                 crate::Icon::Close
                                                     .ui_image(ui, crate::icon::IconSize::Small),
@@ -1197,29 +1243,37 @@ pub(crate) fn render_view_mode_bar(
                 ui.separator();
             }
 
+            // Omit View Mode controls for virtual tabs like ChangeLog since they are native documents
+            let is_changelog = state
+                .active_document()
+                .is_some_and(|doc| doc.path.to_string_lossy().starts_with("Katana://ChangeLog"));
+
+            let prev_is_split = prev == ViewMode::Split;
             let is_split = mode == ViewMode::Split;
-            if ui
-                .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
-                .clicked()
-                && !is_split
-            {
-                mode = ViewMode::Split;
+
+            if !is_changelog {
+                if ui
+                    .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
+                    .clicked()
+                    && !is_split
+                {
+                    mode = ViewMode::Split;
+                }
+
+                ui.selectable_value(
+                    &mut mode,
+                    ViewMode::CodeOnly,
+                    crate::i18n::get().view_mode.code.clone(),
+                );
+                ui.selectable_value(
+                    &mut mode,
+                    ViewMode::PreviewOnly,
+                    crate::i18n::get().view_mode.preview.clone(),
+                );
             }
 
-            ui.selectable_value(
-                &mut mode,
-                ViewMode::CodeOnly,
-                crate::i18n::get().view_mode.code.clone(),
-            );
-            ui.selectable_value(
-                &mut mode,
-                ViewMode::PreviewOnly,
-                crate::i18n::get().view_mode.preview.clone(),
-            );
-
             // Show split controls only while split mode is active.
-            let prev_is_split = prev == ViewMode::Split;
-            if is_split && (is_split == prev_is_split) {
+            if !is_changelog && is_split && (is_split == prev_is_split) {
                 ui.separator();
 
                 // Toggle split direction.
@@ -2313,6 +2367,7 @@ mod native_menu {
     pub const TAG_LANG_ES: i32 = 13;
     pub const TAG_LANG_IT: i32 = 14;
     pub const TAG_CHECK_UPDATES: i32 = 15;
+    pub const TAG_RELEASE_NOTES: i32 = 16;
 
     // These FFI symbols are linked from Objective-C (macos_menu.m) and called
     // only at runtime; the Rust compiler cannot see the call sites.
@@ -2337,6 +2392,7 @@ mod native_menu {
             show_all: *const std::ffi::c_char,
             check_updates: *const std::ffi::c_char,
             help: *const std::ffi::c_char,
+            release_notes: *const std::ffi::c_char,
         );
     }
 }
@@ -2387,6 +2443,7 @@ unsafe fn native_update_menu_strings(
     show_all: &str,
     check_updates: &str,
     help: &str,
+    release_notes: &str,
 ) {
     let f = std::ffi::CString::new(file).unwrap_or_default();
     let ow = std::ffi::CString::new(open_workspace).unwrap_or_default();
@@ -2401,6 +2458,7 @@ unsafe fn native_update_menu_strings(
     let sa = std::ffi::CString::new(show_all).unwrap_or_default();
     let cu = std::ffi::CString::new(check_updates).unwrap_or_default();
     let hlp = std::ffi::CString::new(help).unwrap_or_default();
+    let rn = std::ffi::CString::new(release_notes).unwrap_or_default();
     native_menu::katana_update_menu_strings(
         f.as_ptr(),
         ow.as_ptr(),
@@ -2415,6 +2473,7 @@ unsafe fn native_update_menu_strings(
         sa.as_ptr(),
         cu.as_ptr(),
         hlp.as_ptr(),
+        rn.as_ptr(),
     );
 }
 
@@ -2437,6 +2496,7 @@ pub fn update_native_menu_strings_from_i18n() {
             &msgs.menu.show_all,
             &msgs.menu.check_updates,
             &msgs.menu.help,
+            &msgs.menu.release_notes,
         );
     }
 }
@@ -2755,6 +2815,7 @@ impl eframe::App for KatanaApp {
 
         self.poll_update_install(ctx);
         self.poll_update_check(ctx);
+        self.poll_changelog(ctx);
         self.poll_export(ctx);
 
         // macOS: Poll actions from the native menu.
@@ -2806,6 +2867,9 @@ impl eframe::App for KatanaApp {
                 native_menu::TAG_CHECK_UPDATES => {
                     self.pending_action = AppAction::CheckForUpdates;
                 }
+                native_menu::TAG_RELEASE_NOTES => {
+                    self.pending_action = AppAction::ShowReleaseNotes;
+                }
                 native_menu::TAG_SETTINGS => {
                     self.pending_action = AppAction::ToggleSettings;
                 }
@@ -2847,8 +2911,13 @@ impl eframe::App for KatanaApp {
             let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
             let title_text = match self.state.active_document() {
                 Some(doc) => {
+                    let fname = doc.file_name().unwrap_or("");
                     let rel = relative_full_path(&doc.path, ws_root_for_title.as_deref());
-                    format!("KatanA — {rel}")
+                    crate::shell_logic::format_window_title(
+                        fname,
+                        &rel,
+                        &crate::i18n::get().menu.release_notes,
+                    )
                 }
                 None => "KatanA".to_string(),
             };
@@ -2894,70 +2963,81 @@ impl eframe::App for KatanaApp {
             // Tab row + breadcrumbs + view mode row
             egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
                 render_tab_bar(ui, &mut self.state, &mut self.pending_action);
-                let active_doc_props = self.state.active_document().map(|d| d.path.clone());
-                if let Some(doc_path) = active_doc_props {
-                    let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
-                    let rel = relative_full_path(&doc_path, ws_root.as_deref());
-                    let mut breadcrumb_action = None;
-                    ui.horizontal(|ui| {
-                        let segments: Vec<&str> = rel.split('/').collect();
-                        let mut current_path = ws_root.clone().unwrap_or_default();
-                        for (i, seg) in segments.iter().enumerate() {
-                            if i > 0 {
-                                const CHEVRON_ICON_SIZE: f32 = 10.0;
-                                ui.add(
-                                    egui::Image::new(crate::Icon::ChevronRight.uri())
-                                        .tint(ui.visuals().text_color())
-                                        .max_height(CHEVRON_ICON_SIZE),
-                                );
-                            }
+                let active_doc_props = self.state.active_document();
+                if let Some(doc) = active_doc_props {
+                    let d_path = doc.path.to_string_lossy();
+                    let is_changelog = d_path.starts_with("Katana://ChangeLog");
 
-                            if ws_root.is_none() {
-                                ui.label(egui::RichText::new(*seg).small());
-                                continue;
-                            }
+                    if !is_changelog {
+                        let doc_path = doc.path.clone();
+                        let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+                        let rel = relative_full_path(&doc_path, ws_root.as_deref());
+                        let mut breadcrumb_action = None;
+                        ui.horizontal(|ui| {
+                            let segments: Vec<&str> = rel.split('/').collect();
+                            let mut current_path = ws_root.clone().unwrap_or_default();
+                            for (i, seg) in segments.iter().enumerate() {
+                                if i > 0 {
+                                    const CHEVRON_ICON_SIZE: f32 = 10.0;
+                                    ui.add(
+                                        egui::Image::new(crate::Icon::ChevronRight.uri())
+                                            .tint(ui.visuals().text_color())
+                                            .max_height(CHEVRON_ICON_SIZE),
+                                    );
+                                }
 
-                            current_path = current_path.join(seg);
-                            let is_last = i == segments.len() - 1;
+                                if ws_root.is_none() {
+                                    ui.label(egui::RichText::new(*seg).small());
+                                    continue;
+                                }
 
-                            // The doc_path_clone is only needed for the original `render_tree_entry` logic,
-                            // which is being replaced.
-                            // let doc_path_clone = doc_path.clone();
+                                current_path = current_path.join(seg);
+                                let is_last = i == segments.len() - 1;
 
-                            if is_last {
-                                // Last segment is the file itself, just render it as text
-                                ui.add(
-                                    egui::Label::new(egui::RichText::new(*seg).small())
-                                        .sense(egui::Sense::hover()),
-                                );
-                            } else {
-                                // Dropdown mini-workspace for Breadcrumbs
-                                ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
-                                    let mut ctx_action = crate::app_state::AppAction::None;
+                                // The doc_path_clone is only needed for the original `render_tree_entry` logic,
+                                // which is being replaced.
+                                // let doc_path_clone = doc_path.clone();
 
-                                    if let Some(ws) = &self.state.workspace {
-                                        if let Some(
-                                            katana_core::workspace::TreeEntry::Directory {
-                                                children,
-                                                ..
-                                            },
-                                        ) = find_node_in_tree(&ws.tree, &current_path)
-                                        {
-                                            render_breadcrumb_menu(ui, children, &mut ctx_action);
+                                if is_last {
+                                    // Last segment is the file itself, just render it as text
+                                    ui.add(
+                                        egui::Label::new(egui::RichText::new(*seg).small())
+                                            .sense(egui::Sense::hover()),
+                                    );
+                                } else {
+                                    // Dropdown mini-workspace for Breadcrumbs
+                                    ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
+                                        let mut ctx_action = crate::app_state::AppAction::None;
+
+                                        if let Some(ws) = &self.state.workspace {
+                                            if let Some(
+                                                katana_core::workspace::TreeEntry::Directory {
+                                                    children,
+                                                    ..
+                                                },
+                                            ) = find_node_in_tree(&ws.tree, &current_path)
+                                            {
+                                                render_breadcrumb_menu(
+                                                    ui,
+                                                    children,
+                                                    &mut ctx_action,
+                                                );
+                                            }
                                         }
-                                    }
 
-                                    if !matches!(ctx_action, crate::app_state::AppAction::None) {
-                                        breadcrumb_action = Some(ctx_action);
-                                        ui.close();
-                                    }
-                                });
+                                        if !matches!(ctx_action, crate::app_state::AppAction::None)
+                                        {
+                                            breadcrumb_action = Some(ctx_action);
+                                            ui.close();
+                                        }
+                                    });
+                                }
                             }
+                        });
+                        if let Some(a) = breadcrumb_action {
+                            self.pending_action = a;
                         }
-                    });
-                    if let Some(a) = breadcrumb_action {
-                        self.pending_action = a;
-                    }
+                    } // End if !is_changelog
                     render_view_mode_bar(ui, &mut self.state, &mut self.pending_action);
                 }
             });
@@ -2965,6 +3045,13 @@ impl eframe::App for KatanaApp {
             let mut download_req: Option<DownloadRequest> = None;
             let current_mode = self.state.active_view_mode();
             let is_split = current_mode == ViewMode::Split;
+            let mut is_changelog_tab = false;
+
+            if let Some(doc) = self.state.active_document() {
+                if doc.path.to_string_lossy().starts_with("Katana://ChangeLog") {
+                    is_changelog_tab = true;
+                }
+            }
 
             if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
                 if let Some(doc) = self.state.active_document() {
@@ -2975,29 +3062,39 @@ impl eframe::App for KatanaApp {
                 }
             }
 
-            if is_split {
-                let split_dir = self.state.active_split_direction();
-                let pane_order = self.state.active_pane_order();
-                download_req = render_split_mode(ctx, self, split_dir, pane_order);
-            }
+            if is_changelog_tab {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    crate::changelog::render_release_notes_tab(
+                        ui,
+                        &self.changelog_sections,
+                        self.changelog_rx.is_some(),
+                    );
+                });
+            } else {
+                if is_split {
+                    let split_dir = self.state.active_split_direction();
+                    let pane_order = self.state.active_pane_order();
+                    download_req = render_split_mode(ctx, self, split_dir, pane_order);
+                }
 
-            if !is_split {
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-                    .show(ctx, |ui| match current_mode {
-                        ViewMode::CodeOnly => {
-                            render_editor_content(
-                                ui,
-                                &mut self.state,
-                                &mut self.pending_action,
-                                false,
-                            );
-                        }
-                        ViewMode::PreviewOnly => {
-                            render_preview_only(ui, self);
-                        }
-                        ViewMode::Split => {}
-                    });
+                if !is_split {
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
+                        .show(ctx, |ui| match current_mode {
+                            ViewMode::CodeOnly => {
+                                render_editor_content(
+                                    ui,
+                                    &mut self.state,
+                                    &mut self.pending_action,
+                                    false,
+                                );
+                            }
+                            ViewMode::PreviewOnly => {
+                                render_preview_only(ui, self);
+                            }
+                            ViewMode::Split => {}
+                        });
+                }
             }
 
             if let Some(req) = download_req {
@@ -3020,7 +3117,15 @@ impl eframe::App for KatanaApp {
 
         // About dialog
         if self.show_about {
-            render_about_window(ctx, &mut self.show_about, self.about_icon.as_ref());
+            render_about_window(
+                ctx,
+                &mut self.show_about,
+                self.about_icon.as_ref(),
+                &mut self.pending_action,
+            );
+            if matches!(self.pending_action, AppAction::ShowReleaseNotes) {
+                self.show_about = false;
+            }
         }
 
         // Meta info dialog
@@ -4074,7 +4179,12 @@ fn render_meta_info_window(ctx: &egui::Context, open: &mut bool, path: &std::pat
 }
 
 /// Renders the custom About window with all required OSS project information.
-fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui::TextureHandle>) {
+fn render_about_window(
+    ctx: &egui::Context,
+    open: &mut bool,
+    icon: Option<&egui::TextureHandle>,
+    action: &mut AppAction,
+) {
     const ABOUT_WINDOW_WIDTH: f32 = 400.0;
     const INNER_PADDING: f32 = 8.0;
     const ICON_SIZE: f32 = 64.0;
@@ -4189,7 +4299,27 @@ fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui:
                 SECTION_HEADER_BOTTOM,
             );
             if info.sponsor_url.is_empty() {
-                about_row(ui, &i18n_about.sponsor, &i18n_about.coming_soon);
+                ui.horizontal(|ui| {
+                    ui.add(crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Medium));
+                    ui.label(
+                        egui::RichText::new(crate::i18n::get().menu.release_notes.clone()).weak(),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add(
+                                egui::Button::image(
+                                    crate::Icon::ExternalLink
+                                        .ui_image(ui, crate::icon::IconSize::Small),
+                                )
+                                .frame(false),
+                            )
+                            .on_hover_text(crate::i18n::get().menu.release_notes.clone())
+                            .clicked()
+                        {
+                            *action = AppAction::ShowReleaseNotes;
+                        }
+                    });
+                });
             } else {
                 about_link_row(
                     ui,
@@ -4481,65 +4611,72 @@ fn render_update_window(
     const SPACING_MEDIUM: f32 = 8.0;
     const SPACING_LARGE: f32 = 12.0;
     const MAX_SCROLL_HEIGHT: f32 = 250.0;
+    const UPDATE_DIALOG_WIDTH: f32 = 600.0;
 
     let msgs = &crate::i18n::get().update;
 
     // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
     match &state.update_phase {
         Some(UpdatePhase::Downloading { progress }) => {
-            Modal::new("katana_update_dialog_v6", &msgs.title).show_body_only(ctx, |ui| {
-                ui.add_space(SPACING_SMALL);
-                ui.add(
-                    egui::ProgressBar::new(*progress)
-                        .animate(true)
-                        .text(format!("{:.0}%", progress * 100.0)),
-                );
-                ui.add_space(SPACING_MEDIUM);
-                ui.label(&msgs.downloading);
-            });
+            Modal::new("katana_update_dialog_v6", &msgs.title)
+                .width(UPDATE_DIALOG_WIDTH)
+                .show_body_only(ctx, |ui| {
+                    ui.add_space(SPACING_SMALL);
+                    ui.add(
+                        egui::ProgressBar::new(*progress)
+                            .animate(true)
+                            .text(format!("{:.0}%", progress * 100.0)),
+                    );
+                    ui.add_space(SPACING_MEDIUM);
+                    ui.label(&msgs.downloading);
+                });
             return;
         }
         Some(UpdatePhase::Installing { progress }) => {
-            Modal::new("katana_update_dialog_v6", &msgs.title).show_body_only(ctx, |ui| {
-                ui.add_space(SPACING_SMALL);
-                ui.add(
-                    egui::ProgressBar::new(*progress)
-                        .animate(true)
-                        .text(format!("{:.0}%", progress * 100.0)),
-                );
-                ui.add_space(SPACING_MEDIUM);
-                ui.label(&msgs.installing);
-            });
+            Modal::new("katana_update_dialog_v6", &msgs.title)
+                .width(UPDATE_DIALOG_WIDTH)
+                .show_body_only(ctx, |ui| {
+                    ui.add_space(SPACING_SMALL);
+                    ui.add(
+                        egui::ProgressBar::new(*progress)
+                            .animate(true)
+                            .text(format!("{:.0}%", progress * 100.0)),
+                    );
+                    ui.add_space(SPACING_MEDIUM);
+                    ui.label(&msgs.installing);
+                });
             return;
         }
         Some(UpdatePhase::ReadyToRelaunch) => {
-            let action = Modal::new("katana_update_dialog_v6", &msgs.title).show(
-                ctx,
-                |ui| {
-                    ui.add_space(SPACING_LARGE);
-                    ui.label(egui::RichText::new(&msgs.restart_confirm).heading());
-                    ui.add_space(SPACING_LARGE);
-                },
-                |ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .button(
-                                egui::RichText::new(&msgs.action_restart)
-                                    .color(ui.visuals().widgets.active.text_color())
-                                    .strong(),
-                            )
-                            .clicked()
-                        {
-                            return Some(AppAction::ConfirmRelaunch);
-                        }
-                        if ui.button(&msgs.action_later).clicked() {
-                            return Some(AppAction::DismissUpdate);
-                        }
-                        None
-                    })
-                    .inner
-                },
-            );
+            let action = Modal::new("katana_update_dialog_v6", &msgs.title)
+                .width(UPDATE_DIALOG_WIDTH)
+                .show(
+                    ctx,
+                    |ui| {
+                        ui.add_space(SPACING_LARGE);
+                        ui.label(egui::RichText::new(&msgs.restart_confirm).heading());
+                        ui.add_space(SPACING_LARGE);
+                    },
+                    |ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .button(
+                                    egui::RichText::new(&msgs.action_restart)
+                                        .color(ui.visuals().widgets.active.text_color())
+                                        .strong(),
+                                )
+                                .clicked()
+                            {
+                                return Some(AppAction::ConfirmRelaunch);
+                            }
+                            if ui.button(&msgs.action_later).clicked() {
+                                return Some(AppAction::DismissUpdate);
+                            }
+                            None
+                        })
+                        .inner
+                    },
+                );
             if let Some(action) = action {
                 *pending_action = action;
                 if matches!(pending_action, AppAction::DismissUpdate) {
@@ -4555,43 +4692,47 @@ fn render_update_window(
     // (egui::Window::open() stores resize state, causing unbounded height growth.)
     if state.checking_for_updates {
         // Checking spinner — no footer, no close button
-        Modal::new("katana_update_dialog_v6", &msgs.title).show_body_only(ctx, |ui| {
-            ui.add(egui::Spinner::new());
-            ui.add_space(SPACING_MEDIUM);
-            ui.label(msgs.checking_for_updates.clone());
-        });
+        Modal::new("katana_update_dialog_v6", &msgs.title)
+            .width(UPDATE_DIALOG_WIDTH)
+            .show_body_only(ctx, |ui| {
+                ui.add(egui::Spinner::new());
+                ui.add_space(SPACING_MEDIUM);
+                ui.label(msgs.checking_for_updates.clone());
+            });
     } else if let Some(err) = &state.update_check_error {
         // Error state — OK button to close
         let close = {
             let err = err.clone();
-            Modal::new("katana_update_dialog_v6", &msgs.title).show(
-                ctx,
-                |ui| {
-                    ui.colored_label(
-                        ui.ctx()
-                            .data(|d| {
-                                d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
-                                    "katana_theme_colors",
-                                ))
-                            })
-                            .map_or(crate::theme_bridge::WHITE, |tc| {
-                                crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                            }),
-                        msgs.failed_to_check.clone(),
-                    );
-                    ui.add_space(SPACING_SMALL);
-                    ui.label(&err);
-                },
-                |ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(msgs.action_close.clone()).clicked() {
-                            return Some(true);
-                        }
-                        None
-                    })
-                    .inner
-                },
-            )
+            Modal::new("katana_update_dialog_v6", &msgs.title)
+                .width(UPDATE_DIALOG_WIDTH)
+                .show(
+                    ctx,
+                    |ui| {
+                        ui.colored_label(
+                            ui.ctx()
+                                .data(|d| {
+                                    d.get_temp::<katana_platform::theme::ThemeColors>(
+                                        egui::Id::new("katana_theme_colors"),
+                                    )
+                                })
+                                .map_or(crate::theme_bridge::WHITE, |tc| {
+                                    crate::theme_bridge::rgb_to_color32(tc.system.error_text)
+                                }),
+                            msgs.failed_to_check.clone(),
+                        );
+                        ui.add_space(SPACING_SMALL);
+                        ui.label(&err);
+                    },
+                    |ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(msgs.action_close.clone()).clicked() {
+                                return Some(true);
+                            }
+                            None
+                        })
+                        .inner
+                    },
+                )
         };
         if close == Some(true) {
             *open = false;
@@ -4603,86 +4744,97 @@ fn render_update_window(
         let desc = msgs
             .update_available_desc
             .replace("{version}", tag.as_str());
-        let action = Modal::new("katana_update_dialog_v6", &msgs.title).show(
-            ctx,
-            |ui| {
-                ui.label(
-                    egui::RichText::new(msgs.update_available.clone())
-                        .heading()
-                        .color(ui.visuals().widgets.active.text_color()),
-                );
-                ui.add_space(SPACING_MEDIUM);
-                ui.label(&desc);
-                ui.add_space(SPACING_LARGE);
+        let action = Modal::new("katana_update_dialog_v6", &msgs.title)
+            .width(UPDATE_DIALOG_WIDTH)
+            .show(
+                ctx,
+                |ui| {
+                    ui.label(
+                        egui::RichText::new(msgs.update_available.clone())
+                            .heading()
+                            .color(ui.visuals().widgets.active.text_color()),
+                    );
+                    ui.add_space(SPACING_MEDIUM);
+                    ui.label(&desc);
+                    ui.add_space(SPACING_LARGE);
 
-                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
-                    egui::ScrollArea::vertical()
-                        .max_height(MAX_SCROLL_HEIGHT)
-                        .auto_shrink([true, true])
-                        .show(ui, |ui| {
-                            egui_commonmark::CommonMarkViewer::new().show(
-                                ui,
-                                markdown_cache,
-                                &body_text,
-                            );
-                        });
-                });
-                ui.add_space(SPACING_LARGE);
-            },
-            |ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Primary: Install
-                    if ui
-                        .button(
-                            egui::RichText::new(msgs.install_update.clone())
-                                .color(ui.visuals().widgets.active.text_color())
-                                .strong(),
-                        )
-                        .clicked()
-                    {
-                        return Some(AppAction::InstallUpdate);
-                    }
-                    // Skip
-                    if ui.button(msgs.action_skip_version.clone()).clicked() {
-                        return Some(AppAction::SkipVersion(tag.clone()));
-                    }
-                    // Later
-                    if ui.button(msgs.action_later.clone()).clicked() {
-                        return Some(AppAction::DismissUpdate);
-                    }
-                    None
-                })
-                .inner
-            },
-        );
+                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(MAX_SCROLL_HEIGHT)
+                            .auto_shrink([true, true])
+                            .show(ui, |ui| {
+                                egui_commonmark::CommonMarkViewer::new().show(
+                                    ui,
+                                    markdown_cache,
+                                    &body_text,
+                                );
+                            });
+                    });
+                    ui.add_space(SPACING_LARGE);
+                },
+                |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // Primary: Install
+                        if ui
+                            .button(
+                                egui::RichText::new(msgs.install_update.clone())
+                                    .color(ui.visuals().widgets.active.text_color())
+                                    .strong(),
+                            )
+                            .clicked()
+                        {
+                            return Some(AppAction::InstallUpdate);
+                        }
+                        // Release Notes
+                        if ui
+                            .button(crate::i18n::get().menu.release_notes.clone())
+                            .clicked()
+                        {
+                            return Some(AppAction::ShowReleaseNotes);
+                        }
+                        // Skip
+                        if ui.button(msgs.action_skip_version.clone()).clicked() {
+                            return Some(AppAction::SkipVersion(tag.clone()));
+                        }
+                        // Later
+                        if ui.button(msgs.action_later.clone()).clicked() {
+                            return Some(AppAction::DismissUpdate);
+                        }
+                        None
+                    })
+                    .inner
+                },
+            );
         if let Some(action) = action {
             *pending_action = action;
             if matches!(
                 *pending_action,
-                AppAction::DismissUpdate | AppAction::SkipVersion(_)
+                AppAction::DismissUpdate | AppAction::SkipVersion(_) | AppAction::ShowReleaseNotes
             ) {
                 *open = false;
             }
         }
     } else {
         // Up to date — OK button to close
-        let close = Modal::new("katana_update_dialog_v6", &msgs.title).show(
-            ctx,
-            |ui| {
-                ui.heading(msgs.up_to_date.clone());
-                ui.add_space(SPACING_SMALL);
-                ui.label(msgs.up_to_date_desc.clone());
-            },
-            |ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(msgs.action_close.clone()).clicked() {
-                        return Some(true);
-                    }
-                    None
-                })
-                .inner
-            },
-        );
+        let close = Modal::new("katana_update_dialog_v6", &msgs.title)
+            .width(UPDATE_DIALOG_WIDTH)
+            .show(
+                ctx,
+                |ui| {
+                    ui.heading(msgs.up_to_date.clone());
+                    ui.add_space(SPACING_SMALL);
+                    ui.label(msgs.up_to_date_desc.clone());
+                },
+                |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button(msgs.action_close.clone()).clicked() {
+                            return Some(true);
+                        }
+                        None
+                    })
+                    .inner
+                },
+            );
         if close == Some(true) {
             *open = false;
         }

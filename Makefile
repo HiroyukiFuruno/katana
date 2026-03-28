@@ -29,7 +29,7 @@ run: build ## Run the application (KatanA)
 	cargo run --bin KatanA
 
 .PHONY: run-release
-run-release: ## Run the application in release mode
+run-release-mode: ## Run the application in release mode
 	cargo run --bin KatanA --release
 
 .PHONY: run-performance
@@ -103,7 +103,7 @@ test-specific: ## Run a specific test (e.g., make test-specific T=test_name)
 
 .PHONY: test-integration
 test-integration: ## Run integration tests (UI tests, semantic assertions only) (requires: egui_kittest)
-	cargo test --workspace --test integration
+	cargo test --workspace --test integration -- --test-threads=1
 
 # ---------- CI / Quality Gates ----------
 

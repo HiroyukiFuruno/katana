@@ -18,6 +18,7 @@ enum {
     TAG_LANG_ES        = 13,
     TAG_LANG_IT        = 14,
     TAG_CHECK_UPDATES  = 15,
+    TAG_RELEASE_NOTES  = 16,
 };
 
 // Global: Tag of the last selected menu action.
@@ -50,6 +51,7 @@ static NSMenuItem *g_hide_others_item = nil;
 static NSMenuItem *g_show_all_item = nil;
 static NSMenuItem *g_quit_item = nil;
 static NSMenu *g_help_menu = nil;
+static NSMenuItem *g_release_notes_item = nil;
 
 /// Called from Rust at the very start of main(), before eframe creates the window.
 /// Must be called before the window server registers the process to ensure
@@ -232,8 +234,14 @@ void katana_setup_native_menu(void) {
     NSMenu *helpMenu = [[NSMenu alloc] initWithTitle:@"Help"];
     g_help_menu = helpMenu;
     
-    NSMenuItem *comingSoonItem = [[NSMenuItem alloc] initWithTitle:@"Coming soon!!" action:nil keyEquivalent:@""];
-    [helpMenu addItem:comingSoonItem];
+    NSMenuItem *releaseNotesItem = [[NSMenuItem alloc] 
+        initWithTitle:@"Release Notes" 
+        action:action 
+        keyEquivalent:@""];
+    [releaseNotesItem setTarget:g_target];
+    [releaseNotesItem setTag:TAG_RELEASE_NOTES];
+    [helpMenu addItem:releaseNotesItem];
+    g_release_notes_item = releaseNotesItem;
 
     NSMenuItem *helpMenuItem = [[NSMenuItem alloc] initWithTitle:@"Help" action:nil keyEquivalent:@""];
     [helpMenuItem setSubmenu:helpMenu];
@@ -245,6 +253,11 @@ void katana_setup_native_menu(void) {
     [mainMenu addItem:fileMenuItem];
     [mainMenu addItem:settingsMenuItem];
     [mainMenu addItem:helpMenuItem];
+
+    // Prevent macOS from auto-injecting the Spotlight Search box into our custom "Help" menu
+    // by explicitly giving it a dummy, detached Help Menu.
+    NSMenu *dummyHelpMenu = [[NSMenu alloc] initWithTitle:@"DummyHelp"];
+    [NSApp setHelpMenu:dummyHelpMenu];
 }
 
 /// Called from Rust: Gets and resets the last menu action.
@@ -269,7 +282,8 @@ void katana_update_menu_strings(
     const char* hide_others,
     const char* show_all,
     const char* check_updates,
-    const char* help
+    const char* help,
+    const char* release_notes
 ) {
     @autoreleasepool {
         if (g_file_menu && file) {
@@ -310,6 +324,9 @@ void katana_update_menu_strings(
         }
         if (g_help_menu && help) {
             [g_help_menu setTitle:[NSString stringWithUTF8String:help]];
+        }
+        if (g_release_notes_item && release_notes) {
+            [g_release_notes_item setTitle:[NSString stringWithUTF8String:release_notes]];
         }
     }
 }

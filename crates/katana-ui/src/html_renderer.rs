@@ -51,8 +51,7 @@ const HEADING_LEVEL_3: u8 = 3;
 /// ```
 pub struct HtmlRenderer<'a> {
     ui: &'a mut egui::Ui,
-    #[allow(dead_code)]
-    base_dir: &'a Path,
+    _base_dir: &'a Path,
     text_color: Option<egui::Color32>,
     max_image_width: f32,
 }
@@ -63,7 +62,7 @@ impl<'a> HtmlRenderer<'a> {
         let max_w = ui.available_width();
         Self {
             ui,
-            base_dir,
+            _base_dir: base_dir,
             text_color: None,
             max_image_width: max_w,
         }
@@ -517,7 +516,7 @@ impl<'a> HtmlRenderer<'a> {
     fn new_inner(ui: &'a mut egui::Ui, text_color: Option<egui::Color32>, max_w: f32) -> Self {
         Self {
             ui,
-            base_dir: Path::new(""),
+            _base_dir: Path::new(""),
             text_color,
             max_image_width: max_w,
         }

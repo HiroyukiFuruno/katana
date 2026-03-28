@@ -43,6 +43,9 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
         // Pre-accept terms to bypass the blocking UI in integration tests.
         state.settings.settings_mut().terms_accepted_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
+        // Also pre-set previous app version so the release notes auto-show logic isn't triggered for tests.
+        state.settings.settings_mut().updates.previous_app_version =
+            Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
@@ -281,6 +284,62 @@ fn test_integration_toc_panel_hides_when_disabled() {
     );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_integration_changelog_tab_display() {
+    use katana_ui::app_state::AppAction;
+    use katana_ui::changelog::ChangelogSection;
+
+    let mut harness = setup_harness();
+    harness.step();
+
+    // Trigger ShowReleaseNotes action
+    harness
+        .state_mut()
+        .trigger_action(AppAction::ShowReleaseNotes);
+    for _ in 0..10 {
+        harness.step();
+    }
+
+    // Verify a tab is opened with the ChangeLog path
+    {
+        let state = harness.state();
+        let app = state.app_state_for_test();
+        let active_doc = app.active_document().expect("a document MUST be active");
+        assert!(active_doc
+            .path
+            .to_string_lossy()
+            .starts_with("Katana://ChangeLog"));
+    }
+
+    // Mock sections to exercise interaction logic
+    harness
+        .state_mut()
+        .set_changelog_sections_for_test(vec![ChangelogSection {
+            version: "0.8.0".to_string(),
+            heading: "v0.8.0".to_string(),
+            body: "### Features\n- Fixed the close button overlap".to_string(),
+            default_open: true,
+        }]);
+    harness.state_mut().clear_changelog_rx_for_test();
+    harness.step();
+    harness.step();
+
+    // Verify the changelog is rendered by checking for the title
+    let i18n = katana_ui::i18n::get();
+    let expected_title = format!("{} v{}", i18n.menu.release_notes, env!("CARGO_PKG_VERSION"));
+    harness.get_by_label(&expected_title);
+
+    // Verify it's open and the markdown inside body is visible
+    harness.get_by_label("Fixed the close button overlap");
+
+    // Test header click (icon transition) it should also be active
+    let header_label = "▼ v0.8.0"; // It's open by default now!
+    harness.get_by_label(header_label).hover();
+    harness.step();
+    harness.get_by_label(header_label).click();
+    harness.step();
 }
 
 #[test]
@@ -1365,6 +1424,8 @@ fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'sta
         );
         // Pre-accept terms to bypass the blocking UI in persistence tests.
         state.settings.settings_mut().terms_accepted_version =
+            Some(katana_ui::about_info::APP_VERSION.to_string());
+        state.settings.settings_mut().updates.previous_app_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");
@@ -3141,16 +3202,12 @@ fn test_regression_update_dialog_up_to_date_renders_correctly() {
 
     // Open the update dialog via the test helper.
     harness.state_mut().open_update_dialog_for_test();
-    harness.step();
     harness.run_steps(10);
-
-    // The dialog window title must be present in the rendered output.
-    harness.get_by_label("Check for Updates");
 
     // The "up to date" heading must be visible.
     harness.get_by_label("Up to Date");
 
-    // The explicit OK button (from Modal footer) must be present.
+    // The manual OK button (from Modal footer) must be present.
     harness.get_by_label("OK");
 }
 

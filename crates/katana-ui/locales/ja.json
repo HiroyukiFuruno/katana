@@ -17,7 +17,8 @@
     "hide_others": "他を隠す",
     "show_all": "すべて表示",
     "help": "ヘルプ",
-    "check_updates": "更新を確認..."
+    "check_updates": "更新を確認...",
+    "release_notes": "ChangeLog"
   },
   "about": {
     "basic_info": "基本情報",
@@ -34,8 +35,7 @@
     "documentation": "ドキュメント",
     "report_issue": "不具合を報告",
     "support": "サポート",
-    "sponsor": "スポンサー",
-    "coming_soon": "準備中"
+    "sponsor": "スポンサー"
   },
   "update": {
     "title": "更新の確認",
@@ -158,7 +158,9 @@
       "theme_name_label": "テーマ名:",
       "duplicate": "複製...",
       "reset_contrast": "リセット",
-      "ui_contrast_offset": "UIコントラスト補正"
+      "ui_contrast_offset": "UIコントラスト補正",
+      "show_more": "もっと表示...",
+      "show_less": "少なく表示..."
     },
     "font": {
       "size": "フォントサイズ",

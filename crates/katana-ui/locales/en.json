@@ -17,7 +17,8 @@
     "hide_others": "Hide Others",
     "show_all": "Show All",
     "help": "Help",
-    "check_updates": "Check for Updates..."
+    "check_updates": "Check for Updates...",
+    "release_notes": "Changelog"
   },
   "about": {
     "basic_info": "Basic Info",
@@ -34,8 +35,7 @@
     "documentation": "Documentation",
     "report_issue": "Report Issue",
     "support": "Support",
-    "sponsor": "Sponsor",
-    "coming_soon": "Coming Soon"
+    "sponsor": "Sponsor"
   },
   "update": {
     "title": "Check for Updates",
@@ -158,7 +158,9 @@
       "theme_name_label": "Theme Name:",
       "duplicate": "Duplicate...",
       "reset_contrast": "Reset",
-      "ui_contrast_offset": "UI Contrast Offset"
+      "ui_contrast_offset": "UI Contrast Offset",
+      "show_more": "Show more...",
+      "show_less": "Show less..."
     },
     "font": {
       "size": "Font Size",
