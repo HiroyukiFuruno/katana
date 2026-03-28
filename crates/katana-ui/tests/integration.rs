@@ -3193,6 +3193,7 @@ fn test_regression_update_dialog_up_to_date_renders_correctly() {
             katana_ui::i18n::set_language("en");
             let mut app = KatanaApp::new(state);
             app.skip_splash();
+            app.disable_changelog_display_for_test();
             app
         });
 

@@ -162,6 +162,8 @@ pub struct KatanaApp {
     pub(crate) pending_relaunch: Option<katana_core::update::UpdatePreparation>,
     /// Parsed changelog sections for the release notes window.
     pub(crate) changelog_sections: Vec<crate::changelog::ChangelogSection>,
+    /// Flags whether the changelog tab needs to be displayed after startup.
+    pub(crate) needs_changelog_display: bool,
 }
 
 impl KatanaApp {
@@ -192,6 +194,7 @@ impl KatanaApp {
             show_meta_info_for: None,
             pending_relaunch: None,
             changelog_sections: Vec::new(),
+            needs_changelog_display: false,
         };
         let current_version = env!("CARGO_PKG_VERSION");
         let mut show_changelog = false;
@@ -215,7 +218,7 @@ impl KatanaApp {
             if let Err(e) = app.state.settings.save() {
                 tracing::warn!("Failed to save previous_app_version: {e}");
             }
-            app.pending_action = AppAction::ShowReleaseNotes;
+            app.needs_changelog_display = true;
         }
 
         app.start_update_check(false);
@@ -232,6 +235,12 @@ impl KatanaApp {
     #[doc(hidden)]
     pub fn open_update_dialog_for_test(&mut self) {
         self.show_update_dialog = true;
+    }
+
+    /// Test-only helper: disables automatic changelog display.
+    #[doc(hidden)]
+    pub fn disable_changelog_display_for_test(&mut self) {
+        self.needs_changelog_display = false;
     }
 
     /// Test-only helper to inspect app state.
@@ -584,6 +593,18 @@ impl KatanaApp {
         };
         if done {
             self.workspace_rx = None;
+        }
+
+        // Feature: Automatically show the changelog after updating the app.
+        // We defer this action until the initial workspace has finished loading so that
+        // the newly opened changelog tab doesn't get wiped by `finish_open_workspace`.
+        if self.needs_changelog_display
+            && !self.state.is_loading_workspace
+            && self.workspace_rx.is_none()
+            && matches!(self.pending_action, AppAction::None)
+        {
+            self.needs_changelog_display = false;
+            self.pending_action = AppAction::ShowReleaseNotes;
         }
     }
 
@@ -2809,6 +2830,7 @@ mod tests_extra {
             show_meta_info_for: None,
             pending_relaunch: None,
             changelog_sections: Vec::new(),
+            needs_changelog_display: false,
         }
     }
 
