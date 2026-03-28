@@ -52,6 +52,21 @@ pub fn next_tab_index(current: usize, count: usize) -> usize {
     (current + 1) % count
 }
 
+pub fn format_window_title(
+    doc_file_name: &str,
+    relative_path: &str,
+    release_notes_i18n: &str,
+) -> String {
+    if doc_file_name.starts_with("CHANGELOG_v") && doc_file_name.ends_with(".md") {
+        let ver = doc_file_name
+            .trim_start_matches("CHANGELOG_v")
+            .trim_end_matches(".md");
+        format!("KatanA — {} {}", release_notes_i18n, ver)
+    } else {
+        format!("KatanA — {}", relative_path)
+    }
+}
+
 /// Formats the metadata tooltip string (Size and Modified time).
 pub fn format_metadata_tooltip(
     size: u64,
@@ -370,5 +385,20 @@ mod tests {
         assert_eq!(calculate_splash_progress(0.75), 0.5);
         assert_eq!(calculate_splash_progress(1.5), 1.0);
         assert_eq!(calculate_splash_progress(2.0), 1.0);
+    }
+
+    #[test]
+    fn test_format_window_title_changelog() {
+        let title1 = format_window_title("CHANGELOG_v0.8.0.md", "ignore/me.md", "Release Notes");
+        assert_eq!(title1, "KatanA — Release Notes 0.8.0");
+
+        let title2 = format_window_title("CHANGELOG_v0.7.10.md", "ignore/me.md", "ReleaseNotes_JA");
+        assert_eq!(title2, "KatanA — ReleaseNotes_JA 0.7.10");
+    }
+
+    #[test]
+    fn test_format_window_title_normal_file() {
+        let title = format_window_title("readme.md", "docs/readme.md", "Release Notes");
+        assert_eq!(title, "KatanA — docs/readme.md");
     }
 }

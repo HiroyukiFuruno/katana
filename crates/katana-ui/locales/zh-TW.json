@@ -35,8 +35,7 @@
     "documentation": "文檔",
     "report_issue": "報告問題",
     "support": "支持",
-    "sponsor": "贊助",
-    "coming_soon": "敬請期待"
+    "sponsor": "贊助"
   },
   "update": {
     "title": "檢查更新",
@@ -159,7 +158,9 @@
       "theme_name_label": "主題名稱:",
       "duplicate": "建立複本...",
       "reset_contrast": "重設",
-      "ui_contrast_offset": "UI 對比度偏移"
+      "ui_contrast_offset": "UI 對比度偏移",
+      "show_more": "顯示更多...",
+      "show_less": "顯示更少..."
     },
     "font": {
       "size": "字體大小",

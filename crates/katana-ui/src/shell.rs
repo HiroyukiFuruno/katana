@@ -127,6 +127,7 @@ pub struct KatanaApp {
     /// Receiver for background update checks.
     pub(crate) update_rx:
         Option<std::sync::mpsc::Receiver<Result<Option<katana_core::update::ReleaseInfo>, String>>>,
+    pub(crate) changelog_rx: Option<std::sync::mpsc::Receiver<crate::changelog::ChangelogEvent>>,
     pub(crate) update_install_rx: Option<std::sync::mpsc::Receiver<UpdateInstallEvent>>,
     /// Active background export tasks.
     pub(crate) export_tasks: Vec<ExportTask>,
@@ -159,6 +160,8 @@ pub struct KatanaApp {
     pub(crate) show_meta_info_for: Option<std::path::PathBuf>,
     /// Prepared update ready to be relaunched after user confirmation.
     pub(crate) pending_relaunch: Option<katana_core::update::UpdatePreparation>,
+    /// Parsed changelog sections for the release notes window.
+    pub(crate) changelog_sections: Vec<crate::changelog::ChangelogSection>,
 }
 
 impl KatanaApp {
@@ -171,6 +174,7 @@ impl KatanaApp {
             download_rx: None,
             workspace_rx: None,
             update_rx: None,
+            changelog_rx: None,
             update_install_rx: None,
             export_tasks: Vec::new(),
             pending_document_loads: std::collections::VecDeque::new(),
@@ -187,7 +191,33 @@ impl KatanaApp {
             splash_start: None,
             show_meta_info_for: None,
             pending_relaunch: None,
+            changelog_sections: Vec::new(),
         };
+        let current_version = env!("CARGO_PKG_VERSION");
+        let mut show_changelog = false;
+
+        {
+            let settings_mut = app.state.settings.settings_mut();
+            if let Some(prev) = &settings_mut.updates.previous_app_version {
+                if prev != current_version {
+                    show_changelog = true;
+                }
+            } else {
+                // First launch ever or first launch since v0.8.0
+                show_changelog = true;
+            }
+            if show_changelog {
+                settings_mut.updates.previous_app_version = Some(current_version.to_string());
+            }
+        }
+
+        if show_changelog {
+            if let Err(e) = app.state.settings.save() {
+                tracing::warn!("Failed to save previous_app_version: {e}");
+            }
+            app.pending_action = AppAction::ShowReleaseNotes;
+        }
+
         app.start_update_check(false);
         app
     }
@@ -202,6 +232,26 @@ impl KatanaApp {
     #[doc(hidden)]
     pub fn open_update_dialog_for_test(&mut self) {
         self.show_update_dialog = true;
+    }
+
+    /// Test-only helper to inspect app state.
+    #[doc(hidden)]
+    pub fn app_state_for_test(&self) -> &AppState {
+        &self.state
+    }
+
+    /// Test-only helper to set changelog sections.
+    #[doc(hidden)]
+    pub fn set_changelog_sections_for_test(
+        &mut self,
+        sections: Vec<crate::changelog::ChangelogSection>,
+    ) {
+        self.changelog_sections = sections;
+    }
+
+    /// Test-only helper to clear the changelog receiver.
+    pub fn clear_changelog_rx_for_test(&mut self) {
+        self.changelog_rx = None;
     }
 
     pub(crate) fn take_action(&mut self) -> AppAction {
@@ -1028,6 +1078,26 @@ impl KatanaApp {
                     }
                 }
             }
+            AppAction::ShowReleaseNotes => {
+                self.handle_show_release_notes();
+            }
+            AppAction::ClearAllCaches => {
+                use egui::load::BytesLoader;
+                katana_platform::cache::DefaultCacheService::clear_all_directories();
+                crate::http_cache_loader::PersistentHttpLoader::default().forget_all();
+                ctx.forget_all_images();
+                crate::icon::IconRegistry::install(ctx);
+
+                // Assuming `clear_http_cache` is a decent message for "Successfully cleared" or "Clear cache" button label. Use it as Status msg.
+                self.state.status_message = Some((
+                    crate::i18n::get()
+                        .settings
+                        .behavior
+                        .clear_http_cache
+                        .clone(),
+                    crate::app_state::StatusType::Success,
+                ));
+            }
             AppAction::RequestNewFile(path) => {
                 let ext = self
                     .state
@@ -1147,6 +1217,78 @@ impl KatanaApp {
         }
 
         self.cancel_inactive_renders();
+    }
+
+    fn handle_show_release_notes(&mut self) {
+        let current_version = env!("CARGO_PKG_VERSION").to_string();
+        let previous = self
+            .state
+            .settings
+            .settings()
+            .updates
+            .previous_app_version
+            .clone();
+        let lang = self.state.settings.settings().language.clone();
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.changelog_rx = Some(rx);
+
+        crate::changelog::fetch_changelog(&lang, current_version, previous, tx);
+        tracing::info!("Triggered ShowReleaseNotes background fetch.");
+
+        // Open/select the changelog tab immediately (it will show a loading state until data arrives)
+        let virtual_path =
+            std::path::PathBuf::from(format!("Katana://ChangeLog v{}", env!("CARGO_PKG_VERSION")));
+        if !self
+            .state
+            .open_documents
+            .iter()
+            .any(|d| d.path == virtual_path)
+        {
+            self.state
+                .open_documents
+                .push(katana_core::document::Document::new_empty(
+                    virtual_path.clone(),
+                ));
+        }
+        self.handle_select_document(virtual_path, true);
+    }
+
+    pub(crate) fn poll_changelog(&mut self, _ctx: &egui::Context) {
+        if let Some(rx) = &self.changelog_rx {
+            if let Ok(event) = rx.try_recv() {
+                self.changelog_rx = None;
+                match event {
+                    crate::changelog::ChangelogEvent::Success(sections) => {
+                        self.changelog_sections = sections;
+                        let virtual_path = std::path::PathBuf::from(format!(
+                            "Katana://ChangeLog v{}",
+                            env!("CARGO_PKG_VERSION")
+                        ));
+                        if let Some(pos) = self
+                            .state
+                            .open_documents
+                            .iter()
+                            .position(|d| d.path == virtual_path)
+                        {
+                            self.state.active_doc_idx = Some(pos);
+                        } else {
+                            self.state
+                                .open_documents
+                                .push(katana_core::document::Document::new_empty(virtual_path));
+                            self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
+                        }
+                    }
+                    crate::changelog::ChangelogEvent::Error(err) => {
+                        tracing::error!("Failed to fetch changelog: {}", err);
+                        self.state.status_message = Some((
+                            format!("Failed to fetch release notes: {err}"),
+                            crate::app_state::StatusType::Error,
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     fn handle_export_document(&mut self, ctx: &egui::Context, fmt: crate::app_state::ExportFormat) {
@@ -2067,7 +2209,9 @@ mod tests_extra {
             katana_platform::SettingsService::default(),
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
-        KatanaApp::new(state)
+        let mut app = KatanaApp::new(state);
+        app.pending_action = AppAction::None;
+        app
     }
 
     fn make_temp_workspace() -> tempfile::TempDir {
@@ -2647,6 +2791,7 @@ mod tests_extra {
             download_rx: None,
             workspace_rx: None,
             update_rx: None,
+            changelog_rx: None,
             update_install_rx: None,
             export_tasks: Vec::new(),
             pending_document_loads: std::collections::VecDeque::new(),
@@ -2663,6 +2808,7 @@ mod tests_extra {
             splash_start: None,
             show_meta_info_for: None,
             pending_relaunch: None,
+            changelog_sections: Vec::new(),
         }
     }
 

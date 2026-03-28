@@ -509,11 +509,16 @@ mod tests {
 
         let mut settings = AppSettings::default();
         settings.updates.skipped_version = Some("v0.8.0".to_string());
+        settings.updates.previous_app_version = Some("v0.7.0".to_string());
         let repo = JsonFileRepository::new(path.clone());
         repo.save(&settings).unwrap();
 
         let loaded = repo.load();
         assert_eq!(loaded.updates.skipped_version, Some("v0.8.0".to_string()));
+        assert_eq!(
+            loaded.updates.previous_app_version,
+            Some("v0.7.0".to_string())
+        );
     }
 
     #[test]
@@ -521,6 +526,7 @@ mod tests {
         let json = r#"{"updates": {"interval": "Daily"}}"#;
         let loaded: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(loaded.updates.skipped_version, None);
+        assert_eq!(loaded.updates.previous_app_version, None);
     }
 
     #[test]

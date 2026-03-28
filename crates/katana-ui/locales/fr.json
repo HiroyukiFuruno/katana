@@ -35,8 +35,7 @@
     "documentation": "Documentation",
     "report_issue": "Signaler un problème",
     "support": "Support",
-    "sponsor": "Soutenir",
-    "coming_soon": "Bientôt disponible"
+    "sponsor": "Soutenir"
   },
   "update": {
     "title": "Vérifier les mises à jour",
@@ -159,7 +158,9 @@
       "theme_name_label": "Nom du thème :",
       "duplicate": "Dupliquer...",
       "reset_contrast": "Réinitialiser",
-      "ui_contrast_offset": "Décalage de contraste de l'interface"
+      "ui_contrast_offset": "Décalage de contraste de l'interface",
+      "show_more": "Afficher plus...",
+      "show_less": "Afficher moins..."
     },
     "font": {
       "size": "Taille de la police",

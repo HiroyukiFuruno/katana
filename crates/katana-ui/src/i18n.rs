@@ -2,7 +2,6 @@ use serde::Deserialize;
 use std::sync::{OnceLock, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct I18nMessages {
     pub menu: MenuMessages,
     pub workspace: WorkspaceMessages,
@@ -30,7 +29,6 @@ pub struct I18nMessages {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct ExportMessages {
     pub success: String,
     pub failed: String,
@@ -42,7 +40,6 @@ pub struct ExportMessages {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct TermsMessages {
     pub title: String,
     pub version_label: String,
@@ -52,14 +49,12 @@ pub struct TermsMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct TocMessages {
     pub title: String,
     pub empty: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SearchMessages {
     pub modal_title: String,
     pub query_hint: String,
@@ -69,7 +64,6 @@ pub struct SearchMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct AboutMessages {
     pub basic_info: String,
     pub version: String,
@@ -86,11 +80,9 @@ pub struct AboutMessages {
     pub report_issue: String,
     pub support: String,
     pub sponsor: String,
-    pub coming_soon: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct UpdateMessages {
     pub title: String,
     pub checking_for_updates: String,
@@ -139,7 +131,6 @@ fn default_action_restart() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct MenuMessages {
     pub file: String,
     pub settings: String,
@@ -173,7 +164,6 @@ fn default_menu_release_notes() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct WorkspaceMessages {
     pub no_workspace_open: String,
     pub no_document_selected: String,
@@ -189,7 +179,6 @@ fn default_metadata_tooltip() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct DiagramControllerMessages {
     pub pan_up: String,
     pub pan_down: String,
@@ -209,7 +198,6 @@ fn default_trackpad_help() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct PreviewMessages {
     pub preview_title: String,
     pub refresh_diagrams: String,
@@ -235,7 +223,6 @@ fn default_diagram_controller() -> DiagramControllerMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct PlantumlMessages {
     pub downloading_plantuml: String,
     pub plantuml_installed: String,
@@ -243,7 +230,6 @@ pub struct PlantumlMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct ViewModeMessages {
     pub preview: String,
     pub code: String,
@@ -251,7 +237,6 @@ pub struct ViewModeMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SplitToggleMessages {
     pub horizontal: String,
     pub vertical: String,
@@ -260,7 +245,6 @@ pub struct SplitToggleMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct ErrorMessages {
     pub missing_dependency: String,
     pub curl_launch_failed: String,
@@ -269,7 +253,6 @@ pub struct ErrorMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct StatusMessages {
     pub ready: String,
     pub saved: String,
@@ -280,7 +263,6 @@ pub struct StatusMessages {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct ActionMessages {
     pub expand_all: String,
     pub collapse_all: String,
@@ -360,7 +342,6 @@ fn default_action_discard() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct DialogMessages {
     pub new_file_title: String,
     pub new_directory_title: String,
@@ -381,13 +362,11 @@ fn default_unsaved_changes_msg() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct AiMessages {
     pub ai_unconfigured: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct ToolMessages {
     pub not_installed: String,
     pub install_path: String,
@@ -395,7 +374,6 @@ pub struct ToolMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsMessages {
     pub title: String,
     pub tabs: Vec<SettingsTabMessage>,
@@ -423,7 +401,6 @@ impl SettingsMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsThemeMessages {
     pub preset: String,
     pub dark_section: String,
@@ -444,6 +421,18 @@ pub struct SettingsThemeMessages {
     pub duplicate: String,
     #[serde(default = "default_ui_contrast_offset")]
     pub ui_contrast_offset: String,
+    #[serde(default = "default_show_more")]
+    pub show_more: String,
+    #[serde(default = "default_show_less")]
+    pub show_less: String,
+}
+
+fn default_show_more() -> String {
+    "Show more...".to_string()
+}
+
+fn default_show_less() -> String {
+    "Show less...".to_string()
 }
 
 fn default_ui_contrast_offset() -> String {
@@ -475,14 +464,12 @@ fn default_theme_name_label() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsTabMessage {
     pub key: String,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsFontMessages {
     pub size: String,
     pub family: String,
@@ -490,7 +477,6 @@ pub struct SettingsFontMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsLayoutMessages {
     pub split_direction: String,
     pub horizontal: String,
@@ -504,7 +490,6 @@ pub struct SettingsLayoutMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsWorkspaceMessages {
     pub max_depth: String,
     pub ignored_directories: String,
@@ -545,7 +530,6 @@ fn default_visible_extensions_msg() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct SettingsUpdatesMessages {
     pub section_title: String,
     pub interval: String,
@@ -558,7 +542,6 @@ pub struct SettingsUpdatesMessages {
 
 /// i18n messages for the Behavior settings tab.
 #[derive(Debug, Clone, Deserialize, Default)]
-#[allow(dead_code)]
 pub struct SettingsBehaviorMessages {
     /// Section heading.
     pub section_title: String,
@@ -602,7 +585,6 @@ fn default_days_suffix() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsPreviewMessages {
     pub title: String,
     pub heading: String,
@@ -613,7 +595,6 @@ pub struct SettingsPreviewMessages {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct SettingsColorMessages {
     pub background: String,
     pub panel_background: String,
@@ -715,7 +696,6 @@ fn default_preview_text() -> String {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub struct TabMessages {
     pub nav_prev: String,
     pub nav_next: String,
@@ -878,6 +858,12 @@ mod tests {
         assert_eq!(default_action_reveal_in_os(), "Reveal in OS");
         assert_eq!(default_action_save(), "Save");
         assert_eq!(default_action_cancel(), "Cancel");
+        assert_eq!(default_show_more(), "Show more...");
+        assert_eq!(default_show_less(), "Show less...");
+        assert_eq!(default_ui_contrast_offset(), "UI Contrast Offset");
+        assert_eq!(default_duplicate(), "Duplicate...");
+        assert_eq!(default_custom_section(), "Custom");
+        assert_eq!(default_delete_custom(), "Delete Custom Theme");
     }
 
     #[test]

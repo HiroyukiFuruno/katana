@@ -35,8 +35,7 @@
     "documentation": "Documentação",
     "report_issue": "Relatar problema",
     "support": "Suporte",
-    "sponsor": "Patrocinar",
-    "coming_soon": "Em breve"
+    "sponsor": "Patrocinar"
   },
   "update": {
     "title": "Verificar atualizações",
@@ -159,7 +158,9 @@
       "theme_name_label": "Nome do Tema:",
       "duplicate": "Duplicar...",
       "reset_contrast": "Redefinir",
-      "ui_contrast_offset": "Deslocamento de contraste da interface"
+      "ui_contrast_offset": "Deslocamento de contraste da interface",
+      "show_more": "Exibir mais...",
+      "show_less": "Exibir menos..."
     },
     "font": {
       "size": "Tamanho da Fonte",

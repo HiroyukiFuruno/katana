@@ -35,8 +35,7 @@
     "documentation": "문서",
     "report_issue": "문제 보고",
     "support": "지원",
-    "sponsor": "후원",
-    "coming_soon": "출시 예정"
+    "sponsor": "후원"
   },
   "update": {
     "title": "업데이트 확인",
@@ -159,7 +158,9 @@
       "theme_name_label": "테마 이름:",
       "duplicate": "복제...",
       "reset_contrast": "초기화",
-      "ui_contrast_offset": "UI 대비 오프셋"
+      "ui_contrast_offset": "UI 대비 오프셋",
+      "show_more": "더 보기...",
+      "show_less": "간략히 보기..."
     },
     "font": {
       "size": "글꼴 크기",

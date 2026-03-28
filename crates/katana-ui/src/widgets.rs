@@ -57,10 +57,14 @@ pub struct Modal<'a> {
     show_pct: bool,
     /// Width of the progress bar in pixels.
     bar_width: f32,
+    /// Explicit width for the modal dialog.
+    width: Option<f32>,
 }
 
 /// Default width of the progress bar inside the modal.
 const DEFAULT_BAR_WIDTH: f32 = 280.0;
+/// Default width of the modal dialog.
+const DEFAULT_DIALOG_WIDTH: f32 = 450.0;
 /// Spacing between body content and the progress bar.
 const BODY_TO_BAR_SPACING: f32 = 12.0;
 /// Spacing between progress bar (or body) and the footer buttons.
@@ -75,7 +79,14 @@ impl<'a> Modal<'a> {
             progress: None,
             show_pct: false,
             bar_width: DEFAULT_BAR_WIDTH,
+            width: None,
         }
+    }
+
+    /// Sets the modal's outer dialog width.
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
     }
 
     /// Sets a determinate progress ratio (0.0–1.0).
@@ -115,23 +126,20 @@ impl<'a> Modal<'a> {
     ) -> Option<T> {
         let mut result: Option<T> = None;
 
-        // Use a reasonable dialogue width.
-        // We do not use auto_sized() alone because right_to_left layouts
-        // in the footer will cause the window to expand to full screen width.
-        const DIALOG_WIDTH: f32 = 450.0;
+        let dialog_width = self.width.unwrap_or(DEFAULT_DIALOG_WIDTH);
 
         egui::Window::new(self.title)
             .id(egui::Id::new(self.id))
             .collapsible(false)
             .resizable(false)
-            .default_width(DIALOG_WIDTH)
+            .default_width(dialog_width)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 // Ensure the content area does not expand beyond our desired dialog width
-                ui.set_max_width(DIALOG_WIDTH);
+                ui.set_max_width(dialog_width);
 
                 ui.vertical_centered(|ui| {
-                    ui.set_max_width(DIALOG_WIDTH);
+                    ui.set_max_width(dialog_width);
                     // Slot 1: Body content
                     body(ui);
 
@@ -149,7 +157,7 @@ impl<'a> Modal<'a> {
                 // Slot 3: Footer buttons
                 ui.add_space(BAR_TO_FOOTER_SPACING);
                 ui.horizontal(|ui| {
-                    ui.set_max_width(DIALOG_WIDTH);
+                    ui.set_max_width(dialog_width);
                     result = footer(ui);
                 });
             });

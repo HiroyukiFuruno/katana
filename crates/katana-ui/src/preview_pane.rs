@@ -469,7 +469,6 @@ impl PreviewPane {
     /// Renders the preview pane content (including ScrollArea).
     /// Used when scroll sync is not needed, such as in PreviewOnly mode.
     /// Returns `Some(DownloadRequest)` if the download button is pressed.
-    #[allow(dead_code)]
     pub fn show(&mut self, ui: &mut egui::Ui) -> (Option<DownloadRequest>, Vec<(usize, char)>) {
         self.repaint_ctx = Some(ui.ctx().clone());
         // Poll for background rendering completion.
