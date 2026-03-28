@@ -78,7 +78,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 > linterレイヤーは独立性が高く、他レイヤーへの影響がないため最初に着手する。
 
-- [ ] 2.1 `utils.rs`（406行）の分割
+- [x] 2.1 `utils.rs`（406行）の分割
   - `utils/file_collector.rs`: ファイル収集ロジック
   - `utils/parser.rs`: synパースロジック
   - `utils/reporter.rs`: 違反レポートロジック

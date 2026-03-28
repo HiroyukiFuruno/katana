@@ -1,5 +1,5 @@
 use crate::theme::builder::ThemePresetBuilder;
-use crate::theme::types::*;
+use crate::theme::types::{PresetColorData, Rgb, ThemeMode};
 
 pub(crate) const OCEANIC_NEXT: PresetColorData = ThemePresetBuilder::new(
     ThemeMode::Dark,

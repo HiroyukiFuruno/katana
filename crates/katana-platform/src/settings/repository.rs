@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use super::migration::MigrationRunner;
 use super::migration::{v0_1_2, v0_1_3_to_0_1_4, v0_1_4_to_0_2_0};
-use super::types::*;
+use super::types::{AppSettings, SettingsLoadOrigin};
 
 /// Minimal interface for loading and saving settings.
 pub trait SettingsRepository: Send {

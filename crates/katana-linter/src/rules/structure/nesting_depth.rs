@@ -117,6 +117,7 @@ impl<'ast> Visit<'ast> for NestingDepthVisitor {
     }
 }
 
+/// Lints a file to ensure block nesting depth does not exceed the maximum allowed limit (3 levels).
 pub fn lint_nesting_depth(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = NestingDepthVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);

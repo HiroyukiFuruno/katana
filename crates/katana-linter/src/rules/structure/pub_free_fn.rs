@@ -77,6 +77,7 @@ impl<'ast> Visit<'ast> for PubFreeFnVisitor {
     }
 }
 
+/// Lints a file to discourage the use of public free functions unless they are helpers or entrypoints.
 pub fn lint_pub_free_fn(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = PubFreeFnVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);
