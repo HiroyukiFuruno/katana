@@ -2,6 +2,20 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.0] - 2026-03-28 17:29:17 (UTC)
+
+### 🚀 Features
+
+- Introduced an integrated ChangeLog Viewer UI, allowing users to conveniently browse recent application updates and release notes directly within the app.
+
+### ✨ Improvements
+
+- Unified the alignment of icons and text across the application interface, specifically improving the vertical centering within the ChangeLog and navigation tabs for a cleaner look.
+
+### 🔧 System
+
+- Strengthened network error handling and internal test coverage specifically around background data fetching to guarantee future stability.
+
 ## [0.7.10] - 2026-03-28 04:31:08 (UTC)
 
 ### 🐛 Bug Fixes
