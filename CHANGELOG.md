@@ -2,6 +2,23 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.7.9] - 2026-03-28
+
+### 🐛 Bug Fixes
+
+- **Markdown Rendering**: Implemented geometry-based physical underline drawing to bypass corrupted macOS font metrics for `<u>` tags.
+- **Theme Color Inheritance**: Fixed an issue where bullet points, footnotes, and accordion summaries inherited static default colors rather than dynamic theme definitions.
+- **Buffer Invalidation**: Resolved a destructive cache invalidation bug during theme changes, explicitly isolating texture teardowns from file IO operations.
+- **Accented Hover Colors**: Unified block highlight hover and selection colors with the active accent color across all themes.
+
+### 🎨 UI/UX
+
+- **Settings Framework**: Rebuilt the Custom Themes tab using a two-stage settings accordion for cleaner organizational scaling and integration of type-safe `LabeledColorPicker` components.
+
+### 🔧 Miscellaneous
+
+- **OpenSpec Compliance**: Performed a mass-migration of all 24 specifications and 10 active change proposals to enforce the strict OpenSpec structural schema.
+
 ## [0.7.8] - 2026-03-27 13:03:25 (UTC)
 
 ### 🚀 Features
