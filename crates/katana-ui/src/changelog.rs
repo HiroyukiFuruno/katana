@@ -178,8 +178,12 @@ fn compare_versions(a: &str, b: &str) -> i32 {
 }
 
 /// Renders the release notes as a tab content instead of a modal window.
-pub(crate) fn render_release_notes_tab(ui: &mut egui::Ui, sections: &[ChangelogSection]) {
-    if sections.is_empty() {
+pub(crate) fn render_release_notes_tab(
+    ui: &mut egui::Ui,
+    sections: &[ChangelogSection],
+    is_loading: bool,
+) {
+    if sections.is_empty() && !is_loading {
         return;
     }
 
@@ -188,10 +192,22 @@ pub(crate) fn render_release_notes_tab(ui: &mut egui::Ui, sections: &[ChangelogS
     const TAB_TITLE_SPACING: f32 = 16.0;
     const TAB_INNER_MARGIN_X: i8 = 16;
     const TAB_INNER_MARGIN_Y: i8 = 8;
+    const TAB_BODY_INDENT: f32 = 20.0;
+    const TAB_BOTTOM_PADDING: f32 = 8.0;
+    const TAB_SPINNER_SIZE: f32 = 32.0;
 
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
         .show(ui, |ui| {
+            ui.add_space(TAB_BOTTOM_PADDING);
+
+            if sections.is_empty() && is_loading {
+                ui.centered_and_justified(|ui| {
+                    ui.add(egui::Spinner::new().size(TAB_SPINNER_SIZE));
+                });
+                return;
+            }
+
             // Apply padding around the content
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(
@@ -209,29 +225,82 @@ pub(crate) fn render_release_notes_tab(ui: &mut egui::Ui, sections: &[ChangelogS
 
                     for section in sections {
                         let id = ui.make_persistent_id(&section.version);
-                        egui::collapsing_header::CollapsingState::load_with_default_open(
-                            ui.ctx(),
-                            id,
-                            section.default_open,
-                        )
-                        .show_header(ui, |ui| {
-                            ui.strong(&section.heading);
-                        })
-                        .body(|ui| {
-                            egui::Frame::default()
-                                .inner_margin(egui::Margin::symmetric(
-                                    TAB_INNER_MARGIN_X,
-                                    TAB_INNER_MARGIN_Y,
-                                ))
-                                .show(ui, |ui| {
-                                    // Render body as markdown
-                                    let mut cache = egui_commonmark::CommonMarkCache::default();
-                                    egui_commonmark::CommonMarkViewer::new().show(
-                                        ui,
-                                        &mut cache,
-                                        &section.body,
-                                    );
+                        let mut state =
+                            egui::collapsing_header::CollapsingState::load_with_default_open(
+                                ui.ctx(),
+                                id,
+                                section.default_open,
+                            );
+
+                        let mut is_header_clicked = false;
+                        const TAB_HEADER_HEIGHT: f32 = 20.0;
+                        let (rect, response) = ui.allocate_exact_size(
+                            egui::vec2(ui.available_width(), TAB_HEADER_HEIGHT),
+                            egui::Sense::click(),
+                        );
+
+                        if response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+                        if response.clicked() {
+                            is_header_clicked = true;
+                        }
+
+                        let icon = if state.is_open() { "▼" } else { "▶" };
+                        let text = format!("{} {}", icon, section.heading);
+
+                        let color = if response.hovered() {
+                            ui.visuals().strong_text_color()
+                        } else {
+                            ui.visuals().hyperlink_color
+                        };
+
+                        let galley = ui.painter().layout_no_wrap(
+                            text,
+                            egui::TextStyle::Body.resolve(ui.style()),
+                            color,
+                        );
+
+                        let text_pos = egui::pos2(
+                            rect.min.x,
+                            rect.min.y + (rect.height() - galley.rect.height()) / 2.0,
+                        );
+
+                        ui.painter().galley(text_pos, galley.clone(), color);
+
+                        if response.hovered() {
+                            let text_rect = egui::Rect::from_min_size(text_pos, galley.rect.size());
+                            ui.painter().line_segment(
+                                [text_rect.left_bottom(), text_rect.right_bottom()],
+                                egui::Stroke::new(1.0, color),
+                            );
+                        }
+
+                        if is_header_clicked {
+                            state.toggle(ui);
+                        }
+
+                        state.show_body_unindented(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.add_space(TAB_BODY_INDENT); // Indent body manually since we use unindented
+                                ui.vertical(|ui| {
+                                    egui::Frame::default()
+                                        .inner_margin(egui::Margin::symmetric(
+                                            TAB_INNER_MARGIN_X,
+                                            TAB_INNER_MARGIN_Y,
+                                        ))
+                                        .show(ui, |ui| {
+                                            // Render body as markdown
+                                            let mut cache =
+                                                egui_commonmark::CommonMarkCache::default();
+                                            egui_commonmark::CommonMarkViewer::new().show(
+                                                ui,
+                                                &mut cache,
+                                                &section.body,
+                                            );
+                                        });
                                 });
+                            });
                         });
 
                         ui.add_space(2.0);
