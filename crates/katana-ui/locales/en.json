@@ -17,7 +17,8 @@
     "hide_others": "Hide Others",
     "show_all": "Show All",
     "help": "Help",
-    "check_updates": "Check for Updates..."
+    "check_updates": "Check for Updates...",
+    "release_notes": "Release Notes"
   },
   "about": {
     "basic_info": "Basic Info",

@@ -164,6 +164,12 @@ pub struct MenuMessages {
     pub export_jpg: String,
     pub help: String,
     pub check_updates: String,
+    #[serde(default = "default_menu_release_notes")]
+    pub release_notes: String,
+}
+
+fn default_menu_release_notes() -> String {
+    "Release Notes".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1095,5 +1101,6 @@ mod default_group_tests {
         assert_eq!(default_group_basic(), "Basic");
         assert_eq!(default_group_text(), "Text & Typography");
         assert_eq!(default_group_ui_elements(), "UI Elements");
+        assert_eq!(crate::i18n::default_menu_release_notes(), "Release Notes");
     }
 }

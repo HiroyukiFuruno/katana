@@ -17,7 +17,8 @@
     "hide_others": "Masquer les autres",
     "show_all": "Tout afficher",
     "help": "Aide",
-    "check_updates": "Vérifier les mises à jour..."
+    "check_updates": "Vérifier les mises à jour...",
+    "release_notes": "Notes de version"
   },
   "about": {
     "basic_info": "Informations de base",

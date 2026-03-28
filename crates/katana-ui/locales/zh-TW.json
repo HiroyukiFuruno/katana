@@ -17,7 +17,8 @@
     "hide_others": "隱藏其他",
     "show_all": "顯示全部",
     "help": "幫助",
-    "check_updates": "檢查更新..."
+    "check_updates": "檢查更新...",
+    "release_notes": "發行說明"
   },
   "about": {
     "basic_info": "基本資訊",

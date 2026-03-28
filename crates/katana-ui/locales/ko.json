@@ -17,7 +17,8 @@
     "hide_others": "기타 숨기기",
     "show_all": "모두 표시",
     "help": "도움말",
-    "check_updates": "업데이트 확인..."
+    "check_updates": "업데이트 확인...",
+    "release_notes": "릴리스 노트"
   },
   "about": {
     "basic_info": "기본 정보",

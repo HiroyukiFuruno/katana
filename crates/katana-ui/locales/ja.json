@@ -17,7 +17,8 @@
     "hide_others": "他を隠す",
     "show_all": "すべて表示",
     "help": "ヘルプ",
-    "check_updates": "更新を確認..."
+    "check_updates": "更新を確認...",
+    "release_notes": "リリースノート"
   },
   "about": {
     "basic_info": "基本情報",
