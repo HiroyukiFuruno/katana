@@ -232,7 +232,8 @@ fn ast_linter_no_pub_free_fn() {
 
 #[test]
 fn ast_linter_no_unused_theme_colors() {
-    let all_violations = katana_linter::rules::domains::theme::lint_unused_theme_colors(workspace_root());
+    let all_violations =
+        katana_linter::rules::domains::theme::lint_unused_theme_colors(workspace_root());
     panic_with_violations(
         "unused-theme-colors",
         "Fix: A theme color property is defined in `ThemeColors` but never accessed in UI code. Please use it or remove it.",
@@ -242,7 +243,8 @@ fn ast_linter_no_unused_theme_colors() {
 
 #[test]
 fn ast_linter_no_hardcoded_colors() {
-    let all_violations = katana_linter::rules::domains::theme::lint_no_hardcoded_colors(workspace_root());
+    let all_violations =
+        katana_linter::rules::domains::theme::lint_no_hardcoded_colors(workspace_root());
     panic_with_violations(
         "hardcoded-colors",
         "Fix: A hardcoded UI color was found. Map it to a property in `ThemeColors` and use `theme_bridge::rgb_to_color32`.",

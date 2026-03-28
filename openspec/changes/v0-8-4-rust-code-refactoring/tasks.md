@@ -53,7 +53,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 1-B. clippy `#![deny]` 設定の統一
 
-- [ ] 1.5 各クレートの `lib.rs` / `main.rs` に coding-rules §9 の `#![deny]` を追加
+- [x] 1.5 各クレートの `lib.rs` / `main.rs` に coding-rules §9 の `#![deny]` を追加
   - 現状は `#![deny(warnings)]` のみ → 個別ルールの明示的な `#![deny]` を設定
   - 対象: `clippy::too_many_lines`, `clippy::cognitive_complexity`, `clippy::wildcard_imports`, `clippy::unwrap_used`, `clippy::panic`, `clippy::todo`, `clippy::unimplemented`
   - `#![warn]`: `clippy::expect_used`, `clippy::indexing_slicing`, `clippy::missing_errors_doc`, `missing_docs`
@@ -67,7 +67,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 ### Definition of Done (DoD)
 
 - [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）が `make check` で実行される
-- [ ] clippy `#![deny]` が全クレートで統一設定済み
+- [x] clippy `#![deny]` が全クレートで統一設定済み
 - [x] 既存の6 Visitorが個別ファイルに分離済み
 - [ ] linterクレート内の全ファイルが200行以下（テスト除外）← Phase 2で達成予定
 - [ ] Execute `/openspec-delivery` workflow
