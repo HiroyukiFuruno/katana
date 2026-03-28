@@ -64,6 +64,13 @@ pub(crate) fn render_help_menu(ui: &mut egui::Ui, action: &mut AppAction) {
         *action = AppAction::ToggleAbout;
         ui.close();
     }
+    if ui
+        .button(crate::i18n::get().menu.release_notes.clone())
+        .clicked()
+    {
+        *action = AppAction::ShowReleaseNotes;
+        ui.close();
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -857,7 +864,17 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 ui.horizontal(|ui| {
                     for (idx, doc) in state.open_documents.iter().enumerate() {
                         let is_active = state.active_doc_idx == Some(idx);
-                        let filename = doc.file_name().unwrap_or("untitled").to_string();
+                        let original_filename = doc.file_name().unwrap_or("untitled");
+                        let filename = if original_filename.starts_with("CHANGELOG_v")
+                            && original_filename.ends_with(".md")
+                        {
+                            let ver = original_filename
+                                .trim_start_matches("CHANGELOG_v")
+                                .trim_end_matches(".md");
+                            format!("📄 {} {}", crate::i18n::get().menu.release_notes, ver)
+                        } else {
+                            original_filename.to_string()
+                        };
                         let dirty_suffix = if doc.is_dirty { " *" } else { "" };
                         let title = if doc.is_pinned {
                             format!("📌 {filename}{dirty_suffix}")
@@ -2755,6 +2772,7 @@ impl eframe::App for KatanaApp {
 
         self.poll_update_install(ctx);
         self.poll_update_check(ctx);
+        self.poll_changelog(ctx);
         self.poll_export(ctx);
 
         // macOS: Poll actions from the native menu.
@@ -3020,7 +3038,15 @@ impl eframe::App for KatanaApp {
 
         // About dialog
         if self.show_about {
-            render_about_window(ctx, &mut self.show_about, self.about_icon.as_ref());
+            render_about_window(
+                ctx,
+                &mut self.show_about,
+                self.about_icon.as_ref(),
+                &mut self.pending_action,
+            );
+            if matches!(self.pending_action, AppAction::ShowReleaseNotes) {
+                self.show_about = false;
+            }
         }
 
         // Meta info dialog
@@ -4074,7 +4100,12 @@ fn render_meta_info_window(ctx: &egui::Context, open: &mut bool, path: &std::pat
 }
 
 /// Renders the custom About window with all required OSS project information.
-fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui::TextureHandle>) {
+fn render_about_window(
+    ctx: &egui::Context,
+    open: &mut bool,
+    icon: Option<&egui::TextureHandle>,
+    action: &mut AppAction,
+) {
     const ABOUT_WINDOW_WIDTH: f32 = 400.0;
     const INNER_PADDING: f32 = 8.0;
     const ICON_SIZE: f32 = 64.0;
@@ -4189,7 +4220,27 @@ fn render_about_window(ctx: &egui::Context, open: &mut bool, icon: Option<&egui:
                 SECTION_HEADER_BOTTOM,
             );
             if info.sponsor_url.is_empty() {
-                about_row(ui, &i18n_about.sponsor, &i18n_about.coming_soon);
+                ui.horizontal(|ui| {
+                    ui.add(crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Medium));
+                    ui.label(
+                        egui::RichText::new(crate::i18n::get().menu.release_notes.clone()).weak(),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add(
+                                egui::Button::image(
+                                    crate::Icon::ExternalLink
+                                        .ui_image(ui, crate::icon::IconSize::Small),
+                                )
+                                .frame(false),
+                            )
+                            .on_hover_text(crate::i18n::get().menu.release_notes.clone())
+                            .clicked()
+                        {
+                            *action = AppAction::ShowReleaseNotes;
+                        }
+                    });
+                });
             } else {
                 about_link_row(
                     ui,
@@ -4642,6 +4693,13 @@ fn render_update_window(
                     {
                         return Some(AppAction::InstallUpdate);
                     }
+                    // Release Notes
+                    if ui
+                        .button(crate::i18n::get().menu.release_notes.clone())
+                        .clicked()
+                    {
+                        return Some(AppAction::ShowReleaseNotes);
+                    }
                     // Skip
                     if ui.button(msgs.action_skip_version.clone()).clicked() {
                         return Some(AppAction::SkipVersion(tag.clone()));
@@ -4659,7 +4717,7 @@ fn render_update_window(
             *pending_action = action;
             if matches!(
                 *pending_action,
-                AppAction::DismissUpdate | AppAction::SkipVersion(_)
+                AppAction::DismissUpdate | AppAction::SkipVersion(_) | AppAction::ShowReleaseNotes
             ) {
                 *open = false;
             }

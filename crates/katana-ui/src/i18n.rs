@@ -86,7 +86,6 @@ pub struct AboutMessages {
     pub report_issue: String,
     pub support: String,
     pub sponsor: String,
-    pub coming_soon: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
