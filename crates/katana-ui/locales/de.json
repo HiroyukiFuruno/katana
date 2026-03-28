@@ -157,7 +157,8 @@
       "save_custom_theme_title": "Benutzerdefiniertes Theme speichern",
       "theme_name_label": "Theme-Name:",
       "duplicate": "Duplizieren...",
-      "reset_contrast": "Zurücksetzen"
+      "reset_contrast": "Zurücksetzen",
+      "ui_contrast_offset": "UI-Kontrastkorrektur"
     },
     "font": {
       "size": "Schriftgröße",

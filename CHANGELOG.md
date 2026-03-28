@@ -2,6 +2,12 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.7.10] - 2026-03-28
+
+### 🐛 Bug Fixes
+
+- **Theme Contrast Offset**: Restored the missing UI Contrast Offset logic for `ThemeColors`, ensuring transparent background colors (like hover and active rows) correctly adapt their visibility against dark themes.
+
 ## [0.7.9] - 2026-03-28
 
 ### 🐛 Bug Fixes

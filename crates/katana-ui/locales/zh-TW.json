@@ -157,7 +157,8 @@
       "save_custom_theme_title": "儲存自訂主題",
       "theme_name_label": "主題名稱:",
       "duplicate": "建立複本...",
-      "reset_contrast": "重設"
+      "reset_contrast": "重設",
+      "ui_contrast_offset": "UI 對比度偏移"
     },
     "font": {
       "size": "字體大小",

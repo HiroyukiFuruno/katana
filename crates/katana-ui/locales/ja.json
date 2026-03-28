@@ -157,7 +157,8 @@
       "save_custom_theme_title": "カスタムテーマの保存",
       "theme_name_label": "テーマ名:",
       "duplicate": "複製...",
-      "reset_contrast": "リセット"
+      "reset_contrast": "リセット",
+      "ui_contrast_offset": "UIコントラスト補正"
     },
     "font": {
       "size": "フォントサイズ",

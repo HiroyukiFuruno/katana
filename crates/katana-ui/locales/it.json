@@ -157,7 +157,8 @@
       "save_custom_theme_title": "Salva tema personalizzato",
       "theme_name_label": "Nome del tema:",
       "duplicate": "Duplica...",
-      "reset_contrast": "Ripristina"
+      "reset_contrast": "Ripristina",
+      "ui_contrast_offset": "Compensazione contrasto interfaccia"
     },
     "font": {
       "size": "Dimensione Carattere",

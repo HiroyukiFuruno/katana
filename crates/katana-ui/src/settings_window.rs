@@ -359,6 +359,30 @@ fn section_header(ui: &mut egui::Ui, text: &str) {
 // ── Theme tab ────────────────────────────────────────────────────────
 
 fn render_theme_tab(ui: &mut egui::Ui, settings: &mut SettingsService) {
+    section_header(
+        ui,
+        crate::i18n::get()
+            .settings
+            .theme
+            .ui_contrast_offset
+            .as_str(),
+    );
+    let mut offset = settings.settings().theme.ui_contrast_offset;
+    let original_offset = offset;
+    let slider = egui::Slider::new(&mut offset, -100.0..=100.0)
+        .step_by(1.0)
+        .suffix(" %");
+    if add_styled_slider(ui, slider).changed() {
+        settings.settings_mut().theme.ui_contrast_offset = offset;
+        if offset != original_offset {
+            // Apply the new effective colors dynamically
+            let colors = settings.settings().effective_theme_colors();
+            ui.ctx()
+                .set_visuals(crate::theme_bridge::visuals_from_theme(&colors));
+        }
+    }
+    ui.add_space(SECTION_SPACING);
+
     render_theme_preset_selector(ui, settings);
     ui.add_space(SECTION_SPACING);
 

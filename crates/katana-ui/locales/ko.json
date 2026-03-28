@@ -157,7 +157,8 @@
       "save_custom_theme_title": "사용자 지정 테마 저장",
       "theme_name_label": "테마 이름:",
       "duplicate": "복제...",
-      "reset_contrast": "초기화"
+      "reset_contrast": "초기화",
+      "ui_contrast_offset": "UI 대비 오프셋"
     },
     "font": {
       "size": "글꼴 크기",

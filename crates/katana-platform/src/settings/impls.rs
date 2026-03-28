@@ -14,6 +14,7 @@ impl AppSettings {
             .custom_color_overrides
             .clone()
             .unwrap_or_else(|| self.theme.preset.colors())
+            .with_contrast_offset(self.theme.ui_contrast_offset)
     }
 
     /// Sets font size, clamping to the allowed range [`MIN_FONT_SIZE`, `MAX_FONT_SIZE`].

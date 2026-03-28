@@ -139,9 +139,103 @@ pub(crate) struct PresetColorData {
     pub preview: PreviewColors,
 }
 
-#[test]
-fn test_preview_hover_line_background_default() {
-    let hover = default_hover_line_background();
-    assert_eq!(hover.r, DEFAULT_PREVIEW_LINE_BACKGROUND_RGB);
-    assert_eq!(hover.a, DEFAULT_PREVIEW_HOVER_LINE_BACKGROUND_ALPHA);
+const OFFSET_ZERO: f32 = 0.0;
+const OFFSET_DENOMINATOR: f32 = 100.0;
+const ALPHA_MAX_F32: f32 = 255.0;
+const ALPHA_MIN: f32 = 0.0;
+
+impl Rgba {
+    #[must_use]
+    pub fn with_offset(mut self, offset_percent: f32) -> Self {
+        if offset_percent == OFFSET_ZERO {
+            return self;
+        }
+        let offset_val = ALPHA_MAX_F32 * (offset_percent / OFFSET_DENOMINATOR);
+        let new_a = f32::from(self.a) + offset_val;
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        {
+            self.a = new_a.clamp(ALPHA_MIN, ALPHA_MAX_F32) as u8;
+        }
+        self
+    }
+}
+
+impl ThemeColors {
+    #[must_use]
+    pub fn with_contrast_offset(mut self, offset_percent: f32) -> Self {
+        if offset_percent == OFFSET_ZERO {
+            return self;
+        }
+
+        // System colours
+        self.system.active_file_highlight = self
+            .system
+            .active_file_highlight
+            .with_offset(offset_percent);
+        self.system.button_background = self.system.button_background.with_offset(offset_percent);
+        self.system.button_active_background = self
+            .system
+            .button_active_background
+            .with_offset(offset_percent);
+
+        // Code block colours
+        self.code.current_line_background = self
+            .code
+            .current_line_background
+            .with_offset(offset_percent);
+        self.code.hover_line_background =
+            self.code.hover_line_background.with_offset(offset_percent);
+
+        // Preview colours
+        self.preview.hover_line_background = self
+            .preview
+            .hover_line_background
+            .with_offset(offset_percent);
+
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rgba_with_offset() {
+        let same = Rgba {
+            r: 255,
+            g: 255,
+            b: 255,
+            a: 128,
+        };
+        assert_eq!(same.with_offset(0.0), same);
+        assert_eq!(same.with_offset(100.0).a, 255);
+        assert_eq!(same.with_offset(-100.0).a, 0);
+    }
+
+    #[test]
+    fn test_preview_hover_line_background_default() {
+        let hover = default_hover_line_background();
+        assert_eq!(hover.r, DEFAULT_PREVIEW_LINE_BACKGROUND_RGB);
+        assert_eq!(hover.a, DEFAULT_PREVIEW_HOVER_LINE_BACKGROUND_ALPHA);
+    }
+
+    #[test]
+    fn test_theme_colors_with_contrast_offset() {
+        let theme = ThemePreset::KatanaDark.colors();
+        let original_hover = theme.preview.hover_line_background.a;
+        let modified_theme = theme.with_contrast_offset(50.0);
+        // Since original could be near 255, we just test it changed or clamped
+        assert!(modified_theme.preview.hover_line_background.a >= original_hover);
+
+        let theme2 = ThemePreset::KatanaDark.colors();
+        let modified2 = theme2.with_contrast_offset(0.0);
+        assert_eq!(
+            modified2.system.active_file_highlight,
+            ThemePreset::KatanaDark
+                .colors()
+                .system
+                .active_file_highlight
+        );
+    }
 }

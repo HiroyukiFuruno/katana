@@ -157,7 +157,8 @@
       "save_custom_theme_title": "Enregistrer le thème personnalisé",
       "theme_name_label": "Nom du thème :",
       "duplicate": "Dupliquer...",
-      "reset_contrast": "Réinitialiser"
+      "reset_contrast": "Réinitialiser",
+      "ui_contrast_offset": "Décalage de contraste de l'interface"
     },
     "font": {
       "size": "Taille de la police",

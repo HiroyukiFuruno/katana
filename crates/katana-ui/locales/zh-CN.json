@@ -157,7 +157,8 @@
       "save_custom_theme_title": "保存自定义主题",
       "theme_name_label": "主题名称:",
       "duplicate": "复制...",
-      "reset_contrast": "重置"
+      "reset_contrast": "重置",
+      "ui_contrast_offset": "UI 对比度偏移"
     },
     "font": {
       "size": "字体大小",

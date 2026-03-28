@@ -118,6 +118,8 @@ pub struct CustomTheme {
 pub struct ThemeSettings {
     #[serde(default = "super::defaults::default_theme")]
     pub theme: String,
+    #[serde(default = "super::defaults::default_ui_contrast_offset")]
+    pub ui_contrast_offset: f32,
     #[serde(default)]
     pub preset: ThemePreset,
     #[serde(default)]

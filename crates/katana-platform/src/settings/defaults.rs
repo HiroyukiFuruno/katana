@@ -20,6 +20,10 @@ pub(crate) fn default_theme() -> String {
     "dark".to_string()
 }
 
+pub(crate) fn default_ui_contrast_offset() -> f32 {
+    0.0
+}
+
 pub(crate) fn default_font_size() -> f32 {
     DEFAULT_FONT_SIZE
 }
@@ -118,6 +122,7 @@ impl Default for ThemeSettings {
     fn default() -> Self {
         Self {
             theme: default_theme(),
+            ui_contrast_offset: default_ui_contrast_offset(),
             preset: ThemePreset::default(),
             custom_color_overrides: None,
             custom_themes: Vec::new(),

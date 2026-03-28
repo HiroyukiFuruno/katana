@@ -436,6 +436,12 @@ pub struct SettingsThemeMessages {
     pub theme_name_label: String,
     #[serde(default = "default_duplicate")]
     pub duplicate: String,
+    #[serde(default = "default_ui_contrast_offset")]
+    pub ui_contrast_offset: String,
+}
+
+fn default_ui_contrast_offset() -> String {
+    "UI Contrast Offset".to_string()
 }
 
 fn default_duplicate() -> String {
@@ -996,6 +1002,7 @@ mod additional_coverage_tests {
         assert_eq!(default_action_confirm(), "Confirm");
         assert_eq!(default_action_discard(), "Discard");
         assert_eq!(default_duplicate(), "Duplicate...");
+        assert_eq!(default_ui_contrast_offset(), "UI Contrast Offset");
         assert_eq!(default_no_extension_label(), "No Extension");
         assert_eq!(default_no_extension_warning_title(), "Warning");
         assert_eq!(

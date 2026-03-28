@@ -157,7 +157,8 @@
       "save_custom_theme_title": "Save Custom Theme",
       "theme_name_label": "Theme Name:",
       "duplicate": "Duplicate...",
-      "reset_contrast": "Reset"
+      "reset_contrast": "Reset",
+      "ui_contrast_offset": "UI Contrast Offset"
     },
     "font": {
       "size": "Font Size",
