@@ -100,9 +100,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Done (DoD)
 
-- [ ] linterクレート内の全ファイルが200行以下（テスト除外）
-- [ ] 全ファイルの関数が30行以下
-- [ ] `make check` がパス
+- [x] linterクレート内の全ファイルが200行以下（テスト除外）
+- [x] 全ファイルの関数が30行以下
+- [x] `make check` がパス
 - [ ] Execute `/openspec-delivery` workflow
 
 ---
