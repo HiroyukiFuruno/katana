@@ -2,6 +2,12 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.1] - 2026-03-28 18:05:00 (UTC)
+
+### 🐛 Bug Fixes
+
+- Fixed an issue where the ChangeLog Viewer would not display the latest release notes immediately after an application update due to network caching algorithms.
+
 ## [0.8.0] - 2026-03-28 17:29:17 (UTC)
 
 ### 🚀 Features
