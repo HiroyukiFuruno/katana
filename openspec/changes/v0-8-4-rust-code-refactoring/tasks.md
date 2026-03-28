@@ -22,7 +22,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
   - マージ可能なPRをマージ
   - 不要なPRをクローズ
   - コンフリクト解消が必要なPRの対応
-- [/] 0.8 依存関係（Cargo.toml）の最新化
+- [x] 0.8 依存関係（Cargo.toml）の最新化
   - `cargo outdated` で確認
   - SemVer互換のアップデートを適用
   - Breaking changeがあるものはリスト化して個別対応
