@@ -164,6 +164,8 @@ pub struct KatanaApp {
     pub(crate) changelog_sections: Vec<crate::changelog::ChangelogSection>,
     /// Flags whether the changelog tab needs to be displayed after startup.
     pub(crate) needs_changelog_display: bool,
+    /// The previous app version, used to determine which changelog sections to open by default.
+    pub(crate) old_app_version: Option<String>,
 }
 
 impl KatanaApp {
@@ -195,6 +197,7 @@ impl KatanaApp {
             pending_relaunch: None,
             changelog_sections: Vec::new(),
             needs_changelog_display: false,
+            old_app_version: None,
         };
         let current_version = env!("CARGO_PKG_VERSION");
         let mut show_changelog = false;
@@ -202,6 +205,7 @@ impl KatanaApp {
         {
             let settings_mut = app.state.settings.settings_mut();
             if let Some(prev) = &settings_mut.updates.previous_app_version {
+                app.old_app_version = Some(prev.clone());
                 if prev != current_version {
                     show_changelog = true;
                 }
@@ -1242,13 +1246,14 @@ impl KatanaApp {
 
     fn handle_show_release_notes(&mut self) {
         let current_version = env!("CARGO_PKG_VERSION").to_string();
-        let previous = self
-            .state
-            .settings
-            .settings()
-            .updates
-            .previous_app_version
-            .clone();
+        let previous = self.old_app_version.clone().or_else(|| {
+            self.state
+                .settings
+                .settings()
+                .updates
+                .previous_app_version
+                .clone()
+        });
         let lang = self.state.settings.settings().language.clone();
 
         let (tx, rx) = std::sync::mpsc::channel();
@@ -2831,6 +2836,7 @@ mod tests_extra {
             pending_relaunch: None,
             changelog_sections: Vec::new(),
             needs_changelog_display: false,
+            old_app_version: None,
         }
     }
 

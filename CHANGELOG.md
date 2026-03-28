@@ -2,6 +2,13 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.2] - 2026-03-28 18:45:00 (UTC)
+
+### 🐛 Bug Fixes
+
+- Fixed an issue where the ChangeLog Viewer tab would disappear immediately on startup when restoring a previously opened workspace.
+- Fixed a bug where the accordion sections for the latest update were collapsed by default due to the application inadvertently forgetting its previous version state.
+
 ## [0.8.1] - 2026-03-28 18:05:00 (UTC)
 
 ### 🐛 Bug Fixes
