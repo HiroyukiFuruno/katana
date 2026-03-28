@@ -2,6 +2,17 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.3] - 2026-03-28 18:56:00 (UTC)
+
+### ✨ Improvements
+
+- Added a mechanism to safely detach Katana Desktop from Homebrew management during auto-updates, ensuring older versions aren't automatically reinstalled by `brew upgrade`.
+- Eliminated CDN caching delays inside the ChangeLog viewer by actively appending cache-busting timestamps during version updates.
+
+### 🐛 Bug Fixes
+
+- Fixed an issue where the ChangeLog tab would be incorrectly restored and cached as a zombie tab upon application restart.
+
 ## [0.8.2] - 2026-03-28 18:45:00 (UTC)
 
 ### 🐛 Bug Fixes
