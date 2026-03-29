@@ -140,7 +140,7 @@ impl<'a> LabeledToggle<'a> {
 
 impl<'a> egui::Widget for LabeledToggle<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        const TOGGLE_Y_OFFSET: f32 = 3.0;
+        const TOGGLE_Y_OFFSET: f32 = 0.0;
 
         let toggle_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
         let text_galley = self.text.into_galley(
