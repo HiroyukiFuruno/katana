@@ -48,11 +48,11 @@ pub fn install_image_loaders(ctx: &Context) {
 
     ctx.include_bytes(
         "bytes://icon/copy.svg",
-        include_bytes!("../../../vendor/egui_commonmark_backend/src/copy.svg"),
+        include_bytes!("../../../../vendor/egui_commonmark_backend/src/copy.svg"),
     );
     ctx.include_bytes(
         "bytes://icon/success.svg",
-        include_bytes!("../../../vendor/egui_commonmark_backend/src/check.svg"),
+        include_bytes!("../../../../vendor/egui_commonmark_backend/src/check.svg"),
     );
 
     if !ctx.is_loader_installed(crate::http_cache_loader::PersistentHttpLoader::ID) {

@@ -287,7 +287,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] 6.11 `preview_pane.rs`（1,816行）→ `preview_pane/` サブモジュール
 - [x] 6.12 `preview_pane_ui.rs` の分割 (1,270行) -> `preview_pane/` ディレクトリに統合
 - [x] 6.13 `settings_window.rs`（1,666行）→ `settings/` タブごとに分割
-- [ ] 6.14 `i18n.rs`（1,092行）→ `i18n/` サブモジュール
+- [x] 6.14 `i18n.rs`（1,092行）→ `i18n/` サブモジュール (types.rs + mod.rs)
 - [ ] 6.15 `widgets.rs`（948行）→ `widgets/` コンポーネントごとに分割
 - [ ] 6.16 `font_loader.rs`（838行）→ 必要に応じて分割
 - [ ] 6.17 `svg_loader.rs`（795行）→ `loaders/svg.rs` + 分割
