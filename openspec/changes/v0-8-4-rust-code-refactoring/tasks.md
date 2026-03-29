@@ -314,7 +314,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] `views/modals/` の全モーダルが `shell_ui.rs` のローカルコピーではなく正規の実装であること（✅ 完了済み）
 - [x] `make check` がパス
 
-- [ ] 6.24 `ui/menu`, `ui/header`, `ui/status_bar`, `ui/workspace`, `ui/tab_bar`, `ui/modals` を `struct + impl show() -> Response` パターンへ統一
+- [x] 6.24 `ui/menu`, `ui/header`, `ui/status_bar`, `ui/workspace`, `ui/tab_bar`, `ui/modals` を `struct + impl show() -> Response` パターンへ統一
 - [ ] 6.25 `settings/`, `preview/`, `widgets/` の各UIを props + typed response を持つ自己完結コンポーネントへ統一
 - [ ] 6.26 親子 UI 間の依存を最小 props + typed response に整理し、巨大な `AppState` / `KatanaApp` の横流しを段階的に排除
 - [ ] 6.27 release-critical UI 導線の統合テストを、component 境界再編後の構造に合わせて更新・追加

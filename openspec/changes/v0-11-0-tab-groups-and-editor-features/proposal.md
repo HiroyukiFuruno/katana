@@ -1,30 +1,45 @@
-# OpenSpec Change Proposal: タブグルーピング・セッション復元・ピン留め機能改善 (v0.10.0)
+# OpenSpec Change Proposal: Tab Groups and Session UX Improvements (v0.11.0)
 
-## Overview
+## Why
 
-エディタのタブUXの高度な機能強化を行う変更です。これまで `v0.7.x` 系の各種改善タスクの中で先送り（Deferred）となっていた以下の機能群を、`v0.10.0` マイルストーンとして統合して実装します。
+KatanA には既に次の土台がある。
 
-1. **タブグルーピング機能**: 色・名前付きでタブをグループ化する機能。大量のタブを開いた際の視認性と管理性を向上させます。
-2. **セッション復元機能**: アプリケーション終了時のタブ一覧、アクティブタブ等を永続化し、次回の起動時に履歴を復元する機能を提供します。
-3. **ピン留め機能の改善**: ピン留めされたタブの意図しない削除を防ぐため、UI側のバグ修正とUX改善を行います。
+- tab pinning 自体は `Document.is_pinned` と `TogglePinDocument` で存在する
+- workspace を開き直した際の tab restore は `workspace_tabs:{workspace_path}` persistent cache と `settings.workspace.open_tabs` fallback で既に実装されている
 
-## Motivation
+一方で、実利用上の不足は残っている。
 
-KatanAの基本機能（コアエディタ、設定機能、ファイルツリー、シンタックスハイライト等）の改修が `v0.7.x` および `v0.8.x` で一段落した後に着手すべき、ユーザーの生産性を高めるためのアドバンスドなUX拡張機能です。
+- tab grouping の概念がなく、多数タブを開くと管理が難しい
+- workspace session persistence は `tabs / active_idx / expanded_directories` しか持たず、pinned 状態や group 情報を保存できない
+- pinning は close button、batch close、shortcut close から十分に保護されていない
 
-## Proposed Changes
+したがって本 change は「last_session.json を新設する greenfield session 機能」ではなく、「既存の workspace-scoped session state を versioned に拡張し、tab groups と pin safeguards を載せる」変更として整理する。
 
-- **Tab Grouping**:
-  - `TabGroup { id, name, color, tab_ids }` のデータモデルを追加。
-  - タブのコンテキストメニューに「グループに追加（新規作成・既存への追加）」アクションを追加。
-  - グループの折りたたみ（伸縮）制御によるタブ一覧の非表示/表示の制御。
-- **Session Persistence**:
-  - アプリ終了時に `.gemini/katana/last_session.json` へタブリストを直列化して保存。
-  - 起動時の初期化フローにおいて、セッション復元設定がONの場合は前回開いていたタブ情報を復元。
-- **Pinned Tab Safeguard**:
-  - 閉じるボタン（×）の非表示。
-  - ショートカットキー（cmd+w等）によるタブクローズ処理実行時にピン留め判定を追加。
+## What Changes
 
-## Dependencies / Open Questions
+- workspace-scoped `workspace_tabs` session envelope を versioned schema に拡張し、group / pinned / active / expanded state を保存できるようにする
+- tab group 機能を追加し、名前・色・collapsed state を持つグループへ tab を所属させられるようにする
+- tab restore 設定を追加し、workspace を開いた際に前回 tab session を復元するかをユーザーが制御できるようにする
+- pinned tabs は close button、close shortcut、close all / others / left / right といった通常 close action から保護する
+- pinned / grouped session の backward compatibility を保つため、旧 session payload を read 時に既定値補完で受け入れる
 
-- 実装開始時点の `egui-dock` や他のUIステート実装に依存。
+## Capabilities
+
+### New Capabilities
+
+- `editor-tab-groups`: 名前・色・collapsed state を持つ tab group
+
+### Modified Capabilities
+
+- `workspace-shell`: workspace-scoped session restore の強化
+- `settings-persistence`: session restore setting と session schema version
+- `editor-tabs`: pinned tab safeguard と grouped tab rendering
+
+## Impact
+
+- `crates/katana-ui/src/state/document.rs`: tab group state の導入
+- `crates/katana-ui/src/views/top_bar.rs`: grouped tab rendering、context menu、pinned close safeguard
+- `crates/katana-ui/src/app/action.rs`: close actions が pinned/grouped state を考慮
+- `crates/katana-ui/src/app/workspace.rs`: session envelope の load/save 拡張
+- `crates/katana-platform/src/settings/types/workspace.rs` または related settings type: restore setting の追加
+- `crates/katana-ui/locales/*.json`: group / pin safeguard / restore setting 文言

@@ -11,6 +11,8 @@
 - 左側アクティビティレールのアイコンは既存資産をそのまま再利用し、現行ヘッダー内の小型ボタンより一段大きく描画する。
 - 現ワークスペースの操作ヘッダーを再構成し、更新を左寄せ、全展開・全閉を右寄せに再配置する。
 - フィルター機能はワークスペースヘッダー内に残し、現行の正規表現入力 UI と挙動を維持する。
+- 履歴ボタンは履歴 0 件でもレール内に残し、非活性表示でレイアウトの安定性を保つ。
+- 既存の collapsed toggle 専用サイドパネルは廃止し、レールが常時その役割を担う。
 
 ## Capabilities
 
@@ -26,6 +28,7 @@
 
 ## Impact
 
-- 主な影響範囲は `crates/katana-ui/src/shell_ui.rs`、`crates/katana-ui/src/shell.rs`、`crates/katana-ui/src/app_state.rs`、`crates/katana-ui/locales/*.json`。
+- 主な影響範囲は `crates/katana-ui/src/views/app_frame.rs`、`crates/katana-ui/src/views/panels/workspace.rs`、`crates/katana-ui/src/app_state.rs`、`crates/katana-ui/locales/*.json`。
 - 最近のワークスペース履歴は既存の `settings.workspace.paths` を再利用し、新しい永続化形式の導入は行わない。
 - 既存の検索モーダル、フィルター、ワークスペース再読み込み、全展開・全閉のロジックは維持し、呼び出し導線と配置のみを整理する。
+- 実装は新しい左レール component と既存 `WorkspacePanel` ヘッダー整理に分け、検索モーダルや履歴 action 自体は再利用する。
