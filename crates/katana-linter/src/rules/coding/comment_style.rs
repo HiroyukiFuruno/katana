@@ -7,7 +7,11 @@ pub fn lint_comment_style(path: &Path, _syntax: &syn::File) -> Vec<Violation> {
     };
     let mut violations = Vec::new();
     let mut in_test = false;
-    let mut in_allow = false;
+
+    let mut previous_was_pattern = false;
+    let mut in_block = false;
+    let mut block_allow = false;
+
     for (idx, line) in source.lines().enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with("#[cfg(test)]") {
@@ -16,34 +20,71 @@ pub fn lint_comment_style(path: &Path, _syntax: &syn::File) -> Vec<Violation> {
         if in_test {
             continue;
         }
-        if let Some(msg) = check_line(line, &mut in_allow) {
-            violations.push(build_viol(path, msg, idx));
+
+        if in_block {
+            let check_line = trimmed.strip_suffix("*/").unwrap_or(trimmed).trim();
+            if !block_allow && !is_allowed(check_line) {
+                violations.push(build_viol(path, line.trim(), idx, "Multi-line block comment must start with `/* WHY:` or `/* SAFETY:`."));
+            }
+            if line.contains("*/") {
+                in_block = false;
+            }
+            continue;
+        }
+
+        if let Some((kind, start)) = find_comment_start(line) {
+            let text = &line[start..];
+            match kind {
+                CommentKind::Line => {
+                    let body = extract_body(text.trim(), "//").trim_start_matches(|c| c == '/' || c == '!');
+                    let b = body.trim();
+                    if b.starts_with("WHY:") || b.starts_with("SAFETY:") {
+                        if previous_was_pattern {
+                            violations.push(build_viol(path, text.trim(), idx, "Consecutive `// WHY:` lines are prohibited. Use `/* WHY: ... */` block comments for multi-line reasons."));
+                        }
+                        previous_was_pattern = true;
+                    } else if !is_allowed(b) {
+                        violations.push(build_viol(path, text.trim(), idx, "Comment must start with `WHY:` or `SAFETY:`. Doc comments (`///`) are strictly prohibited unless starting with `WHY:` or `SAFETY:`."));
+                        previous_was_pattern = false;
+                    } else {
+                        previous_was_pattern = false;
+                    }
+                }
+                CommentKind::Block => {
+                    previous_was_pattern = false;
+                    let body = extract_body(text.trim(), "/*").trim_start_matches(|c| c == '*' || c == '!');
+                    let mut b = body;
+                    if let Some(end) = b.find("*/") {
+                        b = &b[..end]; // Single line block
+                    } else {
+                        in_block = true;
+                    }
+
+                    b = b.trim();
+                    if b.starts_with("WHY:") || b.starts_with("SAFETY:") {
+                        block_allow = true;
+                    } else if !is_allowed(b) {
+                        violations.push(build_viol(path, text.trim(), idx, "Block comment must start with `/* WHY:` or `/* SAFETY:`."));
+                        block_allow = false;
+                    } else {
+                        block_allow = true; // explicitly allowed symbol strings like /* --- */
+                    }
+                }
+            }
+        } else {
+            previous_was_pattern = false;
         }
     }
     violations
 }
 
-fn check_line<'a>(line: &'a str, in_allow: &mut bool) -> Option<&'a str> {
-    let Some(start) = find_comment_start(line) else {
-        *in_allow = false;
-        return None;
-    };
-    let text = &line[start..];
-    if text.starts_with("///") || text.starts_with("//!") {
-        return None;
-    }
-    let body = extract_body(text.trim());
-    if body.starts_with("WHY:") || body.starts_with("SAFETY:") {
-        *in_allow = true;
-        return None;
-    }
-    if *in_allow || is_allowed(body) {
-        return None;
-    }
-    Some(text.trim())
+#[derive(Debug, PartialEq)]
+enum CommentKind {
+    Line,
+    Block,
 }
 
-fn find_comment_start(line: &str) -> Option<usize> {
+fn find_comment_start(line: &str) -> Option<(CommentKind, usize)> {
     if line.contains("r#\"") {
         return None;
     }
@@ -61,8 +102,12 @@ fn find_comment_start(line: &str) -> Option<usize> {
             b'"' if !in_char => in_str = !in_str,
             b'\'' if !in_str => in_char = !in_char,
             b'/' if !in_str && !in_char => {
-                if i + 1 < bytes.len() && bytes[i + 1] == b'/' {
-                    return Some(i);
+                if i + 1 < bytes.len() {
+                    if bytes[i + 1] == b'/' {
+                        return Some((CommentKind::Line, i));
+                    } else if bytes[i + 1] == b'*' {
+                        return Some((CommentKind::Block, i));
+                    }
                 }
             }
             _ => {}
@@ -71,11 +116,12 @@ fn find_comment_start(line: &str) -> Option<usize> {
     None
 }
 
-fn build_viol(path: &Path, trimmed: &str, line_idx: usize) -> Violation {
-    let msg = format!(
-        "Comment must start with `// WHY:` or `// SAFETY:`. Found: `{}`",
-        truncate(trimmed, 60)
-    );
+fn extract_body<'a>(trimmed: &'a str, prefix: &str) -> &'a str {
+    trimmed.strip_prefix(prefix).unwrap_or("").trim()
+}
+
+fn build_viol(path: &Path, trimmed: &str, line_idx: usize, msg_prefix: &str) -> Violation {
+    let msg = format!("{} Found: `{}`", msg_prefix, truncate(trimmed, 60));
     Violation {
         file: path.to_path_buf(),
         line: line_idx + 1,
@@ -84,15 +130,12 @@ fn build_viol(path: &Path, trimmed: &str, line_idx: usize) -> Violation {
     }
 }
 
-fn extract_body(trimmed: &str) -> &str {
-    trimmed.strip_prefix("//").unwrap_or("").trim()
-}
-
 fn is_allowed(body: &str) -> bool {
-    body.is_empty()
-        || body
+    let clean = body.trim_end_matches("*/").trim();
+    clean.is_empty()
+        || clean
             .chars()
-            .all(|c| matches!(c, '-' | '─' | '═' | '=' | ' ' | '/' | '━'))
+            .all(|c| matches!(c, '-' | '─' | '═' | '=' | ' ' | '/' | '━' | '*'))
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -128,18 +171,43 @@ mod tests {
 
     #[test]
     fn allows_doc_and_sep() {
-        let code = "/// doc\n// ---\nfn f() {}\n";
+        let code = "// ---\nfn f() {}\n";
         let (_d, p) = write_tmp(code);
         assert!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).is_empty());
+    }
+
+    #[test]
+    fn rejects_doc_without_why() {
+        let code = "/// some doc\nfn f() {}\n";
+        let (_d, p) = write_tmp(code);
+        assert_eq!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).len(), 1);
     }
 
     #[test]
     fn rejects_invalid() {
         let code = "// invalid\nfn f() {}\n";
         let (_d, p) = write_tmp(code);
-        assert_eq!(
-            lint_comment_style(&p, &syn::parse_file(code).unwrap()).len(),
-            1
-        );
+        assert_eq!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).len(), 1);
+    }
+
+    #[test]
+    fn allows_multiline_block_why() {
+        let code = "/* WHY: Some really long\nreason that spans\nmultiple lines */\nfn f() {}\n";
+        let (_d, p) = write_tmp(code);
+        assert!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).is_empty());
+    }
+
+    #[test]
+    fn rejects_invalid_block() {
+        let code = "/* INVALID: garbage\nspans\nmultiple lines */\nfn f() {}\n";
+        let (_d, p) = write_tmp(code);
+        assert_eq!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).len(), 3); // 3 lines of violations
+    }
+
+    #[test]
+    fn rejects_consecutive_why_lines() {
+        let code = "// WHY: reason 1\n// WHY: reason 2\nfn f() {}\n";
+        let (_d, p) = write_tmp(code);
+        assert_eq!(lint_comment_style(&p, &syn::parse_file(code).unwrap()).len(), 1);
     }
 }
