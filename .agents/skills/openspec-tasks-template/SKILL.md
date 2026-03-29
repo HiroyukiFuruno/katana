@@ -54,8 +54,19 @@ To prevent AI workflow skipping and ensure delivery consistency, you MUST INCLUD
 ### Definition of Done (DoD)
 - [ ] (Other task-specific verifiable conditions...)
 - [ ] Execute `/openspec-delivery` workflow (`.agents/workflows/openspec-delivery.md`) to run the comprehensive delivery routine (Self-review, Commit, PR Creation, and Merge).
+```
 
-## 4. Mandatory UI Verification & Feedback (When UI is involved)
+## 4. Mandatory Definition of Ready (DoR) for Subsequent Tasks
+
+When there are multiple major task groups (e.g., Task 1, Task 2, Task 3...), you MUST INCLUDE the following Definition of Ready (DoR) immediately below the heading of every subsequent task (Task 2 and onwards). This prevents the AI from rushing into the next task without properly delivering the previous one.
+
+```markdown
+### Definition of Ready (DoR)
+- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [ ] Base branch is synced, and a new branch is explicitly created for this task.
+```
+
+## 5. Mandatory UI Verification & Feedback (When UI is involved)
 
 Because this project does not use rigid design mockups (e.g., Figma), any change involving the creation or modification of User Interfaces (UI) MUST explicitly include the following items as dedicated tasks within the respective UI implementation group:
 
@@ -63,5 +74,5 @@ Because this project does not use rigid design mockups (e.g., Figma), any change
 - [ ] x.x ユーザーへのUIスナップショット（画像等）の提示および動作報告
 - [ ] x.y ユーザーからのフィードバックに基づくUIの微調整および改善実装
 ```
+
 *(Ensure these task items are placed *before* the Definition of Done for any UI-related group)*
-```

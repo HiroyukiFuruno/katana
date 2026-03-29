@@ -23,13 +23,22 @@ git switch -c <Change-Directory-Name> master
 
 ### Step 2: Task Branch Creation (Per MAJOR Task Group)
 
-For each **Major Task Group** (e.g., `## 1. Core Logic`, `## 2. UI implementation`) in `tasks.md`, derive a *single* task branch from the Base Feature Branch.
+Before creating a new task branch (for Task 2, Task 3, etc.), you MUST explicitly verify its **Definition of Ready (DoR)**:
+
+- **pr**: The PR for the *previous* task branch was created.
+- **review**: The *previous* task branch was self-reviewed.
+- **recovery**: Any violations found during review were fixed and committed.
+- **merge**: The PR for the *previous* task branch was successfully merged.
+- **branch delete**: The local and remote branches for the *previous* task were deleted.
+
+If the DoR is satisfied, base branch is synced (`git switch <base> && git pull`), then for each **Major Task Group** (e.g., `## 1. Core Logic`) in `tasks.md`, derive a *single* task branch from the Base Feature Branch.
 
 ```bash
 git switch -c <Change-Directory-Name>-task<N> <Change-Directory-Name>
 ```
 
-**⚠️ MANDATORY RULE: NO SUBTASK BRANCHING**
+#### ⚠️ MANDATORY RULE: NO SUBTASK BRANCHING
+
 - DO NOT branch for subtasks (`1.1`, `1.2`, `1.4`, etc.).
 - A branch named `-task4` for subtask `1.4` is logically incorrect and strictly prohibited. Subtasks `1.1` to `1.5` MUST all be implemented and committed into the same `...-task1` branch.
 - You should proceed sequentially on the `-task<N>` branch through all its subtasks, committing regularly, and DO NOT open a Pull Request until ALL subtasks for that Major Task Group are completed.
