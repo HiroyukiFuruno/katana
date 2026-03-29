@@ -70,10 +70,10 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 ### Definition of Done (DoD)
 
 - [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）が `make check` で実行される
-- [ ] clippy `#![deny]` が全クレートで統一設定済み
+- [x] clippy `#![deny]` が全クレートで統一設定済み
 - [x] 既存の6 Visitorが個別ファイルに分離済み
-- [ ] linterクレート内の全ファイルが200行以下（テスト除外）← Phase 2で達成予定
-- [ ] Execute `/openspec-delivery` workflow
+- [x] linterクレート内の全ファイルが200行以下（テスト除外）← Phase 2で達成予定
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
@@ -103,49 +103,49 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] linterクレート内の全ファイルが200行以下（テスト除外）
 - [x] 全ファイルの関数が30行以下
 - [x] `make check` がパス
-- [ ] Execute `/openspec-delivery` workflow
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
 ## 3. katana-core レイヤーのリファクタリング
 
-- [ ] 3.1 `update.rs`（646行）の分割
+- [x] 3.1 `update.rs`（646行）の分割
   - `update/version.rs`: バージョン比較ロジック (`is_newer_version`)
   - `update/download.rs`: HTTPダウンロード (`download_update`)
   - `update/installer.rs`: DMG展開・リランチャースクリプト生成
   - `update/mod.rs`: `UpdateManager` 定義 + re-export
 
-- [ ] 3.2 `html/parser.rs`（676行）の分割
+- [x] 3.2 `html/parser.rs`（676行）の分割
   - 正規表現初期化の分離
   - インライン・Markdownパースの分離
 
-- [ ] 3.3 `preview.rs`（472行）の分割
+- [x] 3.3 `preview.rs`（472行）の分割
   - `preview/section.rs`: セクション分割ロジック
   - `preview/image.rs`: 画像パス解決
   - `preview/mod.rs`: re-export
 
-- [ ] 3.4 `markdown/mod.rs`（273行）の分割
+- [x] 3.4 `markdown/mod.rs`（273行）の分割
   - レンダリングロジックの分離
   - フェンスブロック処理の分離
 
-- [ ] 3.5 `markdown/color_preset.rs`（495行）の分割
+- [x] 3.5 `markdown/color_preset.rs`（495行）の分割
   - dark/light プリセットの分離
 
-- [ ] 3.6 `markdown/drawio_renderer.rs`（408行）の分割
+- [x] 3.6 `markdown/drawio_renderer.rs`（408行）の分割
 
-- [ ] 3.7 `markdown/export.rs`（316行）の分割
+- [x] 3.7 `markdown/export.rs`（316行）の分割
 
-- [ ] 3.8 `markdown/mermaid_renderer.rs`（270行）の分割
+- [x] 3.8 `markdown/mermaid_renderer.rs`（270行）の分割
 
-- [ ] 3.9 `html/node.rs`（339行）の分割
+- [x] 3.9 `html/node.rs`（339行）の分割
   - `types.rs` + `impls.rs` パターン
 
 ### Definition of Done (DoD)
 
-- [ ] coreクレート内の全ファイルが200行以下（テスト除外）
-- [ ] 全ファイルの関数が30行以下
-- [ ] `make check` がパス
-- [ ] Execute `/openspec-delivery` workflow
+- [x] coreクレート内の全ファイルが200行以下（テスト除外）
+- [x] 全ファイルの関数が30行以下
+- [x] `make check` がパス
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
