@@ -6,7 +6,7 @@ use katana_linter::rules::domains::markdown::lint_markdown_heading_pairs;
 use katana_linter::rules::{
     lint_comment_style, lint_error_first, lint_file_length, lint_font_normalization,
     lint_function_length, lint_lazy_code, lint_magic_numbers, lint_nesting_depth, lint_performance,
-    lint_prohibited_attributes, lint_prohibited_types, lint_pub_free_fn,
+    lint_prohibited_attributes, lint_prohibited_types, lint_pub_free_fn, lint_type_separation,
 };
 use katana_linter::run_ast_lint;
 use katana_linter::utils::{panic_with_violations, workspace_root};
@@ -15,8 +15,7 @@ fn target_crates(root: &std::path::Path) -> Vec<std::path::PathBuf> {
     vec![
         root.join("crates/katana-linter/src"),
         root.join("crates/katana-core/src"),
-        // root.join("crates/katana-platform/src"), // Phase 5
-        // root.join("crates/katana-ui/src"),       // Phase 6
+        root.join("crates/katana-platform/src"),
     ]
 }
 
@@ -150,6 +149,18 @@ fn ast_linter_file_length() {
         "Fix: File exceeds 200-line limit (excluding tests). Split into smaller modules.",
         &target_crates(root),
         lint_file_length,
+    );
+}
+
+#[test]
+#[ignore] // WHY: wait for full platform/ui refactoring before strictly enforcing
+fn ast_linter_type_separation() {
+    let root = workspace_root().expect("Test requirement");
+    run_ast_lint(
+        "type-separation",
+        "Fix: Do not mix `pub struct` / `pub enum` in the same file as implementation logic methods if the file exceeds the length limit. Use dedicated files like `types.rs` or `types/` dir.",
+        &target_crates(root),
+        lint_type_separation,
     );
 }
 

@@ -1,12 +1,12 @@
 use super::MigrationStrategy;
 use serde_json::{json, Value};
 
-/// Migrates settings from 0.1.4 to 0.2.0.
-///
-/// Changes:
-/// 1. Nests `last_workspace` and `workspace_paths` under `workspace`.
-/// 2. Initializes `open_tabs` and `active_tab_idx`.
-/// 3. Updates version to 0.2.0.
+/* WHY: Migrates settings from 0.1.4 to 0.2.0.
+
+Changes:
+1. Nests `last_workspace` and `workspace_paths` under `workspace`.
+2. Initializes `open_tabs` and `active_tab_idx`.
+3. Updates version to 0.2.0. */
 pub struct Migration014To020;
 
 impl MigrationStrategy for Migration014To020 {

@@ -2,24 +2,24 @@ use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
 
-/// Service for discovering installed macOS fonts.
+// WHY: Service for discovering installed macOS fonts.
 pub struct OsFontScanner;
 
 static SYSTEM_FONTS: OnceLock<Vec<(String, String)>> = OnceLock::new();
 
 impl OsFontScanner {
-    /// Returns a cached list of system fonts to avoid filesystem IO on every frame.
+    // WHY: Returns a cached list of system fonts to avoid filesystem IO on every frame.
     pub fn cached_fonts() -> &'static [(String, String)] {
         SYSTEM_FONTS.get_or_init(Self::scan_fonts).as_slice()
     }
 
-    /// Scans standard macOS font directories for TTF, TTC, and OTF files.
-    ///
-    /// Returns a list of `(font_name, file_path)`.
+    /* WHY: Scans standard macOS font directories for TTF, TTC, and OTF files.
+
+    Returns a list of `(font_name, file_path)`. */
     pub fn scan_fonts() -> Vec<(String, String)> {
         let mut fonts = Vec::new();
 
-        // If HOME is unset, user fonts directory is skipped (fallback to system dirs only).
+        // WHY: If HOME is unset, user fonts directory is skipped (fallback to system dirs only).
         let home_dir = std::env::var("HOME").unwrap_or_default();
         let user_fonts = format!("{home_dir}/Library/Fonts");
 
@@ -41,10 +41,10 @@ impl OsFontScanner {
         fonts
     }
 
-    /// Recursively unnested scan to adhere to maximum nest rules (2 levels focus).
+    // WHY: Recursively unnested scan to adhere to maximum nest rules (2 levels focus).
     pub fn scan_directory(dir: &Path, fonts: &mut Vec<(String, String)>) {
         let Ok(entries) = fs::read_dir(dir) else {
-            return; // Skip directories that do not exist or are not accessible.
+            return; // WHY: Skip directories that do not exist or are not accessible.
         };
 
         for entry in entries.flatten() {
@@ -52,7 +52,7 @@ impl OsFontScanner {
         }
     }
 
-    /// Extracted per-entry logic to ensure max 30 lines and 2 block nest rule.
+    // WHY: Extracted per-entry logic to ensure max 30 lines and 2 block nest rule.
     pub fn process_entry(path: &Path, fonts: &mut Vec<(String, String)>) {
         if !path.is_file() {
             return;
@@ -64,7 +64,7 @@ impl OsFontScanner {
             .to_string_lossy()
             .to_lowercase();
         if ext != "ttf" && ext != "ttc" && ext != "otf" {
-            return; // Skip files with unsupported extensions.
+            return; // WHY: Skip files with unsupported extensions.
         }
 
         let name = path

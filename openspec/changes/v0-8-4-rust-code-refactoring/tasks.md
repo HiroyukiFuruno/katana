@@ -67,6 +67,10 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
   - 6つの既存Visitor + 4つの新規ルールを10個の個別ファイルに分離完了
   - `rules/rust/mod.rs` で公開APIを集約
 
+- [x] 1.8 `lint_type_separation`: 型とロジックの分離の強制
+  - `pub struct` や `pub enum`（公開の型定義）を記述するファイルは、ファイル名が `types.rs` または `types/` 配下などの専用名であるか、あるいはファイル内に `impl` による固有メソッドの実装（関数）を含んではいけない（データクラスの分離）。
+  - ※ 厳格すぎる場合は行数閾値（50行以上など）を設けるハイブリッド制約とする。
+
 ### Definition of Done (DoD)
 
 - [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）の基盤実装が完了し、`katana-linter` / `katana-core` を対象に `make check` で実行される
@@ -190,40 +194,49 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Ready (DoR)
 
-- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
-- [ ] Base branch is synced, and a new branch is explicitly created for this task.
-- [ ] Restore Task 5 (formerly Task 4) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
+- [x] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [x] Base branch is synced, and a new branch is explicitly created for this task.
+- [x] Restore Task 5 (formerly Task 4) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
 
-- [ ] 5.1 `settings.rs`（653行）の完全移行
+- [x] 5.1 `settings.rs`（653行）の完全移行
   - 旧 `settings.rs` の内容を `settings/` サブモジュールに完全移行
   - `pub use` による外部API互換性の維持
 
-- [ ] 5.2 `settings/types.rs`（256行）の分割
+- [x] 5.2 `settings/types.rs`（256行）の分割
   - `types/app.rs`, `types/editor.rs`, `types/window.rs`, `types/behavior.rs` 等
 
-- [ ] 5.3 `theme/builder.rs`（473行）の分割
+- [x] 5.3 `theme/builder.rs`（473行）の分割
   - カラービルダー・フォントビルダーの分離
+  - ※ 構造を整理した結果、テスト除外の実効行数が200行未満となったため追加分割は不要と判断
 
-- [ ] 5.4 `theme/types.rs`（241行）の分割
+- [x] 5.4 `theme/types.rs`（241行）の分割
+  - `ThemePreset` および `PresetColorData` を `theme/preset.rs` へ分離
 
-- [ ] 5.5 `theme/migration.rs`（262行）の分割
+- [x] 5.5 `theme/migration.rs`（262行）の分割
+  - `migration/mod.rs`、`migration/constants.rs`、`migration/legacy_types.rs`に分割してモジュール化
 
-- [ ] 5.6 `cache.rs`（291行）の分割
+- [x] 5.6 `cache.rs`（291行）の分割
+  - `DefaultCacheService` を `cache/default.rs` へ分離
+  - `InMemoryCacheService` を `cache/memory.rs` へ分離
 
-- [ ] 5.7 `filesystem.rs`（279行）の分割
+- [x] 5.7 `filesystem.rs`（279行）の分割
+  - `FilesystemService` を `filesystem/service.rs` へ分離
+  - ディレクトリ走査ロジックを `filesystem/scanner.rs` へ分離
 
-- [ ] 5.8 `settings/defaults.rs`（201行）のボーダーライン確認
+- [x] 5.8 `settings/defaults.rs`（201行）のボーダーライン確認
+  - 構造体・列挙型の定義が0個（関数と`impl Default`のみ）であるため、linterの`num_types > 1`制約に抵触しないことを確認。
+  - 将来のコード追加に備え、ファイル先頭に `WHY/SAFETY` コメントを明記して対応完了。
 
-- [ ] 5.9 AST Linter の構造/コーディングルール対象を `katana-platform/src` へ拡大し、Task 4.2 で棚卸しした既存違反を解消する
+- [x] 5.9 AST Linter の構造/コーディングルール対象を `katana-platform/src` へ拡大し、Task 4.2 で棚卸しした既存違反を解消する
   - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
   - `crates/katana-linter/tests/ast_linter.rs` の target 範囲に `katana-platform/src` を追加する
 
 ### Definition of Done (DoD)
 
-- [ ] platformクレート内の全ファイルが200行以下（テスト除外）
-- [ ] 全ファイルの関数が30行以下
-- [ ] `katana-platform/src` が AST Linter の構造/コーディングルール対象に含まれている
-- [ ] `make check` がパス
+- [x] platformクレート内の全ファイルが200行以下（テスト除外）
+- [x] 全ファイルの関数が30行以下
+- [x] `katana-platform/src` が AST Linter の構造/コーディングルール対象に含まれている
+- [x] `make check` がパス
 - [ ] Execute `/openspec-delivery` workflow
 
 ---
@@ -271,14 +284,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 6-D. その他UIファイルの分割
 
-- [ ] 6.11 `preview_pane.rs`（1,816行）→ `preview/` サブモジュール
+- [x] 6.11 `preview_pane.rs`（1,816行）→ `preview_pane/` サブモジュール
 - [ ] 6.12 `preview_pane_ui.rs`（1,270行）→ `preview/` に統合
 - [ ] 6.13 `settings_window.rs`（1,666行）→ `settings/` タブごとに分割
 - [ ] 6.14 `i18n.rs`（1,092行）→ `i18n/` サブモジュール
 - [ ] 6.15 `widgets.rs`（948行）→ `widgets/` コンポーネントごとに分割
 - [ ] 6.16 `font_loader.rs`（838行）→ 必要に応じて分割
 - [ ] 6.17 `svg_loader.rs`（795行）→ `loaders/svg.rs` + 分割
-- [ ] 6.18 `http_cache_loader.rs`（786行）→ `loaders/http_cache.rs` + 分割
+- [x] 6.18 `http_cache_loader.rs`（786行）→ `http_cache_loader/` サブモジュール分割完了
 - [ ] 6.19 `html_renderer.rs`（635行）→ 分割
 - [ ] 6.20 `main.rs`（595行）→ `setup/` サブモジュール
 - [ ] 6.21 `changelog.rs`（515行）→ 分割

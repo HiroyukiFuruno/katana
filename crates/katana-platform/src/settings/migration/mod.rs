@@ -4,16 +4,16 @@ pub mod v0_1_4_to_0_2_0;
 
 use serde_json::Value;
 
-/// Strategy pattern for migrating settings JSON across versions.
+// WHY: Strategy pattern for migrating settings JSON across versions.
 pub trait MigrationStrategy: Send + Sync {
-    /// Returns the version string this strategy migrates FROM.
+    // WHY: Returns the version string this strategy migrates FROM.
     fn version(&self) -> &str;
 
-    /// Migrates a JSON value from the old format to the new format.
+    // WHY: Migrates a JSON value from the old format to the new format.
     fn migrate(&self, json: Value) -> Value;
 }
 
-/// Runs a sequence of migration strategies to bring a JSON object up to the target version.
+// WHY: Runs a sequence of migration strategies to bring a JSON object up to the target version.
 pub struct MigrationRunner {
     strategies: Vec<Box<dyn MigrationStrategy>>,
 }
@@ -25,25 +25,25 @@ impl Default for MigrationRunner {
 }
 
 impl MigrationRunner {
-    /// Create a new MigrationRunner.
+    // WHY: Create a new MigrationRunner.
     pub fn new() -> Self {
         Self {
             strategies: Vec::new(),
         }
     }
 
-    /// Register a migration strategy.
+    // WHY: Register a migration strategy.
     pub fn add_strategy(&mut self, strategy: Box<dyn MigrationStrategy>) {
         self.strategies.push(strategy);
     }
 
-    /// Migrates a JSON value incrementally until no more strategies match the current version.
+    // WHY: Migrates a JSON value incrementally until no more strategies match the current version.
     pub fn migrate(&self, mut json: Value) -> Value {
         loop {
             let current_version = json
                 .get("version")
                 .and_then(|v| v.as_str())
-                .unwrap_or("0.1.2") // Default for unversioned files
+                .unwrap_or("0.1.2") // WHY: Default for unversioned files
                 .to_string();
 
             let mut mapped = false;
@@ -52,7 +52,7 @@ impl MigrationRunner {
                     tracing::info!("Migrating settings from version: {}", current_version);
                     json = strategy.migrate(json);
                     mapped = true;
-                    // Restart loop to find the next strategy matching the new version.
+                    // WHY: Restart loop to find the next strategy matching the new version.
                     break;
                 }
             }

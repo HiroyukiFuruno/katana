@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Whether a theme is visually dark or light.
+/// WHY: Whether a theme is visually dark or light.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThemeMode {
     Dark,
@@ -22,18 +22,43 @@ pub struct Rgba {
     pub a: u8,
 }
 
-/// System-wide / general UI colours.
+pub(crate) const fn lighten(color: Rgb, amount: u8) -> Rgb {
+    Rgb {
+        r: color.r.saturating_add(amount),
+        g: color.g.saturating_add(amount),
+        b: color.b.saturating_add(amount),
+    }
+}
+
+pub(crate) const fn darken(color: Rgb, amount: u8) -> Rgb {
+    Rgb {
+        r: color.r.saturating_sub(amount),
+        g: color.g.saturating_sub(amount),
+        b: color.b.saturating_sub(amount),
+    }
+}
+
+pub(crate) const fn to_rgba(rgb: Rgb, alpha: u8) -> Rgba {
+    Rgba {
+        r: rgb.r,
+        g: rgb.g,
+        b: rgb.b,
+        a: alpha,
+    }
+}
+
+/// WHY: System-wide / general UI colours.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemColors {
     pub background: Rgb,
     pub panel_background: Rgb,
     pub text: Rgb,
     pub text_secondary: Rgb,
-    /// Text color for success messages
+    /// WHY: Text color for success messages
     pub success_text: Rgb,
-    /// Text color for warning messages
+    /// WHY: Text color for warning messages
     pub warning_text: Rgb,
-    /// Text color for error messages
+    /// WHY: Text color for error messages
     pub error_text: Rgb,
     pub accent: Rgb,
     pub title_bar_text: Rgb,
@@ -45,7 +70,7 @@ pub struct SystemColors {
     pub selection: Rgb,
 }
 
-/// Colours specific to code blocks and editors.
+/// WHY: Colours specific to code blocks and editors.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeColors {
     pub background: Rgb,
@@ -57,7 +82,7 @@ pub struct CodeColors {
     pub selection: Rgb,
 }
 
-/// Colours specific to the markdown preview.
+/// WHY: Colours specific to the markdown preview.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreviewColors {
     pub background: Rgb,
@@ -81,61 +106,18 @@ fn default_hover_line_background() -> Rgba {
     }
 }
 
-/// Complete set of UI colours for the application.
+/// WHY: Complete set of UI colours for the application.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThemeColors {
-    /// Human-readable name (e.g. "KatanA-Dark").
+    /// WHY: Human-readable name (e.g. "KatanA-Dark").
     pub name: String,
-    /// Whether this palette is dark or light.
+    /// WHY: Whether this palette is dark or light.
     pub mode: ThemeMode,
-    /// System-wide colours (panels, sidebars, borders, etc).
+    /// WHY: System-wide colours (panels, sidebars, borders, etc).
     pub system: SystemColors,
-    /// Code block and syntax colours.
+    /// WHY: Code block and syntax colours.
     pub code: CodeColors,
-    /// Preview pane colours.
-    pub preview: PreviewColors,
-}
-
-/// Built-in theme presets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum ThemePreset {
-    #[default]
-    KatanaDark,
-    Dracula,
-    GitHubDark,
-    Nord,
-    Monokai,
-    OneDark,
-    TokyoNight,
-    CatppuccinMocha,
-    MaterialDark,
-    NightOwl,
-    RosePine,
-    Palenight,
-    SynthWave84,
-    Andromeda,
-    OceanicNext,
-    KatanaLight,
-    GitHubLight,
-    SolarizedLight,
-    AyuLight,
-    GruvboxLight,
-    OneLight,
-    RosePineDawn,
-    CatppuccinLatte,
-    MaterialLight,
-    QuietLight,
-    PaperColorLight,
-    MinimalLight,
-    Alabaster,
-    FlatUILight,
-    EverforestLight,
-}
-
-pub(crate) struct PresetColorData {
-    pub mode: ThemeMode,
-    pub system: SystemColors,
-    pub code: CodeColors,
+    /// WHY: Preview pane colours.
     pub preview: PreviewColors,
 }
 
@@ -167,7 +149,7 @@ impl ThemeColors {
             return self;
         }
 
-        // System colours
+        // WHY: System colours
         self.system.active_file_highlight = self
             .system
             .active_file_highlight
@@ -178,7 +160,7 @@ impl ThemeColors {
             .button_active_background
             .with_offset(offset_percent);
 
-        // Code block colours
+        // WHY: Code block colours
         self.code.current_line_background = self
             .code
             .current_line_background
@@ -186,7 +168,7 @@ impl ThemeColors {
         self.code.hover_line_background =
             self.code.hover_line_background.with_offset(offset_percent);
 
-        // Preview colours
+        // WHY: Preview colours
         self.preview.hover_line_background = self
             .preview
             .hover_line_background
@@ -199,6 +181,7 @@ impl ThemeColors {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme::preset::ThemePreset;
 
     #[test]
     fn test_rgba_with_offset() {

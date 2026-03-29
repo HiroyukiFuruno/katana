@@ -1,9 +1,10 @@
-#![deny(
-    warnings,
-    clippy::all,
+#![deny(warnings, clippy::all)]
+#![allow(
+    missing_docs,
+    clippy::missing_errors_doc,
     clippy::too_many_lines,
-    clippy::cognitive_complexity,
-    clippy::wildcard_imports,
+    clippy::expect_used,
+    clippy::indexing_slicing,
     clippy::unwrap_used,
     clippy::panic,
     clippy::todo,

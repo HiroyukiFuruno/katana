@@ -1,80 +1,8 @@
+use crate::theme::palettes::*;
+use crate::theme::preset::PresetColorData;
 use crate::theme::types::{
-    CodeColors, PresetColorData, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode,
+    darken, lighten, to_rgba, CodeColors, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode,
 };
-
-const DEFAULT_ACTIVE_FILE_HIGHLIGHT_ALPHA: u8 = 30;
-const DEFAULT_BUTTON_ACTIVE_ALPHA: u8 = 80;
-const DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA: u8 = 50;
-const DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA: u8 = 15;
-const DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA: u8 = 25;
-
-const DEFAULT_TEXT_SECONDARY_DARKEN: u8 = 70;
-const DEFAULT_TEXT_SECONDARY_LIGHTEN: u8 = 50;
-const DEFAULT_BORDER_DARKEN: u8 = 25;
-const DEFAULT_BORDER_LIGHTEN: u8 = 25;
-const DEFAULT_SELECTION_DARKEN: u8 = 15;
-const DEFAULT_SELECTION_LIGHTEN: u8 = 45;
-const DEFAULT_PANEL_BG_DARKEN_DARK: u8 = 5;
-const DEFAULT_PANEL_BG_DARKEN_LIGHT: u8 = 10;
-const DEFAULT_CODE_BG_LIGHTEN_DARK: u8 = 5;
-const DEFAULT_CODE_BG_DARKEN_LIGHT: u8 = 5;
-const DEFAULT_BUTTON_BACKGROUND_ALPHA: u8 = 255;
-
-const DEFAULT_SUCCESS_DARK: Rgb = Rgb {
-    r: 153,
-    g: 204,
-    b: 153,
-};
-const DEFAULT_SUCCESS_LIGHT: Rgb = Rgb {
-    r: 60,
-    g: 130,
-    b: 60,
-};
-const DEFAULT_WARNING_DARK: Rgb = Rgb {
-    r: 255,
-    g: 204,
-    b: 102,
-};
-const DEFAULT_WARNING_LIGHT: Rgb = Rgb {
-    r: 160,
-    g: 110,
-    b: 20,
-};
-const DEFAULT_ERROR_DARK: Rgb = Rgb {
-    r: 242,
-    g: 119,
-    b: 122,
-};
-const DEFAULT_ERROR_LIGHT: Rgb = Rgb {
-    r: 180,
-    g: 40,
-    b: 40,
-};
-
-pub(crate) const fn lighten(color: Rgb, amount: u8) -> Rgb {
-    Rgb {
-        r: color.r.saturating_add(amount),
-        g: color.g.saturating_add(amount),
-        b: color.b.saturating_add(amount),
-    }
-}
-
-pub(crate) const fn darken(color: Rgb, amount: u8) -> Rgb {
-    Rgb {
-        r: color.r.saturating_sub(amount),
-        g: color.g.saturating_sub(amount),
-        b: color.b.saturating_sub(amount),
-    }
-}
-
-pub(crate) const fn to_rgba(rgb: Rgb, alpha: u8) -> Rgba {
-    Rgba {
-        r: rgb.r,
-        g: rgb.g,
-        b: rgb.b,
-        a: alpha,
-    }
-}
 
 pub(crate) struct ThemePresetBuilder {
     mode: ThemeMode,
@@ -142,141 +70,127 @@ impl ThemePresetBuilder {
         self
     }
 
-    pub(crate) const fn build(self) -> PresetColorData {
-        let is_dark = matches!(self.mode, ThemeMode::Dark);
-
+    const fn resolve_bg_and_text(&self, is_dark: bool) -> (Rgb, Rgb, Rgb) {
         let p_bg = match self.panel_background {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    darken(self.background, DEFAULT_PANEL_BG_DARKEN_DARK)
-                } else {
-                    darken(self.background, DEFAULT_PANEL_BG_DARKEN_LIGHT)
-                }
-            }
+            None if is_dark => darken(self.background, DEFAULT_PANEL_BG_DARKEN_DARK),
+            None => darken(self.background, DEFAULT_PANEL_BG_DARKEN_LIGHT),
         };
         let c_bg = match self.code_background {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    lighten(self.background, DEFAULT_CODE_BG_LIGHTEN_DARK)
-                } else {
-                    darken(self.background, DEFAULT_CODE_BG_DARKEN_LIGHT)
-                }
-            }
+            None if is_dark => lighten(self.background, DEFAULT_CODE_BG_LIGHTEN_DARK),
+            None => darken(self.background, DEFAULT_CODE_BG_DARKEN_LIGHT),
         };
         let t_sec = match self.text_secondary {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    darken(self.text, DEFAULT_TEXT_SECONDARY_DARKEN)
-                } else {
-                    lighten(self.text, DEFAULT_TEXT_SECONDARY_LIGHTEN)
-                }
-            }
+            None if is_dark => darken(self.text, DEFAULT_TEXT_SECONDARY_DARKEN),
+            None => lighten(self.text, DEFAULT_TEXT_SECONDARY_LIGHTEN),
         };
+        (p_bg, c_bg, t_sec)
+    }
+
+    const fn resolve_accents(&self, is_dark: bool) -> (Rgb, Rgb, Rgb, Rgb, Rgb) {
         let border = match self.border {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    lighten(self.background, DEFAULT_BORDER_LIGHTEN)
-                } else {
-                    darken(self.background, DEFAULT_BORDER_DARKEN)
-                }
-            }
+            None if is_dark => lighten(self.background, DEFAULT_BORDER_LIGHTEN),
+            None => darken(self.background, DEFAULT_BORDER_DARKEN),
         };
         let selection = match self.selection {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    lighten(self.background, DEFAULT_SELECTION_LIGHTEN)
-                } else {
-                    darken(self.background, DEFAULT_SELECTION_DARKEN)
-                }
-            }
+            None if is_dark => lighten(self.background, DEFAULT_SELECTION_LIGHTEN),
+            None => darken(self.background, DEFAULT_SELECTION_DARKEN),
         };
-
         let success = match self.success {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    DEFAULT_SUCCESS_DARK
-                } else {
-                    DEFAULT_SUCCESS_LIGHT
-                }
-            }
+            None if is_dark => DEFAULT_SUCCESS_DARK,
+            None => DEFAULT_SUCCESS_LIGHT,
         };
         let warning = match self.warning {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    DEFAULT_WARNING_DARK
-                } else {
-                    DEFAULT_WARNING_LIGHT
-                }
-            }
+            None if is_dark => DEFAULT_WARNING_DARK,
+            None => DEFAULT_WARNING_LIGHT,
         };
         let error = match self.error {
             Some(c) => c,
-            None => {
-                if is_dark {
-                    DEFAULT_ERROR_DARK
-                } else {
-                    DEFAULT_ERROR_LIGHT
-                }
-            }
+            None if is_dark => DEFAULT_ERROR_DARK,
+            None => DEFAULT_ERROR_LIGHT,
         };
+        (border, selection, success, warning, error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    const fn build_system(
+        &self,
+        p_bg: Rgb,
+        t_sec: Rgb,
+        success: Rgb,
+        warning: Rgb,
+        error: Rgb,
+        border: Rgb,
+        selection: Rgb,
+    ) -> SystemColors {
+        SystemColors {
+            background: self.background,
+            panel_background: p_bg,
+            text: self.text,
+            text_secondary: t_sec,
+            success_text: success,
+            warning_text: warning,
+            error_text: error,
+            accent: self.accent,
+            title_bar_text: self.text,
+            file_tree_text: t_sec,
+            active_file_highlight: to_rgba(self.accent, DEFAULT_ACTIVE_FILE_HIGHLIGHT_ALPHA),
+            button_background: to_rgba(p_bg, DEFAULT_BUTTON_BACKGROUND_ALPHA),
+            button_active_background: to_rgba(self.accent, DEFAULT_BUTTON_ACTIVE_ALPHA),
+            border,
+            selection,
+        }
+    }
+
+    const fn build_code(&self, c_bg: Rgb, t_sec: Rgb, selection: Rgb, is_dark: bool) -> CodeColors {
+        let current_line_background = Rgba {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: if is_dark {
+                DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA
+            } else {
+                DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA
+            },
+        };
+        CodeColors {
+            background: c_bg,
+            text: self.text,
+            line_number_text: t_sec,
+            line_number_active_text: self.text,
+            current_line_background,
+            hover_line_background: to_rgba(self.accent, DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA),
+            selection,
+        }
+    }
+
+    const fn build_preview(&self, warning: Rgb, border: Rgb, selection: Rgb) -> PreviewColors {
+        PreviewColors {
+            background: self.background,
+            text: self.text,
+            warning_text: warning,
+            border,
+            selection,
+            hover_line_background: to_rgba(self.accent, DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA),
+        }
+    }
+
+    pub(crate) const fn build(self) -> PresetColorData {
+        let is_dark = matches!(self.mode, ThemeMode::Dark);
+        let (p_bg, c_bg, t_sec) = self.resolve_bg_and_text(is_dark);
+        let (border, selection, success, warning, error) = self.resolve_accents(is_dark);
 
         PresetColorData {
             mode: self.mode,
-            system: SystemColors {
-                background: self.background,
-                panel_background: p_bg,
-                text: self.text,
-                text_secondary: t_sec,
-                success_text: success,
-                warning_text: warning,
-                error_text: error,
-                accent: self.accent,
-                title_bar_text: self.text,
-                file_tree_text: t_sec,
-                active_file_highlight: to_rgba(self.accent, DEFAULT_ACTIVE_FILE_HIGHLIGHT_ALPHA),
-                button_background: to_rgba(p_bg, DEFAULT_BUTTON_BACKGROUND_ALPHA),
-                button_active_background: to_rgba(self.accent, DEFAULT_BUTTON_ACTIVE_ALPHA),
-                border,
-                selection,
-            },
-            code: CodeColors {
-                background: c_bg,
-                text: self.text,
-                line_number_text: t_sec,
-                line_number_active_text: self.text,
-                current_line_background: if is_dark {
-                    Rgba {
-                        r: 0,
-                        g: 0,
-                        b: 0,
-                        a: DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA,
-                    }
-                } else {
-                    Rgba {
-                        r: 0,
-                        g: 0,
-                        b: 0,
-                        a: DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA,
-                    }
-                },
-                hover_line_background: to_rgba(self.accent, DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA),
-                selection,
-            },
-            preview: PreviewColors {
-                background: self.background,
-                text: self.text,
-                warning_text: warning,
-                border,
-                selection,
-                hover_line_background: to_rgba(self.accent, DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA),
-            },
+            system: self.build_system(p_bg, t_sec, success, warning, error, border, selection),
+            code: self.build_code(c_bg, t_sec, selection, is_dark),
+            preview: self.build_preview(warning, border, selection),
         }
     }
 }

@@ -14,6 +14,9 @@ pub use coding::{
     lint_prohibited_attributes, lint_prohibited_types,
 };
 
-pub use structure::{lint_file_length, lint_function_length, lint_nesting_depth, lint_pub_free_fn};
+pub use structure::{
+    lint_file_length, lint_function_length, lint_nesting_depth, lint_pub_free_fn,
+    lint_type_separation,
+};
 
 pub use domains::font_normalization::lint_font_normalization;
