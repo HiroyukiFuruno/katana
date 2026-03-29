@@ -7,3 +7,11 @@ pub struct ExportSettings {
     #[serde(default = "super::super::defaults::default_html_output_dir")]
     pub html_output_dir: String,
 }
+
+impl Default for ExportSettings {
+    fn default() -> Self {
+        Self {
+            html_output_dir: crate::settings::defaults::default_html_output_dir(),
+        }
+    }
+}

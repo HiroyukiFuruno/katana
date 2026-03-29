@@ -17,7 +17,9 @@ impl CacheFacade for InMemoryCacheService {
     fn set_memory(&self, key: &str, value: String) {
         let mut map = write_guard(&self.memory);
         if let Some(pos) = map.iter().position(|(k, _)| k == key) {
-            map[pos].1 = value;
+            if let Some(entry) = map.get_mut(pos) {
+                entry.1 = value;
+            }
         } else {
             map.push((key.to_string(), value));
         }
@@ -31,7 +33,9 @@ impl CacheFacade for InMemoryCacheService {
     fn set_persistent(&self, key: &str, value: String) -> anyhow::Result<()> {
         let mut data = write_guard(&self.persistent);
         if let Some(pos) = data.iter().position(|(k, _)| k == key) {
-            data[pos].1 = value;
+            if let Some(entry) = data.get_mut(pos) {
+                entry.1 = value;
+            }
         } else {
             data.push((key.to_string(), value));
         }

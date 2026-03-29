@@ -36,6 +36,7 @@ impl SettingsService {
     }
 
     // WHY: Persist current settings via the repository.
+    #[allow(clippy::missing_errors_doc)]
     pub fn save(&self) -> anyhow::Result<()> {
         self.repository.save(&self.settings)
     }

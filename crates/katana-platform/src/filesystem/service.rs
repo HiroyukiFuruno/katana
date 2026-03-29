@@ -21,6 +21,7 @@ impl FilesystemService {
     On success, returns a [`Workspace`] with the directory tree populated.
     On failure (unreadable path), returns a recoverable [`WorkspaceError`]. */
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::missing_errors_doc)]
     pub fn open_workspace(
         &self,
         path: impl Into<PathBuf>,
@@ -48,6 +49,7 @@ impl FilesystemService {
     }
 
     // WHY: Load a document from `path`, returning its in-memory representation.
+    #[allow(clippy::missing_errors_doc)]
     pub fn load_document(&self, path: impl Into<PathBuf>) -> Result<Document, DocumentError> {
         let path = path.into();
         let content = std::fs::read_to_string(&path)
@@ -59,6 +61,7 @@ impl FilesystemService {
 
     This is the *only* path that writes to the source file. There is no
     implicit or background save. */
+    #[allow(clippy::missing_errors_doc)]
     pub fn save_document(&self, doc: &mut Document) -> Result<(), DocumentError> {
         std::fs::write(&doc.path, &doc.buffer)
             .map_err(|e| DocumentError::save_failed(doc.path.clone(), e))?;

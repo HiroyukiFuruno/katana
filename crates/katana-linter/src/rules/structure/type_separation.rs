@@ -44,20 +44,29 @@ fn check_syntax_for_types_and_logic(syntax: &syn::File) -> (bool, bool, usize) {
     (has_pub_type, has_logic_impl, first_pub_type_line)
 }
 
+fn create_violation(path: &Path, line: usize, num_lines: usize) -> Violation {
+    let rel_path = path
+        .strip_prefix(std::env::current_dir().unwrap_or_default())
+        .unwrap_or(path)
+        .to_path_buf();
+    Violation {
+        file: rel_path,
+        line,
+        column: 1,
+        message: format!("Mixed logic and data. File ({num_lines} lines) defines pub struct/enum but also contains method logic. Move types to `types.rs` or `types/` dir, or keep file under {MAX_LENGTH_FOR_MIXED_FILE} lines."),
+    }
+}
+
 pub fn lint_type_separation(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut violations = Vec::new();
     let path_str = path.to_string_lossy();
-
     if path_str.contains("/tests/") || path_str.ends_with("tests.rs") {
         return violations;
     }
-
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(_) => return violations,
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return violations;
     };
     let num_lines = source.lines().count();
-
     if is_whitelisted_type_file(&path_str) || num_lines <= MAX_LENGTH_FOR_MIXED_FILE {
         return violations;
     }
@@ -65,16 +74,7 @@ pub fn lint_type_separation(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let (has_pub_type, has_logic, line) = check_syntax_for_types_and_logic(syntax);
 
     if has_pub_type && has_logic {
-        let rel_path = path
-            .strip_prefix(std::env::current_dir().unwrap_or_default())
-            .unwrap_or(path)
-            .to_path_buf();
-        violations.push(Violation {
-            file: rel_path,
-            line,
-            column: 1,
-            message: format!("Mixed logic and data. File ({num_lines} lines) defines pub struct/enum but also contains method logic. Move types to `types.rs` or `types/` dir, or keep file under {MAX_LENGTH_FOR_MIXED_FILE} lines."),
-        });
+        violations.push(create_violation(path, line, num_lines));
     }
 
     violations

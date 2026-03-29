@@ -21,6 +21,7 @@ pub trait CacheFacade: Send + Sync {
     // WHY: Retrieves a value from the persistent cache.
     fn get_persistent(&self, key: &str) -> Option<String>;
     // WHY: Stores a value in the persistent cache, syncing to disk.
+    #[allow(clippy::missing_errors_doc)]
     fn set_persistent(&self, key: &str, value: String) -> anyhow::Result<()>;
 }
 

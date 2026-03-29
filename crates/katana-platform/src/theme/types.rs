@@ -22,6 +22,31 @@ pub struct Rgba {
     pub a: u8,
 }
 
+pub(crate) const fn lighten(color: Rgb, amount: u8) -> Rgb {
+    Rgb {
+        r: color.r.saturating_add(amount),
+        g: color.g.saturating_add(amount),
+        b: color.b.saturating_add(amount),
+    }
+}
+
+pub(crate) const fn darken(color: Rgb, amount: u8) -> Rgb {
+    Rgb {
+        r: color.r.saturating_sub(amount),
+        g: color.g.saturating_sub(amount),
+        b: color.b.saturating_sub(amount),
+    }
+}
+
+pub(crate) const fn to_rgba(rgb: Rgb, alpha: u8) -> Rgba {
+    Rgba {
+        r: rgb.r,
+        g: rgb.g,
+        b: rgb.b,
+        a: alpha,
+    }
+}
+
 /// WHY: System-wide / general UI colours.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemColors {

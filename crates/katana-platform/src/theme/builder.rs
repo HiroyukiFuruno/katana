@@ -1,31 +1,8 @@
 use crate::theme::palettes::*;
 use crate::theme::preset::PresetColorData;
-use crate::theme::types::{CodeColors, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode};
-
-pub(crate) const fn lighten(color: Rgb, amount: u8) -> Rgb {
-    Rgb {
-        r: color.r.saturating_add(amount),
-        g: color.g.saturating_add(amount),
-        b: color.b.saturating_add(amount),
-    }
-}
-
-pub(crate) const fn darken(color: Rgb, amount: u8) -> Rgb {
-    Rgb {
-        r: color.r.saturating_sub(amount),
-        g: color.g.saturating_sub(amount),
-        b: color.b.saturating_sub(amount),
-    }
-}
-
-pub(crate) const fn to_rgba(rgb: Rgb, alpha: u8) -> Rgba {
-    Rgba {
-        r: rgb.r,
-        g: rgb.g,
-        b: rgb.b,
-        a: alpha,
-    }
-}
+use crate::theme::types::{
+    darken, lighten, to_rgba, CodeColors, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode,
+};
 
 pub(crate) struct ThemePresetBuilder {
     mode: ThemeMode,
@@ -141,6 +118,7 @@ impl ThemePresetBuilder {
         (border, selection, success, warning, error)
     }
 
+    #[allow(clippy::too_many_arguments)]
     const fn build_system(
         &self,
         p_bg: Rgb,
@@ -171,20 +149,15 @@ impl ThemePresetBuilder {
     }
 
     const fn build_code(&self, c_bg: Rgb, t_sec: Rgb, selection: Rgb, is_dark: bool) -> CodeColors {
-        let current_line_background = if is_dark {
-            Rgba {
-                r: 0,
-                g: 0,
-                b: 0,
-                a: DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA,
-            }
-        } else {
-            Rgba {
-                r: 0,
-                g: 0,
-                b: 0,
-                a: DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA,
-            }
+        let current_line_background = Rgba {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: if is_dark {
+                DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA
+            } else {
+                DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA
+            },
         };
         CodeColors {
             background: c_bg,

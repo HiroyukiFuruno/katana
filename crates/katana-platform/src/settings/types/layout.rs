@@ -41,3 +41,14 @@ pub struct LayoutSettings {
     #[serde(default)]
     pub toc_position: TocPosition,
 }
+
+impl Default for LayoutSettings {
+    fn default() -> Self {
+        Self {
+            split_direction: Default::default(),
+            pane_order: Default::default(),
+            toc_visible: true,
+            toc_position: Default::default(),
+        }
+    }
+}

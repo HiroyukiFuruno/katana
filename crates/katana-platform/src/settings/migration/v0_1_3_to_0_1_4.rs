@@ -48,4 +48,12 @@ mod tests {
         let extra = migrated["extra"].as_array().unwrap();
         assert_eq!(extra.len(), 2);
     }
+
+    #[test]
+    fn test_migration_013_to_014_not_object() {
+        let strategy = Migration013To014;
+        let old_json = json!("not an object");
+        let new_json = strategy.migrate(old_json.clone());
+        assert_eq!(new_json, old_json);
+    }
 }

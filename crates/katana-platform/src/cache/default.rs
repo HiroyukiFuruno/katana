@@ -101,7 +101,9 @@ impl CacheFacade for DefaultCacheService {
     fn set_memory(&self, key: &str, value: String) {
         let mut map = write_guard(&self.memory);
         if let Some(pos) = map.iter().position(|(k, _)| k == key) {
-            map[pos].1 = value;
+            if let Some(entry) = map.get_mut(pos) {
+                entry.1 = value;
+            }
         } else {
             map.push((key.to_string(), value));
         }
@@ -119,7 +121,9 @@ impl CacheFacade for DefaultCacheService {
         {
             let mut data = write_guard(&self.persistent);
             if let Some(pos) = data.entries.iter().position(|(k, _)| k == key) {
-                data.entries[pos].1 = value;
+                if let Some(entry) = data.entries.get_mut(pos) {
+                    entry.1 = value;
+                }
             } else {
                 data.entries.push((key.to_string(), value));
             }
@@ -214,5 +218,15 @@ mod tests {
 
         cache.set_memory("test", "recovered".to_string());
         assert_eq!(cache.get_memory("test"), Some("recovered".to_string()));
+    }
+
+    #[test]
+    fn test_clear_directory_fallback_on_file() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("just_a_file.txt");
+        std::fs::write(&file_path, b"test").unwrap();
+
+        // Directly call clear_directory on a file to ensure the fallback block is covered
+        DefaultCacheService::clear_directory(&file_path);
     }
 }

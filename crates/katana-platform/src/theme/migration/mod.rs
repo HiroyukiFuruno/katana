@@ -35,7 +35,7 @@ where
 }
 
 impl ThemeColorsLegacyData {
-    fn into_system_colors(&self, is_dark: bool) -> SystemColors {
+    fn to_system_colors(&self, is_dark: bool) -> SystemColors {
         SystemColors {
             background: self.background,
             panel_background: self.panel_background,
@@ -67,7 +67,7 @@ impl ThemeColorsLegacyData {
         }
     }
 
-    fn into_code_colors(&self, is_dark: bool) -> CodeColors {
+    fn to_code_colors(&self, is_dark: bool) -> CodeColors {
         CodeColors {
             background: self.code_background,
             text: self.text,
@@ -91,7 +91,7 @@ impl ThemeColorsLegacyData {
         }
     }
 
-    fn into_preview_colors(&self, is_dark: bool) -> PreviewColors {
+    fn to_preview_colors(&self, is_dark: bool) -> PreviewColors {
         PreviewColors {
             background: self.preview_background,
             text: self.text,
@@ -108,9 +108,9 @@ impl ThemeColorsLegacyData {
 
     fn into_theme_colors(self) -> ThemeColors {
         let is_dark = self.mode == ThemeMode::Dark;
-        let system = self.into_system_colors(is_dark);
-        let code = self.into_code_colors(is_dark);
-        let preview = self.into_preview_colors(is_dark);
+        let system = self.to_system_colors(is_dark);
+        let code = self.to_code_colors(is_dark);
+        let preview = self.to_preview_colors(is_dark);
 
         ThemeColors {
             name: self.name,

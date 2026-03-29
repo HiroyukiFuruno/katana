@@ -41,3 +41,18 @@ pub struct WorkspaceSettings {
     #[serde(default = "super::super::defaults::default_extensionless_excludes")]
     pub extensionless_excludes: Vec<String>,
 }
+
+impl Default for WorkspaceSettings {
+    fn default() -> Self {
+        Self {
+            last_workspace: None,
+            paths: vec![],
+            open_tabs: vec![],
+            active_tab_idx: None,
+            ignored_directories: crate::settings::defaults::default_ignored_directories(),
+            max_depth: DEFAULT_MAX_DEPTH,
+            visible_extensions: crate::settings::defaults::default_visible_extensions(),
+            extensionless_excludes: crate::settings::defaults::default_extensionless_excludes(),
+        }
+    }
+}

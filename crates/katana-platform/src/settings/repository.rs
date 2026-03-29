@@ -11,6 +11,7 @@ use super::types::{AppSettings, SettingsLoadOrigin};
 // WHY: Minimal interface for loading and saving settings.
 pub trait SettingsRepository: Send {
     fn load(&self) -> AppSettings;
+    #[allow(clippy::missing_errors_doc)]
     fn save(&self, settings: &AppSettings) -> anyhow::Result<()>;
     // WHY: Returns the load origin for detecting first launch.
     fn load_origin(&self) -> SettingsLoadOrigin {
