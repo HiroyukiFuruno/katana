@@ -8,14 +8,14 @@ Task 1-3（linter/core まで）はすでに実施済みだが、文書整合の
 
 1. **Task 1 の rollout 範囲に計画漏れがあった**
    - Task 1 の各ルール説明には「Phase 2以降で全クレートに拡大」とある
-   - しかし実際の AST Linter 実行対象は `katana-linter` と `katana-core` が中心で、`katana-platform` と `katana-ui` への拡大を Task 4/5 が明示していなかった
-   - この漏れは Task 4/5 に追加タスクとして反映する
+   - しかし実際の AST Linter 実行対象は `katana-linter` と `katana-core` が中心で、`katana-platform` と `katana-ui` への拡大、および `pub_free_fn` の本有効化を独立 top-level task として明示できていなかった
+   - この漏れは Task 4 を rollout 専用 gate として新設し、Task 5 / Task 6 の完了条件へ接続する形で反映する
 
 2. **Task 1 の仕様文書に stale な実装状況表が残っていた**
    - `specs/ast-linter-enforcement/spec.md` に proposal 当時の「未実装/未設定」表が残っており、完了済みタスクと整合しない
    - 仕様は normative な要件だけを保持する形へ整理する
 
-Task 2 は `katana-linter` 内部の責務分離、Task 3 は `katana-core` のドメイン/レンダリング基盤の分割であり、今回追加した UI コンポーネント化要件そのものの直接対象ではない。一方で、Task 1 の品質ガードレール rollout は Task 4/5 にまたがる未完了項目として扱う必要がある。
+Task 2 は `katana-linter` 内部の責務分離、Task 3 は `katana-core` のドメイン/レンダリング基盤の分割であり、今回確認した文書整合の直接修正対象ではない。一方で、Task 1 の品質ガードレール rollout は Task 4 を gate とし、Task 5 / Task 6 にまたがる未完了項目として扱う必要がある。
 
 ## Goals / Non-Goals
 
@@ -521,6 +521,6 @@ See: docs/coding-rules.ja.md §責務分離の原則
 
 ## Resolved Questions
 
-- ✅ `emoji.rs`（399行）→ **外部データファイル化**（Phase 6で実施）
-- ✅ `i18n.rs`の翻訳文字列定義 → **Rustコードのまま `i18n/` サブモジュール分割**（Phase 5で実施）
+- ✅ `emoji.rs`（399行）→ **外部データファイル化**（Task 7で実施）
+- ✅ `i18n.rs`の翻訳文字列定義 → **Rustコードのまま `i18n/` サブモジュール分割**（Task 6で実施）
 - ✅ 型/データオブジェクトの分離 → **横断的設計原則**として各Phaseで適用
