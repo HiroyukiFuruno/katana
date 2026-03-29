@@ -156,30 +156,30 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Ready (DoR)
 
-- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
-- [ ] Base branch is synced, and a new branch is explicitly created for this task.
+- [x] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [x] Base branch is synced, and a new branch is explicitly created for this task.
 
-- [ ] 4.1 `crates/katana-linter/tests/ast_linter.rs` の target 範囲と staged rollout 方針を見直し、残り2クレートの適用順序を Task 5 / Task 6 に接続する
+- [x] 4.1 `crates/katana-linter/tests/ast_linter.rs` の target 範囲と staged rollout 方針を見直し、残り2クレートの適用順序を Task 5 / Task 6 に接続する
   - `katana-platform/src` は Task 5 の完了条件として扱う
   - `katana-ui/src` は Task 6 の完了条件として扱う
 
-- [ ] 4.2 `katana-platform/src` に対する AST Linter 既存違反の棚卸しを行い、Task 5 で解消すべき項目を fix list として明記する
-  - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
+- [x] 4.2 `katana-platform/src` に対する AST Linter 既存違反の棚卸しを行い、Task 5 で解消すべき項目を fix list として明記する
+  - 対象: `comment_style` (214件), `pub_free_fn` (21件), `function_length` (7件), `nesting_depth` (5件), `file_length` (4件), `error_first` (3件)
 
-- [ ] 4.3 `katana-ui/src` に対する AST Linter 既存違反の棚卸しを行い、Task 6 で解消すべき項目を fix list として明記する
-  - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
+- [x] 4.3 `katana-ui/src` に対する AST Linter 既存違反の棚卸しを行い、Task 6 で解消すべき項目を fix list として明記する
+  - 対象: `comment_style` (1041件), `nesting_depth` (134件), `function_length` (88件), `pub_free_fn` (86件), `error_first` (20件), `file_length` (16件)
 
-- [ ] 4.4 `pub_free_fn` の staged enablement 条件を整理し、Task 6 完了条件と Final Verification に接続する
+- [x] 4.4 `pub_free_fn` の staged enablement 条件を整理し、Task 6 完了条件と Final Verification に接続する
   - `#[ignore]` を外すタイミングが Task 6 の終盤であることを明示する
 
-- [ ] 4.5 Task 5 / Task 6 / Final Verification の DoD が、Task 1 の「全クレートに拡大」という記述と矛盾しない状態になっていることを確認する
+- [x] 4.5 Task 5 / Task 6 / Final Verification の DoD が、Task 1 の「全クレートに拡大」という記述と矛盾しない状態になっていることを確認する
 
 ### Definition of Done (DoD)
 
-- [ ] Task 1 rollout の残課題が top-level task として独立定義されている
-- [ ] `katana-platform/src` の rollout 完了条件が Task 5 に接続されている
-- [ ] `katana-ui/src` の rollout 完了条件と `pub_free_fn` 本有効化条件が Task 6 に接続されている
-- [ ] Final Verification が 4クレート全体の rollout 完了を確認する構造になっている
+- [x] Task 1 rollout の残課題が top-level task として独立定義されている
+- [x] `katana-platform/src` の rollout 完了条件が Task 5 に接続されている
+- [x] `katana-ui/src` の rollout 完了条件と `pub_free_fn` 本有効化条件が Task 6 に接続されている
+- [x] Final Verification が 4クレート全体の rollout 完了を確認する構造になっている
 - [ ] Execute `/openspec-delivery` workflow
 
 ---
@@ -192,6 +192,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
 - [ ] Base branch is synced, and a new branch is explicitly created for this task.
+- [ ] Restore Task 5 (formerly Task 4) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
 
 - [ ] 5.1 `settings.rs`（653行）の完全移行
   - 旧 `settings.rs` の内容を `settings/` サブモジュールに完全移行
@@ -236,6 +237,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
 - [ ] Base branch is synced, and a new branch is explicitly created for this task.
+- [ ] Restore Task 6 (formerly Task 5) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
 
 ### 6-A. God Object (`KatanaApp`) の解体
 
