@@ -273,14 +273,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 6-C. shell_ui.rs（5,118行）の完全解体
 
-- [ ] 6.3 メニューバー系（`render_menu_bar`, `render_file_menu`, `render_settings_menu`, `render_help_menu`）→ `ui/menu/`
-- [ ] 6.4 ヘッダー・ステータスバー → `ui/header.rs`, `ui/status_bar.rs`
-- [ ] 6.5 ワークスペースパネル・ファイルツリー → `ui/workspace/`
-- [ ] 6.6 タブバー → `ui/tab_bar.rs`
-- [ ] 6.7 ビューモード・エディター → `ui/view_mode.rs`, `ui/editor.rs`
-- [ ] 6.8 スプリットビュー → `ui/split/`
-- [ ] 6.9 検索モーダル・ToCパネル → `ui/search_modal.rs`, `ui/toc_panel.rs`
-- [ ] 6.10 各種モーダル → `ui/modals/`（about, meta_info, update, create_node, rename, delete, terms）
+- [x] 6.3 メニューバー系（`render_menu_bar`, `render_file_menu`, `render_settings_menu`, `render_help_menu`）→ `ui/menu/`
+- [x] 6.4 ヘッダー・ステータスバー → `ui/header.rs`, `ui/status_bar.rs`
+- [x] 6.5 ワークスペースパネル・ファイルツリー → `ui/workspace/`
+- [x] 6.6 タブバー → `ui/tab_bar.rs`
+- [x] 6.7 ビューモード・エディター → `ui/view_mode.rs`, `ui/editor.rs`
+- [x] 6.8 スプリットビュー → `ui/split/`
+- [x] 6.9 検索モーダル・ToCパネル → `ui/search_modal.rs`, `ui/toc_panel.rs`
+- [x] 6.10 各種モーダル → `ui/modals/`（about, meta_info, update, create_node, rename, delete, terms）
 
 ### 6-D. その他UIファイルの分割
 
