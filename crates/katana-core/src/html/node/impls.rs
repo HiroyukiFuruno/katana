@@ -3,11 +3,6 @@ use std::path::{Path, PathBuf};
 use super::types::{DisplayMode, HtmlNode, LinkAction, LinkTarget};
 
 impl LinkTarget {
-    /// Classifies a link href into the appropriate target variant.
-    ///
-    /// - URLs starting with `http://` or `https://` → `External`
-    /// - URLs starting with `#` → `Anchor`
-    /// - Everything else → `InternalFile` (resolved against `base_dir`)
     pub fn resolve(href: &str, base_dir: &Path) -> Self {
         if href.starts_with("http://") || href.starts_with("https://") {
             Self::External(href.to_string())
@@ -18,7 +13,6 @@ impl LinkTarget {
         }
     }
 
-    /// Returns the default action for this link target type.
     pub fn default_action(&self) -> LinkAction {
         match self {
             Self::External(url) => LinkAction::OpenInBrowser(url.clone()),
@@ -29,7 +23,6 @@ impl LinkTarget {
         }
     }
 
-    /// Returns the text to display in tooltip.
     pub fn tooltip_text(&self) -> String {
         match self {
             Self::External(url) => url.clone(),
@@ -40,7 +33,6 @@ impl LinkTarget {
 }
 
 impl HtmlNode {
-    /// Returns whether this node is a block or inline element.
     pub fn display_mode(&self) -> DisplayMode {
         match self {
             Self::Heading { .. } | Self::Paragraph { .. } => DisplayMode::Block,
@@ -53,12 +45,10 @@ impl HtmlNode {
         }
     }
 
-    /// Shorthand for `self.display_mode() == DisplayMode::Inline`.
     pub fn is_inline(&self) -> bool {
         self.display_mode() == DisplayMode::Inline
     }
 
-    /// Shorthand for `self.display_mode() == DisplayMode::Block`.
     pub fn is_block(&self) -> bool {
         self.display_mode() == DisplayMode::Block
     }

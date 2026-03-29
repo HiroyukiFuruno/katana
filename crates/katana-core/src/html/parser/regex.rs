@@ -46,7 +46,6 @@ pub fn regex_strong() -> &'static Regex {
     &RE
 }
 
-/// Extracts an attribute value from an HTML tag's attribute string.
 pub fn extract_attr(attrs: &str, attr_name: &str) -> Option<String> {
     let re = Regex::new(&format!(r#"(?is){}\s*=\s*"([^"]+)""#, attr_name)).ok()?;
     re.captures(attrs)

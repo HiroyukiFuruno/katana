@@ -1,12 +1,6 @@
 use crate::html::node::{HtmlNode, LinkTarget};
 use std::path::Path;
 
-/// Parses plain text that may contain markdown inline syntax.
-///
-/// Handles:
-/// - `![alt](src)` → Image
-/// - `[text](url)` → Link
-/// - Plain text → Text
 pub fn parse_inline_text(text: &str, base_dir: &Path, nodes: &mut Vec<HtmlNode>) {
     let mut remaining = text;
 
@@ -63,7 +57,6 @@ fn process_syntax<'a>(text: &'a str, base_dir: &Path, nodes: &mut Vec<HtmlNode>)
     &text[1..]
 }
 
-/// Tries to parse `![alt](src)` at the start of `s`.
 pub fn try_parse_md_image(s: &str) -> Option<(HtmlNode, usize)> {
     let rest = s.strip_prefix("![")?;
     let close_bracket = rest.find("](")?;
@@ -84,7 +77,6 @@ pub fn try_parse_md_image(s: &str) -> Option<(HtmlNode, usize)> {
     ))
 }
 
-/// Tries to parse `[text](url)` at the start of `s`.
 pub fn try_parse_md_link(s: &str, base_dir: &Path) -> Option<(HtmlNode, usize)> {
     let rest = s.strip_prefix('[')?;
     let close_bracket = rest.find("](")?;
