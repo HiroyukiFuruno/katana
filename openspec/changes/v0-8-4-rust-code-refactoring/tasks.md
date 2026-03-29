@@ -67,6 +67,10 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
   - 6つの既存Visitor + 4つの新規ルールを10個の個別ファイルに分離完了
   - `rules/rust/mod.rs` で公開APIを集約
 
+- [ ] 1.8 `lint_type_separation`: 型とロジックの分離の強制
+  - `pub struct` や `pub enum`（公開の型定義）を記述するファイルは、ファイル名が `types.rs` または `types/` 配下などの専用名であるか、あるいはファイル内に `impl` による固有メソッドの実装（関数）を含んではいけない（データクラスの分離）。
+  - ※ 厳格すぎる場合は行数閾値（50行以上など）を設けるハイブリッド制約とする。
+
 ### Definition of Done (DoD)
 
 - [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）の基盤実装が完了し、`katana-linter` / `katana-core` を対象に `make check` で実行される
@@ -194,11 +198,11 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] Base branch is synced, and a new branch is explicitly created for this task.
 - [x] Restore Task 5 (formerly Task 4) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
 
-- [ ] 5.1 `settings.rs`（653行）の完全移行
+- [x] 5.1 `settings.rs`（653行）の完全移行
   - 旧 `settings.rs` の内容を `settings/` サブモジュールに完全移行
   - `pub use` による外部API互換性の維持
 
-- [ ] 5.2 `settings/types.rs`（256行）の分割
+- [x] 5.2 `settings/types.rs`（256行）の分割
   - `types/app.rs`, `types/editor.rs`, `types/window.rs`, `types/behavior.rs` 等
 
 - [ ] 5.3 `theme/builder.rs`（473行）の分割
