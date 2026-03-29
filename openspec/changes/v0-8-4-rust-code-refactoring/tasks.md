@@ -218,7 +218,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
   - `DefaultCacheService` を `cache/default.rs` へ分離
   - `InMemoryCacheService` を `cache/memory.rs` へ分離
 
-- [ ] 5.7 `filesystem.rs`（279行）の分割
+- [x] 5.7 `filesystem.rs`（279行）の分割
+  - `FilesystemService` を `filesystem/service.rs` へ分離
+  - ディレクトリ走査ロジックを `filesystem/scanner.rs` へ分離
 
 - [ ] 5.8 `settings/defaults.rs`（201行）のボーダーライン確認
 
