@@ -1941,6 +1941,7 @@ fn test_ui_split_dir_toggle_horizontal_to_vertical() {
     let node = harness.get_by_label("Toggle Split Direction");
     node.click();
     harness.step();
+    harness.step(); // Action is processed on the next frame
 
     // Check if the Action was correctly dispatched and reflected from the UI
     assert_eq!(

@@ -1,4 +1,4 @@
-use crate::app_state::{AppAction, AppState, ViewMode};
+use crate::app_state::{AppAction, ViewMode};
 use crate::shell::{
     TAB_DROP_ANIMATION_TIME, TAB_DROP_INDICATOR_WIDTH, TAB_INTER_ITEM_SPACING,
     TAB_NAV_BUTTONS_AREA_WIDTH, TAB_TOOLTIP_SHOW_DELAY_SECS,
@@ -97,18 +97,28 @@ impl<'a> StatusBar<'a> {
 }
 
 pub(crate) struct TabBar<'a> {
-    pub state: &'a mut AppState,
-    pub action: &'a mut AppAction,
+    pub workspace_root: Option<&'a std::path::Path>,
+    pub open_documents: &'a [katana_core::document::Document],
+    pub active_doc_idx: Option<usize>,
+    pub recently_closed_tabs: &'a std::collections::VecDeque<std::path::PathBuf>,
 }
 
 impl<'a> TabBar<'a> {
-    pub fn new(state: &'a mut AppState, action: &'a mut AppAction) -> Self {
-        Self { state, action }
+    pub fn new(
+        workspace_root: Option<&'a std::path::Path>,
+        open_documents: &'a [katana_core::document::Document],
+        active_doc_idx: Option<usize>,
+        recently_closed_tabs: &'a std::collections::VecDeque<std::path::PathBuf>,
+    ) -> Self {
+        Self {
+            workspace_root,
+            open_documents,
+            active_doc_idx,
+            recently_closed_tabs,
+        }
     }
 
-    pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
-        let state = self.state;
-        let action = self.action;
+    pub fn show(self, ui: &mut egui::Ui) -> Option<AppAction> {
         const MAX_TAB_WIDTH: f32 = 200.0;
         const PINNED_TAB_MAX_WIDTH: f32 = 60.0;
 
@@ -117,12 +127,12 @@ impl<'a> TabBar<'a> {
         let mut dragged_source: Option<(usize, f32)> = None;
         let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
 
-        let ws_root = state.workspace.data.as_ref().map(|ws| ws.root.clone());
-        let doc_count = state.document.open_documents.len();
+        let ws_root = self.workspace_root;
+        let doc_count = self.open_documents.len();
 
         ui.style_mut().interaction.tooltip_delay = TAB_TOOLTIP_SHOW_DELAY_SECS;
 
-        let resp = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             let nav_button_width = TAB_NAV_BUTTONS_AREA_WIDTH;
             let scroll_width = ui.available_width() - nav_button_width;
 
@@ -141,8 +151,8 @@ impl<'a> TabBar<'a> {
                     let mut dragging_ghost_info = None;
 
                     ui.horizontal(|ui| {
-                        for (idx, doc) in state.document.open_documents.iter().enumerate() {
-                            let is_active = state.document.active_doc_idx == Some(idx);
+                        for (idx, doc) in self.open_documents.iter().enumerate() {
+                            let is_active = self.active_doc_idx == Some(idx);
                             let original_filename = doc.file_name().unwrap_or("untitled");
                             let is_changelog =
                                 doc.path.to_string_lossy().starts_with("Katana://ChangeLog");
@@ -165,7 +175,7 @@ impl<'a> TabBar<'a> {
                             } else {
                                 format!("{filename}{dirty_suffix}")
                             };
-                            let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
+                            let tooltip_path = relative_full_path(&doc.path, ws_root);
 
                             let (title_resp, close_resp) = ui
                                 .push_id(format!("tab_{idx}"), |ui| {
@@ -326,7 +336,7 @@ impl<'a> TabBar<'a> {
                                     tab_action = Some(AppAction::TogglePinDocument(idx));
                                     ui.close();
                                 }
-                                if !state.document.recently_closed_tabs.is_empty() {
+                                if !self.recently_closed_tabs.is_empty() {
                                     ui.separator();
                                     if ui.button(&i18n.tab.restore_closed).clicked() {
                                         tab_action = Some(AppAction::RestoreClosedDocument);
@@ -419,10 +429,10 @@ impl<'a> TabBar<'a> {
                 .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
                 .clicked()
             {
-                if let Some(idx) = state.document.active_doc_idx {
+                if let Some(idx) = self.active_doc_idx {
                     let new_idx = crate::shell_logic::prev_tab_index(idx, doc_count);
                     tab_action = Some(AppAction::SelectDocument(
-                        state.document.open_documents[new_idx].path.clone(),
+                        self.open_documents[new_idx].path.clone(),
                     ));
                     ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
                 }
@@ -439,10 +449,10 @@ impl<'a> TabBar<'a> {
                 .on_hover_text(crate::i18n::get().tab.nav_next.clone())
                 .clicked()
             {
-                if let Some(idx) = state.document.active_doc_idx {
+                if let Some(idx) = self.active_doc_idx {
                     let new_idx = crate::shell_logic::next_tab_index(idx, doc_count);
                     tab_action = Some(AppAction::SelectDocument(
-                        state.document.open_documents[new_idx].path.clone(),
+                        self.open_documents[new_idx].path.clone(),
                     ));
                     ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
                 }
@@ -484,42 +494,61 @@ impl<'a> TabBar<'a> {
             }
         }
 
-        if let Some(action_val) = tab_action {
-            *action = action_val;
-        } else if let Some(idx) = close_idx {
-            *action = AppAction::CloseDocument(idx);
+        if let Some(idx) = close_idx {
+            tab_action = Some(AppAction::CloseDocument(idx));
         }
 
-        resp.response
+        tab_action
     }
 }
 
-pub(crate) struct ViewModeBar<'a> {
-    pub state: &'a mut AppState,
-    pub pending_action: &'a mut AppAction,
+pub(crate) struct ViewModeBar {
+    pub view_mode: ViewMode,
+    pub is_changelog: bool,
+    pub split_direction: katana_platform::SplitDirection,
+    pub pane_order: katana_platform::PaneOrder,
+    pub scroll_sync_enabled: bool,
+    pub scroll_sync_override: Option<bool>,
+    pub update_available: bool,
+    pub update_checking: bool,
 }
 
-impl<'a> ViewModeBar<'a> {
-    pub fn new(state: &'a mut AppState, pending_action: &'a mut AppAction) -> Self {
+impl ViewModeBar {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        view_mode: ViewMode,
+        is_changelog: bool,
+        split_direction: katana_platform::SplitDirection,
+        pane_order: katana_platform::PaneOrder,
+        scroll_sync_enabled: bool,
+        scroll_sync_override: Option<bool>,
+        update_available: bool,
+        update_checking: bool,
+    ) -> Self {
         Self {
-            state,
-            pending_action,
+            view_mode,
+            is_changelog,
+            split_direction,
+            pane_order,
+            scroll_sync_enabled,
+            scroll_sync_override,
+            update_available,
+            update_checking,
         }
     }
 
-    pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
-        let state = self.state;
-        let pending_action = self.pending_action;
-        let mut mode = state.active_view_mode();
+    pub fn show(self, ui: &mut egui::Ui) -> Option<AppAction> {
+        let mut action: Option<AppAction> = None;
+        let mut mode = self.view_mode;
         let prev = mode;
         let bar_height = ui.spacing().interact_size.y;
         let available_width = ui.available_width();
-        let resp = ui.allocate_ui_with_layout(
+        ui.allocate_ui_with_layout(
             egui::vec2(available_width, bar_height),
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
                 // Render non-intrusive Update Available Badge
-                if state.update.available.is_some() && !state.update.checking {
+                if self.update_available && !self.update_checking {
                     const COLOR_SUCCESS_G: u8 = 200;
                     let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
                     let badge_text = egui::RichText::new(badge_str)
@@ -531,15 +560,13 @@ impl<'a> ViewModeBar<'a> {
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .clicked()
                     {
-                        *pending_action = AppAction::CheckForUpdates;
+                        action = Some(AppAction::CheckForUpdates);
                     }
                     ui.separator();
                 }
 
                 // Omit View Mode controls for virtual tabs like ChangeLog since they are native documents
-                let is_changelog = state.active_document().is_some_and(|doc| {
-                    doc.path.to_string_lossy().starts_with("Katana://ChangeLog")
-                });
+                let is_changelog = self.is_changelog;
 
                 let prev_is_split = prev == ViewMode::Split;
                 let is_split = mode == ViewMode::Split;
@@ -570,7 +597,7 @@ impl<'a> ViewModeBar<'a> {
                     ui.separator();
 
                     // Toggle split direction.
-                    let current_dir = state.active_split_direction();
+                    let current_dir = self.split_direction;
                     let (dir_icon, dir_tip) = match current_dir {
                         katana_platform::SplitDirection::Horizontal => (
                             crate::icon::Icon::SplitHorizontal,
@@ -605,11 +632,11 @@ impl<'a> ViewModeBar<'a> {
                                 katana_platform::SplitDirection::Horizontal
                             }
                         };
-                        state.set_active_split_direction(new_dir);
+                        action = Some(AppAction::SetSplitDirection(new_dir));
                     }
 
                     // Toggle pane order.
-                    let current_order = state.active_pane_order();
+                    let current_order = self.pane_order;
                     let (order_text, order_tip) = match current_order {
                         katana_platform::PaneOrder::EditorFirst => (
                             "📄|👁",
@@ -632,19 +659,14 @@ impl<'a> ViewModeBar<'a> {
                                 katana_platform::PaneOrder::EditorFirst
                             }
                         };
-                        state.set_active_pane_order(new_order);
+                        action = Some(AppAction::SetPaneOrder(new_order));
                     }
 
                     ui.separator();
 
-                    let mut is_on = state.scroll.sync_override.unwrap_or(
-                        state
-                            .config
-                            .settings
-                            .settings()
-                            .behavior
-                            .scroll_sync_enabled,
-                    );
+                    let mut is_on = self
+                        .scroll_sync_override
+                        .unwrap_or(self.scroll_sync_enabled);
 
                     const TOGGLE_LABEL_SPACING: f32 = 8.0;
 
@@ -660,17 +682,15 @@ impl<'a> ViewModeBar<'a> {
                     );
 
                     if resp.clicked() {
-                        state.scroll.sync_override = Some(is_on);
+                        action = Some(AppAction::ToggleScrollSync(is_on));
                     }
                 }
             },
         );
         if mode != prev {
-            if mode == ViewMode::Split {
-                state.ensure_active_split_state();
-            }
-            state.set_active_view_mode(mode);
+            action = Some(AppAction::SetViewMode(mode));
         }
-        resp.response
+
+        action
     }
 }

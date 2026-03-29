@@ -175,6 +175,12 @@ impl ActionOps for KatanaApp {
                 // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_pane_order(order);
             }
+            AppAction::SetViewMode(mode) => {
+                self.state.set_active_view_mode(mode);
+            }
+            AppAction::ToggleScrollSync(is_on) => {
+                self.state.scroll.sync_override = Some(is_on);
+            }
             AppAction::CloseOtherDocuments(idx) => {
                 if idx < self.state.document.open_documents.len() {
                     let mut keep = Vec::new();

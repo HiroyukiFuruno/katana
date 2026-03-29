@@ -171,7 +171,22 @@ impl<'a> TabToolbar<'a> {
     fn show(self, ctx: &egui::Context) {
         let app = self.app;
         egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
-            crate::views::top_bar::TabBar::new(&mut app.state, &mut app.pending_action).show(ui);
+            let ws_root = app
+                .state
+                .workspace
+                .data
+                .as_ref()
+                .map(|ws| ws.root.as_path());
+            let tab_action = crate::views::top_bar::TabBar::new(
+                ws_root,
+                &app.state.document.open_documents,
+                app.state.document.active_doc_idx,
+                &app.state.document.recently_closed_tabs,
+            )
+            .show(ui);
+            if let Some(a) = tab_action {
+                app.pending_action = a;
+            }
             let active_doc_props = app.state.active_document();
             if let Some(doc) = active_doc_props {
                 let d_path = doc.path.to_string_lossy();
@@ -187,8 +202,25 @@ impl<'a> TabToolbar<'a> {
                         app.pending_action = a;
                     }
                 }
-                crate::views::top_bar::ViewModeBar::new(&mut app.state, &mut app.pending_action)
-                    .show(ui);
+                let view_action = crate::views::top_bar::ViewModeBar::new(
+                    app.state.active_view_mode(),
+                    is_changelog,
+                    app.state.active_split_direction(),
+                    app.state.active_pane_order(),
+                    app.state
+                        .config
+                        .settings
+                        .settings()
+                        .behavior
+                        .scroll_sync_enabled,
+                    app.state.scroll.sync_override,
+                    app.state.update.available.is_some(),
+                    app.state.update.checking,
+                )
+                .show(ui);
+                if let Some(a) = view_action {
+                    app.pending_action = a;
+                }
             }
         });
     }

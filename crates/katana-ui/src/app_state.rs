@@ -56,6 +56,8 @@ pub enum AppAction {
     CheckForUpdates,
     SetSplitDirection(katana_platform::SplitDirection),
     SetPaneOrder(katana_platform::PaneOrder),
+    SetViewMode(ViewMode),
+    ToggleScrollSync(bool),
     RefreshWorkspace,
     CloseOtherDocuments(usize),
     CloseAllDocuments,
