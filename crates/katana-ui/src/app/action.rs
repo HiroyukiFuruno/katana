@@ -54,8 +54,13 @@ impl ActionOps for KatanaApp {
         self.refresh_preview(&path, &content);
     }
     fn cleanup_closed_tab_previews(&mut self) {
-        let open_paths: std::collections::HashSet<_> =
-            self.state.open_documents.iter().map(|d| &d.path).collect();
+        let open_paths: std::collections::HashSet<_> = self
+            .state
+            .document
+            .open_documents
+            .iter()
+            .map(|d| &d.path)
+            .collect();
         self.tab_previews.retain(|t| open_paths.contains(&t.path));
     }
     fn cancel_inactive_renders(&mut self) {
@@ -89,21 +94,22 @@ impl ActionOps for KatanaApp {
                 // show a confirmation dialog instead of closing immediately.
                 let should_confirm = self
                     .state
+                    .config
                     .settings
                     .settings()
                     .behavior
                     .confirm_close_dirty_tab
-                    && idx < self.state.open_documents.len()
-                    && self.state.open_documents[idx].is_dirty;
+                    && idx < self.state.document.open_documents.len()
+                    && self.state.document.open_documents[idx].is_dirty;
 
                 if should_confirm {
-                    self.state.pending_close_confirm = Some(idx);
+                    self.state.layout.pending_close_confirm = Some(idx);
                 } else {
                     self.force_close_document(idx);
                 }
             }
             AppAction::ForceCloseDocument(idx) => {
-                self.state.pending_close_confirm = None;
+                self.state.layout.pending_close_confirm = None;
                 self.force_close_document(idx);
             }
             AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
@@ -136,6 +142,7 @@ impl ActionOps for KatanaApp {
                     let src = doc.buffer.clone();
                     let concurrency = self
                         .state
+                        .config
                         .settings
                         .settings()
                         .performance
@@ -146,19 +153,19 @@ impl ActionOps for KatanaApp {
             AppAction::ChangeLanguage(lang) => {
                 crate::i18n::set_language(&lang);
                 crate::shell_ui::update_native_menu_strings_from_i18n();
-                self.state.settings.settings_mut().language = lang;
-                if let Err(e) = self.state.settings.save() {
+                self.state.config.settings.settings_mut().language = lang;
+                if let Err(e) = self.state.config.settings.save() {
                     tracing::warn!("Failed to save settings: {e}");
                 }
             }
             AppAction::ToggleSettings => {
-                self.state.show_settings = !self.state.show_settings;
+                self.state.layout.show_settings = !self.state.layout.show_settings;
             }
             AppAction::ToggleAbout => {
                 self.show_about = !self.show_about;
             }
             AppAction::ToggleToc => {
-                self.state.show_toc = !self.state.show_toc;
+                self.state.layout.show_toc = !self.state.layout.show_toc;
             }
             AppAction::SetSplitDirection(dir) => {
                 // Keep toolbar toggles temporary and scoped to the active tab.
@@ -169,9 +176,9 @@ impl ActionOps for KatanaApp {
                 self.state.set_active_pane_order(order);
             }
             AppAction::CloseOtherDocuments(idx) => {
-                if idx < self.state.open_documents.len() {
+                if idx < self.state.document.open_documents.len() {
                     let mut keep = Vec::new();
-                    let old_docs = std::mem::take(&mut self.state.open_documents);
+                    let old_docs = std::mem::take(&mut self.state.document.open_documents);
                     for (i, doc) in old_docs.into_iter().enumerate() {
                         if i == idx {
                             keep.push(doc);
@@ -179,23 +186,23 @@ impl ActionOps for KatanaApp {
                             self.state.push_recently_closed(doc.path);
                         }
                     }
-                    self.state.open_documents = keep;
-                    self.state.active_doc_idx = Some(0);
+                    self.state.document.open_documents = keep;
+                    self.state.document.active_doc_idx = Some(0);
                 }
                 self.save_workspace_state();
             }
             AppAction::CloseAllDocuments => {
-                let old_docs = std::mem::take(&mut self.state.open_documents);
+                let old_docs = std::mem::take(&mut self.state.document.open_documents);
                 for doc in old_docs.into_iter() {
                     self.state.push_recently_closed(doc.path);
                 }
-                self.state.active_doc_idx = None;
+                self.state.document.active_doc_idx = None;
                 self.save_workspace_state();
                 self.cleanup_closed_tab_previews();
             }
             AppAction::CloseDocumentsToRight(idx) => {
                 let mut keep = Vec::new();
-                let old_docs = std::mem::take(&mut self.state.open_documents);
+                let old_docs = std::mem::take(&mut self.state.document.open_documents);
                 for (i, doc) in old_docs.into_iter().enumerate() {
                     if i <= idx {
                         keep.push(doc);
@@ -203,10 +210,10 @@ impl ActionOps for KatanaApp {
                         self.state.push_recently_closed(doc.path);
                     }
                 }
-                self.state.open_documents = keep;
-                if let Some(a_idx) = self.state.active_doc_idx {
+                self.state.document.open_documents = keep;
+                if let Some(a_idx) = self.state.document.active_doc_idx {
                     if a_idx > idx {
-                        self.state.active_doc_idx = Some(idx);
+                        self.state.document.active_doc_idx = Some(idx);
                     }
                 }
                 self.save_workspace_state();
@@ -214,8 +221,8 @@ impl ActionOps for KatanaApp {
             }
             AppAction::CloseDocumentsToLeft(idx) => {
                 let mut keep = Vec::new();
-                let new_active_idx = self.state.active_doc_idx;
-                let old_docs = std::mem::take(&mut self.state.open_documents);
+                let new_active_idx = self.state.document.active_doc_idx;
+                let old_docs = std::mem::take(&mut self.state.document.open_documents);
                 for (i, doc) in old_docs.into_iter().enumerate() {
                     if i >= idx {
                         keep.push(doc);
@@ -223,57 +230,62 @@ impl ActionOps for KatanaApp {
                         self.state.push_recently_closed(doc.path);
                     }
                 }
-                self.state.open_documents = keep;
+                self.state.document.open_documents = keep;
                 if let Some(a_idx) = new_active_idx {
                     if a_idx < idx {
-                        self.state.active_doc_idx = Some(0);
+                        self.state.document.active_doc_idx = Some(0);
                     } else {
-                        self.state.active_doc_idx = Some(a_idx - idx);
+                        self.state.document.active_doc_idx = Some(a_idx - idx);
                     }
                 }
                 self.save_workspace_state();
                 self.cleanup_closed_tab_previews();
             }
             AppAction::TogglePinDocument(idx) => {
-                if idx < self.state.open_documents.len() {
+                if idx < self.state.document.open_documents.len() {
                     let active_path = self.state.active_document().map(|d| d.path.clone());
-                    let doc = &mut self.state.open_documents[idx];
+                    let doc = &mut self.state.document.open_documents[idx];
                     doc.is_pinned = !doc.is_pinned;
                     // Stable sort to move pinned tabs to the front
-                    self.state.open_documents.sort_by_key(|d| !d.is_pinned);
+                    self.state
+                        .document
+                        .open_documents
+                        .sort_by_key(|d| !d.is_pinned);
                     if let Some(path) = active_path {
                         if let Some(new_idx) = self
                             .state
+                            .document
                             .open_documents
                             .iter()
                             .position(|d| d.path == path)
                         {
-                            self.state.active_doc_idx = Some(new_idx);
+                            self.state.document.active_doc_idx = Some(new_idx);
                         }
                     }
                 }
                 self.save_workspace_state();
             }
             AppAction::RestoreClosedDocument => {
-                if let Some(path) = self.state.recently_closed_tabs.pop_back() {
+                if let Some(path) = self.state.document.recently_closed_tabs.pop_back() {
                     self.handle_select_document(path, true);
                 }
             }
             AppAction::ReorderDocument { from, to } => {
-                let len = self.state.open_documents.len();
+                let len = self.state.document.open_documents.len();
                 if from < len && to <= len && from != to {
                     let active_path = self.state.active_document().map(|d| d.path.clone());
-                    let doc = self.state.open_documents.remove(from);
+                    let doc = self.state.document.open_documents.remove(from);
                     let actual_to = if to > from { to - 1 } else { to };
-                    self.state.open_documents.insert(actual_to, doc);
+                    self.state.document.open_documents.insert(actual_to, doc);
                     if let Some(path) = active_path {
                         if let Some(new_idx) = self
                             .state
+                            .document
                             .open_documents
                             .iter()
                             .position(|d| d.path == path)
                         {
-                            self.state.active_doc_idx = Some(new_idx);
+                            self.state.document.active_doc_idx = Some(new_idx);
                         }
                     }
                 }
@@ -286,8 +298,12 @@ impl ActionOps for KatanaApp {
                 self.handle_export_document(ctx, fmt);
             }
             AppAction::AcceptTerms(version) => {
-                self.state.settings.settings_mut().terms_accepted_version = Some(version);
-                if let Err(e) = self.state.settings.save() {
+                self.state
+                    .config
+                    .settings
+                    .settings_mut()
+                    .terms_accepted_version = Some(version);
+                if let Err(e) = self.state.config.settings.save() {
                     tracing::warn!("Failed to save terms acceptance: {e}");
                 }
             }
@@ -298,8 +314,13 @@ impl ActionOps for KatanaApp {
                 self.show_meta_info_for = Some(path);
             }
             AppAction::SkipVersion(version) => {
-                self.state.settings.settings_mut().updates.skipped_version = Some(version);
-                let _ = self.state.settings.save();
+                self.state
+                    .config
+                    .settings
+                    .settings_mut()
+                    .updates
+                    .skipped_version = Some(version);
+                let _ = self.state.config.settings.save();
                 self.show_update_dialog = false;
             }
             AppAction::DismissUpdate => {
@@ -325,7 +346,7 @@ impl ActionOps for KatanaApp {
                 crate::icon::IconRegistry::install(ctx);
 
                 // Assuming `clear_http_cache` is a decent message for "Successfully cleared" or "Clear cache" button label. Use it as Status msg.
-                self.state.status_message = Some((
+                self.state.layout.status_message = Some((
                     crate::i18n::get()
                         .settings
                         .behavior
@@ -337,32 +358,33 @@ impl ActionOps for KatanaApp {
             AppAction::RequestNewFile(path) => {
                 let ext = self
                     .state
+                    .config
                     .settings
                     .settings()
                     .workspace
                     .visible_extensions
                     .first()
                     .cloned();
-                self.state.create_fs_node_modal_state = Some((path, String::new(), ext, false));
+                self.state.layout.create_fs_node_modal = Some((path, String::new(), ext, false));
             }
             AppAction::RequestNewDirectory(path) => {
-                self.state.create_fs_node_modal_state = Some((path, String::new(), None, true));
+                self.state.layout.create_fs_node_modal = Some((path, String::new(), None, true));
             }
             AppAction::RequestRename(path) => {
                 let name = path
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                self.state.rename_modal_state = Some((path, name));
+                self.state.layout.rename_modal = Some((path, name));
             }
             AppAction::RequestDelete(path) => {
-                self.state.delete_modal_state = Some(path);
+                self.state.layout.delete_modal = Some(path);
             }
             AppAction::CopyPathToClipboard(path) => {
                 ctx.copy_text(path.to_string_lossy().to_string());
             }
             AppAction::CopyRelativePathToClipboard(path) => {
-                let rel_path = if let Some(ws) = &self.state.workspace {
+                let rel_path = if let Some(ws) = &self.state.workspace.data {
                     path.strip_prefix(&ws.root).unwrap_or(&path).to_path_buf()
                 } else {
                     path.clone()
@@ -396,9 +418,9 @@ impl ActionOps for KatanaApp {
             }
             AppAction::None => {}
             AppAction::InstallUpdate => {
-                if let Some(release) = &self.state.update_available {
-                    self.state.checking_for_updates = true;
-                    self.state.update_phase =
+                if let Some(release) = &self.state.update.available {
+                    self.state.update.checking = true;
+                    self.state.update.phase =
                         Some(crate::app_state::UpdatePhase::Downloading { progress: 0.0 });
                     let exe_path = std::env::current_exe().unwrap();
                     let target_app_path = if exe_path.to_string_lossy().contains("MacOS") {
@@ -440,8 +462,8 @@ impl ActionOps for KatanaApp {
         // Ensure the newly active document is loaded and has a preview.
         // This handles cases where tabs are closed and the active tab silently shifts.
         let mut inactive_but_focused_path = None;
-        if let Some(active_idx) = self.state.active_doc_idx {
-            if let Some(doc) = self.state.open_documents.get(active_idx) {
+        if let Some(active_idx) = self.state.document.active_doc_idx {
+            if let Some(doc) = self.state.document.open_documents.get(active_idx) {
                 let has_preview = self.tab_previews.iter().any(|t| t.path == doc.path);
                 if !doc.is_loaded || !has_preview {
                     inactive_but_focused_path = Some(doc.path.clone());
@@ -458,13 +480,14 @@ impl ActionOps for KatanaApp {
         let current_version = env!("CARGO_PKG_VERSION").to_string();
         let previous = self.old_app_version.clone().or_else(|| {
             self.state
+                .config
                 .settings
                 .settings()
                 .updates
                 .previous_app_version
                 .clone()
         });
-        let lang = self.state.settings.settings().language.clone();
+        let lang = self.state.config.settings.settings().language.clone();
 
         let (tx, rx) = std::sync::mpsc::channel();
         self.changelog_rx = Some(rx);
@@ -477,11 +500,13 @@ impl ActionOps for KatanaApp {
             std::path::PathBuf::from(format!("Katana://ChangeLog v{}", env!("CARGO_PKG_VERSION")));
         if !self
             .state
+            .document
             .open_documents
             .iter()
             .any(|d| d.path == virtual_path)
         {
             self.state
+                .document
                 .open_documents
                 .push(katana_core::document::Document::new_empty(
                     virtual_path.clone(),
@@ -502,21 +527,24 @@ impl ActionOps for KatanaApp {
                         ));
                         if let Some(pos) = self
                             .state
+                            .document
                             .open_documents
                             .iter()
                             .position(|d| d.path == virtual_path)
                         {
-                            self.state.active_doc_idx = Some(pos);
+                            self.state.document.active_doc_idx = Some(pos);
                         } else {
                             self.state
+                                .document
                                 .open_documents
                                 .push(katana_core::document::Document::new_empty(virtual_path));
-                            self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
+                            self.state.document.active_doc_idx =
+                                Some(self.state.document.open_documents.len() - 1);
                         }
                     }
                     crate::changelog::ChangelogEvent::Error(err) => {
                         tracing::error!("Failed to fetch changelog: {}", err);
-                        self.state.status_message = Some((
+                        self.state.layout.status_message = Some((
                             format!("Failed to fetch release notes: {err}"),
                             crate::app_state::StatusType::Error,
                         ));
@@ -565,7 +593,7 @@ impl ActionOps for KatanaApp {
         let mut show_changelog = false;
 
         {
-            let settings_mut = app.state.settings.settings_mut();
+            let settings_mut = app.state.config.settings.settings_mut();
             if let Some(prev) = &settings_mut.updates.previous_app_version {
                 app.old_app_version = Some(prev.clone());
                 if prev != current_version {
@@ -581,7 +609,7 @@ impl ActionOps for KatanaApp {
         }
 
         if show_changelog {
-            if let Err(e) = app.state.settings.save() {
+            if let Err(e) = app.state.config.settings.save() {
                 tracing::warn!("Failed to save previous_app_version: {e}");
             }
             app.needs_changelog_display = true;

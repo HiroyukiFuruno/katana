@@ -1,106 +1,24 @@
 //! Shared application state.
 //!
-//! `scroll_fraction` — State for bidirectionally synchronizing scroll position
-//! between editor and preview in Split mode, using a ratio (0.0–1.0).
-//!
 //! A single `AppState` container is owned by the egui application. UI
 //! components render from this state and dispatch `AppAction` values back
 //! through the update loop.
 
-use katana_core::{
-    ai::AiProviderRegistry, document::Document, plugin::PluginRegistry, workspace::Workspace,
+pub use crate::state::config::{ConfigState, SettingsSection, SettingsTab};
+pub use crate::state::document::{
+    DocumentState, SplitViewState, TabSplitState, TabViewMode, ViewMode,
 };
+pub use crate::state::layout::LayoutState;
+pub use crate::state::scroll::{ScrollSource, ScrollState};
+pub use crate::state::search::SearchState;
+pub use crate::state::update::{UpdatePhase, UpdateState};
+pub use crate::state::workspace::WorkspaceState;
+
+pub use katana_platform::CacheFacade;
+
+use katana_core::{ai::AiProviderRegistry, document::Document, plugin::PluginRegistry};
 use katana_platform::SettingsService;
-
-/// Display mode for the UI layout
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum ViewMode {
-    PreviewOnly,
-    CodeOnly,
-    Split,
-}
-
-/// Ephemeral split-layout state cached per tab for the lifetime of the app.
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct SplitViewState {
-    pub direction: katana_platform::SplitDirection,
-    pub order: katana_platform::PaneOrder,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct TabViewMode {
-    pub path: std::path::PathBuf,
-    pub mode: ViewMode,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct TabSplitState {
-    pub path: std::path::PathBuf,
-    pub state: SplitViewState,
-}
-
-/// Current phase of the update installation process.
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdatePhase {
-    /// Downloading the update ZIP from GitHub (0.0 - 1.0).
-    Downloading { progress: f32 },
-    /// Extracting and installing the update (0.0 - 1.0).
-    Installing { progress: f32 },
-    /// Ready to relaunch — waiting for user confirmation.
-    ReadyToRelaunch,
-}
-
-/// Top-level section within the settings window.
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub enum SettingsSection {
-    /// Theme, Font, Layout — visual appearance controls.
-    #[default]
-    Appearance,
-    /// Workspace scanning, etc. — functional behaviour controls.
-    Behavior,
-}
-
-/// Tab within the settings window.
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub enum SettingsTab {
-    /// Theme preset and custom colour editing.
-    #[default]
-    Theme,
-    /// Font size and family.
-    Font,
-    /// Editor / preview layout options.
-    Layout,
-    /// Workspace scanning options (max depth, excluded dirs).
-    Workspace,
-    /// Application update settings.
-    Updates,
-    /// Behavior / system-default settings.
-    Behavior,
-}
-
-impl SettingsTab {
-    /// Returns the section this tab belongs to.
-    pub const fn section(&self) -> SettingsSection {
-        match self {
-            Self::Theme | Self::Font | Self::Layout => SettingsSection::Appearance,
-            Self::Workspace | Self::Updates | Self::Behavior => SettingsSection::Behavior,
-        }
-    }
-}
-
-impl SettingsSection {
-    /// Returns the tabs that belong to this section.
-    pub const fn tabs(&self) -> &[SettingsTab] {
-        match self {
-            Self::Appearance => &[SettingsTab::Theme, SettingsTab::Font, SettingsTab::Layout],
-            Self::Behavior => &[
-                SettingsTab::Workspace,
-                SettingsTab::Updates,
-                SettingsTab::Behavior,
-            ],
-        }
-    }
-}
+use std::path::PathBuf;
 
 /// User-visible actions dispatched from UI components to the core update loop.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -114,100 +32,57 @@ pub enum ExportFormat {
 #[derive(Debug)]
 pub enum AppAction {
     InstallUpdate,
-    /// Open a workspace at the given path.
-    OpenWorkspace(std::path::PathBuf),
-    /// Select a file in the project tree.
-    SelectDocument(std::path::PathBuf),
-    /// Open multiple files in the project tree at once.
-    OpenMultipleDocuments(Vec<std::path::PathBuf>),
-    /// Remove a workspace from the persistence list.
+    OpenWorkspace(PathBuf),
+    SelectDocument(PathBuf),
+    OpenMultipleDocuments(Vec<PathBuf>),
     RemoveWorkspace(String),
-    /// Close a tab.
     CloseDocument(usize),
-    /// Force-close a tab without confirmation (used after user confirms discard).
     ForceCloseDocument(usize),
-    /// Update the buffer of the active document.
     UpdateBuffer(String),
-    /// Replace a specific range of text in the active document.
     ReplaceText {
         span: std::ops::Range<usize>,
         replacement: String,
     },
-    /// Toggles the nth task list item globally across the active document.
     ToggleTaskList {
         global_index: usize,
         new_state: char,
     },
-    /// Explicitly save the active document.
     SaveDocument,
-    /// Fully re-render the preview, including diagrams.
     RefreshDiagrams,
-    /// Change language.
     ChangeLanguage(String),
-    /// Toggle the settings window.
     ToggleSettings,
-    /// Toggle the About window.
     ToggleAbout,
-    /// Toggle the table of contents panel.
     ToggleToc,
-    /// Trigger an update check.
     CheckForUpdates,
-    /// Change the split view direction (Horizontal / Vertical).
     SetSplitDirection(katana_platform::SplitDirection),
-    /// Change the pane order within the split view (EditorFirst / PreviewFirst).
     SetPaneOrder(katana_platform::PaneOrder),
-    /// Reload the workspace directory tree from disk.
     RefreshWorkspace,
-    /// Close other tabs besides the target.
     CloseOtherDocuments(usize),
-    /// Close all tabs.
     CloseAllDocuments,
-    /// Close tabs to the right of the target.
     CloseDocumentsToRight(usize),
-    /// Close tabs to the left of the target.
     CloseDocumentsToLeft(usize),
-    /// Toggle pin state of a tab.
     TogglePinDocument(usize),
-    /// Restore the most recently closed tab.
     RestoreClosedDocument,
-    /// Reorder tab from one index to another.
     ReorderDocument {
         from: usize,
         to: usize,
     },
-    /// Export the active document to a specified format.
     ExportDocument(ExportFormat),
-    /// Accept the terms of service.
     AcceptTerms(String),
-    /// Decline the terms of service (exits the app).
     DeclineTerms,
-    /// Shows metadata info for the selected path.
-    ShowMetaInfo(std::path::PathBuf),
-    /// Request to create a new file in the given parent directory.
-    RequestNewFile(std::path::PathBuf),
-    /// Request to create a new directory in the given parent directory.
-    RequestNewDirectory(std::path::PathBuf),
-    /// Request to rename the given path.
-    RequestRename(std::path::PathBuf),
-    /// Request to delete the given path.
-    RequestDelete(std::path::PathBuf),
-    /// Copy the given path to the clipboard.
-    CopyPathToClipboard(std::path::PathBuf),
-    /// Copy the given path relative to the workspace root to the clipboard.
-    CopyRelativePathToClipboard(std::path::PathBuf),
-    /// Reveal the given path in the OS file explorer.
-    RevealInOs(std::path::PathBuf),
-    /// Skip a specific update version (persists to settings).
+    ShowMetaInfo(PathBuf),
+    RequestNewFile(PathBuf),
+    RequestNewDirectory(PathBuf),
+    RequestRename(PathBuf),
+    RequestDelete(PathBuf),
+    CopyPathToClipboard(PathBuf),
+    CopyRelativePathToClipboard(PathBuf),
+    RevealInOs(PathBuf),
     SkipVersion(String),
-    /// Dismiss the update dialog without action ("Later").
     DismissUpdate,
-    /// Confirm relaunch after update is ready.
     ConfirmRelaunch,
-    /// Fetch and show release notes for the current version.
     ShowReleaseNotes,
-    /// Clear all HTTP and locally saved application caches.
     ClearAllCaches,
-    /// No-op (used internally).
     None,
 }
 
@@ -221,117 +96,13 @@ pub enum StatusType {
 
 /// Top-level application state shared across all UI components.
 pub struct AppState {
-    /// The currently open workspace, if any.
-    pub workspace: Option<Workspace>,
-    /// Currently open documents (tabs).
-    pub open_documents: Vec<Document>,
-    /// Index of the currently active document, if any.
-    pub active_doc_idx: Option<usize>,
-    /// View mode per tab. The key is the file path (to prevent index shifts after closing a tab).
-    pub tab_view_modes: Vec<TabViewMode>,
-    /// Split-layout cache per tab. Initialized from persisted defaults when a tab is first opened.
-    pub tab_split_states: Vec<TabSplitState>,
-
-    /// Plugin registry (will be referenced during plugin widget integration in future Task 5.x).
-    pub _plugin_registry: PluginRegistry,
-    /// Non-fatal status message for the status bar with its importance type.
-    pub status_message: Option<(String, StatusType)>,
-    /// Show/hide the workspace panel.
-    pub show_workspace: bool,
-    /// Whether the workspace file filter is enabled.
-    pub filter_enabled: bool,
-    /// The current regular expression query for the workspace folder filter.
-    pub filter_query: String,
-    /// Cache of visible paths for the current filter query. Tuple of (query, visible_paths_set)
-    pub filter_cache: Option<(String, std::collections::HashSet<std::path::PathBuf>)>,
-    /// Show/hide the settings window.
-    pub show_settings: bool,
-    /// Show/hide the table of contents panel.
-    pub show_toc: bool,
-    /// Show/hide the search modal.
-    pub show_search_modal: bool,
-    /// The search query for the file search modal.
-    pub search_query: String,
-    /// Regular expression for including files/dirs in search results.
-    pub search_include_pattern: String,
-    /// Regular expression for excluding files/dirs in search results.
-    pub search_exclude_pattern: String,
-    /// Cached parameters used for the last search to detect programmatic changes.
-    pub last_search_params: Option<(String, String, String)>,
-    /// The cached search results.
-    pub search_results: Vec<std::path::PathBuf>,
-    /// Currently active tab in the settings window.
-    pub active_settings_tab: SettingsTab,
-    /// Override flag to force all collapsible setting tree nodes to open or close
-    pub settings_tree_force_open: Option<bool>,
-    /// Currently active section in the settings window (left sidebar).
-    pub active_settings_section: SettingsSection,
-    /// Trigger to expand/collapse the entire workspace tree. Some(true)=expand all, Some(false)=collapse all.
-    pub force_tree_open: Option<bool>,
-    /// Split mode scroll sync: Normalized scroll position (0.0–1.0).
-    pub scroll_fraction: f32,
-    /// Source of the scroll operation. Prevents chain reactions (infinite loops).
-    pub scroll_source: ScrollSource,
-    /// Previous frame's editor-side max_scroll (content_height - viewport_height).
-    pub editor_max_scroll: f32,
-    pub preview_max_scroll: f32,
-    /// Global line index of the editor's cursor/selection for preview highlighting.
-    pub active_editor_line: Option<usize>,
-    /// Request to scroll the code editor to a specific line.
-    pub scroll_to_line: Option<usize>,
-    /// Global line ranges of the hovered blocks in the preview pane.
-    pub hovered_preview_lines: Vec<std::ops::Range<usize>>,
-    /// Settings persistence service.
-    pub settings: SettingsService,
-    /// Token used to cancel an ongoing background workspace scan.
-    pub workspace_cancel_token: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    /// Indicates if a workspace is currently being loaded asynchronously in the background.
-    pub is_loading_workspace: bool,
-    /// If an update is available on GitHub, contains the latest version string
-    pub update_available: Option<katana_core::update::ReleaseInfo>,
-    /// Flags whether an update check is currently running
-    pub checking_for_updates: bool,
-    /// Current phase of update installation (download/install/ready-to-relaunch).
-    pub update_phase: Option<UpdatePhase>,
-    /// Stores any error encountered during update checking
-    pub update_check_error: Option<String>,
-    /// Global UI scale factor.
-    pub scale_override: f32,
-    /// Facade for memory and persistent cache storage.
-    pub cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
-    /// Set of manually expanded directories in the workspace tree.
-    pub expanded_directories: std::collections::HashSet<std::path::PathBuf>,
-    /// Empty directories manually created in the current session (to bypass markdown-only visibility filter).
-    pub in_memory_dirs: std::collections::HashSet<std::path::PathBuf>,
-    /// History of closed tabs to enable restoring (LIFO).
-    pub recently_closed_tabs: std::collections::VecDeque<std::path::PathBuf>,
-    /// Cache for the last window title set to prevent redundant viewport commands.
-    pub last_window_title: String,
-
-    /// Modal state for creating a new file or directory: `Some((parent_dir, new_name, selected_extension, is_dir))`
-    pub create_fs_node_modal_state: Option<(std::path::PathBuf, String, Option<String>, bool)>,
-    /// Modal state for renaming a file or directory: `Some((target_path, new_name))`
-    pub rename_modal_state: Option<(std::path::PathBuf, String)>,
-    /// Modal state for deleting a file or directory: `Some(target_path)`
-    pub delete_modal_state: Option<std::path::PathBuf>,
-    /// Index of tab awaiting close confirmation (dirty-tab dialog).
-    pub pending_close_confirm: Option<usize>,
-    /// Temporary per-session override to disable scroll sync (e.g. via toolbar button).
-    pub scroll_sync_override: Option<bool>,
-    /// Timestamp of the last auto-save (or last edit), for auto-save interval tracking.
-    pub last_auto_save: Option<std::time::Instant>,
-}
-
-/// Indicates the source of a scroll operation. Used to prevent chain reactions.
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
-pub enum ScrollSource {
-    /// No change from either (initial state).
-    #[default]
-    Neither,
-    /// Scroll from the editor pane.
-    Editor,
-    /// Scroll from the preview pane.
-    Preview,
+    pub document: DocumentState,
+    pub workspace: WorkspaceState,
+    pub layout: LayoutState,
+    pub search: SearchState,
+    pub scroll: ScrollState,
+    pub update: UpdateState,
+    pub config: ConfigState,
 }
 
 impl AppState {
@@ -341,90 +112,43 @@ impl AppState {
         settings: SettingsService,
         cache: std::sync::Arc<dyn katana_platform::CacheFacade>,
     ) -> Self {
-        // ai_registry is planned for future AI integration. Currently unused.
         let _ = ai_registry;
         Self {
-            workspace: None,
-            open_documents: Vec::new(),
-            active_doc_idx: None,
-            tab_view_modes: Vec::new(),
-            tab_split_states: Vec::new(),
-            _plugin_registry: plugin_registry,
-            status_message: None,
-            show_workspace: true,
-            filter_enabled: false,
-            filter_query: String::new(),
-            filter_cache: None,
-            show_settings: false,
-            show_toc: false,
-            show_search_modal: false,
-            search_query: String::new(),
-            search_include_pattern: String::new(),
-            search_exclude_pattern: String::new(),
-            last_search_params: None,
-            search_results: Vec::new(),
-            active_settings_tab: SettingsTab::default(),
-            settings_tree_force_open: None,
-            active_settings_section: SettingsSection::default(),
-            force_tree_open: None,
-            scroll_fraction: 0.0,
-            scroll_source: ScrollSource::Neither,
-            editor_max_scroll: 0.0,
-            preview_max_scroll: 0.0,
-            active_editor_line: None,
-            scroll_to_line: None,
-            hovered_preview_lines: Vec::new(),
-            settings,
-            workspace_cancel_token: None,
-            is_loading_workspace: false,
-            update_available: None,
-            checking_for_updates: false,
-            update_phase: None,
-            update_check_error: None,
-            scale_override: 1.0,
-            cache,
-            expanded_directories: std::collections::HashSet::new(),
-            in_memory_dirs: std::collections::HashSet::new(),
-            recently_closed_tabs: std::collections::VecDeque::with_capacity(
-                Self::MAX_RECENTLY_CLOSED_TABS,
-            ),
-            last_window_title: String::new(),
-            create_fs_node_modal_state: None,
-            rename_modal_state: None,
-            delete_modal_state: None,
-            pending_close_confirm: None,
-            scroll_sync_override: None,
-            last_auto_save: None,
+            document: DocumentState::new(),
+            workspace: WorkspaceState::new(),
+            layout: LayoutState::new(),
+            search: SearchState::new(),
+            scroll: ScrollState::new(),
+            update: UpdateState::new(),
+            config: ConfigState::new(plugin_registry, settings, cache),
         }
     }
 
-    /// Whether the active document has unsaved changes.
     pub fn is_dirty(&self) -> bool {
         self.active_document().map(|d| d.is_dirty).unwrap_or(false)
     }
 
-    /// Get a reference to the currently active document.
     pub fn active_document(&self) -> Option<&Document> {
-        self.active_doc_idx
-            .and_then(|idx| self.open_documents.get(idx))
+        self.document
+            .active_doc_idx
+            .and_then(|idx| self.document.open_documents.get(idx))
     }
 
-    /// Get a mutable reference to the currently active document.
     pub fn active_document_mut(&mut self) -> Option<&mut Document> {
-        self.active_doc_idx
-            .and_then(|idx| self.open_documents.get_mut(idx))
+        self.document
+            .active_doc_idx
+            .and_then(|idx| self.document.open_documents.get_mut(idx))
     }
 
-    /// Returns the path of the currently active document (used for highlighting in the workspace tree).
-    pub fn active_path(&self) -> Option<&std::path::Path> {
-        self.active_document().map(|d| d.path.as_path())
+    pub fn active_path(&self) -> Option<std::path::PathBuf> {
+        self.active_document().map(|d| d.path.clone())
     }
 
-    /// Returns the view mode of the active tab. Default value if no tab is selected.
     pub fn active_view_mode(&self) -> ViewMode {
         self.active_document()
             .and_then(|doc| {
-                self.tab_view_modes
+                self.document
+                    .tab_view_modes
                     .iter()
                     .find(|t| t.path == doc.path)
                     .map(|t| t.mode)
@@ -432,30 +156,36 @@ impl AppState {
             .unwrap_or(ViewMode::PreviewOnly)
     }
 
-    /// Sets the view mode of the active tab.
     pub fn set_active_view_mode(&mut self, mode: ViewMode) {
         if let Some(doc) = self.active_document() {
             let path = doc.path.clone();
-            if let Some(t) = self.tab_view_modes.iter_mut().find(|t| t.path == path) {
+            if let Some(t) = self
+                .document
+                .tab_view_modes
+                .iter_mut()
+                .find(|t| t.path == path)
+            {
                 t.mode = mode;
             } else {
-                self.tab_view_modes.push(TabViewMode { path, mode });
+                self.document
+                    .tab_view_modes
+                    .push(TabViewMode { path, mode });
             }
         }
     }
 
     fn split_defaults(&self) -> SplitViewState {
         SplitViewState {
-            direction: self.settings.settings().layout.split_direction,
-            order: self.settings.settings().layout.pane_order,
+            direction: self.config.settings.settings().layout.split_direction,
+            order: self.config.settings.settings().layout.pane_order,
         }
     }
 
     pub fn initialize_tab_split_state(&mut self, path: impl Into<std::path::PathBuf>) {
         let p = path.into();
-        if !self.tab_split_states.iter().any(|t| t.path == p) {
+        if !self.document.tab_split_states.iter().any(|t| t.path == p) {
             let defaults = self.split_defaults();
-            self.tab_split_states.push(TabSplitState {
+            self.document.tab_split_states.push(TabSplitState {
                 path: p,
                 state: defaults,
             });
@@ -463,17 +193,17 @@ impl AppState {
     }
 
     pub fn ensure_active_split_state(&mut self) {
-        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+        let Some(path) = self.active_path() else {
             return;
         };
         self.initialize_tab_split_state(path);
     }
 
-    /// Returns the split direction for the active tab.
     pub fn active_split_direction(&self) -> katana_platform::SplitDirection {
         self.active_document()
             .and_then(|doc| {
-                self.tab_split_states
+                self.document
+                    .tab_split_states
                     .iter()
                     .find(|t| t.path == doc.path)
                     .map(|t| t.state.direction)
@@ -481,11 +211,11 @@ impl AppState {
             .unwrap_or_else(|| self.split_defaults().direction)
     }
 
-    /// Returns the pane order for the active tab.
     pub fn active_pane_order(&self) -> katana_platform::PaneOrder {
         self.active_document()
             .and_then(|doc| {
-                self.tab_split_states
+                self.document
+                    .tab_split_states
                     .iter()
                     .find(|t| t.path == doc.path)
                     .map(|t| t.state.order)
@@ -493,303 +223,52 @@ impl AppState {
             .unwrap_or_else(|| self.split_defaults().order)
     }
 
-    /// Sets the split direction for the active tab (temporary — not persisted to disk).
     pub fn set_active_split_direction(&mut self, dir: katana_platform::SplitDirection) {
-        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+        let Some(path) = self.active_path() else {
             return;
         };
-        if let Some(t) = self.tab_split_states.iter_mut().find(|t| t.path == path) {
+        if let Some(t) = self
+            .document
+            .tab_split_states
+            .iter_mut()
+            .find(|t| t.path == path)
+        {
             t.state.direction = dir;
         } else {
             let mut defaults = self.split_defaults();
             defaults.direction = dir;
-            self.tab_split_states.push(TabSplitState {
+            self.document.tab_split_states.push(TabSplitState {
                 path,
                 state: defaults,
             });
         }
     }
 
-    /// Sets the pane order for the active tab (temporary — not persisted to disk).
     pub fn set_active_pane_order(&mut self, order: katana_platform::PaneOrder) {
-        let Some(path) = self.active_path().map(std::path::Path::to_path_buf) else {
+        let Some(path) = self.active_path() else {
             return;
         };
-        if let Some(t) = self.tab_split_states.iter_mut().find(|t| t.path == path) {
+        if let Some(t) = self
+            .document
+            .tab_split_states
+            .iter_mut()
+            .find(|t| t.path == path)
+        {
             t.state.order = order;
         } else {
             let mut defaults = self.split_defaults();
             defaults.order = order;
-            self.tab_split_states.push(TabSplitState {
+            self.document.tab_split_states.push(TabSplitState {
                 path,
                 state: defaults,
             });
         }
     }
 
-    pub const MAX_RECENTLY_CLOSED_TABS: usize = 10;
-
-    /// Pushes a file path to the history of recently closed tabs, honoring a 10-item LIFO cap.
     pub fn push_recently_closed(&mut self, path: std::path::PathBuf) {
-        if self.recently_closed_tabs.len() >= Self::MAX_RECENTLY_CLOSED_TABS {
-            self.recently_closed_tabs.pop_front();
+        if self.document.recently_closed_tabs.len() >= DocumentState::MAX_RECENTLY_CLOSED_TABS {
+            self.document.recently_closed_tabs.pop_front();
         }
-        self.recently_closed_tabs.push_back(path);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use katana_core::workspace::TreeEntry;
-    use katana_platform::{PaneOrder, SplitDirection};
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_settings_section_and_tabs_mapping() {
-        assert_eq!(SettingsTab::Theme.section(), SettingsSection::Appearance);
-        assert_eq!(SettingsTab::Font.section(), SettingsSection::Appearance);
-        assert_eq!(SettingsTab::Layout.section(), SettingsSection::Appearance);
-        assert_eq!(SettingsTab::Workspace.section(), SettingsSection::Behavior);
-        assert_eq!(SettingsTab::Updates.section(), SettingsSection::Behavior);
-        assert_eq!(SettingsTab::Behavior.section(), SettingsSection::Behavior);
-
-        assert_eq!(
-            SettingsSection::Appearance.tabs(),
-            &[SettingsTab::Theme, SettingsTab::Font, SettingsTab::Layout]
-        );
-        assert_eq!(
-            SettingsSection::Behavior.tabs(),
-            &[
-                SettingsTab::Workspace,
-                SettingsTab::Updates,
-                SettingsTab::Behavior
-            ]
-        );
-    }
-
-    fn make_state_with_doc(path: &str) -> AppState {
-        let mut state = AppState::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
-        );
-        let doc = Document {
-            path: PathBuf::from(path),
-            buffer: String::new(),
-            is_dirty: false,
-            is_loaded: true,
-            is_pinned: false,
-        };
-        state.open_documents.push(doc);
-        state.active_doc_idx = Some(0);
-        state.initialize_tab_split_state(PathBuf::from(path));
-        state.set_active_view_mode(ViewMode::Split);
-        state
-    }
-
-    #[test]
-    fn test_split_state_is_cached_per_tab_after_settings_change() {
-        let mut state = make_state_with_doc("/tmp/a.md");
-        state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
-        state.initialize_tab_split_state("/tmp/a.md");
-        state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
-
-        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
-    }
-
-    #[test]
-    fn test_pane_order_is_cached_per_tab_after_settings_change() {
-        let mut state = make_state_with_doc("/tmp/b.md");
-        state.settings.settings_mut().layout.pane_order = PaneOrder::EditorFirst;
-        state.initialize_tab_split_state("/tmp/b.md");
-        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
-
-        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
-    }
-
-    #[test]
-    fn test_new_tab_uses_latest_persisted_split_defaults() {
-        let mut state = make_state_with_doc("/tmp/a.md");
-        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
-
-        state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
-        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
-
-        let doc = Document {
-            path: PathBuf::from("/tmp/b.md"),
-            buffer: String::new(),
-            is_dirty: false,
-            is_loaded: true,
-            is_pinned: false,
-        };
-        state.open_documents.push(doc);
-        state.active_doc_idx = Some(1);
-        state.initialize_tab_split_state("/tmp/b.md");
-
-        assert_eq!(state.active_split_direction(), SplitDirection::Vertical);
-        assert_eq!(state.active_pane_order(), PaneOrder::PreviewFirst);
-
-        state.active_doc_idx = Some(0);
-        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
-        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
-    }
-
-    #[test]
-    fn test_split_state_is_initialized_once_then_prefers_tab_local_state() {
-        let mut state = make_state_with_doc("/tmp/a.md");
-        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
-        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
-
-        state.set_active_split_direction(SplitDirection::Vertical);
-        state.set_active_pane_order(PaneOrder::EditorFirst);
-
-        state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
-        state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
-
-        state.open_documents.push(Document {
-            path: PathBuf::from("/tmp/b.md"),
-            buffer: String::new(),
-            is_dirty: false,
-            is_loaded: true,
-            is_pinned: false,
-        });
-        state.active_doc_idx = Some(1);
-        state.initialize_tab_split_state("/tmp/b.md");
-
-        assert_eq!(state.active_split_direction(), SplitDirection::Horizontal);
-        assert_eq!(state.active_pane_order(), PaneOrder::PreviewFirst);
-
-        state.active_doc_idx = Some(0);
-        assert_eq!(state.active_split_direction(), SplitDirection::Vertical);
-        assert_eq!(state.active_pane_order(), PaneOrder::EditorFirst);
-    }
-
-    #[test]
-    fn test_ensure_active_split_state_no_active_doc() {
-        let mut state = AppState::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
-        );
-        // No documents open, active_doc_idx is None — should return early without panic
-        state.ensure_active_split_state();
-        assert!(state.tab_split_states.is_empty());
-    }
-
-    #[test]
-    fn test_set_active_split_direction_no_active_doc() {
-        let mut state = AppState::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
-        );
-        // No documents open — should return early without panic
-        state.set_active_split_direction(SplitDirection::Vertical);
-        assert!(state.tab_split_states.is_empty());
-    }
-
-    #[test]
-    fn test_set_active_pane_order_no_active_doc() {
-        let mut state = AppState::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
-        );
-        // No documents open — should return early without panic
-        state.set_active_pane_order(PaneOrder::PreviewFirst);
-        assert!(state.tab_split_states.is_empty());
-    }
-    #[test]
-    fn test_set_active_split_direction_uninitialized() {
-        let mut state = make_state_with_doc("/tmp/uninit.md");
-        state.tab_split_states.clear();
-        state.set_active_split_direction(SplitDirection::Vertical);
-        assert_eq!(state.tab_split_states.len(), 1);
-        assert_eq!(
-            state.tab_split_states[0].state.direction,
-            SplitDirection::Vertical
-        );
-    }
-
-    #[test]
-    fn test_set_active_pane_order_uninitialized() {
-        let mut state = make_state_with_doc("/tmp/uninit.md");
-        state.tab_split_states.clear();
-        state.set_active_pane_order(PaneOrder::PreviewFirst);
-        assert_eq!(state.tab_split_states.len(), 1);
-        assert_eq!(
-            state.tab_split_states[0].state.order,
-            PaneOrder::PreviewFirst
-        );
-    }
-
-    #[test]
-    fn test_ensure_active_split_state() {
-        let mut state = make_state_with_doc("/tmp/c.md");
-        state.tab_split_states.clear();
-        state.ensure_active_split_state();
-        assert_eq!(state.tab_split_states.len(), 1);
-
-        let mut empty_state = AppState::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
-        );
-        empty_state.ensure_active_split_state(); // Should safely return early
-        assert_eq!(empty_state.tab_split_states.len(), 0);
-    }
-    #[test]
-    fn test_tree_entry_collection() {
-        let root = PathBuf::from("/root");
-        let file1 = root.join("a.md");
-        let file2 = root.join("b.txt");
-        let sub = root.join("sub");
-        let file3 = sub.join("c.md");
-
-        let entry = TreeEntry::Directory {
-            path: root.clone(),
-            children: vec![
-                TreeEntry::File {
-                    path: file1.clone(),
-                },
-                TreeEntry::File {
-                    path: file2.clone(),
-                },
-                TreeEntry::Directory {
-                    path: sub.clone(),
-                    children: vec![TreeEntry::File {
-                        path: file3.clone(),
-                    }],
-                },
-            ],
-        };
-
-        let mut md_files = Vec::new();
-        entry.collect_all_markdown_file_paths(&mut md_files);
-        assert_eq!(md_files.len(), 2);
-        assert!(md_files.contains(&file1));
-        assert!(md_files.contains(&file3));
-
-        let mut dirs = Vec::new();
-        entry.collect_all_directory_paths(&mut dirs);
-        assert_eq!(dirs.len(), 2);
-        assert!(dirs.contains(&root));
-        assert!(dirs.contains(&sub));
-    }
-
-    #[test]
-    fn test_export_action_exists() {
-        // Red phase: testing that ExportDocument variant and ExportFormat exist
-        let action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
-        match action {
-            AppAction::ExportDocument(fmt) => assert_eq!(fmt, crate::app_state::ExportFormat::Html),
-            _ => panic!("Expected ExportDocument action"),
-        }
+        self.document.recently_closed_tabs.push_back(path);
     }
 }

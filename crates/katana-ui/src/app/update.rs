@@ -21,16 +21,16 @@ pub(crate) trait UpdateOps {
 
 impl UpdateOps for KatanaApp {
     fn start_update_check(&mut self, is_manual: bool) {
-        if self.state.checking_for_updates {
+        if self.state.update.checking {
             if is_manual {
                 // Already checking, just show the dialog to let the user see the progress
                 self.show_update_dialog = true;
             }
             return;
         }
-        self.state.checking_for_updates = true;
-        self.state.update_check_error = None;
-        self.state.update_available = None;
+        self.state.update.checking = true;
+        self.state.update.check_error = None;
+        self.state.update.available = None;
 
         if is_manual {
             self.show_update_dialog = true;
@@ -66,7 +66,7 @@ impl UpdateOps for KatanaApp {
                                     // Indeterminate progress if no Content-Length
                                     0.0
                                 };
-                                self.state.update_phase =
+                                self.state.update.phase =
                                     Some(crate::app_state::UpdatePhase::Downloading { progress });
                             }
                             katana_core::update::UpdateProgress::Extracting { current, total } => {
@@ -75,15 +75,15 @@ impl UpdateOps for KatanaApp {
                                 } else {
                                     0.0
                                 };
-                                self.state.update_phase =
+                                self.state.update.phase =
                                     Some(crate::app_state::UpdatePhase::Installing { progress });
                             }
                         }
                         ctx.request_repaint();
                     }
                     UpdateInstallEvent::Finished(Ok(prep)) => {
-                        self.state.checking_for_updates = false;
-                        self.state.update_phase =
+                        self.state.update.checking = false;
+                        self.state.update.phase =
                             Some(crate::app_state::UpdatePhase::ReadyToRelaunch);
                         self.pending_relaunch = Some(prep);
                         self.show_update_dialog = true;
@@ -92,9 +92,9 @@ impl UpdateOps for KatanaApp {
                         break;
                     }
                     UpdateInstallEvent::Finished(Err(err)) => {
-                        self.state.checking_for_updates = false;
-                        self.state.update_phase = None;
-                        self.state.update_check_error = Some(err);
+                        self.state.update.checking = false;
+                        self.state.update.phase = None;
+                        self.state.update.check_error = Some(err);
                         self.show_update_dialog = true;
                         self.update_install_rx = None;
                         ctx.request_repaint();
@@ -108,42 +108,42 @@ impl UpdateOps for KatanaApp {
         if let Some(rx) = &self.update_rx {
             match rx.try_recv() {
                 Ok(Ok(Some(release_info))) => {
-                    self.state.checking_for_updates = false;
+                    self.state.update.checking = false;
                     self.update_rx = None;
                     if katana_core::update::is_newer_version(
                         env!("CARGO_PKG_VERSION"),
                         &release_info.tag_name,
                     ) {
-                        self.state.update_available = Some(release_info);
+                        self.state.update.available = Some(release_info);
                         if !self.update_notified {
                             self.show_update_dialog = true;
                             self.update_notified = true;
                         }
                     } else {
-                        self.state.update_available = None;
+                        self.state.update.available = None;
                         if !self.update_notified {
                             self.update_notified = true;
                         }
                     }
                 }
                 Ok(Ok(None)) => {
-                    self.state.checking_for_updates = false;
+                    self.state.update.checking = false;
                     self.update_rx = None;
-                    self.state.update_available = None;
+                    self.state.update.available = None;
                     if !self.update_notified {
                         self.update_notified = true;
                     }
                 }
                 Ok(Err(err)) => {
-                    self.state.checking_for_updates = false;
-                    self.state.update_check_error = Some(err);
+                    self.state.update.checking = false;
+                    self.state.update.check_error = Some(err);
                     self.update_rx = None;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
                     // Update still in progress.
                 }
                 Err(_) => {
-                    self.state.checking_for_updates = false;
+                    self.state.update.checking = false;
                     self.update_rx = None;
                 }
             }

@@ -200,7 +200,7 @@ impl KatanaApp {
         let mut show_changelog = false;
 
         {
-            let settings_mut = app.state.settings.settings_mut();
+            let settings_mut = app.state.config.settings.settings_mut();
             if let Some(prev) = &settings_mut.updates.previous_app_version {
                 app.old_app_version = Some(prev.clone());
                 if prev != current_version {
@@ -216,7 +216,7 @@ impl KatanaApp {
         }
 
         if show_changelog {
-            if let Err(e) = app.state.settings.save() {
+            if let Err(e) = app.state.config.settings.save() {
                 tracing::warn!("Failed to save previous_app_version: {e}");
             }
             app.needs_changelog_display = true;
@@ -369,8 +369,8 @@ mod tests {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.workspace.data.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // handle_open_workspace: Error with invalid path (L161-167)
@@ -382,7 +382,7 @@ mod tests {
         // Non-existent path, so workspace might be None (or opened as an empty directory)
         // Either an error is recorded or an empty workspace is opened
         assert!(
-            app.state.workspace.is_some() || app.state.status_message.is_some(),
+            app.state.workspace.data.is_some() || app.state.layout.status_message.is_some(),
             "Error or workspace should be set"
         );
     }
@@ -393,7 +393,7 @@ mod tests {
         let mut app = make_app();
         app.handle_select_document(PathBuf::from("/nonexistent/file.md"), true);
         // Load error -> recorded in status_message
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // handle_select_document: Move focus by selecting existing tab (L173-188)
@@ -405,13 +405,13 @@ mod tests {
 
         // Initial load
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.active_doc_idx, Some(0));
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         // Re-select the same file -> does not open a new tab
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert_eq!(app.state.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
     }
 
     // handle_update_buffer: No active document (L213)
@@ -420,7 +420,7 @@ mod tests {
         let mut app = make_app();
         // UpdateBuffer without opening a document -> does not panic
         app.handle_update_buffer("new content".to_string());
-        assert!(app.state.open_documents.is_empty());
+        assert!(app.state.document.open_documents.is_empty());
     }
 
     // handle_update_buffer: Active document exists (L209-215)
@@ -443,7 +443,7 @@ mod tests {
         let mut app = make_app();
         app.handle_save_document();
         // Status message is not set (no document)
-        assert!(app.state.status_message.is_none());
+        assert!(app.state.layout.status_message.is_none());
     }
 
     #[test]
@@ -455,13 +455,16 @@ mod tests {
 
         // 1. Open lazily
         app.handle_select_document(path.clone(), false);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert!(!app.state.open_documents[0].is_loaded);
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert!(!app.state.document.open_documents[0].is_loaded);
 
         // 2. Activate
         app.handle_select_document(path.clone(), true);
-        assert!(app.state.open_documents[0].is_loaded);
-        assert_eq!(app.state.open_documents[0].buffer, "# Lazy content");
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert_eq!(
+            app.state.document.open_documents[0].buffer,
+            "# Lazy content"
+        );
     }
 
     // handle_save_document: Successful save (L222-223)
@@ -474,7 +477,7 @@ mod tests {
         app.handle_update_buffer("# Modified".to_string());
 
         app.handle_save_document();
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // process_action: CloseDocument (L236-244)
@@ -484,11 +487,11 @@ mod tests {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         app.process_action(&egui::Context::default(), AppAction::CloseDocument(0));
-        assert!(app.state.open_documents.is_empty());
-        assert!(app.state.active_doc_idx.is_none());
+        assert!(app.state.document.open_documents.is_empty());
+        assert!(app.state.document.active_doc_idx.is_none());
     }
 
     // process_action: CloseDocument - out of bounds does not panic (L237)
@@ -496,7 +499,7 @@ mod tests {
     fn process_action_close_document_out_of_bounds_does_nothing() {
         let mut app = make_app();
         app.process_action(&egui::Context::default(), AppAction::CloseDocument(99));
-        assert!(app.state.open_documents.is_empty());
+        assert!(app.state.document.open_documents.is_empty());
     }
 
     // process_action: RefreshDiagrams (L248-253)
@@ -538,7 +541,7 @@ mod tests {
             &egui::Context::default(),
             AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf),
         );
-        let (msg, kind) = app.state.status_message.as_ref().unwrap();
+        let (msg, kind) = app.state.layout.status_message.as_ref().unwrap();
         assert_eq!(*kind, crate::app_state::StatusType::Error);
         assert!(msg.contains("headless_chrome"), "msg = {msg}");
     }
@@ -557,7 +560,7 @@ mod tests {
             &egui::Context::default(),
             AppAction::ExportDocument(crate::app_state::ExportFormat::Png),
         );
-        let (msg, kind) = app.state.status_message.as_ref().unwrap();
+        let (msg, kind) = app.state.layout.status_message.as_ref().unwrap();
         assert_eq!(*kind, crate::app_state::StatusType::Error);
         assert!(msg.contains("headless_chrome"), "msg = {msg}");
     }
@@ -626,26 +629,26 @@ mod tests {
     #[test]
     fn process_action_toggle_toc_toggles_flag() {
         let mut app = make_app();
-        assert!(!app.state.show_toc);
+        assert!(!app.state.layout.show_toc);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleToc);
-        assert!(app.state.show_toc);
+        assert!(app.state.layout.show_toc);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleToc);
-        assert!(!app.state.show_toc);
+        assert!(!app.state.layout.show_toc);
     }
 
     // process_action: ToggleSettings
     #[test]
     fn process_action_toggle_settings_toggles_flag() {
         let mut app = make_app();
-        assert!(!app.state.show_settings);
+        assert!(!app.state.layout.show_settings);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
-        assert!(app.state.show_settings);
+        assert!(app.state.layout.show_settings);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
-        assert!(!app.state.show_settings);
+        assert!(!app.state.layout.show_settings);
     }
 
     // process_action: None (L258)
@@ -684,7 +687,7 @@ mod tests {
             AppAction::UpdateBuffer("saved content".to_string()),
         );
         app.process_action(&egui::Context::default(), AppAction::SaveDocument);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // start_download: Thread starts (L263-273)
@@ -696,7 +699,7 @@ mod tests {
             dest: PathBuf::from("/tmp/test_plantuml.jar"),
         });
         // status_message is set
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         // download_rx is set
         assert!(app.download_rx.is_some());
     }
@@ -774,7 +777,7 @@ mod tests_extra {
 
         // Initial load
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         // Set an old hash in tab_hashes (different from buffer)
         app.tab_previews.push(TabPreviewCache {
@@ -787,7 +790,7 @@ mod tests_extra {
         app.handle_select_document(path.clone(), true);
 
         // Tab count remains unchanged
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
     // handle_save_document: Case where fs.save_document fails (L224-228)
@@ -808,7 +811,7 @@ mod tests_extra {
         app.handle_save_document();
 
         // Write failure -> recorded in status_message
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
 
         // Cleanup: restore writability
         let perms = std::fs::Permissions::from_mode(0o644);
@@ -856,7 +859,7 @@ mod tests_extra {
             AppAction::OpenWorkspace(dir.path().to_path_buf()),
         );
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
 
     // process_action: SelectDocument (L235)
@@ -866,7 +869,7 @@ mod tests_extra {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.process_action(&egui::Context::default(), AppAction::SelectDocument(path));
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
     // full_refresh_preview: Hash is updated (L140-147)
@@ -945,7 +948,7 @@ mod tests_extra {
         drop(tx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         assert!(app.download_rx.is_none());
         assert_eq!(
             format!("{:?}", app.pending_action),
@@ -963,7 +966,7 @@ mod tests_extra {
         drop(tx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         assert!(app.download_rx.is_none());
     }
 
@@ -1075,7 +1078,7 @@ mod tests_extra {
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
         // Workspace is still opened despite save failure
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
 
     // ChangeLanguage: settings.save() error is logged, not panicked
@@ -1147,14 +1150,14 @@ mod tests_extra {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
 
         // Add a new file to the workspace
         std::fs::write(dir.path().join("new.md"), "# New").unwrap();
 
         app.handle_refresh_workspace();
         wait_for_workspace(&mut app);
-        let ws = app.state.workspace.as_ref().unwrap();
+        let ws = app.state.workspace.data.as_ref().unwrap();
         let paths: Vec<_> = ws
             .tree
             .iter()
@@ -1168,7 +1171,7 @@ mod tests_extra {
     fn handle_refresh_workspace_no_workspace_does_nothing() {
         let mut app = make_app();
         app.handle_refresh_workspace();
-        assert!(app.state.workspace.is_none());
+        assert!(app.state.workspace.data.is_none());
     }
 
     // handle_refresh_workspace: Error case — workspace root is no longer valid
@@ -1178,15 +1181,15 @@ mod tests_extra {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
 
         // Overwrite the workspace root to a non-existent path
-        app.state.workspace.as_mut().unwrap().root =
+        app.state.workspace.data.as_mut().unwrap().root =
             std::path::PathBuf::from("/nonexistent/deleted/workspace");
 
         app.handle_refresh_workspace();
         wait_for_workspace(&mut app);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // process_action: RefreshWorkspace
@@ -1198,7 +1201,7 @@ mod tests_extra {
         wait_for_workspace(&mut app);
         app.process_action(&egui::Context::default(), AppAction::RefreshWorkspace);
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
     #[test]
     fn test_open_workspace_file_updates_buffer() {
@@ -1234,7 +1237,7 @@ mod tests_extra {
 
         let (tx, rx) = std::sync::mpsc::channel();
         app.workspace_rx = Some(rx);
-        app.state.is_loading_workspace = true;
+        app.state.workspace.is_loading = true;
 
         // Drop the transmitter to simulate thread panic / disconnect
         drop(tx);
@@ -1242,7 +1245,7 @@ mod tests_extra {
         let ui_ctx = egui::Context::default();
         app.poll_workspace_load(&ui_ctx);
 
-        assert!(!app.state.is_loading_workspace);
+        assert!(!app.state.workspace.is_loading);
     }
 
     #[test]
@@ -1254,13 +1257,16 @@ mod tests_extra {
 
         // 1. Open lazily
         app.handle_select_document(path.clone(), false);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert!(!app.state.open_documents[0].is_loaded);
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert!(!app.state.document.open_documents[0].is_loaded);
 
         // 2. Activate
         app.handle_select_document(path.clone(), true);
-        assert!(app.state.open_documents[0].is_loaded);
-        assert_eq!(app.state.open_documents[0].buffer, "# Lazy content");
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert_eq!(
+            app.state.document.open_documents[0].buffer,
+            "# Lazy content"
+        );
     }
 
     #[test]
@@ -1268,7 +1274,7 @@ mod tests_extra {
         let mut app = make_app();
         // Path with no parent (relative) should not crash and hit the break
         app.handle_select_document(std::path::PathBuf::from("root_file.md"), true);
-        assert!(app.state.expanded_directories.is_empty());
+        assert!(app.state.workspace.expanded_directories.is_empty());
     }
 
     #[test]
@@ -1279,7 +1285,7 @@ mod tests_extra {
 
         // Ensure no directories were added to expanded_directories
         assert!(
-            app.state.expanded_directories.is_empty(),
+            app.state.workspace.expanded_directories.is_empty(),
             "Expanded directories should be empty on lazy load"
         );
     }
@@ -1306,12 +1312,12 @@ mod tests_extra {
         }
 
         // Both documents are opened
-        assert_eq!(app.state.open_documents.len(), 2);
+        assert_eq!(app.state.document.open_documents.len(), 2);
         // First document is activated (loaded) and second stays lazy
-        assert!(app.state.open_documents[0].is_loaded);
-        assert!(!app.state.open_documents[1].is_loaded);
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert!(!app.state.document.open_documents[1].is_loaded);
         // Active index points to the first document
-        assert_eq!(app.state.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -1374,7 +1380,7 @@ mod tests_extra {
     #[test]
     fn test_check_for_updates_manual_trigger() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         // manually trigger again while already checking
         app.start_update_check(true);
         // should have skipped spawning another one but set dialog=true
@@ -1385,14 +1391,14 @@ mod tests_extra {
     fn test_check_for_updates_action() {
         let mut app = setup_test_app();
         assert!(!app.show_update_dialog);
-        assert!(!app.state.checking_for_updates);
+        assert!(!app.state.update.checking);
 
         // trigger manual update check
         app.process_action(&egui::Context::default(), AppAction::CheckForUpdates);
 
         // it should immediately set show_update_dialog = true for manual checks
         assert!(app.show_update_dialog);
-        assert!(app.state.checking_for_updates);
+        assert!(app.state.update.checking);
 
         // Emulate an update channel response
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1408,9 +1414,9 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert!(app.state.update_available.is_some());
+        assert!(app.state.update.available.is_some());
         assert_eq!(
-            app.state.update_available.as_ref().unwrap().tag_name,
+            app.state.update.available.as_ref().unwrap().tag_name,
             "100.0.0"
         );
         assert!(app.update_rx.is_none());
@@ -1420,7 +1426,7 @@ mod tests_extra {
     #[test]
     fn test_update_check_error_action() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         let (tx, rx) = std::sync::mpsc::channel();
         tx.send(Err("Network failure".to_string())).unwrap();
         app.update_rx = Some(rx);
@@ -1428,14 +1434,14 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert_eq!(app.state.update_check_error.unwrap(), "Network failure");
+        assert_eq!(app.state.update.check_error.unwrap(), "Network failure");
         assert!(app.update_rx.is_none());
     }
 
     #[test]
     fn test_update_check_channel_closed() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         let (tx, rx) =
             std::sync::mpsc::channel::<Result<Option<katana_core::update::ReleaseInfo>, String>>();
         drop(tx); // cause Err(RecvError) or Disconnected
@@ -1444,7 +1450,7 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert!(!app.state.checking_for_updates);
+        assert!(!app.state.update.checking);
         assert!(app.update_rx.is_none());
     }
 

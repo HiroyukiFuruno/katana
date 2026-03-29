@@ -58,7 +58,7 @@ impl ExportOps for KatanaApp {
         }
     }
     fn export_filename(&self, doc_path: &std::path::Path, ext: &str) -> String {
-        let (prefix, relative) = if let Some(ws) = &self.state.workspace {
+        let (prefix, relative) = if let Some(ws) = &self.state.workspace.data {
             // Build prefix from workspace root path initials
             let initials: String = ws
                 .root
@@ -125,7 +125,7 @@ impl ExportOps for KatanaApp {
                 &crate::i18n::get().export.tool_missing,
                 &[("tool", tool_name), ("format", &ext.to_uppercase())],
             );
-            self.state.status_message = Some((msg, crate::app_state::StatusType::Error));
+            self.state.layout.status_message = Some((msg, crate::app_state::StatusType::Error));
             return;
         }
 
@@ -226,7 +226,8 @@ impl ExportOps for KatanaApp {
                             ("path", &output_path.display().to_string()),
                         ],
                     );
-                    self.state.status_message = Some((msg, crate::app_state::StatusType::Success));
+                    self.state.layout.status_message =
+                        Some((msg, crate::app_state::StatusType::Success));
                     if task.open_on_complete {
                         if let Err(e) = open::that(&output_path) {
                             tracing::warn!("Failed to open {}: {e}", output_path.display());
@@ -243,7 +244,8 @@ impl ExportOps for KatanaApp {
                         &crate::i18n::get().export.failed,
                         &[("format", &task.filename), ("error", &error)],
                     );
-                    self.state.status_message = Some((msg, crate::app_state::StatusType::Error));
+                    self.state.layout.status_message =
+                        Some((msg, crate::app_state::StatusType::Error));
                 }
             }
         }

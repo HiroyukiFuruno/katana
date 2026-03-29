@@ -22,7 +22,7 @@ impl DownloadOps for KatanaApp {
     fn start_download(&mut self, req: DownloadRequest) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.download_rx = Some(rx);
-        self.state.status_message = Some((
+        self.state.layout.status_message = Some((
             crate::i18n::get().plantuml.downloading_plantuml.clone(),
             crate::app_state::StatusType::Info,
         ));
@@ -37,7 +37,7 @@ impl DownloadOps for KatanaApp {
         let done = if let Some(rx) = &self.download_rx {
             match rx.try_recv() {
                 Ok(Ok(())) => {
-                    self.state.status_message = Some((
+                    self.state.layout.status_message = Some((
                         crate::i18n::get().plantuml.plantuml_installed.clone(),
                         crate::app_state::StatusType::Success,
                     ));
@@ -45,7 +45,7 @@ impl DownloadOps for KatanaApp {
                     true
                 }
                 Ok(Err(e)) => {
-                    self.state.status_message = Some((
+                    self.state.layout.status_message = Some((
                         format!(
                             "{}{}",
                             crate::i18n::get().plantuml.download_error.clone(),

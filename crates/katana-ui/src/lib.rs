@@ -34,3 +34,5 @@ pub mod shell_ui;
 pub mod svg_loader;
 pub mod theme_bridge;
 pub mod widgets;
+
+pub mod state;

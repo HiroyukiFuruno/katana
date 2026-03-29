@@ -7,7 +7,7 @@ use katana_ui::shell::KatanaApp;
 fn wait_for_workspace_load(harness: &mut Harness<'static, KatanaApp>) {
     for _ in 0..50 {
         harness.step();
-        if !harness.state_mut().app_state_mut().is_loading_workspace {
+        if !harness.state_mut().app_state_mut().workspace.is_loading {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -41,11 +41,15 @@ fn setup_harness() -> Harness<'static, KatanaApp> {
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         // Pre-accept terms to bypass the blocking UI in integration tests.
-        state.settings.settings_mut().terms_accepted_version =
+        state.config.settings.settings_mut().terms_accepted_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
         // Also pre-set previous app version so the release notes auto-show logic isn't triggered for tests.
-        state.settings.settings_mut().updates.previous_app_version =
-            Some(katana_ui::about_info::APP_VERSION.to_string());
+        state
+            .config
+            .settings
+            .settings_mut()
+            .updates
+            .previous_app_version = Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
@@ -90,7 +94,12 @@ fn test_integration_workspace_and_tabs() {
     harness.step();
 
     // Verify it opened and editor handles it
-    assert!(harness.state_mut().app_state_mut().active_doc_idx.is_some());
+    assert!(harness
+        .state_mut()
+        .app_state_mut()
+        .document
+        .active_doc_idx
+        .is_some());
 
     // Close the document (tab 'x' button or close action)
     harness
@@ -99,7 +108,12 @@ fn test_integration_workspace_and_tabs() {
     harness.step();
 
     // Tab is closed, fallback to workspace view
-    assert!(harness.state_mut().app_state_mut().active_doc_idx.is_none());
+    assert!(harness
+        .state_mut()
+        .app_state_mut()
+        .document
+        .active_doc_idx
+        .is_none());
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
@@ -133,7 +147,7 @@ fn test_integration_toc_panel_display() {
     harness.step(); // KatanaApp reads pending_action, sets show_toc = true, renders TOC panel
 
     // The TOC panel must be visible
-    let toc_visible = harness.state_mut().app_state_mut().show_toc;
+    let toc_visible = harness.state_mut().app_state_mut().layout.show_toc;
     assert!(toc_visible, "show_toc should be true after clicking button");
 
     let toc_title = katana_ui::i18n::get().toc.title.clone();
@@ -185,6 +199,7 @@ fn test_integration_toc_enable_disable_setting() {
     harness
         .state_mut()
         .app_state_mut()
+        .config
         .settings
         .settings_mut()
         .layout
@@ -199,6 +214,7 @@ fn test_integration_toc_enable_disable_setting() {
         !harness
             .state_mut()
             .app_state_mut()
+            .config
             .settings
             .settings()
             .layout
@@ -250,6 +266,7 @@ fn test_integration_toc_panel_hides_when_disabled() {
     harness
         .state_mut()
         .app_state_mut()
+        .config
         .settings
         .settings_mut()
         .layout
@@ -425,7 +442,11 @@ fn test_integration_settings_window() {
     }
     harness.step();
     assert_eq!(
-        harness.state_mut().app_state_mut().active_settings_tab,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .config
+            .active_settings_tab,
         katana_ui::app_state::SettingsTab::Font
     );
     for node in harness.query_all_by_label("Layout") {
@@ -436,11 +457,18 @@ fn test_integration_settings_window() {
     // Instead of forcing the UI click for Layout, we can also directly assert that the tabs exist.
     // To ensure the test passes reliably in CI without being flaky about layout constraints,
     // we can explicitly set the active tab state and verify it renders.
-    harness.state_mut().app_state_mut().active_settings_tab =
-        katana_ui::app_state::SettingsTab::Layout;
+    harness
+        .state_mut()
+        .app_state_mut()
+        .config
+        .active_settings_tab = katana_ui::app_state::SettingsTab::Layout;
     harness.step();
     assert_eq!(
-        harness.state_mut().app_state_mut().active_settings_tab,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .config
+            .active_settings_tab,
         katana_ui::app_state::SettingsTab::Layout
     );
 
@@ -563,6 +591,7 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
     let cache_before = harness
         .state_mut()
         .app_state_mut()
+        .workspace
         .expanded_directories
         .clone();
     assert!(
@@ -611,6 +640,7 @@ fn test_integration_workspace_directory_toggle_non_recursive() {
     let cache_after = harness
         .state_mut()
         .app_state_mut()
+        .workspace
         .expanded_directories
         .clone();
     assert!(
@@ -650,8 +680,13 @@ fn test_integration_update_buffer() {
         "# Updated\n\nNew content".to_string(),
     ));
     harness.step();
-    let active_idx = harness.state_mut().app_state_mut().active_doc_idx.unwrap();
-    let buf = harness.state_mut().app_state_mut().open_documents[active_idx]
+    let active_idx = harness
+        .state_mut()
+        .app_state_mut()
+        .document
+        .active_doc_idx
+        .unwrap();
+    let buf = harness.state_mut().app_state_mut().document.open_documents[active_idx]
         .buffer
         .clone();
     assert!(buf.contains("New content"));
@@ -724,16 +759,38 @@ fn test_integration_multiple_documents_and_navigation() {
         .trigger_action(AppAction::SelectDocument(abs2));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
-    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(1));
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.active_doc_idx,
+        Some(1)
+    );
 
     // Close document 1
     harness
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
-    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(0));
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        1
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.active_doc_idx,
+        Some(0)
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -842,7 +899,11 @@ fn test_integration_open_all_markdown() {
     }
 
     let state = harness.state_mut().app_state_mut();
-    assert_eq!(state.open_documents.len(), 2, "Should open 2 documents");
+    assert_eq!(
+        state.document.open_documents.len(),
+        2,
+        "Should open 2 documents"
+    );
 
     // Test duplicate prevention using the action directly since UI is verified once
     harness
@@ -858,13 +919,13 @@ fn test_integration_open_all_markdown() {
 
     let state = harness.state_mut().app_state_mut();
     assert_eq!(
-        state.open_documents.len(),
+        state.document.open_documents.len(),
         2,
         "Should not duplicate tabs on re-opening"
     );
 
     // Switch between them
-    assert_eq!(state.active_doc_idx, Some(0)); // First file is activated
+    assert_eq!(state.document.active_doc_idx, Some(0)); // First file is activated
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -905,7 +966,11 @@ fn test_integration_directory_collapse_bug() {
     assert!(!child_visible, "Child should not be visible initially");
 
     // 2. Expand all via AppState
-    harness.state_mut().app_state_mut().force_tree_open = Some(true);
+    harness
+        .state_mut()
+        .app_state_mut()
+        .workspace
+        .force_tree_open = Some(true);
     harness.step();
     // Egui's collapsing header only opens 1 level per frame if programmatically triggered
     harness.step();
@@ -925,7 +990,11 @@ fn test_integration_directory_collapse_bug() {
     assert!(child_visible, "Child should now be visible");
 
     // 3. Collapse all via AppState
-    harness.state_mut().app_state_mut().force_tree_open = Some(false);
+    harness
+        .state_mut()
+        .app_state_mut()
+        .workspace
+        .force_tree_open = Some(false);
     harness.step();
     harness.step(); // ensure flushed
 
@@ -967,9 +1036,9 @@ fn test_integration_workspace_panel_collapsed() {
     harness.step();
 
     // Set show_workspace to false and then draw
-    harness.state_mut().app_state_mut().show_workspace = false;
+    harness.state_mut().app_state_mut().layout.show_workspace = false;
     harness.step();
-    assert!(!harness.state_mut().app_state_mut().show_workspace);
+    assert!(!harness.state_mut().app_state_mut().layout.show_workspace);
 
     // Try to click the "›" expand button using kittest (covers shell.rs L403-404)
     // If the button is not found, skip it (in kittest, button strings are
@@ -987,7 +1056,7 @@ fn test_integration_workspace_panel_collapsed() {
         }
     }
 
-    harness.state_mut().app_state_mut().show_workspace = true;
+    harness.state_mut().app_state_mut().layout.show_workspace = true;
     harness.step();
 }
 
@@ -1013,7 +1082,15 @@ fn test_integration_workspace_tab_persistence() {
         .state_mut()
         .trigger_action(AppAction::SelectDocument(abs_file1.clone()));
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        1
+    );
 
     // 2. Setup second workspace
     let ws2 = std::env::temp_dir().join("katana_test_ws2");
@@ -1034,6 +1111,7 @@ fn test_integration_workspace_tab_persistence() {
     let cache_json = harness
         .state_mut()
         .app_state_mut()
+        .config
         .cache
         .get_persistent(&cache_key);
     assert!(
@@ -1137,7 +1215,15 @@ fn test_integration_multiple_tabs_close() {
         .trigger_action(AppAction::SelectDocument(p2));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
 
     // Close tab 0 (the remaining tab appropriately updates active_doc_idx)
     harness
@@ -1150,8 +1236,21 @@ fn test_integration_multiple_tabs_close() {
         .state_mut()
         .trigger_action(AppAction::CloseDocument(0));
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 0);
-    assert!(harness.state_mut().app_state_mut().active_doc_idx.is_none());
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        0
+    );
+    assert!(harness
+        .state_mut()
+        .app_state_mut()
+        .document
+        .active_doc_idx
+        .is_none());
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -1173,7 +1272,14 @@ fn test_integration_workspace_tree_expand_collapse() {
         .trigger_action(AppAction::OpenWorkspace(temp_dir.clone()));
     wait_for_workspace_load(&mut harness);
 
-    assert_eq!(harness.state_mut().app_state_mut().force_tree_open, None);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .workspace
+            .force_tree_open,
+        None
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -1234,13 +1340,13 @@ fn test_integration_sidebar_collapse_expand() {
     wait_for_workspace_load(&mut harness);
 
     // Close sidebar
-    harness.state_mut().app_state_mut().show_workspace = false;
+    harness.state_mut().app_state_mut().layout.show_workspace = false;
     harness.step();
     // The collapsed panel is displayed on redraw
     harness.step();
 
     // Re-expand sidebar
-    harness.state_mut().app_state_mut().show_workspace = true;
+    harness.state_mut().app_state_mut().layout.show_workspace = true;
     harness.step();
 }
 
@@ -1339,11 +1445,19 @@ fn test_integration_directory_entry_click_toggle() {
     wait_for_workspace_load(&mut harness);
 
     // Expand all -> force_tree_open = Some(true)
-    harness.state_mut().app_state_mut().force_tree_open = Some(true);
+    harness
+        .state_mut()
+        .app_state_mut()
+        .workspace
+        .force_tree_open = Some(true);
     harness.step();
 
     // Collapse all -> force_tree_open = Some(false)
-    harness.state_mut().app_state_mut().force_tree_open = Some(false);
+    harness
+        .state_mut()
+        .app_state_mut()
+        .workspace
+        .force_tree_open = Some(false);
     harness.step();
 }
 
@@ -1425,10 +1539,14 @@ fn setup_harness_with_json_repo(settings_path: &std::path::Path) -> Harness<'sta
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         // Pre-accept terms to bypass the blocking UI in persistence tests.
-        state.settings.settings_mut().terms_accepted_version =
+        state.config.settings.settings_mut().terms_accepted_version =
             Some(katana_ui::about_info::APP_VERSION.to_string());
-        state.settings.settings_mut().updates.previous_app_version =
-            Some(katana_ui::about_info::APP_VERSION.to_string());
+        state
+            .config
+            .settings
+            .settings_mut()
+            .updates
+            .previous_app_version = Some(katana_ui::about_info::APP_VERSION.to_string());
 
         katana_ui::i18n::set_language("en");
         let mut app = KatanaApp::new(state);
@@ -1457,7 +1575,7 @@ fn test_persistence_workspace_roundtrip() {
         wait_for_workspace_load(&mut harness);
 
         // Verify workspace was opened.
-        assert!(harness.state_mut().app_state_mut().workspace.is_some());
+        assert!(harness.state_mut().app_state_mut().workspace.data.is_some());
 
         // Verify settings file was written with the workspace path.
         let json = std::fs::read_to_string(&settings_path).unwrap();
@@ -1576,17 +1694,22 @@ fn test_persistence_corrupt_file_falls_back_to_defaults() {
 
     let s = harness.state_mut().app_state_mut();
     assert_eq!(
-        s.settings.settings().theme.theme,
+        s.config.settings.settings().theme.theme,
         "dark",
         "Should fall back to default theme"
     );
     assert_eq!(
-        s.settings.settings().language,
+        s.config.settings.settings().language,
         "en",
         "Should fall back to default language"
     );
     assert!(
-        s.settings.settings().workspace.last_workspace.is_none(),
+        s.config
+            .settings
+            .settings()
+            .workspace
+            .last_workspace
+            .is_none(),
         "Should fall back to no workspace"
     );
 }
@@ -1601,8 +1724,8 @@ fn test_persistence_missing_file_uses_defaults() {
     harness.step();
 
     let s = harness.state_mut().app_state_mut();
-    assert_eq!(s.settings.settings().theme.theme, "dark");
-    assert_eq!(s.settings.settings().language, "en");
+    assert_eq!(s.config.settings.settings().theme.theme, "dark");
+    assert_eq!(s.config.settings.settings().language, "en");
 }
 
 // ── Preview rendering regression tests ──
@@ -1769,8 +1892,19 @@ fn test_integration_cache_facade_restores_tabs() {
     wait_for_workspace_load(&mut harness);
 
     // Validate the tabs were completely restored
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
-    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(1));
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.active_doc_idx,
+        Some(1)
+    );
 }
 
 /// UI Layer Test: Simulate clicking on UI widgets by inserting pointer events into egui.
@@ -1867,6 +2001,7 @@ fn test_action_set_split_direction_horizontal_to_vertical() {
         harness
             .state_mut()
             .app_state_mut()
+            .config
             .settings
             .settings()
             .layout
@@ -2036,7 +2171,12 @@ fn test_file_entry_click_opens_document() {
 
     // Verify no document is open yet
     assert!(
-        harness.state_mut().app_state_mut().active_doc_idx.is_none(),
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .active_doc_idx
+            .is_none(),
         "No document should be open before clicking"
     );
 
@@ -2049,11 +2189,21 @@ fn test_file_entry_click_opens_document() {
 
     // The document must be opened
     assert!(
-        harness.state_mut().app_state_mut().active_doc_idx.is_some(),
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .active_doc_idx
+            .is_some(),
         "Clicking a file entry must open the document (active_doc_idx should be Some)"
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents.len(),
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
         1,
         "Exactly one document should be open after clicking"
     );
@@ -2137,8 +2287,11 @@ fn test_font_size_slider_has_hover_tooltip() {
     harness.step();
 
     // Switch to Font tab
-    harness.state_mut().app_state_mut().active_settings_tab =
-        katana_ui::app_state::SettingsTab::Font;
+    harness
+        .state_mut()
+        .app_state_mut()
+        .config
+        .active_settings_tab = katana_ui::app_state::SettingsTab::Font;
     harness.step();
     harness.step();
 
@@ -2319,6 +2472,7 @@ fn test_ui_all_languages_load_successfully() {
             harness
                 .state_mut()
                 .app_state_mut()
+                .config
                 .settings
                 .settings()
                 .language,
@@ -2353,6 +2507,7 @@ fn test_search_modal_include_exclude_options() {
             .state_mut()
             .app_state_mut()
             .workspace
+            .data
             .as_ref()
             .map_or(0, |w| w.tree.len());
         if count > 0 {
@@ -2363,41 +2518,41 @@ fn test_search_modal_include_exclude_options() {
     }
 
     // Open search modal
-    harness.state_mut().app_state_mut().show_search_modal = true;
+    harness.state_mut().app_state_mut().layout.show_search_modal = true;
     harness.step();
     harness.step();
 
     // 1. Default (no filter) -> clears results
-    harness.state_mut().app_state_mut().search_query = "".to_string();
+    harness.state_mut().app_state_mut().search.query = "".to_string();
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 0);
+    assert_eq!(harness.state_mut().app_state_mut().search.results.len(), 0);
 
     // 2. Query filter
-    harness.state_mut().app_state_mut().search_query = "apple".to_string();
+    harness.state_mut().app_state_mut().search.query = "apple".to_string();
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
-    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("apple.md"));
+    assert_eq!(harness.state_mut().app_state_mut().search.results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search.results[0].ends_with("apple.md"));
 
     // 3. Include pattern
-    harness.state_mut().app_state_mut().search_query = "".to_string();
-    harness.state_mut().app_state_mut().search_include_pattern = "banana".to_string();
+    harness.state_mut().app_state_mut().search.query = "".to_string();
+    harness.state_mut().app_state_mut().search.include_pattern = "banana".to_string();
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
-    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("banana.md"));
+    assert_eq!(harness.state_mut().app_state_mut().search.results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search.results[0].ends_with("banana.md"));
 
     // 4. Exclude pattern
-    harness.state_mut().app_state_mut().search_include_pattern = "".to_string();
-    harness.state_mut().app_state_mut().search_exclude_pattern = "banana".to_string();
+    harness.state_mut().app_state_mut().search.include_pattern = "".to_string();
+    harness.state_mut().app_state_mut().search.exclude_pattern = "banana".to_string();
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 2);
+    assert_eq!(harness.state_mut().app_state_mut().search.results.len(), 2);
 
     // 5. Query + Include + Exclude
-    harness.state_mut().app_state_mut().search_query = "a".to_string(); // 'apple.md' and 'banana.md' have 'a'
-    harness.state_mut().app_state_mut().search_include_pattern = ".md".to_string();
-    harness.state_mut().app_state_mut().search_exclude_pattern = "banana".to_string(); // excludes 'banana.md'
+    harness.state_mut().app_state_mut().search.query = "a".to_string(); // 'apple.md' and 'banana.md' have 'a'
+    harness.state_mut().app_state_mut().search.include_pattern = ".md".to_string();
+    harness.state_mut().app_state_mut().search.exclude_pattern = "banana".to_string(); // excludes 'banana.md'
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().search_results.len(), 1);
-    assert!(harness.state_mut().app_state_mut().search_results[0].ends_with("apple.md"));
+    assert_eq!(harness.state_mut().app_state_mut().search.results.len(), 1);
+    assert!(harness.state_mut().app_state_mut().search.results[0].ends_with("apple.md"));
 }
 
 #[test]
@@ -2455,7 +2610,12 @@ fn test_integration_open_workspace_restores_tabs() {
         harness.step();
 
         // Ensure tabs are saved
-        let settings = harness.state_mut().app_state_mut().settings.settings();
+        let settings = harness
+            .state_mut()
+            .app_state_mut()
+            .config
+            .settings
+            .settings();
         assert_eq!(settings.workspace.open_tabs.len(), 2);
         assert_eq!(settings.workspace.active_tab_idx, Some(1));
     }
@@ -2470,8 +2630,8 @@ fn test_integration_open_workspace_restores_tabs() {
         wait_for_workspace_load(&mut harness);
 
         let state = harness.state_mut().app_state_mut();
-        assert_eq!(state.open_documents.len(), 2);
-        assert_eq!(state.active_doc_idx, Some(1));
+        assert_eq!(state.document.open_documents.len(), 2);
+        assert_eq!(state.document.active_doc_idx, Some(1));
     }
 }
 
@@ -2490,7 +2650,12 @@ fn test_integration_remove_workspace() {
 
     // Verify it's in paths
     {
-        let settings = harness.state_mut().app_state_mut().settings.settings();
+        let settings = harness
+            .state_mut()
+            .app_state_mut()
+            .config
+            .settings
+            .settings();
         assert!(settings
             .workspace
             .paths
@@ -2507,7 +2672,12 @@ fn test_integration_remove_workspace() {
 
     // Verify it's removed
     {
-        let settings = harness.state_mut().app_state_mut().settings.settings();
+        let settings = harness
+            .state_mut()
+            .app_state_mut()
+            .config
+            .settings
+            .settings();
         assert!(!settings
             .workspace
             .paths
@@ -2562,7 +2732,7 @@ fn test_integration_open_workspace_failed() {
     wait_for_workspace_load(&mut harness);
 
     // Validate that the system safely recovered and is_loading_workspace is false
-    assert!(!harness.state_mut().app_state_mut().is_loading_workspace);
+    assert!(!harness.state_mut().app_state_mut().workspace.is_loading);
 }
 
 #[test]
@@ -2602,7 +2772,15 @@ fn test_integration_tab_context_menu_close_others() {
         .trigger_action(AppAction::SelectDocument(abs3));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        3
+    );
 
     // Red Phase: Trigger the unimplemented action
     harness
@@ -2612,9 +2790,13 @@ fn test_integration_tab_context_menu_close_others() {
 
     let state = harness.state_mut().app_state_mut();
     // These should fail because the match arm for CloseOtherDocuments is currently empty.
-    assert_eq!(state.open_documents.len(), 1, "Should close other tabs");
     assert_eq!(
-        state.recently_closed_tabs.len(),
+        state.document.open_documents.len(),
+        1,
+        "Should close other tabs"
+    );
+    assert_eq!(
+        state.document.recently_closed_tabs.len(),
         2,
         "Should put 2 tabs into history"
     );
@@ -2638,8 +2820,8 @@ fn test_integration_tree_context_menu_actions() {
         .trigger_action(AppAction::RequestNewFile(temp_dir.clone()));
     harness.step();
     let state = harness.state_mut().app_state_mut();
-    assert!(state.create_fs_node_modal_state.is_some());
-    let (parent, name, _, is_dir) = state.create_fs_node_modal_state.as_ref().unwrap();
+    assert!(state.layout.create_fs_node_modal.is_some());
+    let (parent, name, _, is_dir) = state.layout.create_fs_node_modal.as_ref().unwrap();
     assert_eq!(*parent, temp_dir);
     assert!(name.is_empty());
     assert!(!*is_dir);
@@ -2650,8 +2832,8 @@ fn test_integration_tree_context_menu_actions() {
         .trigger_action(AppAction::RequestRename(file.clone()));
     harness.step();
     let state = harness.state_mut().app_state_mut();
-    assert!(state.rename_modal_state.is_some());
-    let (target, name) = state.rename_modal_state.as_ref().unwrap();
+    assert!(state.layout.rename_modal.is_some());
+    let (target, name) = state.layout.rename_modal.as_ref().unwrap();
     assert_eq!(*target, file);
     assert_eq!(name, "test.md");
 
@@ -2661,8 +2843,8 @@ fn test_integration_tree_context_menu_actions() {
         .trigger_action(AppAction::RequestDelete(file.clone()));
     harness.step();
     let state = harness.state_mut().app_state_mut();
-    assert!(state.delete_modal_state.is_some());
-    let target = state.delete_modal_state.as_ref().unwrap();
+    assert!(state.layout.delete_modal.is_some());
+    let target = state.layout.delete_modal.as_ref().unwrap();
     assert_eq!(*target, file);
 
     let _ = std::fs::remove_dir_all(&temp_dir);
@@ -2726,9 +2908,17 @@ fn test_integration_ui_context_menu_close_others() {
     harness.run_steps(20);
 
     // Verify it successfully closed everything except b.md
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        1
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs2
     );
 
@@ -2755,23 +2945,47 @@ fn test_integration_tab_restore_closed() {
         .trigger_action(AppAction::SelectDocument(abs2.clone()));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
 
     harness
         .state_mut()
         .trigger_action(AppAction::CloseDocument(1));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        1
+    );
 
     harness
         .state_mut()
         .trigger_action(AppAction::RestoreClosedDocument);
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs2
     );
 
@@ -2804,17 +3018,25 @@ fn test_integration_tab_reorder() {
         .trigger_action(AppAction::SelectDocument(abs3.clone()));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        3
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs1
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs2
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[2].path,
+        harness.state_mut().app_state_mut().document.open_documents[2].path,
         abs3
     );
 
@@ -2824,17 +3046,25 @@ fn test_integration_tab_reorder() {
         .trigger_action(AppAction::ReorderDocument { from: 0, to: 2 });
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        3
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs2
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs1
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[2].path,
+        harness.state_mut().app_state_mut().document.open_documents[2].path,
         abs3
     );
 
@@ -2844,17 +3074,25 @@ fn test_integration_tab_reorder() {
         .trigger_action(AppAction::ReorderDocument { from: 2, to: 0 });
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        3
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs3
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs2
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[2].path,
+        harness.state_mut().app_state_mut().document.open_documents[2].path,
         abs1
     );
 
@@ -2863,7 +3101,15 @@ fn test_integration_tab_reorder() {
         .state_mut()
         .trigger_action(AppAction::ReorderDocument { from: 5, to: 10 });
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 3);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        3
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -2893,15 +3139,23 @@ fn test_integration_tab_pinning() {
         .trigger_action(AppAction::TogglePinDocument(1));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
-    assert!(harness.state_mut().app_state_mut().open_documents[0].is_pinned);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
+    assert!(harness.state_mut().app_state_mut().document.open_documents[0].is_pinned);
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs2
     );
-    assert!(!harness.state_mut().app_state_mut().open_documents[1].is_pinned);
+    assert!(!harness.state_mut().app_state_mut().document.open_documents[1].is_pinned);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs1
     );
 
@@ -2910,7 +3164,7 @@ fn test_integration_tab_pinning() {
         .trigger_action(AppAction::TogglePinDocument(0));
     harness.step();
 
-    assert!(!harness.state_mut().app_state_mut().open_documents[0].is_pinned);
+    assert!(!harness.state_mut().app_state_mut().document.open_documents[0].is_pinned);
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -2951,13 +3205,21 @@ fn test_integration_tab_close_directions() {
         .trigger_action(AppAction::CloseDocumentsToLeft(1));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 2);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        2
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs2
     );
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[1].path,
+        harness.state_mut().app_state_mut().document.open_documents[1].path,
         abs3
     );
 
@@ -2966,9 +3228,17 @@ fn test_integration_tab_close_directions() {
         .trigger_action(AppAction::CloseDocumentsToRight(0));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 1);
     assert_eq!(
-        harness.state_mut().app_state_mut().open_documents[0].path,
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        1
+    );
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.open_documents[0].path,
         abs2
     );
 
@@ -3006,7 +3276,10 @@ fn test_integration_tab_close_edges() {
     harness.step();
 
     // Now open_documents: [abs2, abs3]. a_idx=1 (which is c.md).
-    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(1));
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.active_doc_idx,
+        Some(1)
+    );
 
     // Now index 0 is abs2, index 1 is abs3. active is abs3.
     // CloseRight(0). a_idx=1, idx=0 => a_idx > idx => hit line 649
@@ -3015,7 +3288,10 @@ fn test_integration_tab_close_edges() {
         .trigger_action(AppAction::CloseDocumentsToRight(0));
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().active_doc_idx, Some(0));
+    assert_eq!(
+        harness.state_mut().app_state_mut().document.active_doc_idx,
+        Some(0)
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -3039,7 +3315,15 @@ fn test_integration_tab_close_all() {
         .trigger_action(AppAction::CloseAllDocuments);
     harness.step();
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 0);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        0
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -3063,7 +3347,15 @@ fn test_integration_tab_restore_closed_limit() {
         paths.push(p);
     }
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 11);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        11
+    );
 
     // Close all of them
     for _ in 0..11 {
@@ -3075,11 +3367,20 @@ fn test_integration_tab_restore_closed_limit() {
     }
 
     // Now open_documents should be 0, and recently closed should be 10 (since max is 10)
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 0);
     assert_eq!(
         harness
             .state_mut()
             .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        0
+    );
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
             .recently_closed_tabs
             .len(),
         10
@@ -3093,11 +3394,20 @@ fn test_integration_tab_restore_closed_limit() {
         harness.step();
     }
 
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 10);
     assert_eq!(
         harness
             .state_mut()
             .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        10
+    );
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
             .recently_closed_tabs
             .len(),
         0
@@ -3108,7 +3418,15 @@ fn test_integration_tab_restore_closed_limit() {
         .state_mut()
         .trigger_action(AppAction::RestoreClosedDocument);
     harness.step();
-    assert_eq!(harness.state_mut().app_state_mut().open_documents.len(), 10);
+    assert_eq!(
+        harness
+            .state_mut()
+            .app_state_mut()
+            .document
+            .open_documents
+            .len(),
+        10
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -3188,7 +3506,7 @@ fn test_regression_update_dialog_up_to_date_renders_correctly() {
                 )),
                 std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
             );
-            state.settings.settings_mut().terms_accepted_version =
+            state.config.settings.settings_mut().terms_accepted_version =
                 Some(katana_ui::about_info::APP_VERSION.to_string());
             katana_ui::i18n::set_language("en");
             let mut app = KatanaApp::new(state);
@@ -3201,7 +3519,7 @@ fn test_regression_update_dialog_up_to_date_renders_correctly() {
 
     // The app generally triggers a background update check on startup.
     // We override the state here to force the "up to date" dialog path.
-    harness.state_mut().app_state_mut().checking_for_updates = false;
+    harness.state_mut().app_state_mut().update.checking = false;
 
     // Open the update dialog via the test helper.
     harness.state_mut().open_update_dialog_for_test();
@@ -3245,7 +3563,7 @@ fn test_regression_update_dialog_does_not_stretch_vertically() {
                 )),
                 std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
             );
-            state.settings.settings_mut().terms_accepted_version =
+            state.config.settings.settings_mut().terms_accepted_version =
                 Some(katana_ui::about_info::APP_VERSION.to_string());
             katana_ui::i18n::set_language("en");
             let mut app = KatanaApp::new(state);
@@ -3282,8 +3600,11 @@ fn test_integration_auto_save_interval_precision_preserved_by_ui() {
     harness
         .state_mut()
         .trigger_action(AppAction::ToggleSettings);
-    harness.state_mut().app_state_mut().active_settings_tab =
-        katana_ui::app_state::SettingsTab::Behavior;
+    harness
+        .state_mut()
+        .app_state_mut()
+        .config
+        .active_settings_tab = katana_ui::app_state::SettingsTab::Behavior;
     harness.step();
     harness.step();
 
@@ -3291,6 +3612,7 @@ fn test_integration_auto_save_interval_precision_preserved_by_ui() {
     harness
         .state_mut()
         .app_state_mut()
+        .config
         .settings
         .settings_mut()
         .behavior
@@ -3306,6 +3628,7 @@ fn test_integration_auto_save_interval_precision_preserved_by_ui() {
     let final_val = harness
         .state_mut()
         .app_state_mut()
+        .config
         .settings
         .settings()
         .behavior

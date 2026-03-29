@@ -30,28 +30,33 @@ impl DocumentOps for KatanaApp {
                 if p == std::path::Path::new("") {
                     break;
                 }
-                self.state.expanded_directories.insert(p.to_path_buf());
+                self.state
+                    .workspace
+                    .expanded_directories
+                    .insert(p.to_path_buf());
                 parent = p.parent();
             }
         }
 
         if let Some(idx) = self
             .state
+            .document
             .open_documents
             .iter()
             .position(|d| d.path == path)
         {
             if activate {
-                self.state.active_doc_idx = Some(idx);
-                let doc = &mut self.state.open_documents[idx];
+                self.state.document.active_doc_idx = Some(idx);
+                let doc = &mut self.state.document.open_documents[idx];
                 if !doc.is_loaded {
                     if let Ok(loaded_doc) = self.fs.load_document(&path) {
                         *doc = loaded_doc;
                     }
                 }
-                let src = self.state.open_documents[idx].buffer.clone();
+                let src = self.state.document.open_documents[idx].buffer.clone();
                 let concurrency = self
                     .state
+                    .config
                     .settings
                     .settings()
                     .performance
@@ -67,19 +72,21 @@ impl DocumentOps for KatanaApp {
                     let src = doc.buffer.clone();
                     let concurrency = self
                         .state
+                        .config
                         .settings
                         .settings()
                         .performance
                         .diagram_concurrency;
                     self.full_refresh_preview(&path, &src, false, concurrency);
-                    self.state.open_documents.push(doc);
-                    self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
+                    self.state.document.open_documents.push(doc);
+                    self.state.document.active_doc_idx =
+                        Some(self.state.document.open_documents.len() - 1);
                     self.state.initialize_tab_split_state(path.clone());
                     self.save_workspace_state();
                 }
                 Err(e) => {
                     let error = e.to_string();
-                    self.state.status_message = Some((
+                    self.state.layout.status_message = Some((
                         crate::i18n::tf(
                             &crate::i18n::get().status.cannot_open_file,
                             &[("error", error.as_str())],
@@ -91,6 +98,7 @@ impl DocumentOps for KatanaApp {
         } else {
             // Lazy load: just add to tabs
             self.state
+                .document
                 .open_documents
                 .push(katana_core::document::Document::new_empty(path.clone()));
             self.state.initialize_tab_split_state(path);
@@ -98,22 +106,23 @@ impl DocumentOps for KatanaApp {
         }
     }
     fn force_close_document(&mut self, idx: usize) {
-        if idx < self.state.open_documents.len() {
-            let closed_doc = self.state.open_documents.remove(idx);
+        if idx < self.state.document.open_documents.len() {
+            let closed_doc = self.state.document.open_documents.remove(idx);
             self.state.push_recently_closed(closed_doc.path);
-            self.state.active_doc_idx = if self.state.open_documents.is_empty() {
+            self.state.document.active_doc_idx = if self.state.document.open_documents.is_empty() {
                 None
             } else {
                 Some(
                     self.state
+                        .document
                         .active_doc_idx
                         .unwrap_or(0)
-                        .saturating_sub(if self.state.active_doc_idx == Some(idx) {
+                        .saturating_sub(if self.state.document.active_doc_idx == Some(idx) {
                             1
                         } else {
                             0
                         })
-                        .min(self.state.open_documents.len().saturating_sub(1)),
+                        .min(self.state.document.open_documents.len().saturating_sub(1)),
                 )
             };
         }
@@ -148,7 +157,7 @@ impl DocumentOps for KatanaApp {
         };
         match self.fs.save_document(doc) {
             Ok(()) => {
-                self.state.status_message = Some((
+                self.state.layout.status_message = Some((
                     crate::i18n::get().status.saved.clone(),
                     crate::app_state::StatusType::Success,
                 ));
@@ -156,7 +165,7 @@ impl DocumentOps for KatanaApp {
             }
             Err(e) => {
                 let error = e.to_string();
-                self.state.status_message = Some((
+                self.state.layout.status_message = Some((
                     crate::i18n::tf(
                         &crate::i18n::get().status.save_failed,
                         &[("error", error.as_str())],

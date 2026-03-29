@@ -22,7 +22,7 @@ fn app_state_show_settings_defaults_to_false() {
         katana_platform::SettingsService::default(),
         std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
-    assert!(!state.show_settings);
+    assert!(!state.layout.show_settings);
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn app_state_active_settings_tab_defaults_to_theme() {
         katana_platform::SettingsService::default(),
         std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
-    assert_eq!(state.active_settings_tab, SettingsTab::Theme);
+    assert_eq!(state.config.active_settings_tab, SettingsTab::Theme);
 }
 
 #[test]
@@ -45,11 +45,11 @@ fn show_settings_can_be_toggled() {
         std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
 
-    assert!(!state.show_settings);
-    state.show_settings = true;
-    assert!(state.show_settings);
-    state.show_settings = false;
-    assert!(!state.show_settings);
+    assert!(!state.layout.show_settings);
+    state.layout.show_settings = true;
+    assert!(state.layout.show_settings);
+    state.layout.show_settings = false;
+    assert!(!state.layout.show_settings);
 }
 
 #[test]
@@ -61,11 +61,11 @@ fn active_settings_tab_can_be_changed() {
         std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
     );
 
-    assert_eq!(state.active_settings_tab, SettingsTab::Theme);
-    state.active_settings_tab = SettingsTab::Font;
-    assert_eq!(state.active_settings_tab, SettingsTab::Font);
-    state.active_settings_tab = SettingsTab::Layout;
-    assert_eq!(state.active_settings_tab, SettingsTab::Layout);
+    assert_eq!(state.config.active_settings_tab, SettingsTab::Theme);
+    state.config.active_settings_tab = SettingsTab::Font;
+    assert_eq!(state.config.active_settings_tab, SettingsTab::Font);
+    state.config.active_settings_tab = SettingsTab::Layout;
+    assert_eq!(state.config.active_settings_tab, SettingsTab::Layout);
 }
 
 #[test]

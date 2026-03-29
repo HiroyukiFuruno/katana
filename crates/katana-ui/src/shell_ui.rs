@@ -165,7 +165,7 @@ pub(crate) fn render_status_bar(
 ) {
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            let (msg, kind) = if let Some((msg, kind)) = &state.status_message {
+            let (msg, kind) = if let Some((msg, kind)) = &state.layout.status_message {
                 (msg.as_str(), Some(kind))
             } else {
                 (crate::i18n::get().status.ready.as_str(), None)
@@ -262,11 +262,11 @@ pub(crate) fn render_workspace_panel(
                         .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                         .clicked()
                     {
-                        state.show_workspace = false;
+                        state.layout.show_workspace = false;
                     }
                 });
             });
-            if state.workspace.is_some() {
+            if state.workspace.data.is_some() {
                 ui.horizontal(|ui| {
                     let btn_resp = ui
                         .add(egui::Button::image(
@@ -277,8 +277,9 @@ pub(crate) fn render_workspace_panel(
                         egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "+")
                     });
                     if btn_resp.clicked() {
-                        if let Some(ws) = &state.workspace {
+                        if let Some(ws) = &state.workspace.data {
                             state
+                                .workspace
                                 .expanded_directories
                                 .extend(ws.collect_all_directory_paths());
                         }
@@ -292,7 +293,7 @@ pub(crate) fn render_workspace_panel(
                         egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "-")
                     });
                     if btn_resp.clicked() {
-                        state.force_tree_open = Some(false);
+                        state.workspace.force_tree_open = Some(false);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let icon_bg = if ui.visuals().dark_mode {
@@ -301,14 +302,20 @@ pub(crate) fn render_workspace_panel(
                             crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG) // Always gray for icons in light mode
                         };
 
-                        if !state.settings.settings().workspace.paths.is_empty() {
+                        if !state.config.settings.settings().workspace.paths.is_empty() {
                             let ws_history_img =
                                 crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Small);
                             ui.scope(|ui| {
                                 ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
                                 ui.menu_image_button(ws_history_img, |ui| {
-                                    for path in
-                                        state.settings.settings().workspace.paths.iter().rev()
+                                    for path in state
+                                        .config
+                                        .settings
+                                        .settings()
+                                        .workspace
+                                        .paths
+                                        .iter()
+                                        .rev()
                                     {
                                         ui.horizontal(|ui| {
                                             if ui
@@ -358,7 +365,7 @@ pub(crate) fn render_workspace_panel(
                             *action = AppAction::RefreshWorkspace;
                         }
 
-                        let filter_btn_color = if state.filter_enabled {
+                        let filter_btn_color = if state.search.filter_enabled {
                             if ui.visuals().dark_mode {
                                 ui.visuals().selection.bg_fill
                             } else {
@@ -380,7 +387,7 @@ pub(crate) fn render_workspace_panel(
                             .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                             .clicked()
                         {
-                            state.filter_enabled = !state.filter_enabled;
+                            state.search.filter_enabled = !state.search.filter_enabled;
                         }
 
                         if ui
@@ -394,15 +401,15 @@ pub(crate) fn render_workspace_panel(
                             .on_hover_text(crate::i18n::get().search.modal_title.clone())
                             .clicked()
                         {
-                            state.show_search_modal = true;
+                            state.layout.show_search_modal = true;
                         }
                     });
                 });
 
-                if state.filter_enabled {
+                if state.search.filter_enabled {
                     let mut is_valid_regex = true;
-                    if !state.filter_query.is_empty() {
-                        is_valid_regex = regex::Regex::new(&state.filter_query).is_ok();
+                    if !state.search.filter_query.is_empty() {
+                        is_valid_regex = regex::Regex::new(&state.search.filter_query).is_ok();
                     }
                     ui.horizontal(|ui| {
                         let text_color = if is_valid_regex {
@@ -419,7 +426,7 @@ pub(crate) fn render_workspace_panel(
                                 })
                         };
                         ui.add(
-                            egui::TextEdit::singleline(&mut state.filter_query)
+                            egui::TextEdit::singleline(&mut state.search.filter_query)
                                 .text_color(text_color)
                                 .hint_text("Filter (Regex)...")
                                 .desired_width(f32::INFINITY),
@@ -428,7 +435,7 @@ pub(crate) fn render_workspace_panel(
                 }
             }
             ui.separator();
-            if state.is_loading_workspace {
+            if state.workspace.is_loading {
                 ui.add_space(WORKSPACE_SPINNER_OUTER_MARGIN);
                 ui.horizontal(|ui| {
                     ui.add_space(WORKSPACE_SPINNER_INNER_MARGIN);
@@ -447,41 +454,44 @@ pub(crate) fn render_workspace_content(
     state: &mut AppState,
     action: &mut AppAction,
 ) {
-    if let Some(ws) = &state.workspace {
+    if let Some(ws) = &state.workspace.data {
         let entries = ws.tree.clone();
-        if let Some(force) = state.force_tree_open {
+        if let Some(force) = state.workspace.force_tree_open {
             if force {
                 state
+                    .workspace
                     .expanded_directories
                     .extend(ws.collect_all_directory_paths());
             } else {
-                state.expanded_directories.clear();
+                state.workspace.expanded_directories.clear();
             }
         }
         let active_path = state.active_path().map(|p| p.to_path_buf());
 
         let ws_root = ws.root.clone();
-        if state.filter_enabled && !state.filter_query.is_empty() {
-            let is_negated = state.filter_query.starts_with('!');
+        if state.search.filter_enabled && !state.search.filter_query.is_empty() {
+            let is_negated = state.search.filter_query.starts_with('!');
             let query_str = if is_negated {
-                &state.filter_query[1..]
+                &state.search.filter_query[1..]
             } else {
-                &state.filter_query
+                &state.search.filter_query
             };
 
             if let Ok(regex) = regex::Regex::new(query_str) {
-                if state.filter_cache.as_ref().map(|(q, _)| q) != Some(&state.filter_query) {
+                if state.search.filter_cache.as_ref().map(|(q, _)| q)
+                    != Some(&state.search.filter_query)
+                {
                     let mut visible = std::collections::HashSet::new();
                     gather_visible_paths(&entries, &regex, is_negated, &ws_root, &mut visible);
-                    state.filter_cache = Some((state.filter_query.clone(), visible));
+                    state.search.filter_cache = Some((state.search.filter_query.clone(), visible));
                 }
             } else {
-                state.filter_cache = None;
+                state.search.filter_cache = None;
             }
         } else {
-            state.filter_cache = None;
+            state.search.filter_cache = None;
         }
-        let filter_set = state.filter_cache.as_ref().map(|(_, v)| v);
+        let filter_set = state.search.filter_cache.as_ref().map(|(_, v)| v);
 
         egui::ScrollArea::vertical()
             .id_salt("workspace_tree_scroll")
@@ -492,14 +502,14 @@ pub(crate) fn render_workspace_content(
                     depth: 0,
                     active_path: active_path.as_deref(),
                     filter_set,
-                    expanded_directories: &mut state.expanded_directories,
+                    expanded_directories: &mut state.workspace.expanded_directories,
                     disable_context_menu: false,
                 };
                 for entry in &entries {
                     render_tree_entry(ui, entry, &mut ctx);
                 }
             });
-        state.force_tree_open = None;
+        state.workspace.force_tree_open = None;
     } else {
         ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
         ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
@@ -512,7 +522,7 @@ pub(crate) fn render_workspace_content(
             }
         }
 
-        let recent_paths = &state.settings.settings().workspace.paths;
+        let recent_paths = &state.config.settings.settings().workspace.paths;
         if !recent_paths.is_empty() {
             ui.add_space(RECENT_WORKSPACES_SPACING);
             ui.separator();
@@ -561,7 +571,7 @@ pub(crate) fn render_preview_content(
         if let Some(doc) = state.active_document() {
             let _buffer = &doc.buffer;
             let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
-            let editor_y = *fraction * state.editor_max_scroll.max(1.0);
+            let editor_y = *fraction * state.scroll.editor_max.max(1.0);
 
             let mut points = Vec::new();
             points.push((0.0, 0.0));
@@ -571,7 +581,7 @@ pub(crate) fn render_preview_content(
                 points.push((e_y, p_y));
             }
             points.push((
-                state.editor_max_scroll.max(1.0),
+                state.scroll.editor_max.max(1.0),
                 (*prev_max_scroll).max(1.0),
             ));
 
@@ -627,18 +637,18 @@ pub(crate) fn render_preview_content(
                         let mut hovered_lines = Vec::new();
                         let (req, actions) = preview.show_content(
                             ui,
-                            state.active_editor_line,
+                            state.scroll.active_editor_line,
                             Some(&mut hovered_lines),
                         );
                         if scroll_sync && *source != ScrollSource::Preview {
-                            state.hovered_preview_lines = hovered_lines.clone();
+                            state.scroll.hovered_preview_lines = hovered_lines.clone();
                         }
 
                         if ui.rect_contains_pointer(ui.min_rect())
                             && ui.input(|i| i.pointer.primary_clicked())
                         {
                             if let Some(hovered) = hovered_lines.first() {
-                                state.scroll_to_line = Some(hovered.start);
+                                state.scroll.scroll_to_line = Some(hovered.start);
                             }
                         }
                         download_req = req;
@@ -681,7 +691,7 @@ pub(crate) fn render_preview_content(
                         let p_y = (rect.min.y - preview.content_top_y).max(0.0);
                         points.push((e_y, p_y));
                     }
-                    points.push((state.editor_max_scroll.max(1.0), max_scroll));
+                    points.push((state.scroll.editor_max.max(1.0), max_scroll));
 
                     let mut mapped_y = 0.0;
                     for i in 0..points.len() - 1 {
@@ -704,7 +714,7 @@ pub(crate) fn render_preview_content(
                 }
 
                 let current_fraction =
-                    (editor_target_y / state.editor_max_scroll.max(1.0)).clamp(0.0, 1.0);
+                    (editor_target_y / state.scroll.editor_max.max(1.0)).clamp(0.0, 1.0);
                 let diff = (current_fraction - *fraction).abs();
                 if diff > SCROLL_SYNC_DEAD_ZONE {
                     *fraction = current_fraction;
@@ -724,7 +734,7 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
     let margin = f32::from(PREVIEW_CONTENT_PADDING);
     let spacing = ui.spacing().item_spacing.x;
     let mut button_count = 2.0; // Refresh + Export
-    if state.settings.settings().layout.toc_visible {
+    if state.config.settings.settings().layout.toc_visible {
         button_count += 1.0;
     }
     let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
@@ -802,8 +812,8 @@ pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action:
         });
     });
 
-    if state.settings.settings().layout.toc_visible {
-        let toc_bg = if state.show_toc {
+    if state.config.settings.settings().layout.toc_visible {
+        let toc_bg = if state.layout.show_toc {
             if ui.visuals().dark_mode {
                 ui.visuals().selection.bg_fill
             } else {
@@ -840,8 +850,8 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
     let mut dragged_source: Option<(usize, f32)> = None;
     let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
 
-    let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
-    let doc_count = state.open_documents.len();
+    let ws_root = state.workspace.data.as_ref().map(|ws| ws.root.clone());
+    let doc_count = state.document.open_documents.len();
 
     ui.style_mut().interaction.tooltip_delay = TAB_TOOLTIP_SHOW_DELAY_SECS;
 
@@ -864,8 +874,8 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                 let mut dragging_ghost_info = None;
 
                 ui.horizontal(|ui| {
-                    for (idx, doc) in state.open_documents.iter().enumerate() {
-                        let is_active = state.active_doc_idx == Some(idx);
+                    for (idx, doc) in state.document.open_documents.iter().enumerate() {
+                        let is_active = state.document.active_doc_idx == Some(idx);
                         let original_filename = doc.file_name().unwrap_or("untitled");
                         let is_changelog =
                             doc.path.to_string_lossy().starts_with("Katana://ChangeLog");
@@ -1045,7 +1055,7 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
                                 tab_action = Some(AppAction::TogglePinDocument(idx));
                                 ui.close();
                             }
-                            if !state.recently_closed_tabs.is_empty() {
+                            if !state.document.recently_closed_tabs.is_empty() {
                                 ui.separator();
                                 if ui.button(&i18n.tab.restore_closed).clicked() {
                                     tab_action = Some(AppAction::RestoreClosedDocument);
@@ -1137,10 +1147,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
             .clicked()
         {
-            if let Some(idx) = state.active_doc_idx {
+            if let Some(idx) = state.document.active_doc_idx {
                 let new_idx = crate::shell_logic::prev_tab_index(idx, doc_count);
                 tab_action = Some(AppAction::SelectDocument(
-                    state.open_documents[new_idx].path.clone(),
+                    state.document.open_documents[new_idx].path.clone(),
                 ));
                 ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
             }
@@ -1157,10 +1167,10 @@ pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &m
             .on_hover_text(crate::i18n::get().tab.nav_next.clone())
             .clicked()
         {
-            if let Some(idx) = state.active_doc_idx {
+            if let Some(idx) = state.document.active_doc_idx {
                 let new_idx = crate::shell_logic::next_tab_index(idx, doc_count);
                 tab_action = Some(AppAction::SelectDocument(
-                    state.open_documents[new_idx].path.clone(),
+                    state.document.open_documents[new_idx].path.clone(),
                 ));
                 ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
             }
@@ -1228,7 +1238,7 @@ pub(crate) fn render_view_mode_bar(
         egui::Layout::right_to_left(egui::Align::Center),
         |ui| {
             // Render non-intrusive Update Available Badge
-            if state.update_available.is_some() && !state.checking_for_updates {
+            if state.update.available.is_some() && !state.update.checking {
                 const COLOR_SUCCESS_G: u8 = 200;
                 let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
                 let badge_text = egui::RichText::new(badge_str)
@@ -1346,9 +1356,14 @@ pub(crate) fn render_view_mode_bar(
 
                 ui.separator();
 
-                let mut is_on = state
-                    .scroll_sync_override
-                    .unwrap_or(state.settings.settings().behavior.scroll_sync_enabled);
+                let mut is_on = state.scroll.sync_override.unwrap_or(
+                    state
+                        .config
+                        .settings
+                        .settings()
+                        .behavior
+                        .scroll_sync_enabled,
+                );
 
                 const TOGGLE_LABEL_SPACING: f32 = 8.0;
 
@@ -1364,7 +1379,7 @@ pub(crate) fn render_view_mode_bar(
                 );
 
                 if resp.clicked() {
-                    state.scroll_sync_override = Some(is_on);
+                    state.scroll.sync_override = Some(is_on);
                 }
             }
         },
@@ -1430,10 +1445,10 @@ pub(crate) fn render_editor_content(
 
         let mut scroll_area = egui::ScrollArea::vertical().id_salt("editor_scroll");
 
-        let consuming_preview = sync_scroll && state.scroll_source == ScrollSource::Preview;
+        let consuming_preview = sync_scroll && state.scroll.source == ScrollSource::Preview;
         if consuming_preview {
             scroll_area = scroll_area
-                .vertical_scroll_offset(state.scroll_fraction * state.editor_max_scroll.max(1.0));
+                .vertical_scroll_offset(state.scroll.fraction * state.scroll.editor_max.max(1.0));
         }
 
         let output = egui::Frame::NONE.fill(code_bg).show(ui, |ui| {
@@ -1474,7 +1489,7 @@ pub(crate) fn render_editor_content(
                                 .take(char_idx)
                                 .filter(|&ch| ch == '\n')
                                 .count();
-                            state.scroll_to_line = Some(line);
+                            state.scroll.scroll_to_line = Some(line);
                         }
                     }
 
@@ -1487,7 +1502,7 @@ pub(crate) fn render_editor_content(
                             .take(char_idx)
                             .filter(|&ch| ch == '\n')
                             .count();
-                        state.active_editor_line = Some(paragraph);
+                        state.scroll.active_editor_line = Some(paragraph);
 
                         let cursor_rect = galley.pos_from_cursor(c.primary);
                         current_cursor_y = Some(cursor_rect.min.y);
@@ -1511,7 +1526,7 @@ pub(crate) fn render_editor_content(
                         ui.painter()
                             .rect_filled(highlight_rect, 1.0, highlight_color);
                     } else {
-                        state.active_editor_line = None;
+                        state.scroll.active_editor_line = None;
                     }
 
                     // Hover highlights from preview pane
@@ -1524,7 +1539,7 @@ pub(crate) fn render_editor_content(
                         }
                     });
 
-                    for line_range in &state.hovered_preview_lines {
+                    for line_range in &state.scroll.hovered_preview_lines {
                         let mut current_line = 0;
                         let mut start_char = None;
                         let mut end_char = None;
@@ -1622,7 +1637,7 @@ pub(crate) fn render_editor_content(
                             let resp =
                                 ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
                             if resp.clicked() {
-                                state.scroll_to_line = Some(p);
+                                state.scroll.scroll_to_line = Some(p);
                             }
                             if resp.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -1641,7 +1656,7 @@ pub(crate) fn render_editor_content(
                         *action = AppAction::UpdateBuffer(buffer.clone());
                     }
 
-                    if let Some(target_line) = state.scroll_to_line.take() {
+                    if let Some(target_line) = state.scroll.scroll_to_line.take() {
                         let mut current_line = 0;
                         let mut target_char = None;
                         for (char_idx, c) in buffer.chars().enumerate() {
@@ -1675,22 +1690,22 @@ pub(crate) fn render_editor_content(
         if sync_scroll {
             let max_scroll =
                 (output.inner.content_size.y - output.inner.inner_rect.height()).max(0.0);
-            state.editor_max_scroll = max_scroll;
+            state.scroll.editor_max = max_scroll;
 
             if consuming_preview {
-                state.scroll_source = ScrollSource::Neither;
+                state.scroll.source = ScrollSource::Neither;
                 if max_scroll > 0.0 {
-                    state.scroll_fraction =
+                    state.scroll.fraction =
                         (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
                 }
             } else {
                 if max_scroll > 0.0 {
                     let current_fraction =
                         (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
-                    let diff = (current_fraction - state.scroll_fraction).abs();
+                    let diff = (current_fraction - state.scroll.fraction).abs();
                     if diff > SCROLL_SYNC_DEAD_ZONE {
-                        state.scroll_fraction = current_fraction;
-                        state.scroll_source = ScrollSource::Editor;
+                        state.scroll.fraction = current_fraction;
+                        state.scroll.source = ScrollSource::Editor;
                     }
                 }
             }
@@ -2139,6 +2154,7 @@ fn render_horizontal_split(
     let half_width = (available_width * SPLIT_HALF_RATIO).max(SPLIT_PREVIEW_PANEL_MIN_WIDTH);
     let preview_bg = theme_bridge::rgb_to_color32(
         app.state
+            .config
             .settings
             .settings()
             .effective_theme_colors()
@@ -2147,9 +2163,9 @@ fn render_horizontal_split(
     );
     let active_path = app.state.active_document().map(|d| d.path.clone());
     let mut scroll_state = (
-        app.state.scroll_fraction,
-        app.state.scroll_source,
-        app.state.preview_max_scroll,
+        app.state.scroll.fraction,
+        app.state.scroll.source,
+        app.state.scroll.preview_max,
     );
     let mut download_req = None;
     let panel_id = match pane_order {
@@ -2163,10 +2179,14 @@ fn render_horizontal_split(
         PaneOrder::PreviewFirst => egui::SidePanel::left(panel_id),
     };
 
-    let scroll_sync = app
-        .state
-        .scroll_sync_override
-        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
+    let scroll_sync = app.state.scroll.sync_override.unwrap_or(
+        app.state
+            .config
+            .settings
+            .settings()
+            .behavior
+            .scroll_sync_enabled,
+    );
 
     panel_side
         .resizable(true)
@@ -2191,9 +2211,9 @@ fn render_horizontal_split(
     // Sync preview's scroll state to app.state BEFORE the editor renders.
     // The editor reads/writes app.state directly; writing back after the
     // editor would overwrite the editor's consumption of scroll signals.
-    app.state.scroll_fraction = scroll_state.0;
-    app.state.scroll_source = scroll_state.1;
-    app.state.preview_max_scroll = scroll_state.2;
+    app.state.scroll.fraction = scroll_state.0;
+    app.state.scroll.source = scroll_state.1;
+    app.state.scroll.preview_max = scroll_state.2;
 
     egui::CentralPanel::default()
         .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
@@ -2214,6 +2234,7 @@ fn render_vertical_split(
     let half_height = available_height * SPLIT_HALF_RATIO;
     let preview_bg = theme_bridge::rgb_to_color32(
         app.state
+            .config
             .settings
             .settings()
             .effective_theme_colors()
@@ -2222,9 +2243,9 @@ fn render_vertical_split(
     );
     let active_path = app.state.active_document().map(|d| d.path.clone());
     let mut scroll_state = (
-        app.state.scroll_fraction,
-        app.state.scroll_source,
-        app.state.preview_max_scroll,
+        app.state.scroll.fraction,
+        app.state.scroll.source,
+        app.state.scroll.preview_max,
     );
     let mut download_req = None;
     let panel_id = match pane_order {
@@ -2236,10 +2257,14 @@ fn render_vertical_split(
 
     // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
     let show_preview_top = pane_order == PaneOrder::PreviewFirst;
-    let scroll_sync = app
-        .state
-        .scroll_sync_override
-        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
+    let scroll_sync = app.state.scroll.sync_override.unwrap_or(
+        app.state
+            .config
+            .settings
+            .settings()
+            .behavior
+            .scroll_sync_enabled,
+    );
 
     if show_preview_top {
         egui::TopBottomPanel::top(panel_id)
@@ -2268,9 +2293,9 @@ fn render_vertical_split(
         // The editor reads from app.state directly, so it must see the preview's
         // latest scroll_source/fraction. After the editor runs, its writes to
         // app.state are preserved (no subsequent overwrite).
-        app.state.scroll_fraction = scroll_state.0;
-        app.state.scroll_source = scroll_state.1;
-        app.state.preview_max_scroll = scroll_state.2;
+        app.state.scroll.fraction = scroll_state.0;
+        app.state.scroll.source = scroll_state.1;
+        app.state.scroll.preview_max = scroll_state.2;
 
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
@@ -2300,9 +2325,9 @@ fn render_vertical_split(
                 }
             });
 
-        app.state.scroll_fraction = scroll_state.0;
-        app.state.scroll_source = scroll_state.1;
-        app.state.preview_max_scroll = scroll_state.2;
+        app.state.scroll.fraction = scroll_state.0;
+        app.state.scroll.source = scroll_state.1;
+        app.state.scroll.preview_max = scroll_state.2;
 
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
@@ -2321,6 +2346,7 @@ fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
         0.0,
         theme_bridge::rgb_to_color32(
             app.state
+                .config
                 .settings
                 .settings()
                 .effective_theme_colors()
@@ -2713,29 +2739,30 @@ impl eframe::App for KatanaApp {
         }
 
         // --- Auto-Save Timer ---
-        let auto_save_enabled = self.state.settings.settings().behavior.auto_save;
+        let auto_save_enabled = self.state.config.settings.settings().behavior.auto_save;
         let auto_save_interval = self
             .state
+            .config
             .settings
             .settings()
             .behavior
             .auto_save_interval_secs;
         if auto_save_enabled && auto_save_interval > 0.0 {
             let now = std::time::Instant::now();
-            if let Some(last) = self.state.last_auto_save {
+            if let Some(last) = self.state.document.last_auto_save {
                 if now.duration_since(last).as_secs_f64() >= auto_save_interval {
                     if let Some(doc) = self.state.active_document() {
                         if doc.is_dirty {
                             self.pending_action = crate::app_state::AppAction::SaveDocument;
                         }
                     }
-                    self.state.last_auto_save = Some(now);
+                    self.state.document.last_auto_save = Some(now);
                 }
             } else {
-                self.state.last_auto_save = Some(now);
+                self.state.document.last_auto_save = Some(now);
             }
         } else {
-            self.state.last_auto_save = None;
+            self.state.document.last_auto_save = None;
         }
 
         // Pre-calculate splash state to prevent flickering of the background UI.
@@ -2747,7 +2774,12 @@ impl eframe::App for KatanaApp {
         let splash_is_opaque = self.splash_start.is_some() && splash_opacity >= 1.0;
 
         // Apply theme colours to egui Visuals (only when the palette changed)
-        let theme_colors = self.state.settings.settings().effective_theme_colors();
+        let theme_colors = self
+            .state
+            .config
+            .settings
+            .settings()
+            .effective_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
             let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
@@ -2769,14 +2801,14 @@ impl eframe::App for KatanaApp {
         }
 
         // Apply font size to egui text styles (only when the size changed)
-        let font_size = self.state.settings.settings().clamped_font_size();
+        let font_size = self.state.config.settings.settings().clamped_font_size();
         if self.cached_font_size != Some(font_size) {
             theme_bridge::apply_font_size(ctx, font_size);
             self.cached_font_size = Some(font_size);
         }
 
         // Apply font family by rebuilding FontDefinitions (only when family changed)
-        let font_family = self.state.settings.settings().font.family.clone();
+        let font_family = self.state.config.settings.settings().font.family.clone();
         if self.cached_font_family.as_deref() != Some(&font_family) {
             theme_bridge::apply_font_family(ctx, &font_family);
             self.cached_font_family = Some(font_family);
@@ -2791,7 +2823,7 @@ impl eframe::App for KatanaApp {
                 },
                 egui::Key::T,
             ))
-        }) && !self.state.recently_closed_tabs.is_empty()
+        }) && !self.state.document.recently_closed_tabs.is_empty()
         {
             self.pending_action = AppAction::RestoreClosedDocument;
         }
@@ -2802,7 +2834,7 @@ impl eframe::App for KatanaApp {
                 egui::Key::P,
             ))
         }) {
-            self.state.show_search_modal = true;
+            self.state.layout.show_search_modal = true;
             // The query will persist across invocations as per standard fuzzy finders
         }
 
@@ -2888,6 +2920,7 @@ impl eframe::App for KatanaApp {
             let terms_ver = crate::about_info::APP_VERSION.to_string();
             let accepted_ver = self
                 .state
+                .config
                 .settings
                 .settings()
                 .terms_accepted_version
@@ -2910,7 +2943,7 @@ impl eframe::App for KatanaApp {
             render_status_bar(ctx, &self.state, &export_filenames);
 
             // Reflect the file name in the window title
-            let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+            let ws_root_for_title = self.state.workspace.data.as_ref().map(|ws| ws.root.clone());
             let title_text = match self.state.active_document() {
                 Some(doc) => {
                     let fname = doc.file_name().unwrap_or("");
@@ -2923,9 +2956,9 @@ impl eframe::App for KatanaApp {
                 }
                 None => "KatanA".to_string(),
             };
-            if self.state.last_window_title != title_text {
+            if self.state.layout.last_window_title != title_text {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
-                self.state.last_window_title = title_text.clone();
+                self.state.layout.last_window_title = title_text.clone();
             }
 
             // In-app title bar
@@ -2940,7 +2973,7 @@ impl eframe::App for KatanaApp {
             });
 
             // Show the collapse toggle button even when the workspace is hidden.
-            if !self.state.show_workspace {
+            if !self.state.layout.show_workspace {
                 egui::SidePanel::left("workspace_collapsed")
                     .resizable(false)
                     .exact_width(SIDEBAR_COLLAPSED_TOGGLE_WIDTH)
@@ -2954,7 +2987,7 @@ impl eframe::App for KatanaApp {
                                 .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                                 .clicked()
                             {
-                                self.state.show_workspace = true;
+                                self.state.layout.show_workspace = true;
                             }
                         });
                     });
@@ -2972,7 +3005,7 @@ impl eframe::App for KatanaApp {
 
                     if !is_changelog {
                         let doc_path = doc.path.clone();
-                        let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+                        let ws_root = self.state.workspace.data.as_ref().map(|ws| ws.root.clone());
                         let rel = relative_full_path(&doc_path, ws_root.as_deref());
                         let mut breadcrumb_action = None;
                         ui.horizontal(|ui| {
@@ -3011,7 +3044,7 @@ impl eframe::App for KatanaApp {
                                     ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
                                         let mut ctx_action = crate::app_state::AppAction::None;
 
-                                        if let Some(ws) = &self.state.workspace {
+                                        if let Some(ws) = &self.state.workspace.data {
                                             if let Some(
                                                 katana_core::workspace::TreeEntry::Directory {
                                                     children,
@@ -3055,7 +3088,9 @@ impl eframe::App for KatanaApp {
                 }
             }
 
-            if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
+            if self.state.layout.show_toc
+                && self.state.config.settings.settings().layout.toc_visible
+            {
                 if let Some(doc) = self.state.active_document() {
                     if let Some(preview) = self.tab_previews.iter_mut().find(|p| p.path == doc.path)
                     {
@@ -3113,7 +3148,7 @@ impl eframe::App for KatanaApp {
             self.pending_action = settings_action;
         }
 
-        if self.state.show_search_modal {
+        if self.state.layout.show_search_modal {
             render_search_modal(ctx, &mut self.state, &mut self.pending_action);
         }
 
@@ -3140,13 +3175,13 @@ impl eframe::App for KatanaApp {
         }
 
         // File system operation modals
-        if self.state.create_fs_node_modal_state.is_some() {
+        if self.state.layout.create_fs_node_modal.is_some() {
             render_create_fs_node_modal(ctx, &mut self.state, &mut self.pending_action);
         }
-        if self.state.rename_modal_state.is_some() {
+        if self.state.layout.rename_modal.is_some() {
             render_rename_modal(ctx, &mut self.state, &mut self.pending_action);
         }
-        if self.state.delete_modal_state.is_some() {
+        if self.state.layout.delete_modal.is_some() {
             render_delete_modal(ctx, &mut self.state, &mut self.pending_action);
         }
 
@@ -3432,9 +3467,10 @@ mod tests {
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         state
+            .document
             .open_documents
             .push(Document::new(path, "# Heading\n\nBody"));
-        state.active_doc_idx = Some(0);
+        state.document.active_doc_idx = Some(0);
         state
     }
 
@@ -3444,9 +3480,10 @@ mod tests {
             doc.buffer = markdown.to_string();
         }
         let mut pane = PreviewPane::default();
-        let cache = app.state.cache.clone();
+        let cache = app.state.config.cache.clone();
         let concurrency = app
             .state
+            .config
             .settings
             .settings()
             .performance
@@ -4012,8 +4049,8 @@ mod tests {
         }
 
         // Simulate editor scroll by setting scroll state
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         // Run 3 frames for sync to propagate
         for _ in 0..3 {
@@ -4025,12 +4062,12 @@ mod tests {
         // After sync, scroll_source must settle to Neither.
         // If it bounces to Preview, the sync is creating an oscillation loop.
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither after consumption. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4048,8 +4085,8 @@ mod tests {
             });
         }
 
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
@@ -4058,12 +4095,12 @@ mod tests {
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither in horizontal split. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4083,8 +4120,8 @@ mod tests {
             });
         }
 
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
@@ -4093,12 +4130,12 @@ mod tests {
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither after order swap. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4118,8 +4155,8 @@ mod tests {
         }
 
         // Simulate preview scroll
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Preview;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Preview;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
@@ -4128,12 +4165,12 @@ mod tests {
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Preview→Editor sync must settle to Neither in vertical split. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4380,7 +4417,7 @@ pub(crate) fn render_search_modal(
     state: &mut AppState,
     action: &mut AppAction,
 ) {
-    let mut is_open = state.show_search_modal;
+    let mut is_open = state.layout.show_search_modal;
     egui::Window::new(crate::i18n::get().search.modal_title.clone())
         .open(&mut is_open)
         .collapsible(false)
@@ -4389,7 +4426,7 @@ pub(crate) fn render_search_modal(
         .show(ctx, |ui| {
             // Focus on the text edit automatically
             let response = ui.add(
-                egui::TextEdit::singleline(&mut state.search_query)
+                egui::TextEdit::singleline(&mut state.search.query)
                     .hint_text(crate::i18n::get().search.query_hint.clone())
                     .desired_width(f32::INFINITY),
             );
@@ -4397,8 +4434,8 @@ pub(crate) fn render_search_modal(
 
             let mut include_regexes = Vec::new();
             let mut include_valid = true;
-            if !state.search_include_pattern.is_empty() {
-                for pat in state.search_include_pattern.split(',') {
+            if !state.search.include_pattern.is_empty() {
+                for pat in state.search.include_pattern.split(',') {
                     let pat = pat.trim();
                     if !pat.is_empty() {
                         match regex::Regex::new(pat) {
@@ -4411,8 +4448,8 @@ pub(crate) fn render_search_modal(
 
             let mut exclude_regexes = Vec::new();
             let mut exclude_valid = true;
-            if !state.search_exclude_pattern.is_empty() {
-                for pat in state.search_exclude_pattern.split(',') {
+            if !state.search.exclude_pattern.is_empty() {
+                for pat in state.search.exclude_pattern.split(',') {
                     let pat = pat.trim();
                     if !pat.is_empty() {
                         match regex::Regex::new(pat) {
@@ -4452,32 +4489,32 @@ pub(crate) fn render_search_modal(
             };
 
             ui.add(
-                egui::TextEdit::singleline(&mut state.search_include_pattern)
+                egui::TextEdit::singleline(&mut state.search.include_pattern)
                     .hint_text(crate::i18n::get().search.include_pattern_hint.clone())
                     .text_color(include_color)
                     .desired_width(f32::INFINITY),
             );
 
             ui.add(
-                egui::TextEdit::singleline(&mut state.search_exclude_pattern)
+                egui::TextEdit::singleline(&mut state.search.exclude_pattern)
                     .hint_text(crate::i18n::get().search.exclude_pattern_hint.clone())
                     .text_color(exclude_color)
                     .desired_width(f32::INFINITY),
             );
 
             let current_params = (
-                state.search_query.clone(),
-                state.search_include_pattern.clone(),
-                state.search_exclude_pattern.clone(),
+                state.search.query.clone(),
+                state.search.include_pattern.clone(),
+                state.search.exclude_pattern.clone(),
             );
 
-            if state.last_search_params.as_ref() != Some(&current_params) {
-                state.last_search_params = Some(current_params);
+            if state.search.last_params.as_ref() != Some(&current_params) {
+                state.search.last_params = Some(current_params);
 
-                let query = state.search_query.to_lowercase();
+                let query = state.search.query.to_lowercase();
                 if query.is_empty() && include_regexes.is_empty() && exclude_regexes.is_empty() {
-                    state.search_results.clear();
-                } else if let Some(ws) = &state.workspace {
+                    state.search.results.clear();
+                } else if let Some(ws) = &state.workspace.data {
                     let mut results = Vec::new();
                     crate::shell_logic::collect_matches(
                         &ws.tree,
@@ -4487,7 +4524,7 @@ pub(crate) fn render_search_modal(
                         &ws.root,
                         &mut results,
                     );
-                    state.search_results = results;
+                    state.search.results = results;
                 }
             }
 
@@ -4496,17 +4533,17 @@ pub(crate) fn render_search_modal(
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
-                    if state.search_results.is_empty() && !state.search_query.is_empty() {
+                    if state.search.results.is_empty() && !state.search.query.is_empty() {
                         ui.label(crate::i18n::get().search.no_results.clone());
                     } else {
-                        let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
-                        for path in &state.search_results {
+                        let ws_root = state.workspace.data.as_ref().map(|ws| ws.root.clone());
+                        for path in &state.search.results {
                             let rel =
                                 crate::shell_logic::relative_full_path(path, ws_root.as_deref());
                             if ui.selectable_label(false, rel).clicked() && path.exists() {
-                                *action = AppAction::SelectDocument(path.clone());
+                                *action = AppAction::SelectDocument(path.to_path_buf());
                                 // Close the modal by updating state directly
-                                state.show_search_modal = false;
+                                state.layout.show_search_modal = false;
                             }
                         }
                     }
@@ -4514,7 +4551,7 @@ pub(crate) fn render_search_modal(
         });
 
     if !is_open {
-        state.show_search_modal = false;
+        state.layout.show_search_modal = false;
     }
 }
 
@@ -4532,7 +4569,7 @@ pub(crate) fn render_toc_panel(
     state: &crate::app_state::AppState,
 ) {
     use katana_platform::settings::TocPosition;
-    let position = state.settings.settings().layout.toc_position;
+    let position = state.config.settings.settings().layout.toc_position;
 
     let panel = match position {
         TocPosition::Left => egui::SidePanel::left("toc_panel"),
@@ -4618,7 +4655,7 @@ fn render_update_window(
     let msgs = &crate::i18n::get().update;
 
     // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
-    match &state.update_phase {
+    match &state.update.phase {
         Some(UpdatePhase::Downloading { progress }) => {
             Modal::new("katana_update_dialog_v6", &msgs.title)
                 .width(UPDATE_DIALOG_WIDTH)
@@ -4692,7 +4729,7 @@ fn render_update_window(
 
     // Standard update dialog — use Modal to avoid vertical stretch bug.
     // (egui::Window::open() stores resize state, causing unbounded height growth.)
-    if state.checking_for_updates {
+    if state.update.checking {
         // Checking spinner — no footer, no close button
         Modal::new("katana_update_dialog_v6", &msgs.title)
             .width(UPDATE_DIALOG_WIDTH)
@@ -4701,7 +4738,7 @@ fn render_update_window(
                 ui.add_space(SPACING_MEDIUM);
                 ui.label(msgs.checking_for_updates.clone());
             });
-    } else if let Some(err) = &state.update_check_error {
+    } else if let Some(err) = &state.update.check_error {
         // Error state — OK button to close
         let close = {
             let err = err.clone();
@@ -4739,7 +4776,7 @@ fn render_update_window(
         if close == Some(true) {
             *open = false;
         }
-    } else if let Some(latest) = &state.update_available {
+    } else if let Some(latest) = &state.update.available {
         // Update available — Install/Skip/Later buttons
         let tag = latest.tag_name.clone();
         let body_text = latest.body.clone();
@@ -4852,7 +4889,7 @@ fn render_create_fs_node_modal(
     let mut do_create = false;
 
     if let Some((parent_dir, mut name, mut selected_ext, is_dir)) =
-        state.create_fs_node_modal_state.take()
+        state.layout.create_fs_node_modal.take()
     {
         let title = if is_dir {
             crate::i18n::get().dialog.new_directory_title.clone()
@@ -4880,6 +4917,7 @@ fn render_create_fs_node_modal(
                         if let Some(ref mut ext) = selected_ext {
                             const EXT_COMBOBOX_WIDTH: f32 = 80.0;
                             let options = state
+                                .config
                                 .settings
                                 .settings()
                                 .workspace
@@ -4945,16 +4983,19 @@ fn render_create_fs_node_modal(
                 tracing::error!("Failed to create fs node: {}", e);
             } else {
                 if is_dir {
-                    state.in_memory_dirs.insert(target_path);
+                    state.workspace.in_memory_dirs.insert(target_path);
                 }
                 *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                state.expanded_directories.insert(parent_dir.clone());
+                state
+                    .workspace
+                    .expanded_directories
+                    .insert(parent_dir.clone());
             }
             close = true;
         }
 
         if !close {
-            state.create_fs_node_modal_state = Some((parent_dir, name, selected_ext, is_dir));
+            state.layout.create_fs_node_modal = Some((parent_dir, name, selected_ext, is_dir));
         }
     }
 }
@@ -4967,7 +5008,7 @@ fn render_rename_modal(
     let mut close = false;
     let mut do_rename = false;
 
-    if let Some((target_path, mut new_name)) = state.rename_modal_state.take() {
+    if let Some((target_path, mut new_name)) = state.layout.rename_modal.take() {
         let mut is_open = true;
         egui::Window::new(crate::i18n::get().dialog.rename_title.clone())
             .open(&mut is_open)
@@ -5016,7 +5057,7 @@ fn render_rename_modal(
                     tracing::error!("Failed to rename file: {}", e);
                 } else {
                     *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                    for doc in &mut state.open_documents {
+                    for doc in &mut state.document.open_documents {
                         if doc.path == target_path {
                             doc.path = new_path.clone();
                             break;
@@ -5028,7 +5069,7 @@ fn render_rename_modal(
         }
 
         if !close {
-            state.rename_modal_state = Some((target_path, new_name));
+            state.layout.rename_modal = Some((target_path, new_name));
         }
     }
 }
@@ -5040,7 +5081,7 @@ fn render_delete_modal(
 ) {
     let mut close = false;
 
-    if let Some(target_path) = state.delete_modal_state.take() {
+    if let Some(target_path) = state.layout.delete_modal.take() {
         let mut is_open = true;
         egui::Window::new(crate::i18n::get().dialog.delete_title.clone())
             .open(&mut is_open)
@@ -5084,21 +5125,22 @@ fn render_delete_modal(
                             } else {
                                 *pending_action = crate::app_state::AppAction::RefreshWorkspace;
                                 if let Some(idx) = state
+                                    .document
                                     .open_documents
                                     .iter()
                                     .position(|d| d.path == target_path)
                                 {
-                                    state.open_documents.remove(idx);
-                                    if let Some(active_idx) = state.active_doc_idx {
+                                    state.document.open_documents.remove(idx);
+                                    if let Some(active_idx) = state.document.active_doc_idx {
                                         if active_idx == idx {
-                                            state.active_doc_idx =
-                                                if state.open_documents.is_empty() {
+                                            state.document.active_doc_idx =
+                                                if state.document.open_documents.is_empty() {
                                                     None
                                                 } else {
                                                     Some(if idx > 0 { idx - 1 } else { 0 })
                                                 };
                                         } else if active_idx > idx {
-                                            state.active_doc_idx = Some(active_idx - 1);
+                                            state.document.active_doc_idx = Some(active_idx - 1);
                                         }
                                     }
                                 }
@@ -5114,7 +5156,7 @@ fn render_delete_modal(
         }
 
         if !close {
-            state.delete_modal_state = Some(target_path);
+            state.layout.delete_modal = Some(target_path);
         }
     }
 }

@@ -95,7 +95,13 @@ impl PreviewOps for KatanaApp {
         );
 
         let pane = Self::get_preview_pane(&mut self.tab_previews, path_buf.clone());
-        pane.full_render(source, path, self.state.cache.clone(), force, concurrency);
+        pane.full_render(
+            source,
+            path,
+            self.state.config.cache.clone(),
+            force,
+            concurrency,
+        );
 
         let tab = self
             .tab_previews
