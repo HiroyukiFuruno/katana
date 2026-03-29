@@ -8,6 +8,8 @@
 //!
 //! Therefore, it is excluded from code coverage measurement using `--ignore-filename-regex`.
 
+use crate::app::*;
+
 use eframe::egui;
 
 use crate::{
