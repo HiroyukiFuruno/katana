@@ -13,7 +13,7 @@ use crate::app::*;
 use eframe::egui;
 
 use crate::{
-    app_state::{AppAction, AppState, ViewMode},
+    app_state::{AppAction, ViewMode},
     preview_pane::DownloadRequest,
     widgets::StyledComboBox,
 };
@@ -41,6 +41,15 @@ pub(crate) const WORKSPACE_SPINNER_TEXT_MARGIN: f32 = 5.0;
 pub(crate) const STATUS_SUCCESS_GREEN: u8 = 200;
 /// Spacing before the icon in the status bar.
 pub(crate) const STATUS_BAR_ICON_SPACING: f32 = 4.0;
+
+pub(crate) const SEARCH_MODAL_WIDTH: f32 = 500.0;
+pub(crate) const SEARCH_MODAL_HEIGHT: f32 = 400.0;
+pub(crate) const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+pub(crate) const TOC_PANEL_MARGIN: f32 = 8.0;
+pub(crate) const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
+pub(crate) const TOC_INDENT_PER_LEVEL: f32 = 12.0;
+pub(crate) const LIGHT_MODE_ICON_BG: u8 = 235;
+pub(crate) const LIGHT_MODE_ICON_ACTIVE_BG: u8 = 200;
 
 pub(crate) fn relative_full_path(
     path: &std::path::Path,
@@ -847,7 +856,7 @@ impl eframe::App for KatanaApp {
 
         // About dialog
         if self.show_about {
-            render_about_window(
+            crate::views::modals::about::render_about_window(
                 ctx,
                 &mut self.show_about,
                 self.about_icon.as_ref(),
@@ -861,7 +870,7 @@ impl eframe::App for KatanaApp {
         // Meta info dialog
         if let Some(path) = self.show_meta_info_for.clone() {
             let mut is_open = true;
-            render_meta_info_window(ctx, &mut is_open, &path);
+            crate::views::modals::meta_info::render_meta_info_window(ctx, &mut is_open, &path);
             if !is_open {
                 self.show_meta_info_for = None;
             }
@@ -869,18 +878,30 @@ impl eframe::App for KatanaApp {
 
         // File system operation modals
         if self.state.layout.create_fs_node_modal.is_some() {
-            render_create_fs_node_modal(ctx, &mut self.state, &mut self.pending_action);
+            crate::views::modals::file_ops::render_create_fs_node_modal(
+                ctx,
+                &mut self.state,
+                &mut self.pending_action,
+            );
         }
         if self.state.layout.rename_modal.is_some() {
-            render_rename_modal(ctx, &mut self.state, &mut self.pending_action);
+            crate::views::modals::file_ops::render_rename_modal(
+                ctx,
+                &mut self.state,
+                &mut self.pending_action,
+            );
         }
         if self.state.layout.delete_modal.is_some() {
-            render_delete_modal(ctx, &mut self.state, &mut self.pending_action);
+            crate::views::modals::file_ops::render_delete_modal(
+                ctx,
+                &mut self.state,
+                &mut self.pending_action,
+            );
         }
 
         // Update notification dialog
         if self.show_update_dialog {
-            render_update_window(
+            crate::views::modals::update::render_update_window(
                 ctx,
                 &mut self.show_update_dialog,
                 &self.state,
@@ -1087,7 +1108,7 @@ impl eframe::App for KatanaApp {
 mod tests {
     use super::*;
 
-    use crate::app_state::ScrollSource;
+    use crate::app_state::{AppState, ScrollSource};
     use crate::preview_pane::PreviewPane;
     use katana_platform::PaneOrder;
 
@@ -2028,751 +2049,5 @@ mod tests {
             1,
             "RefreshDiagrams must clear image caches before rerendering preview"
         );
-    }
-}
-
-/// Renders the Meta Info window popup.
-fn render_meta_info_window(ctx: &egui::Context, open: &mut bool, path: &std::path::Path) {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-    let meta_text = crate::shell_logic::format_tree_tooltip(name, path);
-
-    const META_INFO_WINDOW_WIDTH: f32 = 400.0;
-    egui::Window::new(crate::i18n::get().action.show_meta_info.clone())
-        .open(open)
-        .collapsible(false)
-        .resizable(true)
-        .default_width(META_INFO_WINDOW_WIDTH)
-        .show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.label(meta_text);
-            });
-        });
-}
-
-/// Renders the custom About window with all required OSS project information.
-fn render_about_window(
-    ctx: &egui::Context,
-    open: &mut bool,
-    icon: Option<&egui::TextureHandle>,
-    action: &mut AppAction,
-) {
-    const ABOUT_WINDOW_WIDTH: f32 = 400.0;
-    const INNER_PADDING: f32 = 8.0;
-    const ICON_SIZE: f32 = 64.0;
-    const HEADING_SIZE: f32 = 20.0;
-    const DESCRIPTION_SIZE: f32 = 12.0;
-    const SECTION_HEADER_SIZE: f32 = 13.0;
-    const SECTION_SPACING: f32 = 8.0;
-    const HEADING_SPACING: f32 = 8.0;
-    const SECTION_HEADER_BOTTOM: f32 = 2.0;
-
-    let info = crate::about_info::about_info();
-
-    egui::Window::new(format!("About {}", crate::about_info::APP_DISPLAY_NAME))
-        .open(open)
-        .resizable(false)
-        .collapsible(false)
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-        .default_width(ABOUT_WINDOW_WIDTH)
-        .frame(egui::Frame::window(&ctx.style()).inner_margin(INNER_PADDING))
-        .show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.add_space(HEADING_SPACING);
-                // App icon
-                if let Some(tex) = icon {
-                    ui.image(egui::load::SizedTexture::new(
-                        tex.id(),
-                        egui::vec2(ICON_SIZE, ICON_SIZE),
-                    ));
-                    ui.add_space(SECTION_SPACING);
-                }
-                ui.heading(
-                    egui::RichText::new(info.product_name)
-                        .strong()
-                        .size(HEADING_SIZE),
-                );
-                ui.label(
-                    egui::RichText::new(info.description)
-                        .weak()
-                        .size(DESCRIPTION_SIZE),
-                );
-                ui.add_space(HEADING_SPACING);
-            });
-
-            let i18n_about = &crate::i18n::get().about;
-
-            // ── 1. Basic Info ──
-            about_section_header(
-                ui,
-                &i18n_about.basic_info,
-                SECTION_HEADER_SIZE,
-                SECTION_HEADER_BOTTOM,
-            );
-            about_row(ui, &i18n_about.version, &format!("v{}", info.version));
-            about_row(ui, &i18n_about.build, info.build);
-            about_row(ui, &i18n_about.copyright, info.copyright);
-            ui.add_space(SECTION_SPACING);
-
-            // ── 2. Runtime ──
-            about_section_header(
-                ui,
-                &i18n_about.runtime,
-                SECTION_HEADER_SIZE,
-                SECTION_HEADER_BOTTOM,
-            );
-            about_row(ui, &i18n_about.platform, &info.system.os);
-            about_row(ui, &i18n_about.architecture, &info.system.arch);
-            about_row(ui, &i18n_about.rust, &info.system.rustc_version);
-            ui.add_space(SECTION_SPACING);
-
-            // ── 3. License ──
-            about_section_header(
-                ui,
-                &i18n_about.license,
-                SECTION_HEADER_SIZE,
-                SECTION_HEADER_BOTTOM,
-            );
-            about_row(ui, &i18n_about.license, info.license);
-            ui.add_space(SECTION_SPACING);
-
-            // ── 4-6. Links ──
-            about_section_header(
-                ui,
-                &i18n_about.links,
-                SECTION_HEADER_SIZE,
-                SECTION_HEADER_BOTTOM,
-            );
-            about_link_row(
-                ui,
-                &i18n_about.source_code,
-                info.repository,
-                crate::Icon::Github,
-            );
-            about_link_row(
-                ui,
-                &i18n_about.documentation,
-                info.docs_url,
-                crate::Icon::Document,
-            );
-            about_link_row(
-                ui,
-                &i18n_about.report_issue,
-                info.issues_url,
-                crate::Icon::Bug,
-            );
-            ui.add_space(SECTION_SPACING);
-
-            // ── 7. Support / Sponsor ──
-            about_section_header(
-                ui,
-                &i18n_about.support,
-                SECTION_HEADER_SIZE,
-                SECTION_HEADER_BOTTOM,
-            );
-            if info.sponsor_url.is_empty() {
-                ui.horizontal(|ui| {
-                    ui.add(crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Medium));
-                    ui.label(
-                        egui::RichText::new(crate::i18n::get().menu.release_notes.clone()).weak(),
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::image(
-                                    crate::Icon::ExternalLink
-                                        .ui_image(ui, crate::icon::IconSize::Small),
-                                )
-                                .frame(false),
-                            )
-                            .on_hover_text(crate::i18n::get().menu.release_notes.clone())
-                            .clicked()
-                        {
-                            *action = AppAction::ShowReleaseNotes;
-                        }
-                    });
-                });
-            } else {
-                about_link_row(
-                    ui,
-                    &i18n_about.sponsor,
-                    info.sponsor_url,
-                    crate::Icon::Heart,
-                );
-            }
-            ui.add_space(SECTION_SPACING);
-        });
-}
-
-/// Section header for the About dialog.
-fn about_section_header(ui: &mut egui::Ui, title: &str, size: f32, bottom: f32) {
-    ui.separator();
-    ui.label(egui::RichText::new(title).strong().size(size));
-    ui.add_space(bottom);
-}
-
-/// Key-value row (non-clickable).
-fn about_row(ui: &mut egui::Ui, label: &str, value: &str) {
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(label).weak());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(value);
-        });
-    });
-}
-
-fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str, icon: crate::Icon) {
-    ui.horizontal(|ui| {
-        ui.add(icon.ui_image(ui, crate::icon::IconSize::Medium));
-        ui.label(egui::RichText::new(label).weak());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .add(
-                    egui::Button::image(
-                        crate::Icon::ExternalLink.ui_image(ui, crate::icon::IconSize::Small),
-                    )
-                    .frame(false),
-                )
-                .on_hover_text(url)
-                .clicked()
-            {
-                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
-            }
-        });
-    });
-}
-
-pub(crate) const SEARCH_MODAL_WIDTH: f32 = 500.0;
-pub(crate) const SEARCH_MODAL_HEIGHT: f32 = 400.0;
-
-pub(crate) const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
-pub(crate) const TOC_PANEL_MARGIN: f32 = 8.0;
-pub(crate) const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
-pub(crate) const TOC_INDENT_PER_LEVEL: f32 = 12.0;
-
-pub(crate) const LIGHT_MODE_ICON_BG: u8 = 235;
-pub(crate) const LIGHT_MODE_ICON_ACTIVE_BG: u8 = 200;
-
-fn render_update_window(
-    ctx: &egui::Context,
-    open: &mut bool,
-    state: &AppState,
-    markdown_cache: &mut egui_commonmark::CommonMarkCache,
-    pending_action: &mut AppAction,
-) {
-    use crate::app_state::UpdatePhase;
-    use crate::widgets::Modal;
-
-    const SPACING_SMALL: f32 = 4.0;
-    const SPACING_MEDIUM: f32 = 8.0;
-    const SPACING_LARGE: f32 = 12.0;
-    const MAX_SCROLL_HEIGHT: f32 = 250.0;
-    const UPDATE_DIALOG_WIDTH: f32 = 600.0;
-
-    let msgs = &crate::i18n::get().update;
-
-    // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
-    match &state.update.phase {
-        Some(UpdatePhase::Downloading { progress }) => {
-            Modal::new("katana_update_dialog_v6", &msgs.title)
-                .width(UPDATE_DIALOG_WIDTH)
-                .show_body_only(ctx, |ui| {
-                    ui.add_space(SPACING_SMALL);
-                    ui.add(
-                        egui::ProgressBar::new(*progress)
-                            .animate(true)
-                            .text(format!("{:.0}%", progress * 100.0)),
-                    );
-                    ui.add_space(SPACING_MEDIUM);
-                    ui.label(&msgs.downloading);
-                });
-            return;
-        }
-        Some(UpdatePhase::Installing { progress }) => {
-            Modal::new("katana_update_dialog_v6", &msgs.title)
-                .width(UPDATE_DIALOG_WIDTH)
-                .show_body_only(ctx, |ui| {
-                    ui.add_space(SPACING_SMALL);
-                    ui.add(
-                        egui::ProgressBar::new(*progress)
-                            .animate(true)
-                            .text(format!("{:.0}%", progress * 100.0)),
-                    );
-                    ui.add_space(SPACING_MEDIUM);
-                    ui.label(&msgs.installing);
-                });
-            return;
-        }
-        Some(UpdatePhase::ReadyToRelaunch) => {
-            let action = Modal::new("katana_update_dialog_v6", &msgs.title)
-                .width(UPDATE_DIALOG_WIDTH)
-                .show(
-                    ctx,
-                    |ui| {
-                        ui.add_space(SPACING_LARGE);
-                        ui.label(egui::RichText::new(&msgs.restart_confirm).heading());
-                        ui.add_space(SPACING_LARGE);
-                    },
-                    |ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .button(
-                                    egui::RichText::new(&msgs.action_restart)
-                                        .color(ui.visuals().widgets.active.text_color())
-                                        .strong(),
-                                )
-                                .clicked()
-                            {
-                                return Some(AppAction::ConfirmRelaunch);
-                            }
-                            if ui.button(&msgs.action_later).clicked() {
-                                return Some(AppAction::DismissUpdate);
-                            }
-                            None
-                        })
-                        .inner
-                    },
-                );
-            if let Some(action) = action {
-                *pending_action = action;
-                if matches!(pending_action, AppAction::DismissUpdate) {
-                    *open = false;
-                }
-            }
-            return;
-        }
-        None => {} // Fall through to the standard update dialog
-    }
-
-    // Standard update dialog — use Modal to avoid vertical stretch bug.
-    // (egui::Window::open() stores resize state, causing unbounded height growth.)
-    if state.update.checking {
-        // Checking spinner — no footer, no close button
-        Modal::new("katana_update_dialog_v6", &msgs.title)
-            .width(UPDATE_DIALOG_WIDTH)
-            .show_body_only(ctx, |ui| {
-                ui.add(egui::Spinner::new());
-                ui.add_space(SPACING_MEDIUM);
-                ui.label(msgs.checking_for_updates.clone());
-            });
-    } else if let Some(err) = &state.update.check_error {
-        // Error state — OK button to close
-        let close = {
-            let err = err.clone();
-            Modal::new("katana_update_dialog_v6", &msgs.title)
-                .width(UPDATE_DIALOG_WIDTH)
-                .show(
-                    ctx,
-                    |ui| {
-                        ui.colored_label(
-                            ui.ctx()
-                                .data(|d| {
-                                    d.get_temp::<katana_platform::theme::ThemeColors>(
-                                        egui::Id::new("katana_theme_colors"),
-                                    )
-                                })
-                                .map_or(crate::theme_bridge::WHITE, |tc| {
-                                    crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                                }),
-                            msgs.failed_to_check.clone(),
-                        );
-                        ui.add_space(SPACING_SMALL);
-                        ui.label(&err);
-                    },
-                    |ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button(msgs.action_close.clone()).clicked() {
-                                return Some(true);
-                            }
-                            None
-                        })
-                        .inner
-                    },
-                )
-        };
-        if close == Some(true) {
-            *open = false;
-        }
-    } else if let Some(latest) = &state.update.available {
-        // Update available — Install/Skip/Later buttons
-        let tag = latest.tag_name.clone();
-        let body_text = latest.body.clone();
-        let desc = msgs
-            .update_available_desc
-            .replace("{version}", tag.as_str());
-        let action = Modal::new("katana_update_dialog_v6", &msgs.title)
-            .width(UPDATE_DIALOG_WIDTH)
-            .show(
-                ctx,
-                |ui| {
-                    ui.label(
-                        egui::RichText::new(msgs.update_available.clone())
-                            .heading()
-                            .color(ui.visuals().widgets.active.text_color()),
-                    );
-                    ui.add_space(SPACING_MEDIUM);
-                    ui.label(&desc);
-                    ui.add_space(SPACING_LARGE);
-
-                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
-                        egui::ScrollArea::vertical()
-                            .max_height(MAX_SCROLL_HEIGHT)
-                            .auto_shrink([true, true])
-                            .show(ui, |ui| {
-                                egui_commonmark::CommonMarkViewer::new().show(
-                                    ui,
-                                    markdown_cache,
-                                    &body_text,
-                                );
-                            });
-                    });
-                    ui.add_space(SPACING_LARGE);
-                },
-                |ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // Primary: Install
-                        if ui
-                            .button(
-                                egui::RichText::new(msgs.install_update.clone())
-                                    .color(ui.visuals().widgets.active.text_color())
-                                    .strong(),
-                            )
-                            .clicked()
-                        {
-                            return Some(AppAction::InstallUpdate);
-                        }
-                        // Release Notes
-                        if ui
-                            .button(crate::i18n::get().menu.release_notes.clone())
-                            .clicked()
-                        {
-                            return Some(AppAction::ShowReleaseNotes);
-                        }
-                        // Skip
-                        if ui.button(msgs.action_skip_version.clone()).clicked() {
-                            return Some(AppAction::SkipVersion(tag.clone()));
-                        }
-                        // Later
-                        if ui.button(msgs.action_later.clone()).clicked() {
-                            return Some(AppAction::DismissUpdate);
-                        }
-                        None
-                    })
-                    .inner
-                },
-            );
-        if let Some(action) = action {
-            *pending_action = action;
-            if matches!(
-                *pending_action,
-                AppAction::DismissUpdate | AppAction::SkipVersion(_) | AppAction::ShowReleaseNotes
-            ) {
-                *open = false;
-            }
-        }
-    } else {
-        // Up to date — OK button to close
-        let close = Modal::new("katana_update_dialog_v6", &msgs.title)
-            .width(UPDATE_DIALOG_WIDTH)
-            .show(
-                ctx,
-                |ui| {
-                    ui.heading(msgs.up_to_date.clone());
-                    ui.add_space(SPACING_SMALL);
-                    ui.label(msgs.up_to_date_desc.clone());
-                },
-                |ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(msgs.action_close.clone()).clicked() {
-                            return Some(true);
-                        }
-                        None
-                    })
-                    .inner
-                },
-            );
-        if close == Some(true) {
-            *open = false;
-        }
-    }
-}
-
-fn render_create_fs_node_modal(
-    ctx: &egui::Context,
-    state: &mut crate::app_state::AppState,
-    pending_action: &mut crate::app_state::AppAction,
-) {
-    let mut close = false;
-    let mut do_create = false;
-
-    if let Some((parent_dir, mut name, mut selected_ext, is_dir)) =
-        state.layout.create_fs_node_modal.take()
-    {
-        let title = if is_dir {
-            crate::i18n::get().dialog.new_directory_title.clone()
-        } else {
-            crate::i18n::get().dialog.new_file_title.clone()
-        };
-
-        let mut is_open = true;
-        egui::Window::new(title)
-            .open(&mut is_open)
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    const MODAL_INPUT_WIDTH: f32 = 200.0;
-                    let re = ui.add(
-                        egui::TextEdit::singleline(&mut name)
-                            .hint_text("Name")
-                            .desired_width(MODAL_INPUT_WIDTH),
-                    );
-                    re.request_focus();
-
-                    if !is_dir {
-                        if let Some(ref mut ext) = selected_ext {
-                            const EXT_COMBOBOX_WIDTH: f32 = 80.0;
-                            let options = state
-                                .config
-                                .settings
-                                .settings()
-                                .workspace
-                                .visible_extensions
-                                .clone();
-                            crate::widgets::StyledComboBox::new("new_file_ext", ext.as_str())
-                                .width(EXT_COMBOBOX_WIDTH)
-                                .show(ui, |ui| {
-                                    for opt in &options {
-                                        ui.selectable_value(ext, opt.clone(), opt);
-                                    }
-                                });
-                        }
-                    }
-
-                    if re.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        do_create = true;
-                    }
-                });
-                const SPACING_SMALL: f32 = 8.0;
-                ui.add_space(SPACING_SMALL);
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(crate::i18n::get().action.cancel.clone())
-                        .clicked()
-                    {
-                        close = true;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(crate::i18n::get().action.save.clone()).clicked() {
-                            do_create = true;
-                        }
-                    });
-                });
-            });
-
-        if !is_open {
-            close = true;
-        }
-
-        if do_create && !name.is_empty() {
-            let actual_name = if !is_dir {
-                if let Some(ref ext) = selected_ext {
-                    if name.ends_with(&format!(".{}", ext)) {
-                        name.clone()
-                    } else {
-                        format!("{}.{}", name, ext)
-                    }
-                } else {
-                    name.clone()
-                }
-            } else {
-                name.clone()
-            };
-
-            let target_path = parent_dir.join(&actual_name);
-            let res = if is_dir {
-                std::fs::create_dir(&target_path)
-            } else {
-                std::fs::File::create(&target_path).map(|_| ())
-            };
-            if let Err(e) = res {
-                tracing::error!("Failed to create fs node: {}", e);
-            } else {
-                if is_dir {
-                    state.workspace.in_memory_dirs.insert(target_path);
-                }
-                *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                state
-                    .workspace
-                    .expanded_directories
-                    .insert(parent_dir.clone());
-            }
-            close = true;
-        }
-
-        if !close {
-            state.layout.create_fs_node_modal = Some((parent_dir, name, selected_ext, is_dir));
-        }
-    }
-}
-
-fn render_rename_modal(
-    ctx: &egui::Context,
-    state: &mut crate::app_state::AppState,
-    pending_action: &mut crate::app_state::AppAction,
-) {
-    let mut close = false;
-    let mut do_rename = false;
-
-    if let Some((target_path, mut new_name)) = state.layout.rename_modal.take() {
-        let mut is_open = true;
-        egui::Window::new(crate::i18n::get().dialog.rename_title.clone())
-            .open(&mut is_open)
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    const MODAL_INPUT_WIDTH: f32 = 200.0;
-                    let re = ui.add(
-                        egui::TextEdit::singleline(&mut new_name)
-                            .hint_text("New Name")
-                            .desired_width(MODAL_INPUT_WIDTH),
-                    );
-                    re.request_focus();
-
-                    if re.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        do_rename = true;
-                    }
-                });
-                const SPACING_SMALL: f32 = 8.0;
-                ui.add_space(SPACING_SMALL);
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(crate::i18n::get().action.cancel.clone())
-                        .clicked()
-                    {
-                        close = true;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(crate::i18n::get().action.save.clone()).clicked() {
-                            do_rename = true;
-                        }
-                    });
-                });
-            });
-
-        if !is_open {
-            close = true;
-        }
-
-        if do_rename && !new_name.is_empty() {
-            if let Some(parent) = target_path.parent() {
-                let new_path = parent.join(&new_name);
-                if let Err(e) = std::fs::rename(&target_path, &new_path) {
-                    tracing::error!("Failed to rename file: {}", e);
-                } else {
-                    *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                    for doc in &mut state.document.open_documents {
-                        if doc.path == target_path {
-                            doc.path = new_path.clone();
-                            break;
-                        }
-                    }
-                }
-            }
-            close = true;
-        }
-
-        if !close {
-            state.layout.rename_modal = Some((target_path, new_name));
-        }
-    }
-}
-
-fn render_delete_modal(
-    ctx: &egui::Context,
-    state: &mut crate::app_state::AppState,
-    pending_action: &mut crate::app_state::AppAction,
-) {
-    let mut close = false;
-
-    if let Some(target_path) = state.layout.delete_modal.take() {
-        let mut is_open = true;
-        egui::Window::new(crate::i18n::get().dialog.delete_title.clone())
-            .open(&mut is_open)
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .show(ctx, |ui| {
-                let name = target_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("?");
-                let msg = crate::i18n::tf(
-                    &crate::i18n::get().dialog.delete_confirm_msg,
-                    &[("name", name)],
-                );
-                ui.label(msg);
-
-                const SPACING_SMALL: f32 = 8.0;
-                ui.add_space(SPACING_SMALL);
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(crate::i18n::get().action.cancel.clone())
-                        .clicked()
-                    {
-                        close = true;
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let del_btn = egui::Button::new(
-                            egui::RichText::new(crate::i18n::get().action.delete.clone())
-                                .color(ui.visuals().error_fg_color),
-                        );
-                        if ui.add(del_btn).clicked() {
-                            let res = if target_path.is_dir() {
-                                std::fs::remove_dir_all(&target_path)
-                            } else {
-                                std::fs::remove_file(&target_path)
-                            };
-
-                            if let Err(e) = res {
-                                tracing::error!("Failed to delete path: {}", e);
-                            } else {
-                                *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                                if let Some(idx) = state
-                                    .document
-                                    .open_documents
-                                    .iter()
-                                    .position(|d| d.path == target_path)
-                                {
-                                    state.document.open_documents.remove(idx);
-                                    if let Some(active_idx) = state.document.active_doc_idx {
-                                        if active_idx == idx {
-                                            state.document.active_doc_idx =
-                                                if state.document.open_documents.is_empty() {
-                                                    None
-                                                } else {
-                                                    Some(if idx > 0 { idx - 1 } else { 0 })
-                                                };
-                                        } else if active_idx > idx {
-                                            state.document.active_doc_idx = Some(active_idx - 1);
-                                        }
-                                    }
-                                }
-                            }
-                            close = true;
-                        }
-                    });
-                });
-            });
-
-        if !is_open {
-            close = true;
-        }
-
-        if !close {
-            state.layout.delete_modal = Some(target_path);
-        }
     }
 }
