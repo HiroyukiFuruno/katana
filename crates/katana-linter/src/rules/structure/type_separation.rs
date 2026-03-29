@@ -6,14 +6,16 @@ const MAX_LENGTH_FOR_MIXED_FILE: usize = 50;
 
 fn check_item_for_types_and_logic(item: &Item) -> (bool, bool, usize) {
     match item {
-        Item::Struct(ItemStruct { vis, ident, .. })
-            if matches!(vis, syn::Visibility::Public(_)) =>
-        {
-            (true, false, ident.span().start().line)
-        }
-        Item::Enum(ItemEnum { vis, ident, .. }) if matches!(vis, syn::Visibility::Public(_)) => {
-            (true, false, ident.span().start().line)
-        }
+        Item::Struct(ItemStruct {
+            vis: syn::Visibility::Public(_),
+            ident,
+            ..
+        }) => (true, false, ident.span().start().line),
+        Item::Enum(ItemEnum {
+            vis: syn::Visibility::Public(_),
+            ident,
+            ..
+        }) => (true, false, ident.span().start().line),
         Item::Impl(ItemImpl { items, .. }) => {
             let has_logic = items.iter().any(|i| matches!(i, ImplItem::Fn(_)));
             (false, has_logic, 0)
