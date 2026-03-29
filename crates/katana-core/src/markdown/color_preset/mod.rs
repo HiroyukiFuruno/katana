@@ -1,105 +1,70 @@
-//! Theme preset system for preview rendering and editor configuration.
-//!
-//! Provides a `DiagramColorPreset` data structure that centralizes all color
-//! constants, syntax highlighting themes, and font settings used across
-//! Mermaid, PlantUML, Draw.io renderers, and the code editor.
-//!
-//! Design principles:
-//! - Presets are const-constructible for zero-cost static definitions.
-//! - A base preset can be partially overridden via the `with_*` builder methods.
-//! - Future theme system can swap presets without touching renderer internals.
-
+/* WHY: Theme preset system for preview rendering and editor configuration.
+Provides a `DiagramColorPreset` data structure that centralizes all color
+constants, syntax highlighting themes, and font settings.
+Design principles:
+- Presets are const-constructible for zero-cost static definitions.
+- A base preset can be partially overridden via the `with_*` builder methods.
+- Future theme system can swap presets without touching renderer internals. */
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod dark;
 pub mod light;
 
-/// A complete theme preset for preview rendering and editor configuration.
-///
-/// All color fields are `&'static str` CSS hex color values (e.g. `"#E0E0E0"`).
-/// Font candidate paths are OS-specific absolute paths, tried in priority order.
-/// Use `DARK` / `LIGHT` associated constants for built-in presets,
-/// or create a custom preset with partial overrides via builder methods.
 #[derive(Debug, Clone)]
 pub struct DiagramColorPreset {
     // WHY: ── Common Colors ──
-    /// Background color for diagram canvases.
     pub background: &'static str,
-    /// Primary text / label color.
     pub text: &'static str,
-    /// Default fill color for shapes (vertices).
     pub fill: &'static str,
-    /// Default stroke / border color for shapes.
     pub stroke: &'static str,
-    /// Color for arrows and connection lines.
     pub arrow: &'static str,
 
     // WHY: ── DrawIo-specific ──
-    /// Default label text color for DrawIo shapes.
-    /// Used when the shape style does not include an explicit `fontColor`.
-    /// Should contrast well against common fill colors (light blue, light green, etc.).
     pub drawio_label_color: &'static str,
 
     // WHY: ── Mermaid-specific ──
-    /// Mermaid `--theme` argument value (e.g. `"dark"`, `"default"`).
     pub mermaid_theme: &'static str,
 
     // WHY: ── PlantUML-specific ──
-    /// PlantUML class / participant background.
     pub plantuml_class_bg: &'static str,
-    /// PlantUML note background.
     pub plantuml_note_bg: &'static str,
-    /// PlantUML note font color.
     pub plantuml_note_text: &'static str,
 
     // WHY: ── Syntax Highlighting ──
-    /// Syntect theme name for dark mode code blocks.
     pub syntax_theme_dark: &'static str,
-    /// Syntect theme name for light mode code blocks.
     pub syntax_theme_light: &'static str,
 
     // WHY: ── Preview Text ──
-    /// Override text color for the preview pane (hex, e.g. `"#E0E0E0"`).
     pub preview_text: &'static str,
 
     // WHY: ── Font Settings ──
-    /// OS font paths for proportional (body text) family, in priority order.
     pub proportional_font_candidates: Vec<&'static str>,
-    /// OS font paths for monospace (code) family, in priority order.
     pub monospace_font_candidates: Vec<&'static str>,
-    /// OS font paths for emoji fallback family, in priority order.
     pub emoji_font_candidates: Vec<&'static str>,
-    /// Font size for the code editor TextEdit (in egui points).
     pub editor_font_size: f32,
 }
 
 pub static DARK_MODE: AtomicBool = AtomicBool::new(true);
 
 impl DiagramColorPreset {
-    /// Default font size for the code editor (egui points).
     pub const DEFAULT_EDITOR_FONT_SIZE: f32 = 14.0;
 
-    /// Dark theme preset — optimized for dark application backgrounds.
     pub fn dark() -> &'static Self {
         dark::get_dark_preset()
     }
 
-    /// Light theme preset — optimized for light application backgrounds.
     pub fn light() -> &'static Self {
         light::get_light_preset()
     }
 
-    /// Checks if the current UI mode in Katana is dark.
     pub fn is_dark_mode() -> bool {
         DARK_MODE.load(Ordering::Relaxed)
     }
 
-    /// Sets the current UI mode globally.
     pub fn set_dark_mode(is_dark: bool) {
         DARK_MODE.store(is_dark, Ordering::Relaxed);
     }
 
-    /// Returns the currently active preset based on the current UI theme.
     pub fn current() -> &'static Self {
         if Self::is_dark_mode() {
             Self::dark()
@@ -108,9 +73,6 @@ impl DiagramColorPreset {
         }
     }
 
-    /// Parses a `#RRGGBB` hex string into `(r, g, b)` components.
-    ///
-    /// Returns `None` if parsing fails. Alpha is always opaque (255).
     pub fn parse_hex_rgb(hex: &str) -> Option<(u8, u8, u8)> {
         const HEX_RGB_LEN: usize = 6;
         const HEX_RADIX: u32 = 16;
@@ -129,11 +91,6 @@ impl DiagramColorPreset {
         Some((r, g, b))
     }
 
-    /// Calculates the relative luminance of a `#RRGGBB` hex color.
-    ///
-    /// Uses the sRGB luminance formula (ITU-R BT.709).
-    /// Returns a value between 0.0 (black) and 1.0 (white).
-    /// Returns `None` if the hex string cannot be parsed.
     pub fn relative_luminance(hex: &str) -> Option<f64> {
         const CHANNEL_MAX: f64 = 255.0;
         const LUMA_R: f64 = 0.2126;

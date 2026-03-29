@@ -4,7 +4,6 @@ use crate::markdown::color_preset::DiagramColorPreset;
 
 use super::utils::{attr_f64, extract_style_value, xml_escape};
 
-/// Renders a vertex cell as an SVG shape + label.
 pub fn render_vertex(
     cell: &Element,
     shapes: &mut String,
@@ -25,7 +24,6 @@ pub fn render_vertex(
     append_label(cell, cx, cy, labels, preset);
 }
 
-/// Renders the shape part (rect/ellipse) of a vertex.
 fn render_shape(geo: &Element, style: &str, shapes: &mut String, preset: &DiagramColorPreset) {
     let x = attr_f64(geo, "x");
     let y = attr_f64(geo, "y");
@@ -53,7 +51,6 @@ fn render_shape(geo: &Element, style: &str, shapes: &mut String, preset: &Diagra
     }
 }
 
-/// Adds the cell's label text as an SVG `<text>` element.
 fn append_label(
     cell: &Element,
     cx: f64,

@@ -1,15 +1,13 @@
 use crate::markdown::color_preset::DiagramColorPreset;
 use crate::markdown::{render, DiagramRenderer, MarkdownError};
 
-/// Exporter for generating standalone HTML documents.
 pub struct HtmlExporter;
 
 impl HtmlExporter {
-    /// Exports Markdown as a standalone HTML document with embedded CSS matching the given preset.
-    ///
-    /// When `base_dir` is provided, relative image paths in the rendered HTML are
-    /// resolved to absolute `file://` URLs so that images display correctly even
-    /// when the HTML is opened from a different directory (e.g. a temp file).
+    /* WHY: Exports Markdown as a standalone HTML document with embedded CSS.
+    When `base_dir` is provided, relative image paths in the rendered HTML are
+    resolved to absolute `file://` URLs so that images display correctly even
+    when the HTML is opened from a different directory (e.g. a temp file). */
     pub fn export<R: DiagramRenderer>(
         source: &str,
         renderer: &R,
@@ -49,7 +47,6 @@ impl HtmlExporter {
         )
     }
 
-    /// Resolves relative `src` attributes in `<img>` tags to absolute `file://` URLs.
     fn resolve_relative_paths(html: &str, base_dir: &std::path::Path) -> String {
         // WHY: Match src="..." that don't start with http://, https://, data:, or file://
         let re = regex::Regex::new(r#"src="([^"]+)""#).unwrap();

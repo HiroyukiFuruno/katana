@@ -4,7 +4,6 @@ use crate::markdown::color_preset::DiagramColorPreset;
 
 use super::{edge::render_edge, utils::attr_f64, vertex::render_vertex};
 
-/// Assembles the entire SVG document.
 pub fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
     // WHY: Builds a map of cell ID -> (x, y, w, h).
     let geo_map = build_geo_map(cells);
@@ -41,7 +40,6 @@ fn build_geo_map(cells: &[&Element]) -> Vec<(String, (f64, f64, f64, f64))> {
     geo_map
 }
 
-/// Writes a single `<mxCell>` to the shapes/labels buffers.
 pub fn render_cell(
     cell: &Element,
     shapes: &mut String,

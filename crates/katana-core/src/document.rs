@@ -1,23 +1,16 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-/// Represents a single document in a workspace.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Document {
-    /// Absolute path to the source file on disk.
     pub path: PathBuf,
-    /// In-memory buffer content (may differ from disk if dirty).
     pub buffer: String,
-    /// Whether the buffer has unsaved changes.
     pub is_dirty: bool,
-    /// Whether the document content is currently loaded.
     pub is_loaded: bool,
-    /// Whether the document tab is pinned to the left.
     pub is_pinned: bool,
 }
 
 impl Document {
-    /// Create a new document with `content` loaded from `path`.
     pub fn new(path: impl Into<PathBuf>, content: impl Into<String>) -> Self {
         Self {
             path: path.into(),
@@ -28,7 +21,6 @@ impl Document {
         }
     }
 
-    /// Create a new empty document for lazy loading.
     pub fn new_empty(path: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),
@@ -39,7 +31,6 @@ impl Document {
         }
     }
 
-    /// Update the in-memory buffer content. Marks the document as dirty.
     pub fn update_buffer(&mut self, content: impl Into<String>) {
         let new = content.into();
         if self.buffer != new {
@@ -48,18 +39,15 @@ impl Document {
         }
     }
 
-    /// Mark the document as clean (called after a successful save).
     pub fn mark_clean(&mut self) {
         self.is_dirty = false;
     }
 
-    /// Returns the file name of this document, if available.
     pub fn file_name(&self) -> Option<&str> {
         self.path.file_name()?.to_str()
     }
 }
 
-/// Errors related to document operations.
 #[derive(Debug, Error)]
 pub enum DocumentError {
     #[error("Failed to read document at {path}: {source}")]

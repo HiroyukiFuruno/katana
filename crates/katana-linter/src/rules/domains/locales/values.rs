@@ -8,21 +8,21 @@ struct LocaleException {
     value: &'static str,
 }
 
-/// Exclusion list for translation value validation.
-///
-/// [Operating Rules]
-/// 1. As a general rule, values that are identical across all languages (same as English) should be added here.
-/// 2. Applies to proper nouns (App names, Tool names, etc.), programming terms (Rust, etc.), and version numbers.
-/// 3. Using `*` for the key (`key`) or value (`value`) allows for broad matching.
-/// 4. However, meaningful words ("File", "Search", etc.) MUST NOT be broadly excluded. They require translation.
-///
-/// [Examples of patterns that must NOT be excluded]
-/// - Common menu items like "Edit", "View", "Help" (should be translated in each language).
-/// - Sentence fragments or message text that conveys meaning to the user.
-///
-/// [Procedure for adding]
-/// When new proper nouns or universal identifiers (e.g. v1.0.0) are introduced, if the Linter generates false positives,
-/// carefully review and consider before adding them to this list.
+/* WHY: Exclusion list for translation value validation.
+
+[Operating Rules]
+1. As a general rule, values that are identical across all languages (same as English) should be added here.
+2. Applies to proper nouns (App names, Tool names, etc.), programming terms (Rust, etc.), and version numbers.
+3. Using `*` for the key (`key`) or value (`value`) allows for broad matching.
+4. However, meaningful words ("File", "Search", etc.) MUST NOT be broadly excluded. They require translation.
+
+[Examples of patterns that must NOT be excluded]
+- Common menu items like "Edit", "View", "Help" (should be translated in each language).
+- Sentence fragments or message text that conveys meaning to the user.
+
+[Procedure for adding]
+When new proper nouns or universal identifiers (e.g. v1.0.0) are introduced, if the Linter generates false positives,
+carefully review and consider before adding them to this list. */
 const LOCALE_VALUE_EXCEPTIONS: &[LocaleException] = &[
     LocaleException {
         key: "rust",

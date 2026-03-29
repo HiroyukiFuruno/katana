@@ -1,13 +1,5 @@
-//! Diagram block detection and rendering adapter contracts.
-//!
-//! MVP supported input formats:
-//! - `mermaid`  — raw Mermaid source text in a fenced `mermaid` block
-//! - `plantuml` — raw PlantUML source with `@startuml`/`@enduml` delimiters
-//! - `drawio`   — raw uncompressed XML containing `<mxfile>` or `<mxGraphModel>`
-
 use serde::{Deserialize, Serialize};
 
-/// Supported diagram kinds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagramKind {
     Mermaid,
@@ -16,7 +8,6 @@ pub enum DiagramKind {
 }
 
 impl DiagramKind {
-    /// Map a code-fence info string to a `DiagramKind`, or `None` if unsupported.
     pub fn from_info(info: &str) -> Option<Self> {
         match info.trim().to_ascii_lowercase().as_str() {
             "mermaid" => Some(Self::Mermaid),
@@ -35,16 +26,13 @@ impl DiagramKind {
     }
 }
 
-/// A parsed diagram block extracted from the Markdown source.
 #[derive(Debug, Clone)]
 pub struct DiagramBlock {
     pub kind: DiagramKind,
-    /// Raw source inside the fence (content only, no delimiters).
     pub source: String,
 }
 
 impl DiagramBlock {
-    /// Validate MVP input format constraints.
     pub fn validate(&self) -> Result<(), DiagramValidationError> {
         match self.kind {
             DiagramKind::Mermaid => {
@@ -78,7 +66,6 @@ impl DiagramBlock {
     }
 }
 
-/// Validation errors for diagram block input.
 #[derive(Debug, thiserror::Error)]
 pub enum DiagramValidationError {
     #[error("{kind} block has empty source")]
@@ -91,39 +78,30 @@ pub enum DiagramValidationError {
     UnsupportedEncoding { kind: &'static str, message: String },
 }
 
-/// Result returned by a diagram renderer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DiagramResult {
-    /// Successfully rendered HTML/SVG fragment.
     Ok(String),
-    /// Successfully rendered as PNG bytes (e.g. mmdc output).
     OkPng(Vec<u8>),
-    /// Rendering failed; preserve the original source for fallback display.
-    Err { source: String, error: String },
-    /// Required command line tool is not found.
+    Err {
+        source: String,
+        error: String,
+    },
     CommandNotFound {
         tool_name: String,
         install_hint: String,
         source: String,
     },
-    /// Required runtime tool is not installed (supports auto-download).
     NotInstalled {
-        /// Display name (e.g., "PlantUML").
         kind: String,
-        /// Download URL.
         download_url: String,
-        /// Installation path.
         install_path: std::path::PathBuf,
     },
 }
 
-/// Trait that all diagram renderer adapters must implement.
 pub trait DiagramRenderer: Send + Sync {
     fn render(&self, block: &DiagramBlock) -> DiagramResult;
 }
 
-/// A no-op renderer: outputs the diagram source as a plain code block.
-/// Used as the default until real renderers are integrated.
 pub struct NoOpRenderer;
 
 impl DiagramRenderer for NoOpRenderer {

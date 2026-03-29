@@ -47,7 +47,6 @@ fn is_pat_ok(pat: &syn::Pat) -> bool {
     }
 }
 
-/// Lints a file for violations of the Error First principle (e.g., `if let Ok(...)`).
 pub fn lint_error_first(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = ErrorFirstVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);

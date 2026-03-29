@@ -1,6 +1,5 @@
 use crate::utils::is_emoji_or_symbol;
 
-/// List of UI method names to inspect.
 pub fn ui_methods() -> Vec<&'static str> {
     vec![
         "label",
@@ -18,12 +17,10 @@ pub fn ui_methods() -> Vec<&'static str> {
     ]
 }
 
-/// List of function calls (`Type::func()` format) to inspect.
 pub fn ui_functions() -> Vec<&'static str> {
     vec!["new"]
 }
 
-/// Target type names for function calls.
 pub fn ui_types_for_new() -> Vec<&'static str> {
     vec!["RichText", "Button"]
 }

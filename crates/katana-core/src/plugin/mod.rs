@@ -1,26 +1,18 @@
-//! Plugin foundation: typed extension points, registry, and version contracts.
-//!
-//! MVP constraints:
-//! - Built-in plugins only; no runtime manifest file required.
-//! - All registrations happen at startup from compile-time definitions.
-//! - Plugins failing to initialize are disabled, not fatal.
+/* WHY: Plugin foundation: typed extension points, registry, and version contracts.
+MVP constraints:
+- Built-in plugins only; no runtime manifest file required.
+- All registrations happen at startup from compile-time definitions.
+- Plugins failing to initialize are disabled, not fatal. */
 
-/// Plugin API contract version.
-/// Plugins must declare compatibility with this version to be activated.
 pub const PLUGIN_API_VERSION: u32 = 1;
 
-/// The category of extension a plugin contributes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExtensionPoint {
-    /// Contributes an additional diagram renderer.
     RendererEnhancement,
-    /// Contributes an AI tool available in AI workflows.
     AiTool,
-    /// Contributes a UI panel to the shell.
     UiPanel,
 }
 
-/// Metadata for a registered plugin.
 #[derive(Debug, Clone)]
 pub struct PluginMeta {
     pub id: String,
@@ -29,18 +21,13 @@ pub struct PluginMeta {
     pub extension_points: Vec<ExtensionPoint>,
 }
 
-/// Possible outcomes of initializing a plugin.
 #[derive(Debug)]
 pub enum PluginInitResult {
-    /// Plugin initialized successfully.
     Ok,
-    /// Plugin failed to initialize; it is disabled but does not crash the app.
     Failed(String),
-    /// Plugin declared an incompatible API version.
     IncompatibleVersion { declared: u32, required: u32 },
 }
 
-/// Status of a plugin in the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PluginStatus {
     Active,
@@ -48,14 +35,12 @@ pub enum PluginStatus {
     IncompatibleVersion,
 }
 
-/// A registered plugin entry in the registry.
 #[derive(Debug)]
 struct PluginEntry {
     meta: PluginMeta,
     status: PluginStatus,
 }
 
-/// The plugin registry: assembled at startup from static built-in definitions.
 #[derive(Default)]
 pub struct PluginRegistry {
     entries: Vec<PluginEntry>,
@@ -66,11 +51,8 @@ impl PluginRegistry {
         Self::default()
     }
 
-    /// Register and initialize a plugin described by `meta`, using `init_fn`
-    /// to perform any startup work.
-    ///
-    /// - Incompatible API version → marked `IncompatibleVersion`.
-    /// - `init_fn` returns `Err` → marked `Disabled`, application continues.
+    /* WHY: Register and initialize a plugin described by `meta`, using `init_fn` to perform any startup work.
+    Incompatible API version → marked `IncompatibleVersion`. `init_fn` returns `Err` → marked `Disabled`, application continues. */
     pub fn register<F>(&mut self, meta: PluginMeta, init_fn: F)
     where
         F: FnOnce() -> Result<(), String>,
@@ -104,7 +86,6 @@ impl PluginRegistry {
         }
     }
 
-    /// Return metadata for all plugins that are active and contribute to `point`.
     pub fn active_plugins_for(&self, point: &ExtensionPoint) -> Vec<&PluginMeta> {
         let mut result = Vec::new();
         for entry in &self.entries {
@@ -115,7 +96,6 @@ impl PluginRegistry {
         result
     }
 
-    /// Status of a plugin by ID.
     pub fn status(&self, id: &str) -> Option<&PluginStatus> {
         match self.entries.iter().find(|e| e.meta.id == id) {
             Some(entry) => Some(&entry.status),
@@ -123,7 +103,6 @@ impl PluginRegistry {
         }
     }
 
-    /// Total number of active plugins.
     pub fn active_count(&self) -> usize {
         let mut count = 0;
         for entry in &self.entries {

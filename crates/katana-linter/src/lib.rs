@@ -116,8 +116,8 @@ pub fn run_ast_lint(
     }
 
     if let Err(e) = utils::format_violations(rule_name, hint, &all_violations) {
-        // WHY: The AST Linter executes as part of the test suite boundary.
-        // Failing tests fundamentally require panics to communicate failure natively.
+        /* WHY: The AST Linter executes as part of the test suite boundary.
+        Failing tests fundamentally require panics to communicate failure natively. */
         #[allow(clippy::panic)]
         {
             panic!("{e}");

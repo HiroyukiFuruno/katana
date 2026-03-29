@@ -1,4 +1,3 @@
-
 pub mod image;
 pub mod section;
 #[cfg(test)]

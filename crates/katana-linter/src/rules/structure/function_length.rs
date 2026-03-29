@@ -78,7 +78,6 @@ impl<'ast> Visit<'ast> for FunctionLengthVisitor {
     }
 }
 
-/// Lints a file for functions that exceed the maximum allowed line count (30 lines).
 pub fn lint_function_length(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = FunctionLengthVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);

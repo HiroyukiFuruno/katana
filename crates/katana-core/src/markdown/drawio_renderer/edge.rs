@@ -4,16 +4,10 @@ use crate::markdown::color_preset::DiagramColorPreset;
 
 use super::utils::{attr_f64, xml_escape, Rect};
 
-/// Upward offset of edge labels from the baseline (px).
 const EDGE_LABEL_VERTICAL_OFFSET: f64 = 6.0;
 
-/// Minimum vector length threshold to prevent division by zero in `border_point()`.
 const BORDER_POINT_EPSILON: f64 = 0.001;
 
-/// Renders an edge cell as a polyline with an arrow.
-///
-/// Uses the nearest point on the source and target rectangle borders as connection points,
-/// and also routes through `mxPoint` waypoints included in the `Array` element within `mxGeometry`.
 #[allow(clippy::type_complexity)]
 pub fn render_edge(
     cell: &Element,
@@ -42,7 +36,6 @@ pub fn render_edge(
     append_edge_label(cell, shapes, x1, y1, x2, y2, preset);
 }
 
-/// Assembles the polyline coordinate sequence.
 fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2: f64) -> String {
     let mut s = format!("{x1:.1},{y1:.1}");
     for (wx, wy) in waypoints {
@@ -76,7 +69,6 @@ fn resolve_edge_rects(
     ))
 }
 
-/// Renders the edge label at the midpoint, if it exists.
 fn append_edge_label(
     cell: &Element,
     shapes: &mut String,
@@ -99,7 +91,6 @@ fn append_edge_label(
     }
 }
 
-/// Collects waypoint coordinates from `Array` > `mxPoint` elements within `mxGeometry`.
 fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
     let Some(geo) = cell.get_child("mxGeometry") else {
         return Vec::new();
@@ -128,7 +119,6 @@ fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
     points
 }
 
-/// Returns the connection point on the rectangle's border along the direction vector from `(cx, cy)` to `(tx, ty)`.
 fn border_point(rect: &Rect, cx: f64, cy: f64, tx: f64, ty: f64) -> (f64, f64) {
     let dx = tx - cx;
     let dy = ty - cy;

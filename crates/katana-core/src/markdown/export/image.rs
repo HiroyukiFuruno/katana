@@ -1,13 +1,9 @@
 use crate::markdown::MarkdownError;
 
-/// Default fallback viewport width in pixels for screenshot captures.
 const DEFAULT_VIEWPORT_WIDTH: f64 = 1280.0;
-/// Default fallback viewport height in pixels for screenshot captures.
 const DEFAULT_VIEWPORT_HEIGHT: f64 = 800.0;
-/// Scale factor for retina-quality screenshot captures.
 const SCREENSHOT_SCALE: f64 = 2.0;
 
-/// Exporter for generating image files (PNG/JPG) via Headless Chrome.
 pub struct ImageExporter;
 
 impl ImageExporter {

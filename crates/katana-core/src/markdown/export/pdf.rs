@@ -1,16 +1,13 @@
 use crate::markdown::MarkdownError;
 
-/// Exporter for generating PDF documents via Headless Chrome.
 pub struct PdfExporter;
 
 impl PdfExporter {
-    /// Returns true if Headless Chrome can be initialized.
     pub fn is_available() -> bool {
         // WHY: We assume it's available as headless_chrome can download a browser.
         true
     }
 
-    /// Exports the given HTML content to a PDF file at the specified path.
     pub fn export(html: &str, output: &std::path::Path) -> Result<(), MarkdownError> {
         use headless_chrome::{Browser, LaunchOptions};
 

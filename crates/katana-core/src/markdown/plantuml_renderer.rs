@@ -1,11 +1,8 @@
-//! PlantUML subprocess renderer.
-//!
-//! Runs `java -jar plantuml.jar -pipe -tsvg`,
-//! passes PlantUML source to stdin and reads SVG from stdout.
-//!
-//! MVP constraints:
-//! - Only supports raw source containing `@startuml` / `@enduml` delimiters.
-//! - JAR search path is: `PLANTUML_JAR` environment variable -> adjacent to binary -> XDG data directory.
+/* WHY: PlantUML subprocess renderer.
+Runs `java -jar plantuml.jar -pipe -tsvg`, passes PlantUML source to stdin and reads SVG from stdout.
+MVP constraints:
+- Only supports raw source containing `@startuml` / `@enduml` delimiters.
+- JAR search path is: `PLANTUML_JAR` environment variable -> adjacent to binary -> XDG data directory. */
 
 use std::{
     io::Write,
@@ -16,7 +13,6 @@ use std::{
 use super::color_preset::DiagramColorPreset;
 use super::diagram::{DiagramBlock, DiagramResult};
 
-/// Returns candidate paths to search for the PlantUML JAR.
 pub fn jar_candidate_paths() -> Vec<PathBuf> {
     // WHY: If the environment variable is set, use only that path (ignore other candidates).
     #[allow(clippy::single_match)]
@@ -48,17 +44,14 @@ pub fn jar_candidate_paths() -> Vec<PathBuf> {
     paths
 }
 
-/// Default JAR path where Katana automatically installs.
 pub fn default_install_path() -> Option<PathBuf> {
     dirs_sys::home_dir().map(|h| h.join(".local").join("katana").join("plantuml.jar"))
 }
 
-/// Returns the path to the available PlantUML JAR on the system. If it doesn't exist, returns `None`.
 pub fn find_plantuml_jar() -> Option<PathBuf> {
     jar_candidate_paths().into_iter().find(|p| p.exists())
 }
 
-/// Converts PlantUML source to SVG.
 pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
     let Some(jar) = find_plantuml_jar() else {
         let install_path = default_install_path().unwrap_or_else(|| PathBuf::from("plantuml.jar"));
@@ -79,10 +72,8 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// Injects theme skinparams into PlantUML source based on the active color preset.
-///
-/// Inserts background + color defaults right after `@startuml`
-/// so that SVG renders blend naturally with the host UI theme.
+/* WHY: Injects theme skinparams into PlantUML source based on the active color preset.
+Inserts background + color defaults right after `@startuml` so that SVG renders blend naturally with the host UI theme. */
 fn inject_theme(source: &str, preset: &DiagramColorPreset) -> String {
     let skinparams = generate_skinparams(preset);
     if let Some(pos) = source.find("@startuml") {
@@ -129,7 +120,6 @@ skinparam sequenceArrowColor {arrow}
     )
 }
 
-/// Runs `java -jar plantuml.jar`, passes the source, and returns the SVG.
 pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let preset = DiagramColorPreset::current();
     let themed_source = inject_theme(source, preset);
@@ -173,7 +163,6 @@ fn build_plantuml_args(jar: &Path) -> Vec<String> {
     args
 }
 
-/// Converts SVG text into an HTML fragment for preview embedding.
 pub fn svg_to_html_fragment(svg: &str) -> String {
     format!(r#"<div class="katana-diagram plantuml">{svg}</div>"#)
 }

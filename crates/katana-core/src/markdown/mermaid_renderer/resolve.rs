@@ -4,10 +4,8 @@ use std::{
     sync::OnceLock,
 };
 
-/// Process-wide cache for the resolved `mmdc` binary path (excluding env-var override).
 static MMDC_RESOLVED_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-/// Returns the `mmdc` binary path using a fast multi-tier strategy.
 pub fn resolve_mmdc_binary() -> PathBuf {
     // WHY: Always check env var first (not cached — allows runtime override)
     #[allow(clippy::single_match)]
@@ -26,7 +24,6 @@ pub fn resolve_mmdc_binary() -> PathBuf {
         .clone()
 }
 
-/// Probes well-known binary directories for `mmdc`.
 fn probe_well_known_paths() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
 
@@ -60,7 +57,6 @@ fn probe_well_known_paths() -> Option<PathBuf> {
     None
 }
 
-/// Resolves `mmdc` under the nvm default alias without spawning a shell.
 fn probe_nvm_mmdc(nvm_dir: &str) -> Option<PathBuf> {
     let alias_file = PathBuf::from(format!("{nvm_dir}/alias/default"));
     let alias = std::fs::read_to_string(&alias_file).ok()?;
@@ -97,7 +93,6 @@ fn find_mmdc_by_prefix(versions_dir: &std::path::Path, alias: &str) -> Option<Pa
     best
 }
 
-/// Tries `which mmdc` using the current process PATH (no shell spawn).
 fn which_from_current_path() -> Option<PathBuf> {
     let output = Command::new("which")
         .arg("mmdc")
@@ -114,7 +109,6 @@ fn which_from_current_path() -> Option<PathBuf> {
     None
 }
 
-/// Spawns a zsh login shell to resolve `mmdc`.
 fn resolve_via_login_shell() -> Option<PathBuf> {
     let output = Command::new("/bin/zsh")
         .args(vec!["-l", "-c", "which mmdc"])
@@ -131,8 +125,6 @@ fn resolve_via_login_shell() -> Option<PathBuf> {
     None
 }
 
-/// Builds a [`Command`] for the resolved `mmdc` binary with a PATH
-/// that includes the binary's own directory.
 pub fn build_mmdc_command() -> Command {
     let mmdc = resolve_mmdc_binary();
     let mut cmd = Command::new(&mmdc);

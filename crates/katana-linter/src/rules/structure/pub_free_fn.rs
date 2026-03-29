@@ -3,8 +3,6 @@ use crate::Violation;
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
-/// Detects `pub fn` and `pub(crate) fn` at module top level (outside impl blocks).
-/// Domain logic must be in struct + impl blocks per coding-rules §1.1.
 struct PubFreeFnVisitor {
     file: PathBuf,
     violations: Vec<Violation>,
@@ -77,7 +75,6 @@ impl<'ast> Visit<'ast> for PubFreeFnVisitor {
     }
 }
 
-/// Lints a file to discourage the use of public free functions unless they are helpers or entrypoints.
 pub fn lint_pub_free_fn(path: &Path, syntax: &syn::File) -> Vec<Violation> {
     let mut visitor = PubFreeFnVisitor::new(path.to_path_buf());
     visitor.visit_file(syntax);

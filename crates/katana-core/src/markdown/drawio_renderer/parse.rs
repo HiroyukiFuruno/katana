@@ -2,7 +2,6 @@ use xmltree::Element;
 
 use super::utils::{attr_f64, CANVAS_EDGE_MARGIN, CANVAS_MIN_HEIGHT, CANVAS_MIN_WIDTH};
 
-/// Returns the `<mxGraphModel>` element from either `<mxfile>` or `<mxGraphModel>`.
 pub fn extract_graph_model(root: &Element) -> Result<&Element, String> {
     if root.name == "mxGraphModel" {
         return Ok(root);
@@ -18,7 +17,6 @@ pub fn extract_graph_model(root: &Element) -> Result<&Element, String> {
     Err(format!("Unsupported root element: {}", root.name))
 }
 
-/// Collects all `<mxCell>` elements under `<root>`.
 pub fn collect_cells(model: &Element) -> Vec<&Element> {
     let root = match model.get_child("root") {
         Some(r) => r,
@@ -31,7 +29,6 @@ pub fn collect_cells(model: &Element) -> Vec<&Element> {
         .collect()
 }
 
-/// Estimates canvas size (maximum coordinates of all vertices + margin).
 pub fn estimate_canvas_size(cells: &[&Element]) -> (f64, f64) {
     let (mut max_x, mut max_y) = (CANVAS_MIN_WIDTH, CANVAS_MIN_HEIGHT);
     for cell in cells {

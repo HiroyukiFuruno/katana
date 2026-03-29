@@ -3,14 +3,9 @@ use crate::Violation;
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
-/// Detects potentially unoptimized UI update patterns.
-/// Specifically:
-/// 1. Unconditional `request_repaint()` calls in `update` loops.
-/// 2. Unconditional `window.set_title()` calls.
 struct PerformanceVisitor {
     file: PathBuf,
     violations: Vec<Violation>,
-    /// Nesting depth of being inside a conditional block (if/match).
     in_conditional: u32,
 }
 

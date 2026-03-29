@@ -8,14 +8,8 @@ pub use version::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UpdateProgress {
-    Downloading {
-        downloaded: u64,
-        total: Option<u64>,
-    },
-    Extracting {
-        current: usize,
-        total: usize,
-    },
+    Downloading { downloaded: u64, total: Option<u64> },
+    Extracting { current: usize, total: usize },
 }
 
 #[derive(Debug, Default)]

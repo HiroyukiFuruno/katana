@@ -7,7 +7,6 @@ use super::plantuml_renderer;
 
 use super::fence::transform_diagram_blocks;
 
-/// Production renderer: delegates each diagram block type to the actual subprocess / XML parser.
 #[derive(Debug, Default)]
 pub struct KatanaRenderer;
 
@@ -21,13 +20,11 @@ impl DiagramRenderer for KatanaRenderer {
     }
 }
 
-/// The result of rendering a Markdown buffer.
 #[derive(Debug, Clone)]
 pub struct RenderOutput {
     pub html: String,
 }
 
-/// Errors that may arise during Markdown rendering.
 #[derive(Debug, thiserror::Error)]
 pub enum MarkdownError {
     #[error("Rendering failed: {0}")]
@@ -36,7 +33,6 @@ pub enum MarkdownError {
     ExportFailed(String),
 }
 
-/// Build default `comrak` options with GFM extensions enabled.
 pub fn gfm_options() -> ComrakOptions<'static> {
     let mut opts = ComrakOptions::default();
     opts.extension.strikethrough = true;
@@ -49,12 +45,10 @@ pub fn gfm_options() -> ComrakOptions<'static> {
     opts
 }
 
-/// Renders Markdown to HTML using the production `KatanaRenderer`.
 pub fn render_with_katana_renderer(source: &str) -> Result<RenderOutput, MarkdownError> {
     render(source, &KatanaRenderer)
 }
 
-/// Render Markdown to HTML, routing diagram fences through `renderer`.
 pub fn render<R: DiagramRenderer>(
     source: &str,
     renderer: &R,
@@ -64,7 +58,6 @@ pub fn render<R: DiagramRenderer>(
     Ok(RenderOutput { html })
 }
 
-/// Convenience render using the no-op diagram renderer.
 pub fn render_basic(source: &str) -> Result<RenderOutput, MarkdownError> {
     render(source, &diagram::NoOpRenderer)
 }

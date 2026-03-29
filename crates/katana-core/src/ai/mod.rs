@@ -1,7 +1,7 @@
 /* WHY: Defines the traits and types that the rest of the application uses to
-        issue AI requests without knowing about provider-specific authentication,
-        transport, or model details.
-   */
+     issue AI requests without knowing about provider-specific authentication,
+     transport, or model details.
+*/
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Param {
@@ -45,9 +45,9 @@ pub enum AiError {
 }
 
 /* WHY: Provider-specific authentication, transport, and retry concerns are
-        entirely encapsulated inside implementations of this trait.
-        The rest of the application never depends on provider-specific types.
-   */
+     entirely encapsulated inside implementations of this trait.
+     The rest of the application never depends on provider-specific types.
+*/
 pub trait AiProvider: Send + Sync {
     fn id(&self) -> &str;
 
@@ -59,8 +59,8 @@ pub trait AiProvider: Send + Sync {
 }
 
 /* WHY: The rest of the application interacts with AI features through the registry
-        rather than through concrete provider types.
-   */
+     rather than through concrete provider types.
+*/
 #[derive(Default)]
 pub struct AiProviderRegistry {
     providers: Vec<Box<dyn AiProvider>>,
@@ -93,8 +93,8 @@ impl AiProviderRegistry {
     pub fn execute(&self, request: &AiRequest) -> Result<AiResponse, AiError> {
         let id = self.active_id.as_deref().ok_or(AiError::NotConfigured)?;
         /* WHY: `set_active` returns `true` only if it exists in providers.
-                Therefore, if `active_id` is `Some`, it must exist in providers.
-         */
+               Therefore, if `active_id` is `Some`, it must exist in providers.
+        */
         let provider = self
             .providers
             .iter()

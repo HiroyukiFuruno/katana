@@ -1,8 +1,6 @@
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
-/// Recursively collects all `.rs` files starting from the root directory.
-/// Excludes paths containing `tests`.
 pub fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let walker = WalkBuilder::new(root)
@@ -24,10 +22,6 @@ pub fn collect_rs_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Gets the static workspace root directory of the application.
-///
-/// # Errors
-/// Returns an error string if the root cannot be resolved from the manifest directory.
 pub fn workspace_root() -> Result<&'static Path, String> {
     use std::sync::OnceLock;
     static ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();

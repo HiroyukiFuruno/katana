@@ -1,7 +1,6 @@
 use comrak::nodes::{AstNode, NodeValue};
 use comrak::{parse_document, Arena, Options};
 
-/// A single heading in the markdown document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutlineItem {
     pub level: u8,
@@ -29,7 +28,6 @@ fn extract_text_from_node<'a>(node: &'a AstNode<'a>, out: &mut String) {
     }
 }
 
-/// Parses the markdown source and extracts all headings (h1-h6) as an outline.
 pub fn extract_outline(source: &str) -> Vec<OutlineItem> {
     let arena = Arena::new();
     let mut options = Options::default();

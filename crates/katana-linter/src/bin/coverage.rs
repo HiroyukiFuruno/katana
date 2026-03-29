@@ -65,7 +65,6 @@ fn check_noise_contains(trimmed: &str) -> bool {
     trimmed.starts_with('{') && trimmed.ends_with('}')
 }
 
-/// Identifies LLVM specific instrumentation noise or unreachable macros
 fn is_noise(trimmed: &str) -> bool {
     let exact_matches = vec![
         "",

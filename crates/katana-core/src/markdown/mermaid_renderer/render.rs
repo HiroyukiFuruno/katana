@@ -6,7 +6,6 @@ use crate::markdown::diagram::{DiagramBlock, DiagramResult};
 
 use super::resolve::build_mmdc_command;
 
-/// Checks if `mmdc` is available.
 pub fn is_mmdc_available() -> bool {
     build_mmdc_command()
         .arg("--version")
@@ -17,10 +16,7 @@ pub fn is_mmdc_available() -> bool {
         .unwrap_or(false)
 }
 
-/// Converts Mermaid source to PNG.
-///
-/// Rendering as PNG with mmdc (Puppeteer/Chrome based)
-/// bypasses resvg's lack of support for `<foreignObject>`.
+/* WHY: Rendering as PNG with mmdc (Puppeteer/Chrome based) bypasses resvg's lack of support for <foreignObject>. */
 pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     if !is_mmdc_available() {
         return DiagramResult::CommandNotFound {
@@ -38,10 +34,7 @@ pub fn render_mermaid(block: &DiagramBlock) -> DiagramResult {
     }
 }
 
-/// Executes mmdc via a temporary file and returns PNG bytes.
-///
-/// PNG output ensures mmdc (Puppeteer) correctly renders all SVG elements.
-/// Bypasses text loss caused by `<foreignObject>` which resvg doesn't support.
+/* WHY: PNG output ensures mmdc (Puppeteer) correctly renders all SVG elements. Bypasses text loss caused by <foreignObject> which resvg doesn't support. */
 pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     let input_file = create_input_file(source)?;
     // WHY: mmdc determines the format by the output file's extension.
@@ -71,7 +64,6 @@ pub fn run_mmdc_process(source: &str) -> Result<Vec<u8>, String> {
     std::fs::read(&output_path).map_err(|e| format!("PNG read failed: {e}"))
 }
 
-/// Writes Mermaid source to a temporary file.
 pub fn create_input_file(source: &str) -> Result<NamedTempFile, String> {
     let mut file = NamedTempFile::with_suffix(".mmd")
         .map_err(|e| format!("Temp file creation failed: {e}"))?;

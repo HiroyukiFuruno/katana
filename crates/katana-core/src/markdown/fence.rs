@@ -1,9 +1,7 @@
 use super::diagram::{DiagramBlock, DiagramKind, DiagramRenderer, DiagramResult};
 
-/// Byte length of the fence block start delimiter "```".
 pub const FENCE_OPEN_LEN: usize = 3;
 
-/// Byte length of the fence block end delimiter "\n```".
 pub const FENCE_CLOSE_LEN: usize = 4;
 
 pub struct FenceBlock {
@@ -12,7 +10,6 @@ pub struct FenceBlock {
     pub raw: String,
 }
 
-/// Extract one complete fenced block from the start of `s`.
 pub fn extract_fence_block(s: &str) -> Option<(FenceBlock, &str)> {
     let body = s.strip_prefix("```")?;
     let info_end = body.find('\n')?;
@@ -67,8 +64,8 @@ pub fn render_diagram_block<R: DiagramRenderer>(
             install_hint,
             ..
         } => fallback_html("", &format!("{tool_name} not found. {install_hint}")),
-        // WHY: In the core layer, "NotInstalled" is displayed as fallback text.
-        // WHY: The appropriate download UI is rendered in the UI layer by `RenderedSection::NotInstalled`.
+        /* WHY: In the core layer, "NotInstalled" is displayed as fallback text.
+        The appropriate download UI is rendered in the UI layer by `RenderedSection::NotInstalled`. */
         DiagramResult::NotInstalled { kind, .. } => {
             fallback_html("", &format!("{kind} is not installed"))
         }
@@ -89,7 +86,6 @@ pub fn process_fence<R: DiagramRenderer>(output: &mut String, remaining: &mut &s
     *remaining = after;
 }
 
-/// Walk code fences in `source`, replace diagram blocks with rendered HTML.
 pub fn transform_diagram_blocks<R: DiagramRenderer>(source: &str, renderer: &R) -> String {
     let mut output = String::with_capacity(source.len());
     let mut remaining = source;
@@ -151,12 +147,11 @@ mod tests {
     fn transform_handles_fence_at_start_of_input() {
         let source = "```mermaid\ngraph TD; A-->B\n```\nAfter";
         let result = transform_diagram_blocks(source, &NoOpRenderer);
-        // WHY: NoOpRenderer returns empty string for OkPng, so diagram is replaced with nothing.
-        // WHY: But the key assertion is that the "After" text is preserved and no panic occurs.
+        /* WHY: NoOpRenderer returns empty string for OkPng, so diagram is replaced with nothing.
+        But the key assertion is that the "After" text is preserved and no panic occurs. */
         assert!(result.contains("After"));
     }
 
-    /// A test renderer that always returns OkPng with fixed bytes.
     struct PngTestRenderer;
     impl DiagramRenderer for PngTestRenderer {
         fn render(&self, _block: &DiagramBlock) -> DiagramResult {

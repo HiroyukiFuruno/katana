@@ -1,4 +1,4 @@
-//! Markdown parsing pipeline using `comrak`.
+/* WHY: Markdown parsing pipeline using `comrak`. */
 
 pub mod color_preset;
 pub mod diagram;

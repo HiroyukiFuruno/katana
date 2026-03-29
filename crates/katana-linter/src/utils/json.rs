@@ -5,10 +5,6 @@ use std::{
     path::Path,
 };
 
-/// Parses a custom locale JSON file into a `serde_json::Value`.
-///
-/// # Errors
-/// Returns a list of `Violation` if the file reading or JSON parsing fails.
 pub fn parse_json_file(path: &Path) -> Result<Value, Vec<Violation>> {
     let source = std::fs::read_to_string(path).map_err(|err| {
         vec![Violation {
@@ -29,7 +25,6 @@ pub fn parse_json_file(path: &Path) -> Result<Value, Vec<Violation>> {
     })
 }
 
-/// Recursively flattens a JSON structure to collect paths and their value types (shapes).
 pub fn collect_json_shape(
     value: &Value,
     path: Option<&str>,
@@ -61,7 +56,6 @@ pub fn collect_json_shape(
     }
 }
 
-/// Flattens a JSON structure to collect paths mapping to their actual string values.
 pub fn collect_json_values(value: &Value, path: Option<&str>, out: &mut BTreeMap<String, String>) {
     match value {
         Value::Object(map) => {
@@ -89,7 +83,6 @@ pub fn collect_json_values(value: &Value, path: Option<&str>, out: &mut BTreeMap
     }
 }
 
-/// Extracts embedded `{placeholders}` for each key within the JSON object tree.
 pub fn collect_json_placeholders(
     value: &Value,
     path: Option<&str>,
@@ -121,7 +114,6 @@ pub fn collect_json_placeholders(
     }
 }
 
-/// Scans text to extract `{placeholder_name}` embedded parameter tags.
 pub fn extract_placeholders(text: &str) -> BTreeSet<String> {
     let mut placeholders = BTreeSet::new();
     let bytes = text.as_bytes();
@@ -147,7 +139,6 @@ pub fn extract_placeholders(text: &str) -> BTreeSet<String> {
     placeholders
 }
 
-/// Checks if a string acts like a valid template placeholder name.
 pub fn is_placeholder_name(candidate: &str) -> bool {
     let mut chars = candidate.chars();
     let Some(first) = chars.next() else {

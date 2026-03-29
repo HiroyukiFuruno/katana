@@ -3,9 +3,6 @@ use crate::Violation;
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
-/// Detects direct usage of `FontDefinitions::default()` or `FontDefinitions::empty()`
-/// outside of `font_loader.rs`. All font setup must go through `NormalizeFonts`
-/// to ensure consistent CJK baseline alignment.
 struct FontNormalizationVisitor {
     file: PathBuf,
     violations: Vec<Violation>,

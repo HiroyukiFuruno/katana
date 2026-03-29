@@ -3,8 +3,6 @@ use crate::Violation;
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
-/// Detects `#[allow(dead_code)]` attributes in production code.
-/// Dead code should be deleted, not silenced with attributes.
 struct ProhibitedAttributeVisitor {
     file: PathBuf,
     violations: Vec<Violation>,
