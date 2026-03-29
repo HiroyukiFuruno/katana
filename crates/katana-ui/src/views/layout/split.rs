@@ -1,0 +1,250 @@
+use katana_platform::SplitDirection;
+
+use crate::app::preview::PreviewOps;
+use crate::preview_pane::DownloadRequest;
+use crate::shell::KatanaApp;
+use crate::shell::SPLIT_PREVIEW_PANEL_MIN_WIDTH;
+use crate::shell_ui::{SPLIT_HALF_RATIO, SPLIT_PANEL_MAX_RATIO};
+use crate::state::ScrollSource;
+use crate::theme_bridge;
+use crate::views::panels::editor::render_editor_content;
+use crate::views::panels::preview::preview_panel_id;
+use crate::views::panels::preview::render_preview_content;
+use katana_platform::PaneOrder;
+pub(crate) fn render_split_mode(
+    ctx: &egui::Context,
+    app: &mut KatanaApp,
+    split_dir: SplitDirection,
+    pane_order: PaneOrder,
+) -> Option<DownloadRequest> {
+    match split_dir {
+        SplitDirection::Horizontal => render_horizontal_split(ctx, app, pane_order),
+        SplitDirection::Vertical => render_vertical_split(ctx, app, pane_order),
+    }
+}
+
+pub(crate) fn render_horizontal_split(
+    ctx: &egui::Context,
+    app: &mut KatanaApp,
+    pane_order: PaneOrder,
+) -> Option<DownloadRequest> {
+    let available_width = ctx.available_rect().width();
+    let half_width = (available_width * SPLIT_HALF_RATIO).max(SPLIT_PREVIEW_PANEL_MIN_WIDTH);
+    let preview_bg = theme_bridge::rgb_to_color32(
+        app.state
+            .config
+            .settings
+            .settings()
+            .effective_theme_colors()
+            .preview
+            .background,
+    );
+    let active_path = app.state.active_document().map(|d| d.path.clone());
+    let mut scroll_state = (
+        app.state.scroll.fraction,
+        app.state.scroll.source,
+        app.state.scroll.preview_max,
+    );
+    let mut download_req = None;
+    let panel_id = match pane_order {
+        PaneOrder::EditorFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_right"),
+        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_left"),
+    };
+
+    // EditorFirst: preview panel on the right; PreviewFirst: preview panel on the left.
+    let panel_side = match pane_order {
+        PaneOrder::EditorFirst => egui::SidePanel::right(panel_id),
+        PaneOrder::PreviewFirst => egui::SidePanel::left(panel_id),
+    };
+
+    let scroll_sync = app.state.scroll.sync_override.unwrap_or(
+        app.state
+            .config
+            .settings
+            .settings()
+            .behavior
+            .scroll_sync_enabled,
+    );
+
+    panel_side
+        .resizable(true)
+        .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
+        .default_width(half_width)
+        .frame(egui::Frame::NONE.fill(preview_bg))
+        .show(ctx, |ui| {
+            if let Some(path) = &active_path {
+                let pane =
+                    crate::shell::KatanaApp::get_preview_pane(&mut app.tab_previews, path.clone());
+                download_req = render_preview_content(
+                    ui,
+                    pane,
+                    &mut app.state,
+                    &mut app.pending_action,
+                    scroll_sync,
+                    &mut scroll_state,
+                );
+            }
+        });
+
+    // Sync preview's scroll state to app.state BEFORE the editor renders.
+    // The editor reads/writes app.state directly; writing back after the
+    // editor would overwrite the editor's consumption of scroll signals.
+    app.state.scroll.fraction = scroll_state.0;
+    app.state.scroll.source = scroll_state.1;
+    app.state.scroll.preview_max = scroll_state.2;
+
+    egui::CentralPanel::default()
+        .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
+        .show(ctx, |ui| {
+            render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
+        });
+
+    download_req
+}
+
+pub(crate) fn render_vertical_split(
+    ctx: &egui::Context,
+    app: &mut KatanaApp,
+    pane_order: PaneOrder,
+) -> Option<DownloadRequest> {
+    let available_height = ctx.available_rect().height();
+    let half_height = available_height * SPLIT_HALF_RATIO;
+    let preview_bg = theme_bridge::rgb_to_color32(
+        app.state
+            .config
+            .settings
+            .settings()
+            .effective_theme_colors()
+            .preview
+            .background,
+    );
+    let active_path = app.state.active_document().map(|d| d.path.clone());
+    let mut scroll_state = (
+        app.state.scroll.fraction,
+        app.state.scroll.source,
+        app.state.scroll.preview_max,
+    );
+    let mut download_req = None;
+    let panel_id = match pane_order {
+        PaneOrder::EditorFirst => {
+            preview_panel_id(active_path.as_deref(), "preview_panel_v_bottom")
+        }
+        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_v_top"),
+    };
+
+    // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
+    let show_preview_top = pane_order == PaneOrder::PreviewFirst;
+    let scroll_sync = app.state.scroll.sync_override.unwrap_or(
+        app.state
+            .config
+            .settings
+            .settings()
+            .behavior
+            .scroll_sync_enabled,
+    );
+
+    if show_preview_top {
+        egui::TopBottomPanel::top(panel_id)
+            .resizable(true)
+            .default_height(half_height)
+            .max_height(available_height * SPLIT_PANEL_MAX_RATIO)
+            .frame(egui::Frame::NONE.fill(preview_bg))
+            .show(ctx, |ui| {
+                if let Some(path) = &active_path {
+                    let pane = crate::shell::KatanaApp::get_preview_pane(
+                        &mut app.tab_previews,
+                        path.clone(),
+                    );
+                    download_req = render_preview_content(
+                        ui,
+                        pane,
+                        &mut app.state,
+                        &mut app.pending_action,
+                        scroll_sync,
+                        &mut scroll_state,
+                    );
+                }
+            });
+
+        // Sync preview's scroll state to app.state BEFORE the editor renders.
+        // The editor reads from app.state directly, so it must see the preview's
+        // latest scroll_source/fraction. After the editor runs, its writes to
+        // app.state are preserved (no subsequent overwrite).
+        app.state.scroll.fraction = scroll_state.0;
+        app.state.scroll.source = scroll_state.1;
+        app.state.scroll.preview_max = scroll_state.2;
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
+            .show(ctx, |ui| {
+                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
+            });
+    } else {
+        egui::TopBottomPanel::bottom(panel_id)
+            .resizable(true)
+            .default_height(half_height)
+            .max_height(available_height * SPLIT_PANEL_MAX_RATIO)
+            .frame(egui::Frame::NONE.fill(preview_bg))
+            .show(ctx, |ui| {
+                if let Some(path) = &active_path {
+                    let pane = crate::shell::KatanaApp::get_preview_pane(
+                        &mut app.tab_previews,
+                        path.clone(),
+                    );
+                    download_req = render_preview_content(
+                        ui,
+                        pane,
+                        &mut app.state,
+                        &mut app.pending_action,
+                        scroll_sync,
+                        &mut scroll_state,
+                    );
+                }
+            });
+
+        app.state.scroll.fraction = scroll_state.0;
+        app.state.scroll.source = scroll_state.1;
+        app.state.scroll.preview_max = scroll_state.2;
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
+            .show(ctx, |ui| {
+                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
+            });
+    }
+
+    download_req
+}
+
+pub(crate) fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
+    ui.painter().rect_filled(
+        ui.max_rect(),
+        0.0,
+        theme_bridge::rgb_to_color32(
+            app.state
+                .config
+                .settings
+                .settings()
+                .effective_theme_colors()
+                .preview
+                .background,
+        ),
+    );
+    let active_path = app.state.active_document().map(|d| d.path.clone());
+    let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
+    if let Some(path) = active_path {
+        let pane = crate::shell::KatanaApp::get_preview_pane(&mut app.tab_previews, path);
+        render_preview_content(
+            ui,
+            pane,
+            &mut app.state,
+            &mut app.pending_action,
+            false,
+            &mut scroll_state,
+        );
+    } else {
+        ui.centered_and_justified(|ui| {
+            ui.label(crate::i18n::get().workspace.no_document_selected.clone());
+        });
+    }
+}

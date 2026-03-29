@@ -8,11 +8,13 @@
 //!
 //! Therefore, it is excluded from code coverage measurement using `--ignore-filename-regex`.
 
+use crate::app::*;
+
 use eframe::egui;
 
 use crate::{
-    app_state::{AppAction, AppState, ScrollSource, ViewMode},
-    preview_pane::{DownloadRequest, PreviewPane},
+    app_state::{AppAction, AppState, ViewMode},
+    preview_pane::DownloadRequest,
     widgets::StyledComboBox,
 };
 
@@ -20,1680 +22,31 @@ const INVISIBLE_LABEL_SIZE: f32 = 0.1;
 /// Splash screen animation repaint interval (~30fps).
 const SPLASH_REPAINT_INTERVAL_MS: u64 = 32;
 
-fn invisible_label(text: &str) -> egui::RichText {
+pub(crate) fn invisible_label(text: &str) -> egui::RichText {
     egui::RichText::new(text)
         .size(INVISIBLE_LABEL_SIZE)
         .color(crate::theme_bridge::TRANSPARENT)
 }
 
-use crate::shell::{
-    ACTIVE_FILE_HIGHLIGHT_ROUNDING, EDITOR_INITIAL_VISIBLE_ROWS, FILE_TREE_PANEL_DEFAULT_WIDTH,
-    FILE_TREE_PANEL_MIN_WIDTH, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
-    RECENT_WORKSPACES_SPACING, SCROLL_SYNC_DEAD_ZONE, TAB_DROP_ANIMATION_TIME,
-    TAB_DROP_INDICATOR_WIDTH, TAB_INTER_ITEM_SPACING, TAB_NAV_BUTTONS_AREA_WIDTH,
-    TAB_TOOLTIP_SHOW_DELAY_SECS, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
-};
 use crate::theme_bridge;
-use katana_platform::{PaneOrder, SplitDirection};
 
 pub(crate) fn open_folder_dialog() -> Option<std::path::PathBuf> {
     rfd::FileDialog::new().pick_folder()
 }
 
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn render_menu_bar(ctx: &egui::Context, state: &mut AppState, action: &mut AppAction) {
-    egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-        egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button(crate::i18n::get().menu.file.clone(), |ui| {
-                render_file_menu(ui, state, action);
-            });
-            ui.menu_button(crate::i18n::get().menu.settings.clone(), |ui| {
-                render_settings_menu(ui, state, action);
-            });
-            ui.menu_button(crate::i18n::get().menu.help.clone(), |ui| {
-                render_help_menu(ui, action);
-            });
-            render_header_right(ui, state);
-        });
-    });
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn render_help_menu(ui: &mut egui::Ui, action: &mut AppAction) {
-    if ui.button(crate::i18n::get().menu.about.clone()).clicked() {
-        *action = AppAction::ToggleAbout;
-        ui.close();
-    }
-    if ui
-        .button(crate::i18n::get().menu.release_notes.clone())
-        .clicked()
-    {
-        *action = AppAction::ShowReleaseNotes;
-        ui.close();
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn render_file_menu(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
-    if ui
-        .button(crate::i18n::get().menu.open_workspace.clone())
-        .clicked()
-    {
-        if let Some(path) = open_folder_dialog() {
-            *action = AppAction::OpenWorkspace(path);
-        }
-        ui.close();
-    }
-    ui.separator();
-    if ui
-        .add_enabled(
-            state.is_dirty(),
-            egui::Button::new(crate::i18n::get().menu.save.clone()),
-        )
-        .clicked()
-    {
-        *action = AppAction::SaveDocument;
-        ui.close();
-    }
-
-    let has_doc = state.active_document().is_some();
-    ui.add_enabled_ui(has_doc, |ui| {
-        ui.menu_button(crate::i18n::get().menu.export.clone(), |ui| {
-            if ui
-                .button(crate::i18n::get().menu.export_html.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_pdf.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_png.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_jpg.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
-                ui.close();
-            }
-        });
-    });
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn render_settings_menu(ui: &mut egui::Ui, _state: &AppState, action: &mut AppAction) {
-    ui.menu_button(crate::i18n::get().menu.language.clone(), |ui| {
-        let mut reset_layout = false;
-        for (code, display_name) in crate::i18n::supported_languages() {
-            if ui.button(display_name.as_str()).clicked() {
-                *action = AppAction::ChangeLanguage(code.to_string());
-                reset_layout = true;
-            }
-        }
-        if reset_layout {
-            ui.close();
-        }
-    });
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn render_header_right(ui: &mut egui::Ui, state: &AppState) {
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        if state.is_dirty() {
-            ui.label("*");
-        }
-    });
-}
-
-pub(crate) fn render_status_bar(
-    ctx: &egui::Context,
-    state: &AppState,
-    export_filenames: &[String],
-) {
-    egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            let (msg, kind) = if let Some((msg, kind)) = &state.status_message {
-                (msg.as_str(), Some(kind))
-            } else {
-                (crate::i18n::get().status.ready.as_str(), None)
-            };
-
-            let (color, icon) = match kind {
-                Some(crate::app_state::StatusType::Error) => (
-                    ui.ctx()
-                        .data(|d| {
-                            d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
-                                "katana_theme_colors",
-                            ))
-                        })
-                        .map_or(crate::theme_bridge::WHITE, |tc| {
-                            crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                        }),
-                    Some(crate::Icon::Error),
-                ),
-                Some(crate::app_state::StatusType::Warning) => {
-                    (ui.visuals().warn_fg_color, Some(crate::Icon::Warning))
-                }
-                Some(crate::app_state::StatusType::Success) => (
-                    crate::theme_bridge::from_rgb(0, STATUS_SUCCESS_GREEN, 0),
-                    Some(crate::Icon::Success),
-                ),
-                Some(crate::app_state::StatusType::Info) => {
-                    (ui.visuals().text_color(), Some(crate::Icon::Info))
-                }
-                _ => (ui.visuals().text_color(), None),
-            };
-
-            ui.add_space(STATUS_BAR_ICON_SPACING);
-            if let Some(i) = icon {
-                ui.add(egui::Image::new(i.uri()).tint(color));
-                ui.add_space(2.0);
-            }
-            ui.colored_label(color, msg);
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if !export_filenames.is_empty() {
-                    let total = export_filenames.len();
-                    ui.spinner();
-                    for (i, filename) in export_filenames.iter().enumerate() {
-                        let numbered = crate::i18n::tf(
-                            &crate::i18n::get().export.exporting,
-                            &[("filename", &format!("({}/{}) {}", i + 1, total, filename))],
-                        );
-                        ui.label(numbered);
-                    }
-                }
-                const DIRTY_DOT_MAX_HEIGHT: f32 = 10.0;
-                if state.is_dirty() {
-                    ui.add(
-                        egui::Image::new(crate::Icon::Dot.uri())
-                            .tint(ui.visuals().text_color())
-                            .max_height(DIRTY_DOT_MAX_HEIGHT),
-                    );
-                }
-            });
-        });
-    });
-}
-
-const WORKSPACE_SPINNER_OUTER_MARGIN: f32 = 10.0;
-const WORKSPACE_SPINNER_INNER_MARGIN: f32 = 10.0;
-const WORKSPACE_SPINNER_TEXT_MARGIN: f32 = 5.0;
+pub(crate) const WORKSPACE_SPINNER_OUTER_MARGIN: f32 = 10.0;
+pub(crate) const WORKSPACE_SPINNER_INNER_MARGIN: f32 = 10.0;
+pub(crate) const WORKSPACE_SPINNER_TEXT_MARGIN: f32 = 5.0;
 /// Green channel value for the success status bar color.
-const STATUS_SUCCESS_GREEN: u8 = 200;
+pub(crate) const STATUS_SUCCESS_GREEN: u8 = 200;
 /// Spacing before the icon in the status bar.
-const STATUS_BAR_ICON_SPACING: f32 = 4.0;
-
-pub(crate) fn render_workspace_panel(
-    ctx: &egui::Context,
-    state: &mut AppState,
-    action: &mut AppAction,
-) {
-    egui::SidePanel::left("workspace_tree")
-        .resizable(true)
-        .min_width(FILE_TREE_PANEL_MIN_WIDTH)
-        .default_width(FILE_TREE_PANEL_DEFAULT_WIDTH)
-        .show(ctx, |ui| {
-            let panel_width = ui.available_width();
-            ui.set_max_width(panel_width);
-            ui.set_min_width(panel_width);
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-            ui.horizontal(|ui| {
-                ui.heading(crate::i18n::get().workspace.workspace_title.clone());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add(egui::Button::image(
-                            crate::icon::Icon::ChevronLeft
-                                .ui_image(ui, crate::icon::IconSize::Small),
-                        ))
-                        .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
-                        .clicked()
-                    {
-                        state.show_workspace = false;
-                    }
-                });
-            });
-            if state.workspace.is_some() {
-                ui.horizontal(|ui| {
-                    let btn_resp = ui
-                        .add(egui::Button::image(
-                            crate::Icon::ExpandAll.ui_image(ui, crate::icon::IconSize::Small),
-                        ))
-                        .on_hover_text(crate::i18n::get().action.expand_all.clone());
-                    btn_resp.widget_info(|| {
-                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "+")
-                    });
-                    if btn_resp.clicked() {
-                        if let Some(ws) = &state.workspace {
-                            state
-                                .expanded_directories
-                                .extend(ws.collect_all_directory_paths());
-                        }
-                    }
-                    let btn_resp = ui
-                        .add(egui::Button::image(
-                            crate::Icon::CollapseAll.ui_image(ui, crate::icon::IconSize::Small),
-                        ))
-                        .on_hover_text(crate::i18n::get().action.collapse_all.clone());
-                    btn_resp.widget_info(|| {
-                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "-")
-                    });
-                    if btn_resp.clicked() {
-                        state.force_tree_open = Some(false);
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let icon_bg = if ui.visuals().dark_mode {
-                            crate::theme_bridge::TRANSPARENT
-                        } else {
-                            crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG) // Always gray for icons in light mode
-                        };
-
-                        if !state.settings.settings().workspace.paths.is_empty() {
-                            let ws_history_img =
-                                crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Small);
-                            ui.scope(|ui| {
-                                ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
-                                ui.menu_image_button(ws_history_img, |ui| {
-                                    for path in
-                                        state.settings.settings().workspace.paths.iter().rev()
-                                    {
-                                        ui.horizontal(|ui| {
-                                            if ui
-                                                .add(egui::Button::image_and_text(
-                                                    crate::Icon::Remove
-                                                        .ui_image(ui, crate::icon::IconSize::Small),
-                                                    invisible_label("x"),
-                                                ))
-                                                .on_hover_text(
-                                                    crate::i18n::get()
-                                                        .action
-                                                        .remove_workspace
-                                                        .clone(),
-                                                )
-                                                .clicked()
-                                            {
-                                                *action = AppAction::RemoveWorkspace(path.clone());
-                                                ui.close();
-                                            }
-                                            if ui.selectable_label(false, path).clicked() {
-                                                *action = AppAction::OpenWorkspace(
-                                                    std::path::PathBuf::from(path),
-                                                );
-                                                ui.close();
-                                            }
-                                        });
-                                    }
-                                })
-                                .response
-                                .on_hover_text(
-                                    crate::i18n::get().workspace.recent_workspaces.clone(),
-                                );
-                            });
-                        }
-
-                        if ui
-                            .add(
-                                egui::Button::image_and_text(
-                                    crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Small),
-                                    invisible_label("🔄"),
-                                )
-                                .fill(icon_bg),
-                            )
-                            .on_hover_text(crate::i18n::get().action.refresh_workspace.clone())
-                            .clicked()
-                        {
-                            *action = AppAction::RefreshWorkspace;
-                        }
-
-                        let filter_btn_color = if state.filter_enabled {
-                            if ui.visuals().dark_mode {
-                                ui.visuals().selection.bg_fill
-                            } else {
-                                crate::theme_bridge::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
-                                // Darker gray when active in light mode
-                            }
-                        } else {
-                            icon_bg
-                        };
-
-                        if ui
-                            .add(
-                                egui::Button::image_and_text(
-                                    crate::Icon::Filter.ui_image(ui, crate::icon::IconSize::Small),
-                                    invisible_label("\u{2207}"),
-                                )
-                                .fill(filter_btn_color),
-                            )
-                            .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
-                            .clicked()
-                        {
-                            state.filter_enabled = !state.filter_enabled;
-                        }
-
-                        if ui
-                            .add(
-                                egui::Button::image_and_text(
-                                    crate::Icon::Search.ui_image(ui, crate::icon::IconSize::Small),
-                                    invisible_label("🔍"),
-                                )
-                                .fill(icon_bg),
-                            )
-                            .on_hover_text(crate::i18n::get().search.modal_title.clone())
-                            .clicked()
-                        {
-                            state.show_search_modal = true;
-                        }
-                    });
-                });
-
-                if state.filter_enabled {
-                    let mut is_valid_regex = true;
-                    if !state.filter_query.is_empty() {
-                        is_valid_regex = regex::Regex::new(&state.filter_query).is_ok();
-                    }
-                    ui.horizontal(|ui| {
-                        let text_color = if is_valid_regex {
-                            ui.visuals().text_color()
-                        } else {
-                            ui.ctx()
-                                .data(|d| {
-                                    d.get_temp::<katana_platform::theme::ThemeColors>(
-                                        egui::Id::new("katana_theme_colors"),
-                                    )
-                                })
-                                .map_or(crate::theme_bridge::WHITE, |tc| {
-                                    crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                                })
-                        };
-                        ui.add(
-                            egui::TextEdit::singleline(&mut state.filter_query)
-                                .text_color(text_color)
-                                .hint_text("Filter (Regex)...")
-                                .desired_width(f32::INFINITY),
-                        );
-                    });
-                }
-            }
-            ui.separator();
-            if state.is_loading_workspace {
-                ui.add_space(WORKSPACE_SPINNER_OUTER_MARGIN);
-                ui.horizontal(|ui| {
-                    ui.add_space(WORKSPACE_SPINNER_INNER_MARGIN);
-                    ui.spinner();
-                    ui.add_space(WORKSPACE_SPINNER_TEXT_MARGIN);
-                    ui.label(crate::i18n::get().action.refresh_workspace.clone());
-                });
-            } else {
-                render_workspace_content(ui, state, action);
-            }
-        });
-}
-
-pub(crate) fn render_workspace_content(
-    ui: &mut egui::Ui,
-    state: &mut AppState,
-    action: &mut AppAction,
-) {
-    if let Some(ws) = &state.workspace {
-        let entries = ws.tree.clone();
-        if let Some(force) = state.force_tree_open {
-            if force {
-                state
-                    .expanded_directories
-                    .extend(ws.collect_all_directory_paths());
-            } else {
-                state.expanded_directories.clear();
-            }
-        }
-        let active_path = state.active_path().map(|p| p.to_path_buf());
-
-        let ws_root = ws.root.clone();
-        if state.filter_enabled && !state.filter_query.is_empty() {
-            let is_negated = state.filter_query.starts_with('!');
-            let query_str = if is_negated {
-                &state.filter_query[1..]
-            } else {
-                &state.filter_query
-            };
-
-            if let Ok(regex) = regex::Regex::new(query_str) {
-                if state.filter_cache.as_ref().map(|(q, _)| q) != Some(&state.filter_query) {
-                    let mut visible = std::collections::HashSet::new();
-                    gather_visible_paths(&entries, &regex, is_negated, &ws_root, &mut visible);
-                    state.filter_cache = Some((state.filter_query.clone(), visible));
-                }
-            } else {
-                state.filter_cache = None;
-            }
-        } else {
-            state.filter_cache = None;
-        }
-        let filter_set = state.filter_cache.as_ref().map(|(_, v)| v);
-
-        egui::ScrollArea::vertical()
-            .id_salt("workspace_tree_scroll")
-            .show(ui, |ui| {
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-                let mut ctx = TreeRenderContext {
-                    action,
-                    depth: 0,
-                    active_path: active_path.as_deref(),
-                    filter_set,
-                    expanded_directories: &mut state.expanded_directories,
-                    disable_context_menu: false,
-                };
-                for entry in &entries {
-                    render_tree_entry(ui, entry, &mut ctx);
-                }
-            });
-        state.force_tree_open = None;
-    } else {
-        ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
-        ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
-        if ui
-            .button(crate::i18n::get().menu.open_workspace.clone())
-            .clicked()
-        {
-            if let Some(path) = open_folder_dialog() {
-                *action = AppAction::OpenWorkspace(path);
-            }
-        }
-
-        let recent_paths = &state.settings.settings().workspace.paths;
-        if !recent_paths.is_empty() {
-            ui.add_space(RECENT_WORKSPACES_SPACING);
-            ui.separator();
-            ui.add_space(RECENT_WORKSPACES_SPACING);
-            ui.heading(crate::i18n::get().workspace.recent_workspaces.clone());
-            ui.add_space(RECENT_WORKSPACES_ITEM_SPACING);
-            for path in recent_paths.iter().rev() {
-                ui.horizontal(|ui| {
-                    if ui
-                        .button("×")
-                        .on_hover_text(crate::i18n::get().action.remove_workspace.clone())
-                        .clicked()
-                    {
-                        *action = AppAction::RemoveWorkspace(path.clone());
-                    }
-                    if ui.selectable_label(false, path).clicked() {
-                        *action = AppAction::OpenWorkspace(std::path::PathBuf::from(path));
-                    }
-                });
-            }
-        }
-    }
-}
-
-pub(crate) fn render_preview_content(
-    ui: &mut egui::Ui,
-    preview: &mut PreviewPane,
-    state: &mut AppState,
-    action: &mut AppAction,
-    scroll_sync: bool,
-    scroll_state: &mut (f32, ScrollSource, f32),
-) -> Option<DownloadRequest> {
-    let mut download_req = None;
-    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
-    let outer_rect = ui.available_rect_before_wrap();
-    ui.allocate_rect(outer_rect, egui::Sense::hover());
-
-    let (fraction, source, prev_max_scroll) = scroll_state;
-    let mut scroll_area = egui::ScrollArea::vertical()
-        .id_salt("preview_scroll")
-        .auto_shrink(std::array::from_fn(|_| false));
-
-    let mut target_scroll_offset = *fraction * (*prev_max_scroll).max(1.0);
-    let consuming_editor = scroll_sync && *source == ScrollSource::Editor;
-    if consuming_editor {
-        if let Some(doc) = state.active_document() {
-            let _buffer = &doc.buffer;
-            let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
-            let editor_y = *fraction * state.editor_max_scroll.max(1.0);
-
-            let mut points = Vec::new();
-            points.push((0.0, 0.0));
-            for (span, rect) in &preview.heading_anchors {
-                let e_y = span.start as f32 * row_height;
-                let p_y = (rect.min.y - preview.content_top_y).max(0.0);
-                points.push((e_y, p_y));
-            }
-            points.push((
-                state.editor_max_scroll.max(1.0),
-                (*prev_max_scroll).max(1.0),
-            ));
-
-            let mut mapped_y = 0.0;
-            for i in 0..points.len() - 1 {
-                let (e_y1, p_y1) = points[i];
-                let (e_y2, p_y2) = points[i + 1];
-                if editor_y >= e_y1 && editor_y <= e_y2 {
-                    if e_y2 > e_y1 {
-                        let t = (editor_y - e_y1) / (e_y2 - e_y1);
-                        mapped_y = p_y1 + t * (p_y2 - p_y1);
-                    } else {
-                        mapped_y = p_y1;
-                    }
-                    break;
-                }
-            }
-            if editor_y > points.last().unwrap().0 {
-                mapped_y = points.last().unwrap().1;
-            }
-            target_scroll_offset = mapped_y;
-        }
-
-        scroll_area = scroll_area.vertical_scroll_offset(target_scroll_offset);
-    }
-
-    let mut content_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(outer_rect)
-            .layout(egui::Layout::top_down(egui::Align::Min)),
-    );
-    content_ui.set_clip_rect(outer_rect);
-
-    let output = scroll_area.show(&mut content_ui, |ui| {
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                PREVIEW_CONTENT_PADDING,
-                PREVIEW_CONTENT_PADDING,
-            ))
-            .show(ui, |ui| {
-                let content_width = ui.available_width();
-                let child_rect = egui::Rect::from_min_size(
-                    ui.next_widget_position(),
-                    egui::vec2(content_width, 0.0),
-                );
-                ui.scope_builder(
-                    egui::UiBuilder::new()
-                        .max_rect(child_rect)
-                        .layout(egui::Layout::top_down(egui::Align::Min)),
-                    |ui| {
-                        const PREVIEW_PANE_TOP_BOTTOM_PADDING: f32 = 4.0; // 0.25rem padding
-                        ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
-                        let mut hovered_lines = Vec::new();
-                        let (req, actions) = preview.show_content(
-                            ui,
-                            state.active_editor_line,
-                            Some(&mut hovered_lines),
-                        );
-                        if scroll_sync && *source != ScrollSource::Preview {
-                            state.hovered_preview_lines = hovered_lines.clone();
-                        }
-
-                        if ui.rect_contains_pointer(ui.min_rect())
-                            && ui.input(|i| i.pointer.primary_clicked())
-                        {
-                            if let Some(hovered) = hovered_lines.first() {
-                                state.scroll_to_line = Some(hovered.start);
-                            }
-                        }
-                        download_req = req;
-                        if let Some((global_index, new_state)) = actions.into_iter().next() {
-                            *action = AppAction::ToggleTaskList {
-                                global_index,
-                                new_state,
-                            };
-                        }
-                        ui.add_space(PREVIEW_PANE_TOP_BOTTOM_PADDING);
-                    },
-                );
-            });
-    });
-
-    if scroll_sync {
-        let max_scroll = (output.content_size.y - output.inner_rect.height()).max(0.0);
-        *prev_max_scroll = max_scroll;
-
-        if consuming_editor {
-            *source = ScrollSource::Neither;
-            if max_scroll > 0.0 {
-                // If mapped via piecewise, we should inversely map the actual offset back to fraction to stay stable.
-                // However, holding the fraction is generally safer.
-                // We leave fraction alone when consuming editor input.
-            }
-        } else {
-            if max_scroll > 0.0 {
-                let preview_y = output.state.offset.y;
-                let mut editor_target_y = preview_y;
-
-                if let Some(doc) = state.active_document() {
-                    let _buffer = &doc.buffer;
-                    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
-
-                    let mut points = Vec::new();
-                    points.push((0.0, 0.0));
-                    for (span, rect) in &preview.heading_anchors {
-                        let e_y = span.start as f32 * row_height;
-                        let p_y = (rect.min.y - preview.content_top_y).max(0.0);
-                        points.push((e_y, p_y));
-                    }
-                    points.push((state.editor_max_scroll.max(1.0), max_scroll));
-
-                    let mut mapped_y = 0.0;
-                    for i in 0..points.len() - 1 {
-                        let (e_y1, p_y1) = points[i];
-                        let (e_y2, p_y2) = points[i + 1];
-                        if preview_y >= p_y1 && preview_y <= p_y2 {
-                            if p_y2 > p_y1 {
-                                let t = (preview_y - p_y1) / (p_y2 - p_y1);
-                                mapped_y = e_y1 + t * (e_y2 - e_y1);
-                            } else {
-                                mapped_y = e_y1;
-                            }
-                            break;
-                        }
-                    }
-                    if preview_y > points.last().unwrap().1 {
-                        mapped_y = points.last().unwrap().0;
-                    }
-                    editor_target_y = mapped_y;
-                }
-
-                let current_fraction =
-                    (editor_target_y / state.editor_max_scroll.max(1.0)).clamp(0.0, 1.0);
-                let diff = (current_fraction - *fraction).abs();
-                if diff > SCROLL_SYNC_DEAD_ZONE {
-                    *fraction = current_fraction;
-                    *source = ScrollSource::Preview;
-                }
-            }
-        }
-    }
-
-    render_preview_header(ui, state, action);
-
-    download_req
-}
-
-pub(crate) fn render_preview_header(ui: &mut egui::Ui, state: &AppState, action: &mut AppAction) {
-    let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
-    let margin = f32::from(PREVIEW_CONTENT_PADDING);
-    let spacing = ui.spacing().item_spacing.x;
-    let mut button_count = 2.0; // Refresh + Export
-    if state.settings.settings().layout.toc_visible {
-        button_count += 1.0;
-    }
-    let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
-
-    let button_rect = egui::Rect::from_min_size(
-        egui::pos2(
-            ui.max_rect().right() - margin - total_width,
-            ui.max_rect().top() + margin,
-        ),
-        egui::vec2(total_width, button_size.y),
-    );
-    let mut overlay_ui = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(button_rect)
-            .layout(egui::Layout::right_to_left(egui::Align::Center)),
-    );
-    let has_doc = state.active_document().is_some();
-
-    let icon_bg = if ui.visuals().dark_mode {
-        crate::theme_bridge::TRANSPARENT
-    } else {
-        crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG)
-    };
-
-    if overlay_ui
-        .add_enabled(
-            has_doc,
-            egui::Button::image_and_text(
-                crate::Icon::Refresh.ui_image(ui, crate::icon::IconSize::Medium),
-                invisible_label("🔄"),
-            )
-            .min_size(button_size)
-            .fill(icon_bg),
-        )
-        .on_hover_text(crate::i18n::get().preview.refresh_diagrams.clone())
-        .clicked()
-    {
-        *action = AppAction::RefreshDiagrams;
-    }
-
-    let export_img =
-        egui::Image::new(crate::icon::Icon::Export.uri()).tint(overlay_ui.visuals().text_color());
-    overlay_ui.scope(|ui| {
-        ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
-        ui.menu_image_button(export_img, |ui| {
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-            if ui
-                .button(crate::i18n::get().menu.export_html.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Html);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_pdf.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_png.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Png);
-                ui.close();
-            }
-            if ui
-                .button(crate::i18n::get().menu.export_jpg.clone())
-                .clicked()
-            {
-                *action = AppAction::ExportDocument(crate::app_state::ExportFormat::Jpg);
-                ui.close();
-            }
-        });
-    });
-
-    if state.settings.settings().layout.toc_visible {
-        let toc_bg = if state.show_toc {
-            if ui.visuals().dark_mode {
-                ui.visuals().selection.bg_fill
-            } else {
-                crate::theme_bridge::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
-            }
-        } else {
-            icon_bg
-        };
-        if overlay_ui
-            .add_enabled(
-                has_doc,
-                egui::Button::image_and_text(
-                    crate::Icon::Toc.ui_image(ui, crate::icon::IconSize::Medium),
-                    invisible_label("toggle_toc"),
-                )
-                .min_size(button_size)
-                .fill(toc_bg),
-            )
-            .on_hover_text(crate::i18n::get().action.toggle_toc.clone())
-            .clicked()
-        {
-            *action = AppAction::ToggleToc;
-        }
-    }
-}
-
-/// Tab bar: Displays tabs of open documents side-by-side.
-pub(crate) fn render_tab_bar(ui: &mut egui::Ui, state: &mut AppState, action: &mut AppAction) {
-    const MAX_TAB_WIDTH: f32 = 200.0;
-    const PINNED_TAB_MAX_WIDTH: f32 = 60.0;
-
-    let mut close_idx: Option<usize> = None;
-    let mut tab_action: Option<AppAction> = None;
-    let mut dragged_source: Option<(usize, f32)> = None;
-    let mut tab_rects: Vec<(usize, egui::Rect)> = Vec::new();
-
-    let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
-    let doc_count = state.open_documents.len();
-
-    ui.style_mut().interaction.tooltip_delay = TAB_TOOLTIP_SHOW_DELAY_SECS;
-
-    ui.horizontal(|ui| {
-        let nav_button_width = TAB_NAV_BUTTONS_AREA_WIDTH;
-        let scroll_width = ui.available_width() - nav_button_width;
-
-        let should_scroll = ui.memory_mut(|mem| {
-            mem.data
-                .get_temp::<bool>(egui::Id::new("scroll_tab_req"))
-                .unwrap_or(false)
-        });
-
-        egui::ScrollArea::horizontal()
-            .max_width(scroll_width)
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-            .id_salt("tab_scroll")
-            .show(ui, |ui| {
-                let mut current_hovered_drop_x = None;
-                let mut dragging_ghost_info = None;
-
-                ui.horizontal(|ui| {
-                    for (idx, doc) in state.open_documents.iter().enumerate() {
-                        let is_active = state.active_doc_idx == Some(idx);
-                        let original_filename = doc.file_name().unwrap_or("untitled");
-                        let is_changelog =
-                            doc.path.to_string_lossy().starts_with("Katana://ChangeLog");
-
-                        let filename = if is_changelog {
-                            original_filename.to_string()
-                        } else if original_filename.starts_with("CHANGELOG_v")
-                            && original_filename.ends_with(".md")
-                        {
-                            let ver = original_filename
-                                .trim_start_matches("CHANGELOG_v")
-                                .trim_end_matches(".md");
-                            format!("📄 {} {}", crate::i18n::get().menu.release_notes, ver)
-                        } else {
-                            original_filename.to_string()
-                        };
-                        let dirty_suffix = if doc.is_dirty { " *" } else { "" };
-                        let title = if doc.is_pinned {
-                            format!("📌 {filename}{dirty_suffix}")
-                        } else {
-                            format!("{filename}{dirty_suffix}")
-                        };
-                        let tooltip_path = relative_full_path(&doc.path, ws_root.as_deref());
-
-                        let (title_resp, close_resp) = ui
-                            .push_id(format!("tab_{idx}"), |ui| {
-                                ui.set_max_width(if doc.is_pinned {
-                                    PINNED_TAB_MAX_WIDTH
-                                } else {
-                                    MAX_TAB_WIDTH
-                                });
-                                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-
-                                let t_resp = if is_changelog {
-                                    ui.add(
-                                        egui::Button::image_and_text(
-                                            crate::Icon::Info
-                                                .ui_image(ui, crate::icon::IconSize::Small),
-                                            &title,
-                                        )
-                                        .selected(is_active),
-                                    )
-                                } else {
-                                    ui.add(egui::Button::selectable(is_active, &title))
-                                };
-
-                                let c_resp = ui.add(egui::Button::image_and_text(
-                                    crate::Icon::Close.ui_image(ui, crate::icon::IconSize::Small),
-                                    invisible_label("x"),
-                                ));
-                                (t_resp, c_resp)
-                            })
-                            .inner;
-
-                        let full_tab_rect = title_resp.rect.union(close_resp.rect);
-                        tab_rects.push((idx, full_tab_rect));
-
-                        let tab_interact = ui.interact(
-                            title_resp.rect,
-                            egui::Id::new("tab_interact").with(idx),
-                            egui::Sense::click_and_drag(),
-                        );
-
-                        let mut clicked_tab = tab_interact.clicked();
-                        if close_resp.clicked() {
-                            close_idx = Some(idx);
-                            clicked_tab = false;
-                        }
-
-                        let is_being_dragged = ui.ctx().is_being_dragged(tab_interact.id);
-                        if is_being_dragged {
-                            if let Some(pointer_pos) = ui.ctx().pointer_interact_pos() {
-                                let press_origin = ui
-                                    .input(|i| i.pointer.press_origin())
-                                    .unwrap_or(pointer_pos);
-                                let drag_offset = pointer_pos - press_origin;
-                                let ghost_rect = full_tab_rect.translate(drag_offset);
-
-                                // Save the ghost center X for the exact moment of drop!
-                                ui.memory_mut(|mem| {
-                                    mem.data.insert_temp(
-                                        egui::Id::new("drag_ghost_x").with(idx),
-                                        ghost_rect.center().x,
-                                    )
-                                });
-
-                                // Auto-scroll the horizontal scroll area to ensure the dragged tab is visible
-                                ui.scroll_to_rect(ghost_rect, None);
-
-                                // 1. Render ghost tab following the cursor
-                                egui::Area::new(egui::Id::new("tab_ghost").with(idx))
-                                    .fixed_pos(ghost_rect.min)
-                                    .order(egui::Order::Tooltip)
-                                    .show(ui.ctx(), |ui| {
-                                        ui.set_max_width(if doc.is_pinned {
-                                            PINNED_TAB_MAX_WIDTH
-                                        } else {
-                                            MAX_TAB_WIDTH
-                                        });
-                                        ui.style_mut().wrap_mode =
-                                            Some(egui::TextWrapMode::Truncate);
-
-                                        ui.horizontal(|ui| {
-                                            ui.spacing_mut().item_spacing.x = 0.0;
-                                            if is_changelog {
-                                                let btn = egui::Button::image_and_text(
-                                                    crate::Icon::Info.ui_image(
-                                                        ui,
-                                                        crate::icon::IconSize::Medium,
-                                                    ),
-                                                    &title,
-                                                )
-                                                .selected(is_active);
-                                                ui.add(btn);
-                                            } else {
-                                                ui.add(egui::Button::selectable(is_active, &title));
-                                            }
-                                            ui.add(egui::Button::image_and_text(
-                                                crate::Icon::Close
-                                                    .ui_image(ui, crate::icon::IconSize::Small),
-                                                invisible_label("x"),
-                                            ));
-                                        });
-                                    });
-
-                                dragging_ghost_info = Some((ghost_rect, full_tab_rect.y_range()));
-                            }
-                        }
-
-                        // Task 3.7: Only scroll when navigated via left/right buttons.
-                        if is_active && should_scroll {
-                            tab_interact.scroll_to_me(Some(egui::Align::Center));
-                        }
-
-                        // Retrieve the saved ghost_x purely from memory because pointer input might be cleared
-                        if tab_interact.drag_stopped() {
-                            if let Some(ghost_x) = ui.memory(|mem| {
-                                mem.data
-                                    .get_temp::<f32>(egui::Id::new("drag_ghost_x").with(idx))
-                            }) {
-                                dragged_source = Some((idx, ghost_x));
-                            }
-                        }
-
-                        let tab_interact = tab_interact.on_hover_text(&tooltip_path);
-
-                        tab_interact.context_menu(|ui| {
-                            let i18n = crate::i18n::get();
-
-                            if ui.button(&i18n.tab.close).clicked() {
-                                tab_action = Some(AppAction::CloseDocument(idx));
-                                ui.close();
-                            }
-                            if ui.button(&i18n.tab.close_others).clicked() {
-                                tab_action = Some(AppAction::CloseOtherDocuments(idx));
-                                ui.close();
-                            }
-                            if ui.button(&i18n.tab.close_all).clicked() {
-                                tab_action = Some(AppAction::CloseAllDocuments);
-                                ui.close();
-                            }
-                            if ui.button(&i18n.tab.close_right).clicked() {
-                                tab_action = Some(AppAction::CloseDocumentsToRight(idx));
-                                ui.close();
-                            }
-                            if ui.button(&i18n.tab.close_left).clicked() {
-                                tab_action = Some(AppAction::CloseDocumentsToLeft(idx));
-                                ui.close();
-                            }
-                            ui.separator();
-                            let pin_label = if doc.is_pinned {
-                                &i18n.tab.unpin
-                            } else {
-                                &i18n.tab.pin
-                            };
-                            if ui.button(pin_label).clicked() {
-                                tab_action = Some(AppAction::TogglePinDocument(idx));
-                                ui.close();
-                            }
-                            if !state.recently_closed_tabs.is_empty() {
-                                ui.separator();
-                                if ui.button(&i18n.tab.restore_closed).clicked() {
-                                    tab_action = Some(AppAction::RestoreClosedDocument);
-                                    ui.close();
-                                }
-                            }
-                        });
-
-                        if clicked_tab && !is_active {
-                            tab_action = Some(AppAction::SelectDocument(doc.path.clone()));
-                        }
-
-                        ui.add_space(TAB_INTER_ITEM_SPACING);
-                    }
-
-                    let mut drop_points = Vec::new();
-                    if !tab_rects.is_empty() {
-                        for i in 0..tab_rects.len() {
-                            if i == 0 {
-                                drop_points.push((0, tab_rects[i].1.left()));
-                            } else {
-                                let prev_right = tab_rects[i - 1].1.right();
-                                let current_left = tab_rects[i].1.left();
-                                drop_points.push((i, (prev_right + current_left) / 2.0));
-                            }
-                        }
-                        drop_points.push((tab_rects.len(), tab_rects.last().unwrap().1.right()));
-                    }
-
-                    if let Some((ghost_rect, y_range)) = dragging_ghost_info {
-                        let mut best_dist = f32::MAX;
-                        let mut best_x = None;
-
-                        for (_insert_idx, x) in &drop_points {
-                            let dist = (ghost_rect.center().x - x).abs();
-                            if dist < best_dist {
-                                best_dist = dist;
-                                best_x = Some(*x);
-                            }
-                        }
-                        if let Some(x) = best_x {
-                            current_hovered_drop_x = Some((x, y_range));
-                        }
-                    }
-
-                    // Draw animated (lerp) insertion marker
-                    if let Some((target_x, y_range)) = current_hovered_drop_x {
-                        let indicator_id = egui::Id::new("tab_drop_indicator");
-                        let animated_x = ui.ctx().animate_value_with_time(
-                            indicator_id,
-                            target_x,
-                            TAB_DROP_ANIMATION_TIME,
-                        );
-
-                        let stroke = egui::Stroke::new(
-                            TAB_DROP_INDICATOR_WIDTH,
-                            ui.visuals().selection.bg_fill,
-                        );
-                        ui.painter().vline(animated_x, y_range, stroke);
-                    }
-                });
-            });
-
-        if should_scroll {
-            ui.memory_mut(|mem| {
-                mem.data
-                    .remove_temp::<bool>(egui::Id::new("scroll_tab_req"));
-            });
-        }
-
-        ui.separator();
-
-        let nav_enabled = doc_count > 1;
-        let icon_bg = if ui.visuals().dark_mode {
-            crate::theme_bridge::TRANSPARENT
-        } else {
-            crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG)
-        };
-
-        if ui
-            .add_enabled(
-                nav_enabled,
-                egui::Button::image_and_text(
-                    crate::Icon::TriangleLeft.ui_image(ui, crate::icon::IconSize::Small),
-                    invisible_label("◀"),
-                )
-                .fill(icon_bg),
-            )
-            .on_hover_text(crate::i18n::get().tab.nav_prev.clone())
-            .clicked()
-        {
-            if let Some(idx) = state.active_doc_idx {
-                let new_idx = crate::shell_logic::prev_tab_index(idx, doc_count);
-                tab_action = Some(AppAction::SelectDocument(
-                    state.open_documents[new_idx].path.clone(),
-                ));
-                ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
-            }
-        }
-        if ui
-            .add_enabled(
-                nav_enabled,
-                egui::Button::image_and_text(
-                    crate::Icon::TriangleRight.ui_image(ui, crate::icon::IconSize::Small),
-                    invisible_label("▶"),
-                )
-                .fill(icon_bg),
-            )
-            .on_hover_text(crate::i18n::get().tab.nav_next.clone())
-            .clicked()
-        {
-            if let Some(idx) = state.active_doc_idx {
-                let new_idx = crate::shell_logic::next_tab_index(idx, doc_count);
-                tab_action = Some(AppAction::SelectDocument(
-                    state.open_documents[new_idx].path.clone(),
-                ));
-                ui.memory_mut(|m| m.data.insert_temp(egui::Id::new("scroll_tab_req"), true));
-            }
-        }
-    });
-
-    if let Some((src_idx, ghost_center_x)) = dragged_source {
-        let mut drop_points = Vec::new();
-        if !tab_rects.is_empty() {
-            for i in 0..tab_rects.len() {
-                if i == 0 {
-                    drop_points.push((0, tab_rects[i].1.left()));
-                } else {
-                    let prev_right = tab_rects[i - 1].1.right();
-                    let current_left = tab_rects[i].1.left();
-                    drop_points.push((i, (prev_right + current_left) / 2.0));
-                }
-            }
-            drop_points.push((tab_rects.len(), tab_rects.last().unwrap().1.right()));
-        }
-
-        let mut best_dist = f32::MAX;
-        let mut best_insert_idx = None;
-
-        for (insert_idx, x) in drop_points {
-            let dist = (ghost_center_x - x).abs();
-            if dist < best_dist {
-                best_dist = dist;
-                best_insert_idx = Some(insert_idx);
-            }
-        }
-
-        if let Some(to) = best_insert_idx {
-            if src_idx != to && src_idx + 1 != to {
-                tab_action = Some(AppAction::ReorderDocument { from: src_idx, to });
-            }
-        }
-    }
-
-    if let Some(action_val) = tab_action {
-        *action = action_val;
-    } else if let Some(idx) = close_idx {
-        *action = AppAction::CloseDocument(idx);
-    }
-}
+pub(crate) const STATUS_BAR_ICON_SPACING: f32 = 4.0;
 
 pub(crate) fn relative_full_path(
     path: &std::path::Path,
     ws_root: Option<&std::path::Path>,
 ) -> String {
     crate::shell_logic::relative_full_path(path, ws_root)
-}
-
-pub(crate) fn render_view_mode_bar(
-    ui: &mut egui::Ui,
-    state: &mut AppState,
-    pending_action: &mut AppAction,
-) {
-    let mut mode = state.active_view_mode();
-    let prev = mode;
-    let bar_height = ui.spacing().interact_size.y;
-    let available_width = ui.available_width();
-    ui.allocate_ui_with_layout(
-        egui::vec2(available_width, bar_height),
-        egui::Layout::right_to_left(egui::Align::Center),
-        |ui| {
-            // Render non-intrusive Update Available Badge
-            if state.update_available.is_some() && !state.checking_for_updates {
-                const COLOR_SUCCESS_G: u8 = 200;
-                let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
-                let badge_text = egui::RichText::new(badge_str)
-                    .color(crate::theme_bridge::from_rgb(0, COLOR_SUCCESS_G, 100))
-                    .strong();
-
-                if ui
-                    .add(egui::Button::new(badge_text).sense(egui::Sense::click()))
-                    .on_hover_cursor(egui::CursorIcon::PointingHand)
-                    .clicked()
-                {
-                    *pending_action = AppAction::CheckForUpdates;
-                }
-                ui.separator();
-            }
-
-            // Omit View Mode controls for virtual tabs like ChangeLog since they are native documents
-            let is_changelog = state
-                .active_document()
-                .is_some_and(|doc| doc.path.to_string_lossy().starts_with("Katana://ChangeLog"));
-
-            let prev_is_split = prev == ViewMode::Split;
-            let is_split = mode == ViewMode::Split;
-
-            if !is_changelog {
-                if ui
-                    .selectable_label(is_split, crate::i18n::get().view_mode.split.clone())
-                    .clicked()
-                    && !is_split
-                {
-                    mode = ViewMode::Split;
-                }
-
-                ui.selectable_value(
-                    &mut mode,
-                    ViewMode::CodeOnly,
-                    crate::i18n::get().view_mode.code.clone(),
-                );
-                ui.selectable_value(
-                    &mut mode,
-                    ViewMode::PreviewOnly,
-                    crate::i18n::get().view_mode.preview.clone(),
-                );
-            }
-
-            // Show split controls only while split mode is active.
-            if !is_changelog && is_split && (is_split == prev_is_split) {
-                ui.separator();
-
-                // Toggle split direction.
-                let current_dir = state.active_split_direction();
-                let (dir_icon, dir_tip) = match current_dir {
-                    katana_platform::SplitDirection::Horizontal => (
-                        crate::icon::Icon::SplitHorizontal,
-                        crate::i18n::get().split_toggle.vertical.clone(),
-                    ),
-                    katana_platform::SplitDirection::Vertical => (
-                        crate::icon::Icon::SplitVertical,
-                        crate::i18n::get().split_toggle.horizontal.clone(),
-                    ),
-                };
-                let icon_size = crate::icon::IconSize::Medium;
-                let resp_dir = ui
-                    .add(egui::Button::image(
-                        dir_icon.image(icon_size).tint(ui.visuals().text_color()),
-                    ))
-                    .on_hover_text(dir_tip);
-
-                resp_dir.widget_info(|| {
-                    egui::WidgetInfo::labeled(
-                        egui::WidgetType::Button,
-                        true,
-                        "Toggle Split Direction",
-                    )
-                });
-
-                if resp_dir.clicked() {
-                    let new_dir = match current_dir {
-                        katana_platform::SplitDirection::Horizontal => {
-                            katana_platform::SplitDirection::Vertical
-                        }
-                        katana_platform::SplitDirection::Vertical => {
-                            katana_platform::SplitDirection::Horizontal
-                        }
-                    };
-                    state.set_active_split_direction(new_dir);
-                }
-
-                // Toggle pane order.
-                let current_order = state.active_pane_order();
-                let (order_text, order_tip) = match current_order {
-                    katana_platform::PaneOrder::EditorFirst => (
-                        "📄|👁",
-                        crate::i18n::get().split_toggle.preview_first.clone(),
-                    ),
-                    katana_platform::PaneOrder::PreviewFirst => {
-                        ("👁|📄", crate::i18n::get().split_toggle.editor_first.clone())
-                    }
-                };
-                if ui
-                    .add(egui::Button::new(order_text).sense(egui::Sense::click()))
-                    .on_hover_text(order_tip)
-                    .clicked()
-                {
-                    let new_order = match current_order {
-                        katana_platform::PaneOrder::EditorFirst => {
-                            katana_platform::PaneOrder::PreviewFirst
-                        }
-                        katana_platform::PaneOrder::PreviewFirst => {
-                            katana_platform::PaneOrder::EditorFirst
-                        }
-                    };
-                    state.set_active_pane_order(new_order);
-                }
-
-                ui.separator();
-
-                let mut is_on = state
-                    .scroll_sync_override
-                    .unwrap_or(state.settings.settings().behavior.scroll_sync_enabled);
-
-                const TOGGLE_LABEL_SPACING: f32 = 8.0;
-
-                let resp = ui.add(
-                    crate::widgets::LabeledToggle::new(
-                        crate::i18n::get().settings.behavior.scroll_sync.clone(),
-                        &mut is_on,
-                    )
-                    .position(crate::widgets::TogglePosition::Right)
-                    .alignment(crate::widgets::ToggleAlignment::Attached(
-                        TOGGLE_LABEL_SPACING,
-                    )),
-                );
-
-                if resp.clicked() {
-                    state.scroll_sync_override = Some(is_on);
-                }
-            }
-        },
-    );
-    if mode != prev {
-        if mode == ViewMode::Split {
-            state.ensure_active_split_state();
-        }
-        state.set_active_view_mode(mode);
-    }
-}
-
-pub(crate) fn render_editor_content(
-    ui: &mut egui::Ui,
-    state: &mut AppState,
-    action: &mut AppAction,
-    sync_scroll: bool,
-) {
-    if let Some(doc) = state.active_document() {
-        let mut buffer = doc.buffer.clone();
-
-        let (
-            code_bg,
-            code_text,
-            code_selection,
-            current_line_bg,
-            hover_line_bg,
-            ln_text,
-            ln_active_text,
-        ) = ui.ctx().data(|d| {
-            if let Some(tc) = d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
-                "katana_theme_colors",
-            )) {
-                (
-                    crate::theme_bridge::rgb_to_color32(tc.code.background),
-                    crate::theme_bridge::rgb_to_color32(tc.code.text),
-                    Some(crate::theme_bridge::rgb_to_color32(tc.code.selection)),
-                    Some(crate::theme_bridge::rgba_to_color32(
-                        tc.code.current_line_background,
-                    )),
-                    Some(crate::theme_bridge::rgba_to_color32(
-                        tc.code.hover_line_background,
-                    )),
-                    Some(crate::theme_bridge::rgb_to_color32(
-                        tc.code.line_number_text,
-                    )),
-                    Some(crate::theme_bridge::rgb_to_color32(
-                        tc.code.line_number_active_text,
-                    )),
-                )
-            } else {
-                (
-                    ui.visuals().extreme_bg_color,
-                    ui.visuals().text_color(),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-            }
-        });
-
-        let mut scroll_area = egui::ScrollArea::vertical().id_salt("editor_scroll");
-
-        let consuming_preview = sync_scroll && state.scroll_source == ScrollSource::Preview;
-        if consuming_preview {
-            scroll_area = scroll_area
-                .vertical_scroll_offset(state.scroll_fraction * state.editor_max_scroll.max(1.0));
-        }
-
-        let output = egui::Frame::NONE.fill(code_bg).show(ui, |ui| {
-            ui.style_mut().visuals.override_text_color = Some(code_text);
-            ui.style_mut().visuals.extreme_bg_color = code_bg;
-            if let Some(sel) = code_selection {
-                ui.style_mut().visuals.selection.bg_fill = sel;
-            }
-
-            scroll_area.show(ui, |ui| {
-                ui.horizontal_top(|ui| {
-                    const LINE_NUMBER_MARGIN: f32 = 40.0;
-                    const LINE_NUMBER_PAD_RIGHT: f32 = 8.0;
-                    let left_margin = LINE_NUMBER_MARGIN;
-                    let (ln_rect, _) =
-                        ui.allocate_exact_size(egui::vec2(left_margin, 0.0), egui::Sense::hover());
-                    let text_output = egui::TextEdit::multiline(&mut buffer)
-                        .font(egui::TextStyle::Monospace)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(EDITOR_INITIAL_VISIBLE_ROWS)
-                        .margin(egui::Margin {
-                            left: 0,
-                            right: LINE_NUMBER_MARGIN as i8,
-                            top: 0,
-                            bottom: 0,
-                        })
-                        .frame(false)
-                        .show(ui);
-                    let response = text_output.response;
-                    let galley = text_output.galley;
-
-                    if response.clicked() {
-                        if let Some(c) = text_output.cursor_range {
-                            let char_idx = c.primary.index;
-                            let line = galley
-                                .text()
-                                .chars()
-                                .take(char_idx)
-                                .filter(|&ch| ch == '\n')
-                                .count();
-                            state.scroll_to_line = Some(line);
-                        }
-                    }
-
-                    let mut current_cursor_y = None;
-                    if let Some(c) = text_output.cursor_range {
-                        let char_idx = c.primary.index;
-                        let paragraph = galley
-                            .text()
-                            .chars()
-                            .take(char_idx)
-                            .filter(|&ch| ch == '\n')
-                            .count();
-                        state.active_editor_line = Some(paragraph);
-
-                        let cursor_rect = galley.pos_from_cursor(c.primary);
-                        current_cursor_y = Some(cursor_rect.min.y);
-
-                        let min_y = cursor_rect.min.y;
-                        let max_y = cursor_rect.max.y;
-
-                        let highlight_rect = egui::Rect::from_min_max(
-                            egui::pos2(ln_rect.min.x, response.rect.min.y + min_y),
-                            egui::pos2(response.rect.max.x, response.rect.min.y + max_y),
-                        );
-
-                        const HIGHLIGHT_ALPHA: u8 = 15;
-                        let highlight_color = current_line_bg.unwrap_or_else(|| {
-                            if ui.visuals().dark_mode {
-                                crate::theme_bridge::from_white_alpha(HIGHLIGHT_ALPHA)
-                            } else {
-                                crate::theme_bridge::from_black_alpha(HIGHLIGHT_ALPHA)
-                            }
-                        });
-                        ui.painter()
-                            .rect_filled(highlight_rect, 1.0, highlight_color);
-                    } else {
-                        state.active_editor_line = None;
-                    }
-
-                    // Hover highlights from preview pane
-                    const HOVER_HIGHLIGHT_ALPHA: u8 = 10;
-                    let hover_color = hover_line_bg.unwrap_or_else(|| {
-                        if ui.visuals().dark_mode {
-                            crate::theme_bridge::from_white_alpha(HOVER_HIGHLIGHT_ALPHA)
-                        } else {
-                            crate::theme_bridge::from_black_alpha(HOVER_HIGHLIGHT_ALPHA)
-                        }
-                    });
-
-                    for line_range in &state.hovered_preview_lines {
-                        let mut current_line = 0;
-                        let mut start_char = None;
-                        let mut end_char = None;
-
-                        for (char_idx, c) in buffer.chars().enumerate() {
-                            if current_line == line_range.start && start_char.is_none() {
-                                start_char = Some(char_idx);
-                            }
-                            if current_line == line_range.end + 1 {
-                                end_char = Some(char_idx.saturating_sub(1));
-                                break;
-                            }
-                            if c == '\n' {
-                                current_line += 1;
-                            }
-                        }
-                        if start_char.is_some() && end_char.is_none() {
-                            end_char = Some(buffer.chars().count().saturating_sub(1));
-                        }
-
-                        if let (Some(start_idx), Some(end_idx)) = (start_char, end_char) {
-                            let cursor_start = egui::text::CCursor {
-                                index: start_idx,
-                                prefer_next_row: false,
-                            };
-                            // Ensure we don't highlight beyond the actual characters
-                            let cursor_end = egui::text::CCursor {
-                                index: end_idx.saturating_sub(1),
-                                prefer_next_row: false,
-                            };
-
-                            let pos_start = galley.pos_from_cursor(cursor_start);
-                            let pos_end = galley.pos_from_cursor(cursor_end);
-
-                            let highlight_rect = egui::Rect::from_min_max(
-                                egui::pos2(ln_rect.min.x, response.rect.min.y + pos_start.min.y),
-                                egui::pos2(
-                                    response.rect.max.x,
-                                    response.rect.min.y + pos_end.max.y,
-                                ),
-                            );
-                            ui.painter().rect_filled(highlight_rect, 1.0, hover_color);
-                        }
-                    }
-
-                    // Draw line numbers
-                    let clip_rect = ui.clip_rect().expand(100.0);
-                    let mut p = 0;
-                    let mut is_start_of_para = true;
-
-                    for row in &galley.rows {
-                        let top_y = row.rect().min.y;
-                        let y = response.rect.min.y + top_y;
-                        let is_visible = is_start_of_para
-                            && y <= clip_rect.max.y
-                            && (y + row.rect().height()) >= clip_rect.min.y;
-
-                        if is_visible {
-                            let is_current = current_cursor_y == Some(top_y);
-                            let text = format!("{}", p + 1);
-                            let color = if is_current {
-                                ln_active_text.unwrap_or_else(|| ui.visuals().text_color())
-                            } else {
-                                const LINE_NUMBER_INACTIVE_ALPHA: f32 = 0.3;
-                                ln_text.unwrap_or_else(|| {
-                                    ui.visuals()
-                                        .text_color()
-                                        .linear_multiply(LINE_NUMBER_INACTIVE_ALPHA)
-                                })
-                            };
-                            let font_id = egui::TextStyle::Monospace.resolve(ui.style());
-
-                            let label_rect = egui::Rect::from_min_size(
-                                egui::pos2(ln_rect.min.x, y),
-                                egui::vec2(
-                                    left_margin - LINE_NUMBER_PAD_RIGHT,
-                                    row.rect().height(),
-                                ),
-                            );
-                            let mut text_rt = egui::RichText::new(text).color(color).font(font_id);
-                            if is_current {
-                                text_rt = text_rt.strong();
-                            }
-
-                            let label_for_measuring =
-                                egui::Label::new(text_rt.clone()).selectable(false);
-                            // align right
-                            let galley_ln = label_for_measuring.layout_in_ui(ui);
-                            let offset_x = (label_rect.width() - galley_ln.1.rect.width()).max(0.0);
-                            let tight_rect = egui::Rect::from_min_size(
-                                label_rect.min + egui::vec2(offset_x, 0.0),
-                                galley_ln.1.rect.size(),
-                            );
-
-                            let resp =
-                                ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
-                            if resp.clicked() {
-                                state.scroll_to_line = Some(p);
-                            }
-                            if resp.hovered() {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            }
-
-                            ui.put(tight_rect, egui::Label::new(text_rt).selectable(false));
-                        }
-
-                        is_start_of_para = row.ends_with_newline;
-                        if row.ends_with_newline {
-                            p += 1;
-                        }
-                    }
-
-                    if response.changed() {
-                        *action = AppAction::UpdateBuffer(buffer.clone());
-                    }
-
-                    if let Some(target_line) = state.scroll_to_line.take() {
-                        let mut current_line = 0;
-                        let mut target_char = None;
-                        for (char_idx, c) in buffer.chars().enumerate() {
-                            if current_line == target_line && target_char.is_none() {
-                                target_char = Some(char_idx);
-                                break;
-                            }
-                            if c == '\n' {
-                                current_line += 1;
-                            }
-                        }
-                        if let Some(idx) = target_char {
-                            let cursor = egui::text::CCursor {
-                                index: idx,
-                                prefer_next_row: false,
-                            };
-                            let pos = galley.pos_from_cursor(cursor);
-                            let rect = egui::Rect::from_min_max(
-                                egui::pos2(response.rect.min.x, response.rect.min.y + pos.min.y),
-                                egui::pos2(response.rect.max.x, response.rect.min.y + pos.max.y),
-                            );
-                            ui.scroll_to_rect(rect, Some(egui::Align::Center));
-                        }
-                    }
-                    response
-                })
-                .inner
-            })
-        });
-
-        if sync_scroll {
-            let max_scroll =
-                (output.inner.content_size.y - output.inner.inner_rect.height()).max(0.0);
-            state.editor_max_scroll = max_scroll;
-
-            if consuming_preview {
-                state.scroll_source = ScrollSource::Neither;
-                if max_scroll > 0.0 {
-                    state.scroll_fraction =
-                        (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
-                }
-            } else {
-                if max_scroll > 0.0 {
-                    let current_fraction =
-                        (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
-                    let diff = (current_fraction - state.scroll_fraction).abs();
-                    if diff > SCROLL_SYNC_DEAD_ZONE {
-                        state.scroll_fraction = current_fraction;
-                        state.scroll_source = ScrollSource::Editor;
-                    }
-                }
-            }
-        }
-    }
 }
 
 pub(crate) struct TreeRenderContext<'a, 'b> {
@@ -1705,645 +58,13 @@ pub(crate) struct TreeRenderContext<'a, 'b> {
     pub disable_context_menu: bool,
 }
 
-fn find_node_in_tree<'a>(
-    entries: &'a [katana_core::workspace::TreeEntry],
-    target: &std::path::Path,
-) -> Option<&'a katana_core::workspace::TreeEntry> {
-    for entry in entries {
-        match entry {
-            katana_core::workspace::TreeEntry::Directory { path, children } => {
-                if path == target {
-                    return Some(entry);
-                }
-                if target.starts_with(path) {
-                    if let Some(found) = find_node_in_tree(children, target) {
-                        return Some(found);
-                    }
-                }
-            }
-            katana_core::workspace::TreeEntry::File { path } => {
-                if path == target {
-                    return Some(entry);
-                }
-            }
-        }
-    }
-    None
-}
-
-pub(crate) fn render_breadcrumb_menu(
-    ui: &mut egui::Ui,
-    entries: &[katana_core::workspace::TreeEntry],
-    action: &mut crate::app_state::AppAction,
-) {
-    for entry in entries {
-        match entry {
-            katana_core::workspace::TreeEntry::Directory { path, children } => {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                ui.menu_button(name, |ui| {
-                    render_breadcrumb_menu(ui, children, action);
-                });
-            }
-            katana_core::workspace::TreeEntry::File { path } => {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                if ui.button(name).clicked() {
-                    *action = crate::app_state::AppAction::SelectDocument(path.clone());
-                    ui.close();
-                }
-            }
-        }
-    }
-}
-
-pub(crate) fn render_tree_entry(
-    ui: &mut egui::Ui,
-    entry: &katana_core::workspace::TreeEntry,
-    ctx: &mut TreeRenderContext<'_, '_>,
-) {
-    use katana_core::workspace::TreeEntry;
-    let entry_path = match entry {
-        TreeEntry::Directory { path, .. } => path,
-        TreeEntry::File { path } => path,
-    };
-    if let Some(fs) = ctx.filter_set {
-        if !fs.contains(entry_path) {
-            return;
-        }
-    }
-    match entry {
-        TreeEntry::Directory { path, children } => {
-            render_directory_entry(ui, path, children, ctx);
-        }
-        TreeEntry::File { path } => {
-            render_file_entry(ui, entry, path, ctx);
-        }
-    }
-}
-
 pub(crate) fn indent_prefix(depth: usize) -> String {
     "  ".repeat(depth)
-}
-
-fn render_tree_context_menu(
-    ui: &mut egui::Ui,
-    path: &std::path::Path,
-    is_dir: bool,
-    children: Option<&[katana_core::workspace::TreeEntry]>,
-    entry: Option<&katana_core::workspace::TreeEntry>,
-    ctx: &mut TreeRenderContext<'_, '_>,
-) {
-    let msg = &crate::i18n::get().action;
-
-    let target_dir = if is_dir {
-        path.to_path_buf()
-    } else {
-        path.parent().unwrap_or(path).to_path_buf()
-    };
-
-    if is_dir {
-        if ui.button(msg.new_file.clone()).clicked() {
-            *ctx.action = crate::app_state::AppAction::RequestNewFile(target_dir.clone());
-            ui.close();
-        }
-        if ui.button(msg.new_directory.clone()).clicked() {
-            *ctx.action = crate::app_state::AppAction::RequestNewDirectory(target_dir);
-            ui.close();
-        }
-        ui.separator();
-    }
-
-    if is_dir {
-        if let Some(children) = children {
-            if ui.button(msg.recursive_expand.clone()).clicked() {
-                let mut to_expand = Vec::new();
-                for child in children {
-                    child.collect_all_directory_paths(&mut to_expand);
-                }
-                ctx.expanded_directories.insert(path.to_path_buf());
-                ctx.expanded_directories.extend(to_expand);
-                ui.close();
-            }
-            if ui.button(msg.recursive_open_all.clone()).clicked() {
-                let mut to_open = Vec::new();
-                for child in children {
-                    child.collect_all_markdown_file_paths(&mut to_open);
-                }
-                if !to_open.is_empty() {
-                    *ctx.action = crate::app_state::AppAction::OpenMultipleDocuments(to_open);
-                }
-                ui.close();
-            }
-        }
-    } else if entry.is_some() {
-        #[allow(clippy::collapsible_if)]
-        if ui.button(msg.open.clone()).clicked() {
-            *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
-            ui.close();
-        }
-    }
-
-    ui.separator();
-
-    if ui.button(msg.reveal_in_os.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::RevealInOs(path.to_path_buf());
-        ui.close();
-    }
-    if ui.button(msg.copy_path.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::CopyPathToClipboard(path.to_path_buf());
-        ui.close();
-    }
-    if ui.button(msg.copy_relative_path.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::CopyRelativePathToClipboard(path.to_path_buf());
-        ui.close();
-    }
-    if ui.button(msg.show_meta_info.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::ShowMetaInfo(path.to_path_buf());
-        ui.close();
-    }
-
-    ui.separator();
-
-    if ui.button(msg.rename.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::RequestRename(path.to_path_buf());
-        ui.close();
-    }
-    if ui.button(msg.delete.clone()).clicked() {
-        *ctx.action = crate::app_state::AppAction::RequestDelete(path.to_path_buf());
-        ui.close();
-    }
-}
-
-pub(crate) fn render_directory_entry(
-    ui: &mut egui::Ui,
-    path: &std::path::Path,
-    children: &[katana_core::workspace::TreeEntry],
-    ctx: &mut TreeRenderContext<'_, '_>,
-) {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-    let id = ui.make_persistent_id(format!("dir:{}", path.display()));
-
-    // Check programmatic state for expansion
-    let is_open = ctx.expanded_directories.contains(path);
-
-    // Sync egui animation state with programmatic state
-    let mut state =
-        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
-    state.set_open(is_open);
-    let file_tree_color = ui.visuals().text_color();
-    let (rect, mut resp) = ui.allocate_at_least(
-        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
-        egui::Sense::click(),
-    );
-    resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-
-    let accessible_label = format!("dir {}", name);
-    resp.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &accessible_label)
-    });
-
-    if resp.clicked() {
-        if is_open {
-            ctx.expanded_directories.remove(path);
-        } else {
-            ctx.expanded_directories.insert(path.to_path_buf());
-        }
-    }
-
-    if ui.is_rect_visible(rect) {
-        if ui.rect_contains_pointer(rect) && ui.is_enabled() {
-            ui.painter()
-                .rect_filled(rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
-        }
-
-        let mut child_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        );
-        child_ui.add_space(TREE_LABEL_HOFFSET);
-        let prefix = indent_prefix(ctx.depth);
-        let arrow_icon = if is_open {
-            crate::icon::Icon::PanDown
-        } else {
-            crate::icon::Icon::PanRight
-        };
-        let folder_icon = if is_open {
-            crate::icon::Icon::FolderOpen
-        } else {
-            crate::icon::Icon::FolderClosed
-        };
-
-        child_ui.add(egui::Label::new(prefix).selectable(false));
-
-        // Add spacing equivalent to item_spacing.x = 2.0 manually or rely on default layout
-        child_ui.add(
-            arrow_icon
-                .image(crate::icon::IconSize::Small)
-                .tint(file_tree_color),
-        );
-        child_ui.add(
-            folder_icon
-                .image(crate::icon::IconSize::Medium)
-                .tint(file_tree_color),
-        );
-        child_ui.add(
-            egui::Label::new(egui::RichText::new(name).color(file_tree_color))
-                .selectable(false)
-                .truncate(),
-        );
-        // We do not union because resp already covers the whole area and the
-        // children don't have interactive senses that would steal hover/clicks.
-    }
-
-    // Context Menu for directories
-    if !ctx.disable_context_menu {
-        resp.context_menu(|ui| {
-            render_tree_context_menu(ui, path, true, Some(children), None, ctx);
-        });
-    }
-
-    if resp.clicked() {
-        let new_state = !is_open;
-        state.set_open(new_state);
-        if new_state {
-            ctx.expanded_directories.insert(path.to_path_buf());
-        } else {
-            ctx.expanded_directories.remove(path);
-        }
-    }
-    state.store(ui.ctx());
-
-    if state.is_open() {
-        let prev_depth = ctx.depth;
-        ctx.depth += 1;
-        for child in children {
-            render_tree_entry(ui, child, ctx);
-        }
-        ctx.depth = prev_depth;
-    }
-}
-
-fn gather_visible_paths(
-    entries: &[katana_core::workspace::TreeEntry],
-    regex: &regex::Regex,
-    is_negated: bool,
-    ws_root: &std::path::Path,
-    visible: &mut std::collections::HashSet<std::path::PathBuf>,
-) -> bool {
-    let mut any_visible = false;
-    for entry in entries {
-        match entry {
-            katana_core::workspace::TreeEntry::File { path } => {
-                let rel = crate::shell_logic::relative_full_path(path, Some(ws_root));
-                let is_match = regex.is_match(&rel);
-                let should_show = if is_negated { !is_match } else { is_match };
-
-                if should_show {
-                    visible.insert(path.clone());
-                    any_visible = true;
-                }
-            }
-            katana_core::workspace::TreeEntry::Directory { path, children } => {
-                if gather_visible_paths(children, regex, is_negated, ws_root, visible) {
-                    visible.insert(path.clone());
-                    any_visible = true;
-                }
-            }
-        }
-    }
-    any_visible
-}
-
-pub(crate) fn render_file_entry(
-    ui: &mut egui::Ui,
-    entry: &katana_core::workspace::TreeEntry,
-    path: &std::path::Path,
-    ctx: &mut TreeRenderContext<'_, '_>,
-) {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-    // Prepend two spaces to align with the directory's arrow and its following space ("▶ ").
-
-    // Accessibility label without leading indentation (used for widget_info / test queries).
-    let accessible_label = format!("file {}", name);
-
-    let is_active = ctx.active_path.is_some_and(|ap| ap == path);
-
-    let text_color = if is_active {
-        ui.visuals().widgets.active.fg_stroke.color
-    } else {
-        ui.visuals().text_color()
-    };
-    let (full_rect, mut resp) = ui.allocate_at_least(
-        egui::vec2(ui.available_width(), TREE_ROW_HEIGHT),
-        egui::Sense::click(),
-    );
-    resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-
-    if ui.is_rect_visible(full_rect) {
-        if is_active {
-            let highlight_color = ui.visuals().selection.bg_fill;
-            ui.painter()
-                .rect_filled(full_rect, ACTIVE_FILE_HIGHLIGHT_ROUNDING, highlight_color);
-        } else if ui.rect_contains_pointer(full_rect) && ui.is_enabled() {
-            ui.painter()
-                .rect_filled(full_rect, 2.0, ui.visuals().widgets.hovered.bg_fill);
-        }
-
-        let mut child_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(full_rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        );
-        child_ui.add_space(TREE_LABEL_HOFFSET);
-
-        let prefix_string = indent_prefix(ctx.depth);
-        child_ui.add(
-            egui::Label::new(egui::RichText::new(prefix_string).color(text_color))
-                .selectable(false),
-        );
-
-        // Allocate empty space exactly matching the directory arrow icon's size
-        child_ui.allocate_response(
-            egui::vec2(crate::icon::IconSize::Small.to_vec2().x, 0.0),
-            egui::Sense::hover(),
-        );
-
-        if entry.is_markdown() {
-            child_ui.add(
-                crate::icon::Icon::Document
-                    .image(crate::icon::IconSize::Medium)
-                    .tint(text_color),
-            );
-        } else {
-            // For non-markdown, we might want a raw file icon, but for now we fallback to invisible space to match old behavior
-            child_ui.allocate_response(
-                egui::vec2(crate::icon::IconSize::Medium.to_vec2().x, 0.0),
-                egui::Sense::hover(),
-            );
-        };
-
-        let mut rich = egui::RichText::new(name).color(text_color);
-        if is_active {
-            rich = rich.strong();
-        }
-        let resp_label = child_ui.add(egui::Label::new(rich).truncate().selectable(false));
-
-        resp_label.widget_info(|| {
-            egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &accessible_label)
-        });
-    }
-
-    if !ctx.disable_context_menu {
-        resp.context_menu(|ui| {
-            render_tree_context_menu(ui, path, false, None, Some(entry), ctx);
-        });
-    }
-
-    if resp.clicked() {
-        *ctx.action = crate::app_state::AppAction::SelectDocument(path.to_path_buf());
-    }
 }
 
 // ─────────────────────────────────────────────
 // Split layout helpers
 // ─────────────────────────────────────────────
-
-/// Renders the split view and returns a pending download request if any.
-///
-/// Supports both `Horizontal` (left/right) and `Vertical` (top/bottom) splits,
-/// with configurable pane order via `PaneOrder`.
-fn render_split_mode(
-    ctx: &egui::Context,
-    app: &mut KatanaApp,
-    split_dir: SplitDirection,
-    pane_order: PaneOrder,
-) -> Option<DownloadRequest> {
-    match split_dir {
-        SplitDirection::Horizontal => render_horizontal_split(ctx, app, pane_order),
-        SplitDirection::Vertical => render_vertical_split(ctx, app, pane_order),
-    }
-}
-
-/// Renders a left/right 50-50 split using SidePanel + CentralPanel.
-///
-/// The panel width is calculated as half of the available central area so that
-/// both panes always occupy an equal share regardless of window size.
-fn render_horizontal_split(
-    ctx: &egui::Context,
-    app: &mut KatanaApp,
-    pane_order: PaneOrder,
-) -> Option<DownloadRequest> {
-    let available_width = ctx.available_rect().width();
-    let half_width = (available_width * SPLIT_HALF_RATIO).max(SPLIT_PREVIEW_PANEL_MIN_WIDTH);
-    let preview_bg = theme_bridge::rgb_to_color32(
-        app.state
-            .settings
-            .settings()
-            .effective_theme_colors()
-            .preview
-            .background,
-    );
-    let active_path = app.state.active_document().map(|d| d.path.clone());
-    let mut scroll_state = (
-        app.state.scroll_fraction,
-        app.state.scroll_source,
-        app.state.preview_max_scroll,
-    );
-    let mut download_req = None;
-    let panel_id = match pane_order {
-        PaneOrder::EditorFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_right"),
-        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_h_left"),
-    };
-
-    // EditorFirst: preview panel on the right; PreviewFirst: preview panel on the left.
-    let panel_side = match pane_order {
-        PaneOrder::EditorFirst => egui::SidePanel::right(panel_id),
-        PaneOrder::PreviewFirst => egui::SidePanel::left(panel_id),
-    };
-
-    let scroll_sync = app
-        .state
-        .scroll_sync_override
-        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
-
-    panel_side
-        .resizable(true)
-        .min_width(SPLIT_PREVIEW_PANEL_MIN_WIDTH)
-        .default_width(half_width)
-        .frame(egui::Frame::NONE.fill(preview_bg))
-        .show(ctx, |ui| {
-            if let Some(path) = &active_path {
-                let pane =
-                    crate::shell::KatanaApp::get_preview_pane(&mut app.tab_previews, path.clone());
-                download_req = render_preview_content(
-                    ui,
-                    pane,
-                    &mut app.state,
-                    &mut app.pending_action,
-                    scroll_sync,
-                    &mut scroll_state,
-                );
-            }
-        });
-
-    // Sync preview's scroll state to app.state BEFORE the editor renders.
-    // The editor reads/writes app.state directly; writing back after the
-    // editor would overwrite the editor's consumption of scroll signals.
-    app.state.scroll_fraction = scroll_state.0;
-    app.state.scroll_source = scroll_state.1;
-    app.state.preview_max_scroll = scroll_state.2;
-
-    egui::CentralPanel::default()
-        .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-        .show(ctx, |ui| {
-            render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
-        });
-
-    download_req
-}
-
-/// Renders a top/bottom 50-50 split using TopBottomPanel + CentralPanel.
-fn render_vertical_split(
-    ctx: &egui::Context,
-    app: &mut KatanaApp,
-    pane_order: PaneOrder,
-) -> Option<DownloadRequest> {
-    let available_height = ctx.available_rect().height();
-    let half_height = available_height * SPLIT_HALF_RATIO;
-    let preview_bg = theme_bridge::rgb_to_color32(
-        app.state
-            .settings
-            .settings()
-            .effective_theme_colors()
-            .preview
-            .background,
-    );
-    let active_path = app.state.active_document().map(|d| d.path.clone());
-    let mut scroll_state = (
-        app.state.scroll_fraction,
-        app.state.scroll_source,
-        app.state.preview_max_scroll,
-    );
-    let mut download_req = None;
-    let panel_id = match pane_order {
-        PaneOrder::EditorFirst => {
-            preview_panel_id(active_path.as_deref(), "preview_panel_v_bottom")
-        }
-        PaneOrder::PreviewFirst => preview_panel_id(active_path.as_deref(), "preview_panel_v_top"),
-    };
-
-    // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
-    let show_preview_top = pane_order == PaneOrder::PreviewFirst;
-    let scroll_sync = app
-        .state
-        .scroll_sync_override
-        .unwrap_or(app.state.settings.settings().behavior.scroll_sync_enabled);
-
-    if show_preview_top {
-        egui::TopBottomPanel::top(panel_id)
-            .resizable(true)
-            .default_height(half_height)
-            .max_height(available_height * SPLIT_PANEL_MAX_RATIO)
-            .frame(egui::Frame::NONE.fill(preview_bg))
-            .show(ctx, |ui| {
-                if let Some(path) = &active_path {
-                    let pane = crate::shell::KatanaApp::get_preview_pane(
-                        &mut app.tab_previews,
-                        path.clone(),
-                    );
-                    download_req = render_preview_content(
-                        ui,
-                        pane,
-                        &mut app.state,
-                        &mut app.pending_action,
-                        scroll_sync,
-                        &mut scroll_state,
-                    );
-                }
-            });
-
-        // Sync preview's scroll state to app.state BEFORE the editor renders.
-        // The editor reads from app.state directly, so it must see the preview's
-        // latest scroll_source/fraction. After the editor runs, its writes to
-        // app.state are preserved (no subsequent overwrite).
-        app.state.scroll_fraction = scroll_state.0;
-        app.state.scroll_source = scroll_state.1;
-        app.state.preview_max_scroll = scroll_state.2;
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-            .show(ctx, |ui| {
-                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
-            });
-    } else {
-        egui::TopBottomPanel::bottom(panel_id)
-            .resizable(true)
-            .default_height(half_height)
-            .max_height(available_height * SPLIT_PANEL_MAX_RATIO)
-            .frame(egui::Frame::NONE.fill(preview_bg))
-            .show(ctx, |ui| {
-                if let Some(path) = &active_path {
-                    let pane = crate::shell::KatanaApp::get_preview_pane(
-                        &mut app.tab_previews,
-                        path.clone(),
-                    );
-                    download_req = render_preview_content(
-                        ui,
-                        pane,
-                        &mut app.state,
-                        &mut app.pending_action,
-                        scroll_sync,
-                        &mut scroll_state,
-                    );
-                }
-            });
-
-        app.state.scroll_fraction = scroll_state.0;
-        app.state.scroll_source = scroll_state.1;
-        app.state.preview_max_scroll = scroll_state.2;
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-            .show(ctx, |ui| {
-                render_editor_content(ui, &mut app.state, &mut app.pending_action, scroll_sync);
-            });
-    }
-
-    download_req
-}
-
-/// Renders the preview-only mode into the given ui.
-fn render_preview_only(ui: &mut egui::Ui, app: &mut KatanaApp) {
-    ui.painter().rect_filled(
-        ui.max_rect(),
-        0.0,
-        theme_bridge::rgb_to_color32(
-            app.state
-                .settings
-                .settings()
-                .effective_theme_colors()
-                .preview
-                .background,
-        ),
-    );
-    let active_path = app.state.active_document().map(|d| d.path.clone());
-    let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
-    if let Some(path) = active_path {
-        let pane = crate::shell::KatanaApp::get_preview_pane(&mut app.tab_previews, path);
-        render_preview_content(
-            ui,
-            pane,
-            &mut app.state,
-            &mut app.pending_action,
-            false,
-            &mut scroll_state,
-        );
-    } else {
-        ui.centered_and_justified(|ui| {
-            ui.label(crate::i18n::get().workspace.no_document_selected.clone());
-        });
-    }
-}
 
 // ─────────────────────────────────────────────
 // eframe::App implementation (egui main rendering loop)
@@ -2508,28 +229,15 @@ pub fn update_native_menu_strings_from_i18n() {}
 // eframe::App Implementation (egui Main Rendering Loop)
 // ─────────────────────────────────────────────
 
-use crate::shell::{KatanaApp, SIDEBAR_COLLAPSED_TOGGLE_WIDTH, SPLIT_PREVIEW_PANEL_MIN_WIDTH};
+use crate::shell::{KatanaApp, SIDEBAR_COLLAPSED_TOGGLE_WIDTH};
 
 // Half-panel ratio for responsive 50/50 split.
-const SPLIT_HALF_RATIO: f32 = 0.5;
+pub(crate) const SPLIT_HALF_RATIO: f32 = 0.5;
 /// Maximum ratio for TopBottomPanel in vertical split.
 /// Prevents preview from consuming more than 70% of the available height,
 /// guaranteeing the editor retains at least 30% for scrolling.
-const SPLIT_PANEL_MAX_RATIO: f32 = 0.7;
-const PREVIEW_CONTENT_PADDING: i8 = 12;
-
-fn preview_panel_id(path: Option<&std::path::Path>, base: &'static str) -> egui::Id {
-    match path {
-        Some(path) => egui::Id::new((base, path)),
-        None => egui::Id::new(base),
-    }
-}
-
-fn invalidate_preview_image_cache(ctx: &egui::Context, action: &AppAction) {
-    if matches!(action, AppAction::RefreshDiagrams) {
-        crate::icon::IconRegistry::install(ctx);
-    }
-}
+pub(crate) const SPLIT_PANEL_MAX_RATIO: f32 = 0.7;
+pub(crate) const PREVIEW_CONTENT_PADDING: i8 = 12;
 
 impl KatanaApp {
     const TERMS_MODAL_WIDTH: f32 = 600.0;
@@ -2711,29 +419,30 @@ impl eframe::App for KatanaApp {
         }
 
         // --- Auto-Save Timer ---
-        let auto_save_enabled = self.state.settings.settings().behavior.auto_save;
+        let auto_save_enabled = self.state.config.settings.settings().behavior.auto_save;
         let auto_save_interval = self
             .state
+            .config
             .settings
             .settings()
             .behavior
             .auto_save_interval_secs;
         if auto_save_enabled && auto_save_interval > 0.0 {
             let now = std::time::Instant::now();
-            if let Some(last) = self.state.last_auto_save {
+            if let Some(last) = self.state.document.last_auto_save {
                 if now.duration_since(last).as_secs_f64() >= auto_save_interval {
                     if let Some(doc) = self.state.active_document() {
                         if doc.is_dirty {
                             self.pending_action = crate::app_state::AppAction::SaveDocument;
                         }
                     }
-                    self.state.last_auto_save = Some(now);
+                    self.state.document.last_auto_save = Some(now);
                 }
             } else {
-                self.state.last_auto_save = Some(now);
+                self.state.document.last_auto_save = Some(now);
             }
         } else {
-            self.state.last_auto_save = None;
+            self.state.document.last_auto_save = None;
         }
 
         // Pre-calculate splash state to prevent flickering of the background UI.
@@ -2745,7 +454,12 @@ impl eframe::App for KatanaApp {
         let splash_is_opaque = self.splash_start.is_some() && splash_opacity >= 1.0;
 
         // Apply theme colours to egui Visuals (only when the palette changed)
-        let theme_colors = self.state.settings.settings().effective_theme_colors();
+        let theme_colors = self
+            .state
+            .config
+            .settings
+            .settings()
+            .effective_theme_colors();
         if self.cached_theme.as_ref() != Some(&theme_colors) {
             let dark = theme_colors.mode == katana_platform::theme::ThemeMode::Dark;
             ctx.set_visuals(theme_bridge::visuals_from_theme(&theme_colors));
@@ -2767,14 +481,14 @@ impl eframe::App for KatanaApp {
         }
 
         // Apply font size to egui text styles (only when the size changed)
-        let font_size = self.state.settings.settings().clamped_font_size();
+        let font_size = self.state.config.settings.settings().clamped_font_size();
         if self.cached_font_size != Some(font_size) {
             theme_bridge::apply_font_size(ctx, font_size);
             self.cached_font_size = Some(font_size);
         }
 
         // Apply font family by rebuilding FontDefinitions (only when family changed)
-        let font_family = self.state.settings.settings().font.family.clone();
+        let font_family = self.state.config.settings.settings().font.family.clone();
         if self.cached_font_family.as_deref() != Some(&font_family) {
             theme_bridge::apply_font_family(ctx, &font_family);
             self.cached_font_family = Some(font_family);
@@ -2789,7 +503,7 @@ impl eframe::App for KatanaApp {
                 },
                 egui::Key::T,
             ))
-        }) && !self.state.recently_closed_tabs.is_empty()
+        }) && !self.state.document.recently_closed_tabs.is_empty()
         {
             self.pending_action = AppAction::RestoreClosedDocument;
         }
@@ -2800,7 +514,7 @@ impl eframe::App for KatanaApp {
                 egui::Key::P,
             ))
         }) {
-            self.state.show_search_modal = true;
+            self.state.layout.show_search_modal = true;
             // The query will persist across invocations as per standard fuzzy finders
         }
 
@@ -2878,7 +592,7 @@ impl eframe::App for KatanaApp {
         }
 
         let action = self.take_action();
-        invalidate_preview_image_cache(ctx, &action);
+        crate::views::panels::preview::invalidate_preview_image_cache(ctx, &action);
         self.process_action(ctx, action);
 
         if !splash_is_opaque {
@@ -2886,6 +600,7 @@ impl eframe::App for KatanaApp {
             let terms_ver = crate::about_info::APP_VERSION.to_string();
             let accepted_ver = self
                 .state
+                .config
                 .settings
                 .settings()
                 .terms_accepted_version
@@ -2898,17 +613,16 @@ impl eframe::App for KatanaApp {
 
         if !splash_is_opaque {
             // On macOS, the egui menu is hidden because the native menu bar is used.
-            #[cfg(not(target_os = "macos"))]
-            render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
+            crate::views::top_bar::render_menu_bar(ctx, &mut self.state, &mut self.pending_action);
             let export_filenames: Vec<String> = self
                 .export_tasks
                 .iter()
                 .map(|t| t.filename.clone())
                 .collect();
-            render_status_bar(ctx, &self.state, &export_filenames);
+            crate::views::top_bar::render_status_bar(ctx, &self.state, &export_filenames);
 
             // Reflect the file name in the window title
-            let ws_root_for_title = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+            let ws_root_for_title = self.state.workspace.data.as_ref().map(|ws| ws.root.clone());
             let title_text = match self.state.active_document() {
                 Some(doc) => {
                     let fname = doc.file_name().unwrap_or("");
@@ -2921,9 +635,9 @@ impl eframe::App for KatanaApp {
                 }
                 None => "KatanA".to_string(),
             };
-            if self.state.last_window_title != title_text {
+            if self.state.layout.last_window_title != title_text {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_text.clone()));
-                self.state.last_window_title = title_text.clone();
+                self.state.layout.last_window_title = title_text.clone();
             }
 
             // In-app title bar
@@ -2938,7 +652,7 @@ impl eframe::App for KatanaApp {
             });
 
             // Show the collapse toggle button even when the workspace is hidden.
-            if !self.state.show_workspace {
+            if !self.state.layout.show_workspace {
                 egui::SidePanel::left("workspace_collapsed")
                     .resizable(false)
                     .exact_width(SIDEBAR_COLLAPSED_TOGGLE_WIDTH)
@@ -2952,17 +666,21 @@ impl eframe::App for KatanaApp {
                                 .on_hover_text(crate::i18n::get().workspace.workspace_title.clone())
                                 .clicked()
                             {
-                                self.state.show_workspace = true;
+                                self.state.layout.show_workspace = true;
                             }
                         });
                     });
             } else {
-                render_workspace_panel(ctx, &mut self.state, &mut self.pending_action);
+                crate::views::panels::workspace::render_workspace_panel(
+                    ctx,
+                    &mut self.state,
+                    &mut self.pending_action,
+                );
             }
 
             // Tab row + breadcrumbs + view mode row
             egui::TopBottomPanel::top("tab_toolbar").show(ctx, |ui| {
-                render_tab_bar(ui, &mut self.state, &mut self.pending_action);
+                crate::views::top_bar::render_tab_bar(ui, &mut self.state, &mut self.pending_action);
                 let active_doc_props = self.state.active_document();
                 if let Some(doc) = active_doc_props {
                     let d_path = doc.path.to_string_lossy();
@@ -2970,7 +688,7 @@ impl eframe::App for KatanaApp {
 
                     if !is_changelog {
                         let doc_path = doc.path.clone();
-                        let ws_root = self.state.workspace.as_ref().map(|ws| ws.root.clone());
+                        let ws_root = self.state.workspace.data.as_ref().map(|ws| ws.root.clone());
                         let rel = relative_full_path(&doc_path, ws_root.as_deref());
                         let mut breadcrumb_action = None;
                         ui.horizontal(|ui| {
@@ -3009,15 +727,15 @@ impl eframe::App for KatanaApp {
                                     ui.menu_button(egui::RichText::new(*seg).small(), |ui| {
                                         let mut ctx_action = crate::app_state::AppAction::None;
 
-                                        if let Some(ws) = &self.state.workspace {
+                                        if let Some(ws) = &self.state.workspace.data {
                                             if let Some(
                                                 katana_core::workspace::TreeEntry::Directory {
                                                     children,
                                                     ..
                                                 },
-                                            ) = find_node_in_tree(&ws.tree, &current_path)
+                                            ) = crate::views::panels::tree::find_node_in_tree(&ws.tree, &current_path)
                                             {
-                                                render_breadcrumb_menu(
+                                                crate::views::panels::workspace::render_breadcrumb_menu(
                                                     ui,
                                                     children,
                                                     &mut ctx_action,
@@ -3038,7 +756,7 @@ impl eframe::App for KatanaApp {
                             self.pending_action = a;
                         }
                     } // End if !is_changelog
-                    render_view_mode_bar(ui, &mut self.state, &mut self.pending_action);
+                    crate::views::top_bar::render_view_mode_bar(ui, &mut self.state, &mut self.pending_action);
                 }
             });
 
@@ -3053,11 +771,17 @@ impl eframe::App for KatanaApp {
                 }
             }
 
-            if self.state.show_toc && self.state.settings.settings().layout.toc_visible {
+            if self.state.layout.show_toc
+                && self.state.config.settings.settings().layout.toc_visible
+            {
                 if let Some(doc) = self.state.active_document() {
                     if let Some(preview) = self.tab_previews.iter_mut().find(|p| p.path == doc.path)
                     {
-                        render_toc_panel(ctx, &mut preview.pane, &self.state);
+                        crate::views::panels::toc::render_toc_panel(
+                            ctx,
+                            &mut preview.pane,
+                            &self.state,
+                        );
                     }
                 }
             }
@@ -3074,7 +798,9 @@ impl eframe::App for KatanaApp {
                 if is_split {
                     let split_dir = self.state.active_split_direction();
                     let pane_order = self.state.active_pane_order();
-                    download_req = render_split_mode(ctx, self, split_dir, pane_order);
+                    download_req = crate::views::layout::split::render_split_mode(
+                        ctx, self, split_dir, pane_order,
+                    );
                 }
 
                 if !is_split {
@@ -3082,7 +808,7 @@ impl eframe::App for KatanaApp {
                         .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
                         .show(ctx, |ui| match current_mode {
                             ViewMode::CodeOnly => {
-                                render_editor_content(
+                                crate::views::panels::editor::render_editor_content(
                                     ui,
                                     &mut self.state,
                                     &mut self.pending_action,
@@ -3090,7 +816,7 @@ impl eframe::App for KatanaApp {
                                 );
                             }
                             ViewMode::PreviewOnly => {
-                                render_preview_only(ui, self);
+                                crate::views::layout::split::render_preview_only(ui, self);
                             }
                             ViewMode::Split => {}
                         });
@@ -3111,8 +837,12 @@ impl eframe::App for KatanaApp {
             self.pending_action = settings_action;
         }
 
-        if self.state.show_search_modal {
-            render_search_modal(ctx, &mut self.state, &mut self.pending_action);
+        if self.state.layout.show_search_modal {
+            crate::views::modals::search::render_search_modal(
+                ctx,
+                &mut self.state,
+                &mut self.pending_action,
+            );
         }
 
         // About dialog
@@ -3138,13 +868,13 @@ impl eframe::App for KatanaApp {
         }
 
         // File system operation modals
-        if self.state.create_fs_node_modal_state.is_some() {
+        if self.state.layout.create_fs_node_modal.is_some() {
             render_create_fs_node_modal(ctx, &mut self.state, &mut self.pending_action);
         }
-        if self.state.rename_modal_state.is_some() {
+        if self.state.layout.rename_modal.is_some() {
             render_rename_modal(ctx, &mut self.state, &mut self.pending_action);
         }
-        if self.state.delete_modal_state.is_some() {
+        if self.state.layout.delete_modal.is_some() {
             render_delete_modal(ctx, &mut self.state, &mut self.pending_action);
         }
 
@@ -3356,6 +1086,11 @@ impl eframe::App for KatanaApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::app_state::ScrollSource;
+    use crate::preview_pane::PreviewPane;
+    use katana_platform::PaneOrder;
+
     use eframe::egui::{self, pos2, Rect};
     use eframe::App as _;
     use egui::load::{BytesLoadResult, BytesLoader, LoadError};
@@ -3366,7 +1101,7 @@ mod tests {
         Arc,
     };
 
-    const PREVIEW_CONTENT_PADDING: f32 = 12.0;
+    pub(crate) const PREVIEW_CONTENT_PADDING: f32 = 12.0;
 
     /// Custom testing egui Context that pre-populates dummy font mappings for Markdown
     /// layout families. PreviewPane panics if these are missing natively.
@@ -3430,9 +1165,10 @@ mod tests {
             std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
         );
         state
+            .document
             .open_documents
             .push(Document::new(path, "# Heading\n\nBody"));
-        state.active_doc_idx = Some(0);
+        state.document.active_doc_idx = Some(0);
         state
     }
 
@@ -3442,9 +1178,10 @@ mod tests {
             doc.buffer = markdown.to_string();
         }
         let mut pane = PreviewPane::default();
-        let cache = app.state.cache.clone();
+        let cache = app.state.config.cache.clone();
         let concurrency = app
             .state
+            .config
             .settings
             .settings()
             .performance
@@ -3500,7 +1237,7 @@ mod tests {
                 .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
                 .show(ctx, |ui| {
                     before_height = ui.available_height();
-                    render_preview_header(ui, &state, &mut action);
+                    crate::views::panels::preview::render_preview_header(ui, &state, &mut action);
                     remaining_height = ui.available_height();
                 });
         });
@@ -3531,7 +1268,12 @@ mod tests {
                         expanded_directories: &mut expanded_directories,
                         disable_context_menu: false,
                     };
-                    render_file_entry(ui, &entry, &path, &mut render_ctx);
+                    crate::views::panels::workspace::render_file_entry(
+                        ui,
+                        &entry,
+                        &path,
+                        &mut render_ctx,
+                    );
                 });
         });
 
@@ -3566,12 +1308,19 @@ mod tests {
         let path = PathBuf::from("/tmp/padding.md");
         let mut app = app_with_preview_doc(&path, "# PaddingHeading\n\nBody");
         let output = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(path.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3610,7 +1359,10 @@ mod tests {
 
         ctx.data_mut(|data| {
             data.insert_persisted(
-                preview_panel_id(Some(stale.as_path()), "preview_panel_h_right"),
+                crate::views::panels::preview::preview_panel_id(
+                    Some(stale.as_path()),
+                    "preview_panel_h_right",
+                ),
                 egui::containers::panel::PanelState {
                     rect: Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(240.0, 800.0)),
                 },
@@ -3618,12 +1370,19 @@ mod tests {
         });
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3641,21 +1400,35 @@ mod tests {
         let mut app = app_with_preview_doc(&active, "# Title\n\nBody");
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let first_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after first frame")
         .rect;
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let second_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after second frame")
         .rect;
@@ -3687,21 +1460,35 @@ mod tests {
         let mut app = app_with_preview_doc(&active, markdown);
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let first_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after first frame")
         .rect;
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let second_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after second frame")
         .rect;
@@ -3735,21 +1522,35 @@ mod tests {
         let mut app = app_with_preview_doc(&active, markdown);
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let first_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after first frame")
         .rect;
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
         let second_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect after second frame")
         .rect;
@@ -3776,7 +1577,10 @@ mod tests {
 
         ctx.data_mut(|data| {
             data.insert_persisted(
-                preview_panel_id(Some(stale.as_path()), "preview_panel_v_bottom"),
+                crate::views::panels::preview::preview_panel_id(
+                    Some(stale.as_path()),
+                    "preview_panel_v_bottom",
+                ),
                 egui::containers::panel::PanelState {
                     rect: Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(1200.0, 180.0)),
                 },
@@ -3784,12 +1588,19 @@ mod tests {
         });
 
         let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-            render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_vertical_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_v_bottom"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_v_bottom",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3808,12 +1619,19 @@ mod tests {
         let mut app = app_with_preview_doc(&path, &long_line);
 
         let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(path.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3849,12 +1667,19 @@ mod tests {
         let mut app = app_with_preview_doc(&path, &inline_code);
 
         let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(path.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3893,12 +1718,19 @@ mod tests {
         let mut app = app_with_preview_doc(&path, markdown);
 
         let output = ctx.run(test_input(egui::vec2(900.0, 700.0)), |ctx| {
-            render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+            crate::views::layout::split::render_horizontal_split(
+                ctx,
+                &mut app,
+                PaneOrder::EditorFirst,
+            );
         });
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(path.as_path()), "preview_panel_h_right"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(path.as_path()),
+                "preview_panel_h_right",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -3962,13 +1794,20 @@ mod tests {
         // Run 3 frames for layout stabilization
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, total_height)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         let preview_rect = egui::containers::panel::PanelState::load(
             &ctx,
-            preview_panel_id(Some(active.as_path()), "preview_panel_v_bottom"),
+            crate::views::panels::preview::preview_panel_id(
+                Some(active.as_path()),
+                "preview_panel_v_bottom",
+            ),
         )
         .expect("preview panel rect")
         .rect;
@@ -4005,30 +1844,38 @@ mod tests {
         // Stabilize layout (5 frames)
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         // Simulate editor scroll by setting scroll state
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         // Run 3 frames for sync to propagate
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         // After sync, scroll_source must settle to Neither.
         // If it bounces to Preview, the sync is creating an oscillation loop.
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither after consumption. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4042,26 +1889,34 @@ mod tests {
 
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_horizontal_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_horizontal_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_horizontal_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither in horizontal split. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4077,26 +1932,34 @@ mod tests {
         // Use PreviewFirst (swapped order)
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::PreviewFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::PreviewFirst,
+                );
             });
         }
 
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Editor;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Editor;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::PreviewFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::PreviewFirst,
+                );
             });
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Editor→Preview sync must settle to Neither after order swap. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4111,27 +1974,35 @@ mod tests {
 
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         // Simulate preview scroll
-        app.state.scroll_fraction = 0.5;
-        app.state.scroll_source = ScrollSource::Preview;
+        app.state.scroll.fraction = 0.5;
+        app.state.scroll.source = ScrollSource::Preview;
 
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
-                render_vertical_split(ctx, &mut app, PaneOrder::EditorFirst);
+                crate::views::layout::split::render_vertical_split(
+                    ctx,
+                    &mut app,
+                    PaneOrder::EditorFirst,
+                );
             });
         }
 
         assert_eq!(
-            app.state.scroll_source,
+            app.state.scroll.source,
             ScrollSource::Neither,
             "Preview→Editor sync must settle to Neither in vertical split. \
              Got {:?}, fraction={:.4}",
-            app.state.scroll_source,
-            app.state.scroll_fraction,
+            app.state.scroll.source,
+            app.state.scroll.fraction,
         );
     }
 
@@ -4370,232 +2241,16 @@ fn about_link_row(ui: &mut egui::Ui, label: &str, url: &str, icon: crate::Icon) 
     });
 }
 
-const SEARCH_MODAL_WIDTH: f32 = 500.0;
-const SEARCH_MODAL_HEIGHT: f32 = 400.0;
+pub(crate) const SEARCH_MODAL_WIDTH: f32 = 500.0;
+pub(crate) const SEARCH_MODAL_HEIGHT: f32 = 400.0;
 
-pub(crate) fn render_search_modal(
-    ctx: &egui::Context,
-    state: &mut AppState,
-    action: &mut AppAction,
-) {
-    let mut is_open = state.show_search_modal;
-    egui::Window::new(crate::i18n::get().search.modal_title.clone())
-        .open(&mut is_open)
-        .collapsible(false)
-        .resizable(true)
-        .default_size(egui::vec2(SEARCH_MODAL_WIDTH, SEARCH_MODAL_HEIGHT))
-        .show(ctx, |ui| {
-            // Focus on the text edit automatically
-            let response = ui.add(
-                egui::TextEdit::singleline(&mut state.search_query)
-                    .hint_text(crate::i18n::get().search.query_hint.clone())
-                    .desired_width(f32::INFINITY),
-            );
-            response.request_focus();
+pub(crate) const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
+pub(crate) const TOC_PANEL_MARGIN: f32 = 8.0;
+pub(crate) const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
+pub(crate) const TOC_INDENT_PER_LEVEL: f32 = 12.0;
 
-            let mut include_regexes = Vec::new();
-            let mut include_valid = true;
-            if !state.search_include_pattern.is_empty() {
-                for pat in state.search_include_pattern.split(',') {
-                    let pat = pat.trim();
-                    if !pat.is_empty() {
-                        match regex::Regex::new(pat) {
-                            Ok(re) => include_regexes.push(re),
-                            Err(_) => include_valid = false,
-                        }
-                    }
-                }
-            }
-
-            let mut exclude_regexes = Vec::new();
-            let mut exclude_valid = true;
-            if !state.search_exclude_pattern.is_empty() {
-                for pat in state.search_exclude_pattern.split(',') {
-                    let pat = pat.trim();
-                    if !pat.is_empty() {
-                        match regex::Regex::new(pat) {
-                            Ok(re) => exclude_regexes.push(re),
-                            Err(_) => exclude_valid = false,
-                        }
-                    }
-                }
-            }
-
-            let include_color = if include_valid {
-                ui.visuals().text_color()
-            } else {
-                ui.ctx()
-                    .data(|d| {
-                        d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
-                            "katana_theme_colors",
-                        ))
-                    })
-                    .map_or(crate::theme_bridge::WHITE, |tc| {
-                        crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                    })
-            };
-
-            let exclude_color = if exclude_valid {
-                ui.visuals().text_color()
-            } else {
-                ui.ctx()
-                    .data(|d| {
-                        d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
-                            "katana_theme_colors",
-                        ))
-                    })
-                    .map_or(crate::theme_bridge::WHITE, |tc| {
-                        crate::theme_bridge::rgb_to_color32(tc.system.error_text)
-                    })
-            };
-
-            ui.add(
-                egui::TextEdit::singleline(&mut state.search_include_pattern)
-                    .hint_text(crate::i18n::get().search.include_pattern_hint.clone())
-                    .text_color(include_color)
-                    .desired_width(f32::INFINITY),
-            );
-
-            ui.add(
-                egui::TextEdit::singleline(&mut state.search_exclude_pattern)
-                    .hint_text(crate::i18n::get().search.exclude_pattern_hint.clone())
-                    .text_color(exclude_color)
-                    .desired_width(f32::INFINITY),
-            );
-
-            let current_params = (
-                state.search_query.clone(),
-                state.search_include_pattern.clone(),
-                state.search_exclude_pattern.clone(),
-            );
-
-            if state.last_search_params.as_ref() != Some(&current_params) {
-                state.last_search_params = Some(current_params);
-
-                let query = state.search_query.to_lowercase();
-                if query.is_empty() && include_regexes.is_empty() && exclude_regexes.is_empty() {
-                    state.search_results.clear();
-                } else if let Some(ws) = &state.workspace {
-                    let mut results = Vec::new();
-                    crate::shell_logic::collect_matches(
-                        &ws.tree,
-                        &query,
-                        &include_regexes,
-                        &exclude_regexes,
-                        &ws.root,
-                        &mut results,
-                    );
-                    state.search_results = results;
-                }
-            }
-
-            ui.separator();
-
-            egui::ScrollArea::vertical()
-                .auto_shrink([false; 2])
-                .show(ui, |ui| {
-                    if state.search_results.is_empty() && !state.search_query.is_empty() {
-                        ui.label(crate::i18n::get().search.no_results.clone());
-                    } else {
-                        let ws_root = state.workspace.as_ref().map(|ws| ws.root.clone());
-                        for path in &state.search_results {
-                            let rel =
-                                crate::shell_logic::relative_full_path(path, ws_root.as_deref());
-                            if ui.selectable_label(false, rel).clicked() && path.exists() {
-                                *action = AppAction::SelectDocument(path.clone());
-                                // Close the modal by updating state directly
-                                state.show_search_modal = false;
-                            }
-                        }
-                    }
-                });
-        });
-
-    if !is_open {
-        state.show_search_modal = false;
-    }
-}
-
-const TOC_PANEL_DEFAULT_WIDTH: f32 = 200.0;
-const TOC_PANEL_MARGIN: f32 = 8.0;
-const TOC_HEADING_VISIBILITY_THRESHOLD: f32 = 40.0;
-const TOC_INDENT_PER_LEVEL: f32 = 12.0;
-
-const LIGHT_MODE_ICON_BG: u8 = 235;
-const LIGHT_MODE_ICON_ACTIVE_BG: u8 = 200;
-
-pub(crate) fn render_toc_panel(
-    ctx: &egui::Context,
-    preview: &mut crate::preview_pane::PreviewPane,
-    state: &crate::app_state::AppState,
-) {
-    use katana_platform::settings::TocPosition;
-    let position = state.settings.settings().layout.toc_position;
-
-    let panel = match position {
-        TocPosition::Left => egui::SidePanel::left("toc_panel"),
-        TocPosition::Right => egui::SidePanel::right("toc_panel"),
-    };
-
-    let frame = egui::Frame::side_top_panel(&ctx.style()).inner_margin(TOC_PANEL_MARGIN);
-
-    panel
-        .frame(frame)
-        .resizable(true)
-        .default_width(TOC_PANEL_DEFAULT_WIDTH)
-        .show(ctx, |ui| {
-            ui.heading(crate::i18n::get().toc.title.clone());
-            ui.separator();
-
-            // Prevent text from wrapping or pushing the SidePanel width. Text will truncate with `...`
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-
-            egui::ScrollArea::vertical()
-                .auto_shrink(false)
-                .show(ui, |ui| {
-                    if preview.outline_items.is_empty() {
-                        ui.label(
-                            egui::RichText::new(crate::i18n::get().toc.empty.clone())
-                                .weak()
-                                .italics(),
-                        );
-                    } else {
-                        let mut active_index = 0;
-                        if let Some(visible_rect) = preview.visible_rect {
-                            let threshold = visible_rect.min.y + TOC_HEADING_VISIBILITY_THRESHOLD;
-                            for (i, (_, rect)) in preview.heading_anchors.iter().enumerate() {
-                                if rect.min.y <= threshold {
-                                    active_index = i;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-
-                        let mut next_scroll = None;
-                        for (i, item) in preview.outline_items.iter().enumerate() {
-                            let indent = (item.level as f32 - 1.0) * TOC_INDENT_PER_LEVEL;
-                            ui.horizontal(|ui| {
-                                ui.add_space(indent);
-                                let is_active = i == active_index;
-                                let mut text = egui::RichText::new(&item.text);
-                                if is_active {
-                                    text = text
-                                        .strong()
-                                        .color(ui.visuals().widgets.active.text_color());
-                                }
-                                if ui.selectable_label(is_active, text).clicked() {
-                                    next_scroll = Some(item.index);
-                                }
-                            });
-                        }
-                        if next_scroll.is_some() {
-                            preview.scroll_request = next_scroll;
-                        }
-                    }
-                });
-        });
-}
+pub(crate) const LIGHT_MODE_ICON_BG: u8 = 235;
+pub(crate) const LIGHT_MODE_ICON_ACTIVE_BG: u8 = 200;
 
 fn render_update_window(
     ctx: &egui::Context,
@@ -4616,7 +2271,7 @@ fn render_update_window(
     let msgs = &crate::i18n::get().update;
 
     // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
-    match &state.update_phase {
+    match &state.update.phase {
         Some(UpdatePhase::Downloading { progress }) => {
             Modal::new("katana_update_dialog_v6", &msgs.title)
                 .width(UPDATE_DIALOG_WIDTH)
@@ -4690,7 +2345,7 @@ fn render_update_window(
 
     // Standard update dialog — use Modal to avoid vertical stretch bug.
     // (egui::Window::open() stores resize state, causing unbounded height growth.)
-    if state.checking_for_updates {
+    if state.update.checking {
         // Checking spinner — no footer, no close button
         Modal::new("katana_update_dialog_v6", &msgs.title)
             .width(UPDATE_DIALOG_WIDTH)
@@ -4699,7 +2354,7 @@ fn render_update_window(
                 ui.add_space(SPACING_MEDIUM);
                 ui.label(msgs.checking_for_updates.clone());
             });
-    } else if let Some(err) = &state.update_check_error {
+    } else if let Some(err) = &state.update.check_error {
         // Error state — OK button to close
         let close = {
             let err = err.clone();
@@ -4737,7 +2392,7 @@ fn render_update_window(
         if close == Some(true) {
             *open = false;
         }
-    } else if let Some(latest) = &state.update_available {
+    } else if let Some(latest) = &state.update.available {
         // Update available — Install/Skip/Later buttons
         let tag = latest.tag_name.clone();
         let body_text = latest.body.clone();
@@ -4850,7 +2505,7 @@ fn render_create_fs_node_modal(
     let mut do_create = false;
 
     if let Some((parent_dir, mut name, mut selected_ext, is_dir)) =
-        state.create_fs_node_modal_state.take()
+        state.layout.create_fs_node_modal.take()
     {
         let title = if is_dir {
             crate::i18n::get().dialog.new_directory_title.clone()
@@ -4878,6 +2533,7 @@ fn render_create_fs_node_modal(
                         if let Some(ref mut ext) = selected_ext {
                             const EXT_COMBOBOX_WIDTH: f32 = 80.0;
                             let options = state
+                                .config
                                 .settings
                                 .settings()
                                 .workspace
@@ -4943,16 +2599,19 @@ fn render_create_fs_node_modal(
                 tracing::error!("Failed to create fs node: {}", e);
             } else {
                 if is_dir {
-                    state.in_memory_dirs.insert(target_path);
+                    state.workspace.in_memory_dirs.insert(target_path);
                 }
                 *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                state.expanded_directories.insert(parent_dir.clone());
+                state
+                    .workspace
+                    .expanded_directories
+                    .insert(parent_dir.clone());
             }
             close = true;
         }
 
         if !close {
-            state.create_fs_node_modal_state = Some((parent_dir, name, selected_ext, is_dir));
+            state.layout.create_fs_node_modal = Some((parent_dir, name, selected_ext, is_dir));
         }
     }
 }
@@ -4965,7 +2624,7 @@ fn render_rename_modal(
     let mut close = false;
     let mut do_rename = false;
 
-    if let Some((target_path, mut new_name)) = state.rename_modal_state.take() {
+    if let Some((target_path, mut new_name)) = state.layout.rename_modal.take() {
         let mut is_open = true;
         egui::Window::new(crate::i18n::get().dialog.rename_title.clone())
             .open(&mut is_open)
@@ -5014,7 +2673,7 @@ fn render_rename_modal(
                     tracing::error!("Failed to rename file: {}", e);
                 } else {
                     *pending_action = crate::app_state::AppAction::RefreshWorkspace;
-                    for doc in &mut state.open_documents {
+                    for doc in &mut state.document.open_documents {
                         if doc.path == target_path {
                             doc.path = new_path.clone();
                             break;
@@ -5026,7 +2685,7 @@ fn render_rename_modal(
         }
 
         if !close {
-            state.rename_modal_state = Some((target_path, new_name));
+            state.layout.rename_modal = Some((target_path, new_name));
         }
     }
 }
@@ -5038,7 +2697,7 @@ fn render_delete_modal(
 ) {
     let mut close = false;
 
-    if let Some(target_path) = state.delete_modal_state.take() {
+    if let Some(target_path) = state.layout.delete_modal.take() {
         let mut is_open = true;
         egui::Window::new(crate::i18n::get().dialog.delete_title.clone())
             .open(&mut is_open)
@@ -5082,21 +2741,22 @@ fn render_delete_modal(
                             } else {
                                 *pending_action = crate::app_state::AppAction::RefreshWorkspace;
                                 if let Some(idx) = state
+                                    .document
                                     .open_documents
                                     .iter()
                                     .position(|d| d.path == target_path)
                                 {
-                                    state.open_documents.remove(idx);
-                                    if let Some(active_idx) = state.active_doc_idx {
+                                    state.document.open_documents.remove(idx);
+                                    if let Some(active_idx) = state.document.active_doc_idx {
                                         if active_idx == idx {
-                                            state.active_doc_idx =
-                                                if state.open_documents.is_empty() {
+                                            state.document.active_doc_idx =
+                                                if state.document.open_documents.is_empty() {
                                                     None
                                                 } else {
                                                     Some(if idx > 0 { idx - 1 } else { 0 })
                                                 };
                                         } else if active_idx > idx {
-                                            state.active_doc_idx = Some(active_idx - 1);
+                                            state.document.active_doc_idx = Some(active_idx - 1);
                                         }
                                     }
                                 }
@@ -5112,7 +2772,7 @@ fn render_delete_modal(
         }
 
         if !close {
-            state.delete_modal_state = Some(target_path);
+            state.layout.delete_modal = Some(target_path);
         }
     }
 }

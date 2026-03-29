@@ -23,7 +23,7 @@ mod tests {
                 std::sync::Arc::new(katana_platform::InMemoryCacheService::default()),
             );
             // Pre-accept terms for testing
-            state.settings.settings_mut().terms_accepted_version =
+            state.config.settings.settings_mut().terms_accepted_version =
                 Some(katana_ui::about_info::APP_VERSION.to_string());
             katana_ui::i18n::set_language("en");
             let mut app = KatanaApp::new(state);
@@ -56,8 +56,8 @@ mod tests {
 
         for _ in 0..100 {
             harness.step();
-            if !harness.state_mut().app_state_mut().is_loading_workspace
-                && harness.state_mut().app_state_mut().workspace.is_some()
+            if !harness.state_mut().app_state_mut().workspace.is_loading
+                && harness.state_mut().app_state_mut().workspace.data.is_some()
             {
                 break;
             }

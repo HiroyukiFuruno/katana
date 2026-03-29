@@ -90,7 +90,7 @@ pub(crate) fn render_settings_window(
     state: &mut crate::app_state::AppState,
     preview_pane: &mut PreviewPane,
 ) -> Option<AppAction> {
-    if !state.show_settings {
+    if !state.layout.show_settings {
         return None;
     }
 
@@ -104,7 +104,7 @@ pub(crate) fn render_settings_window(
         );
     }
 
-    let mut open = state.show_settings;
+    let mut open = state.layout.show_settings;
     egui::Window::new(crate::i18n::get().settings.title.clone())
         .open(&mut open)
         .fixed_size(egui::vec2(
@@ -134,7 +134,7 @@ pub(crate) fn render_settings_window(
                             .on_hover_text(crate::i18n::get().action.expand_all.clone())
                             .clicked()
                         {
-                            state.settings_tree_force_open = Some(true);
+                            state.config.settings_tree_force_open = Some(true);
                         }
                         if ui
                             .add(egui::Button::image_and_text(
@@ -144,7 +144,7 @@ pub(crate) fn render_settings_window(
                             .on_hover_text(crate::i18n::get().action.collapse_all.clone())
                             .clicked()
                         {
-                            state.settings_tree_force_open = Some(false);
+                            state.config.settings_tree_force_open = Some(false);
                         }
                     });
                     const TAB_SPACING: f32 = 4.0;
@@ -160,7 +160,7 @@ pub(crate) fn render_settings_window(
                 });
 
             let show_preview = matches!(
-                state.active_settings_tab,
+                state.config.active_settings_tab,
                 SettingsTab::Theme | SettingsTab::Font | SettingsTab::Layout
             );
 
@@ -177,7 +177,7 @@ pub(crate) fn render_settings_window(
 
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 let tab_messages = &crate::i18n::get().settings.tabs;
-                let title = match state.active_settings_tab {
+                let title = match state.config.active_settings_tab {
                     SettingsTab::Theme => tab_messages
                         .iter()
                         .find(|t| t.key == "theme")
@@ -217,9 +217,13 @@ pub(crate) fn render_settings_window(
                     .auto_shrink(false)
                     .show(ui, |ui| {
                         egui::Frame::NONE.inner_margin(INNER_MARGIN).show(ui, |ui| {
-                            match state.active_settings_tab {
-                                SettingsTab::Theme => render_theme_tab(ui, &mut state.settings),
-                                SettingsTab::Font => render_font_tab(ui, &mut state.settings),
+                            match state.config.active_settings_tab {
+                                SettingsTab::Theme => {
+                                    render_theme_tab(ui, &mut state.config.settings)
+                                }
+                                SettingsTab::Font => {
+                                    render_font_tab(ui, &mut state.config.settings)
+                                }
                                 SettingsTab::Layout => render_layout_tab(ui, state),
                                 SettingsTab::Workspace => render_workspace_tab(ui, state),
                                 SettingsTab::Updates => {
@@ -238,11 +242,11 @@ pub(crate) fn render_settings_window(
             });
 
             // Clear the force open flag after rendering the tree once
-            if state.settings_tree_force_open.is_some() {
-                state.settings_tree_force_open = None;
+            if state.config.settings_tree_force_open.is_some() {
+                state.config.settings_tree_force_open = None;
             }
         });
-    state.show_settings = open;
+    state.layout.show_settings = open;
     triggered_action
 }
 // ── Tree Navigation ──────────────────────────────────────────────────
@@ -269,33 +273,33 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
     .id_salt("settings_grp_appearance")
     .icon(egui_commonmark::ui_components::centering::AccordionIcon::paint_optically_centered);
 
-    if let Some(force_open) = state.settings_tree_force_open {
+    if let Some(force_open) = state.config.settings_tree_force_open {
         appearance_header = appearance_header.open(Some(force_open));
     }
 
     appearance_header.show(ui, |ui| {
-        let theme_selected = state.active_settings_tab == SettingsTab::Theme;
+        let theme_selected = state.config.active_settings_tab == SettingsTab::Theme;
         if ui
             .selectable_label(theme_selected, settings_msgs.tab_name("theme"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Theme;
+            state.config.active_settings_tab = SettingsTab::Theme;
         }
 
-        let font_selected = state.active_settings_tab == SettingsTab::Font;
+        let font_selected = state.config.active_settings_tab == SettingsTab::Font;
         if ui
             .selectable_label(font_selected, settings_msgs.tab_name("font"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Font;
+            state.config.active_settings_tab = SettingsTab::Font;
         }
 
-        let layout_selected = state.active_settings_tab == SettingsTab::Layout;
+        let layout_selected = state.config.active_settings_tab == SettingsTab::Layout;
         if ui
             .selectable_label(layout_selected, settings_msgs.tab_name("layout"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Layout;
+            state.config.active_settings_tab = SettingsTab::Layout;
         }
     });
 
@@ -319,33 +323,33 @@ fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppStat
     .id_salt("settings_grp_system")
     .icon(egui_commonmark::ui_components::centering::AccordionIcon::paint_optically_centered);
 
-    if let Some(force_open) = state.settings_tree_force_open {
+    if let Some(force_open) = state.config.settings_tree_force_open {
         system_header = system_header.open(Some(force_open));
     }
 
     system_header.show(ui, |ui| {
-        let workspace_selected = state.active_settings_tab == SettingsTab::Workspace;
+        let workspace_selected = state.config.active_settings_tab == SettingsTab::Workspace;
         if ui
             .selectable_label(workspace_selected, settings_msgs.tab_name("workspace"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Workspace;
+            state.config.active_settings_tab = SettingsTab::Workspace;
         }
 
-        let updates_selected = state.active_settings_tab == SettingsTab::Updates;
+        let updates_selected = state.config.active_settings_tab == SettingsTab::Updates;
         if ui
             .selectable_label(updates_selected, settings_msgs.tab_name("updates"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Updates;
+            state.config.active_settings_tab = SettingsTab::Updates;
         }
 
-        let behavior_selected = state.active_settings_tab == SettingsTab::Behavior;
+        let behavior_selected = state.config.active_settings_tab == SettingsTab::Behavior;
         if ui
             .selectable_label(behavior_selected, settings_msgs.tab_name("behavior"))
             .clicked()
         {
-            state.active_settings_tab = SettingsTab::Behavior;
+            state.config.active_settings_tab = SettingsTab::Behavior;
         }
     });
 }
@@ -1169,7 +1173,7 @@ fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
 fn render_layout_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     let title = crate::i18n::get().settings.tab_name("layout");
     section_header(ui, &title);
-    render_toc_toggle(ui, &mut state.settings);
+    render_toc_toggle(ui, &mut state.config.settings);
     ui.add_space(SECTION_SPACING);
     render_toc_position_selector(ui, state);
     ui.add_space(SECTION_SPACING);
@@ -1197,7 +1201,7 @@ fn render_toc_toggle(ui: &mut egui::Ui, settings: &mut SettingsService) {
 }
 
 fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
-    if !state.settings.settings().layout.toc_visible {
+    if !state.config.settings.settings().layout.toc_visible {
         return;
     }
 
@@ -1205,7 +1209,7 @@ fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state:
 
     ui.label(crate::i18n::get().settings.layout.toc_position.clone());
     ui.horizontal(|ui| {
-        let current = state.settings.settings().layout.toc_position;
+        let current = state.config.settings.settings().layout.toc_position;
         if ui
             .selectable_label(
                 current == TocPosition::Left,
@@ -1214,8 +1218,8 @@ fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state:
             .clicked()
             && current != TocPosition::Left
         {
-            state.settings.settings_mut().layout.toc_position = TocPosition::Left;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.toc_position = TocPosition::Left;
+            let _ = state.config.settings.save();
         }
         if ui
             .selectable_label(
@@ -1225,8 +1229,8 @@ fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state:
             .clicked()
             && current != TocPosition::Right
         {
-            state.settings.settings_mut().layout.toc_position = TocPosition::Right;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.toc_position = TocPosition::Right;
+            let _ = state.config.settings.save();
         }
     });
 }
@@ -1234,7 +1238,7 @@ fn render_toc_position_selector(ui: &mut egui::Ui, state: &mut crate::app_state:
 fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     ui.label(crate::i18n::get().settings.layout.split_direction.clone());
     ui.horizontal(|ui| {
-        let current = state.settings.settings().layout.split_direction;
+        let current = state.config.settings.settings().layout.split_direction;
         if ui
             .selectable_label(
                 current == SplitDirection::Horizontal,
@@ -1243,8 +1247,9 @@ fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_sta
             .clicked()
             && current != SplitDirection::Horizontal
         {
-            state.settings.settings_mut().layout.split_direction = SplitDirection::Horizontal;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.split_direction =
+                SplitDirection::Horizontal;
+            let _ = state.config.settings.save();
         }
         if ui
             .selectable_label(
@@ -1254,8 +1259,8 @@ fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_sta
             .clicked()
             && current != SplitDirection::Vertical
         {
-            state.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.split_direction = SplitDirection::Vertical;
+            let _ = state.config.settings.save();
         }
     });
 }
@@ -1263,7 +1268,7 @@ fn render_split_direction_selector(ui: &mut egui::Ui, state: &mut crate::app_sta
 fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     ui.label(crate::i18n::get().settings.layout.pane_order.clone());
     ui.horizontal(|ui| {
-        let current = state.settings.settings().layout.pane_order;
+        let current = state.config.settings.settings().layout.pane_order;
         if ui
             .selectable_label(
                 current == PaneOrder::EditorFirst,
@@ -1272,8 +1277,8 @@ fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::A
             .clicked()
             && current != PaneOrder::EditorFirst
         {
-            state.settings.settings_mut().layout.pane_order = PaneOrder::EditorFirst;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.pane_order = PaneOrder::EditorFirst;
+            let _ = state.config.settings.save();
         }
         if ui
             .selectable_label(
@@ -1283,8 +1288,8 @@ fn render_pane_order_selector(ui: &mut egui::Ui, state: &mut crate::app_state::A
             .clicked()
             && current != PaneOrder::PreviewFirst
         {
-            state.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
-            let _ = state.settings.save();
+            state.config.settings.settings_mut().layout.pane_order = PaneOrder::PreviewFirst;
+            let _ = state.config.settings.save();
         }
     });
 }
@@ -1328,7 +1333,7 @@ fn render_string_list_editor(ui: &mut egui::Ui, list: &mut Vec<String>) -> bool 
 
 fn render_workspace_tab(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     let workspace_msgs = &crate::i18n::get().settings.workspace;
-    let settings = &mut state.settings;
+    let settings = &mut state.config.settings;
 
     section_header(ui, &workspace_msgs.max_depth);
     let mut max_depth = settings.settings().workspace.max_depth;
@@ -1478,7 +1483,7 @@ fn render_updates_tab(
     state: &mut crate::app_state::AppState,
 ) -> Option<AppAction> {
     let update_msgs = &crate::i18n::get().settings.updates;
-    let settings = &mut state.settings;
+    let settings = &mut state.config.settings;
 
     section_header(ui, &update_msgs.section_title);
 
@@ -1535,7 +1540,7 @@ fn render_behavior_tab(
     state: &mut crate::app_state::AppState,
 ) -> Option<AppAction> {
     let behavior_msgs = &crate::i18n::get().settings.behavior;
-    let settings = &mut state.settings;
+    let settings = &mut state.config.settings;
 
     // A1: Confirm before closing unsaved tabs
     let mut confirm = settings.settings().behavior.confirm_close_dirty_tab;

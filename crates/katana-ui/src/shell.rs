@@ -8,9 +8,11 @@ use eframe::egui;
 use katana_platform::theme::ThemeColors;
 use katana_platform::FilesystemService;
 
+use crate::app::*;
+
 use crate::{
     app_state::{AppAction, AppState},
-    preview_pane::{DownloadRequest, PreviewPane},
+    preview_pane::PreviewPane,
 };
 
 // ─────────────────────────────────────────────
@@ -77,11 +79,6 @@ pub(crate) const DOWNLOAD_STATUS_CHECK_INTERVAL_MS: u64 = 200;
 
 /// Rounding radius of the active row background in the file tree.
 pub(crate) const ACTIVE_FILE_HIGHLIGHT_ROUNDING: f32 = 3.0;
-
-/// Converts a string to u64 using FNV-1a hash.
-fn hash_str(s: &str) -> u64 {
-    crate::shell_logic::hash_str(s)
-}
 
 pub(crate) struct TabPreviewCache {
     pub path: std::path::PathBuf,
@@ -203,7 +200,7 @@ impl KatanaApp {
         let mut show_changelog = false;
 
         {
-            let settings_mut = app.state.settings.settings_mut();
+            let settings_mut = app.state.config.settings.settings_mut();
             if let Some(prev) = &settings_mut.updates.previous_app_version {
                 app.old_app_version = Some(prev.clone());
                 if prev != current_version {
@@ -219,7 +216,7 @@ impl KatanaApp {
         }
 
         if show_changelog {
-            if let Err(e) = app.state.settings.save() {
+            if let Err(e) = app.state.config.settings.save() {
                 tracing::warn!("Failed to save previous_app_version: {e}");
             }
             app.needs_changelog_display = true;
@@ -266,1121 +263,6 @@ impl KatanaApp {
     pub fn clear_changelog_rx_for_test(&mut self) {
         self.changelog_rx = None;
     }
-
-    pub(crate) fn take_action(&mut self) -> AppAction {
-        std::mem::replace(&mut self.pending_action, AppAction::None)
-    }
-
-    pub(crate) fn get_preview_pane(
-        previews: &mut Vec<TabPreviewCache>,
-        path: std::path::PathBuf,
-    ) -> &mut PreviewPane {
-        if let Some(idx) = previews.iter().position(|t| t.path == path) {
-            &mut previews[idx].pane
-        } else {
-            previews.push(TabPreviewCache {
-                path,
-                pane: PreviewPane::default(),
-                hash: 0,
-            });
-            &mut previews.last_mut().expect("just pushed").pane
-        }
-    }
-
-    /// Reflects only text changes (keeps existing images for diagrams).
-    fn refresh_preview(&mut self, path: &std::path::Path, source: &str) {
-        let h = hash_str(source);
-        let path_buf = path.to_path_buf();
-
-        let current_hash = self
-            .tab_previews
-            .iter()
-            .find(|t| t.path == path_buf)
-            .map(|t| t.hash)
-            .unwrap_or(0);
-
-        if current_hash != 0 && current_hash == h {
-            return;
-        }
-
-        Self::get_preview_pane(&mut self.tab_previews, path_buf.clone())
-            .update_markdown_sections(source, path);
-
-        if let Some(tab) = self.tab_previews.iter_mut().find(|t| t.path == path_buf) {
-            tab.hash = h;
-        }
-    }
-
-    fn full_refresh_preview(
-        &mut self,
-        path: &std::path::Path,
-        source: &str,
-        force: bool,
-        concurrency: usize,
-    ) {
-        let h = hash_str(source);
-        let path_buf = path.to_path_buf();
-        let current_hash = self
-            .tab_previews
-            .iter()
-            .find(|t| t.path == path_buf)
-            .map(|t| t.hash)
-            .unwrap_or(0);
-
-        if !force && current_hash != 0 && current_hash == h {
-            return;
-        }
-
-        tracing::debug!(
-            "[DEBUG-HASH] MISMATCH or FORCE. Running full_render for path: {:?}. force={}, current_hash={}, new_hash={}",
-            path_buf,
-            force,
-            current_hash,
-            h
-        );
-
-        let pane = Self::get_preview_pane(&mut self.tab_previews, path_buf.clone());
-        pane.full_render(source, path, self.state.cache.clone(), force, concurrency);
-
-        let tab = self
-            .tab_previews
-            .iter_mut()
-            .find(|t| t.path == path_buf)
-            .expect("just fetched pane");
-        // If force, also reset hash to 0 so it redraws on switch, or update it now.
-        // We update to true hash since we re-rendered anyway.
-        tab.hash = h;
-    }
-
-    fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
-        // Save current workspace state (including open tabs) before unloading it
-        if self.state.workspace.is_some() {
-            self.save_workspace_state();
-        }
-
-        self.state.is_loading_workspace = true;
-        // Temporary feedback
-        self.state.status_message = Some((
-            crate::i18n::tf(
-                &crate::i18n::get().status.opened_workspace,
-                &vec![("name", "...")],
-            ),
-            crate::app_state::StatusType::Info,
-        ));
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.workspace_rx = Some(rx);
-        let path_clone = path.clone();
-
-        // 1. Cancel any existing workspace scan
-        if let Some(token) = &self.state.workspace_cancel_token {
-            token.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        // 2. Create a new cancellation token for this scan
-        let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        self.state.workspace_cancel_token = Some(new_token.clone());
-
-        let settings = self.state.settings.settings().workspace.clone();
-        let in_memory_dirs = self.state.in_memory_dirs.clone();
-
-        std::thread::spawn(move || {
-            let fs = katana_platform::FilesystemService::new();
-            let result = fs.open_workspace(
-                &path_clone,
-                &settings.ignored_directories,
-                settings.max_depth,
-                &settings.visible_extensions,
-                &settings.extensionless_excludes,
-                new_token,
-                &in_memory_dirs,
-            );
-            let _ = tx.send((WorkspaceLoadType::Open, path_clone, result));
-        });
-    }
-
-    fn finish_open_workspace(
-        &mut self,
-        path: std::path::PathBuf,
-        ws: katana_core::workspace::Workspace,
-    ) {
-        let name = ws.name().unwrap_or("unknown").to_string();
-        self.state.status_message = Some((
-            crate::i18n::tf(
-                &crate::i18n::get().status.opened_workspace,
-                &vec![("name", name.as_str())],
-            ),
-            crate::app_state::StatusType::Success,
-        ));
-        self.state.workspace = Some(ws);
-        self.state.open_documents.clear();
-        self.state.active_doc_idx = None;
-        self.state.filter_cache = None;
-        let path_str = path.display().to_string();
-
-        let mut to_open = Vec::new();
-        let mut active_idx = None;
-
-        let cache_key = format!("workspace_tabs:{}", path_str);
-        if let Some(cache_json) = self.state.cache.get_persistent(&cache_key) {
-            #[derive(serde::Deserialize)]
-            struct TabState {
-                tabs: Vec<String>,
-                active_idx: Option<usize>,
-                #[serde(default)]
-                expanded_directories: std::collections::HashSet<String>,
-            }
-            if let Ok(state) = serde_json::from_str::<TabState>(&cache_json) {
-                to_open = state.tabs;
-                active_idx = state.active_idx;
-                self.state.expanded_directories = state
-                    .expanded_directories
-                    .into_iter()
-                    .map(std::path::PathBuf::from)
-                    .collect();
-            }
-        } else {
-            // Fallback for first time after migration
-            let is_same_as_last = self
-                .state
-                .settings
-                .settings()
-                .workspace
-                .last_workspace
-                .as_deref()
-                == Some(path_str.as_str());
-
-            if is_same_as_last {
-                let settings = self.state.settings.settings();
-                to_open = settings.workspace.open_tabs.clone();
-                active_idx = settings.workspace.active_tab_idx;
-            }
-        }
-
-        // Persist the last opened workspace path.
-        {
-            let settings = self.state.settings.settings_mut();
-            settings.workspace.last_workspace = Some(path_str.clone());
-
-            // Move to end of history (most recent)
-            settings.workspace.paths.retain(|p| p != &path_str);
-            settings.workspace.paths.push(path_str);
-        }
-
-        // Restore tabs for the opened workspace
-        if !to_open.is_empty() {
-            // Retain only files that exist
-            to_open.retain(|p| std::path::Path::new(p).exists());
-
-            let active_idx_val = active_idx.unwrap_or(0).min(to_open.len().saturating_sub(1));
-
-            for (i, p) in to_open.iter().enumerate() {
-                let path = std::path::PathBuf::from(p);
-                if i == active_idx_val {
-                    if let Ok(doc) = self.fs.load_document(path) {
-                        self.state.open_documents.push(doc);
-                        self.state
-                            .initialize_tab_split_state(std::path::PathBuf::from(p));
-                    }
-                } else {
-                    // Lazy load non-active tabs
-                    self.state
-                        .open_documents
-                        .push(katana_core::document::Document::new_empty(path));
-                    self.state
-                        .initialize_tab_split_state(std::path::PathBuf::from(p));
-                }
-            }
-            if !self.state.open_documents.is_empty() {
-                let idx = active_idx
-                    .unwrap_or(0)
-                    .min(self.state.open_documents.len() - 1);
-                self.state.active_doc_idx = Some(idx);
-                let active_doc = &self.state.open_documents[idx];
-                let src = active_doc.buffer.clone();
-                let doc_path = active_doc.path.clone();
-                let concurrency = self
-                    .state
-                    .settings
-                    .settings()
-                    .performance
-                    .diagram_concurrency;
-                self.full_refresh_preview(&doc_path, &src, false, concurrency);
-            }
-        }
-
-        if let Err(e) = self.state.settings.save() {
-            tracing::warn!("Failed to save settings: {e}");
-        }
-    }
-
-    fn handle_refresh_workspace(&mut self) {
-        let Some(workspace) = &self.state.workspace else {
-            return;
-        };
-        let root = workspace.root.clone();
-
-        self.state.is_loading_workspace = true;
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.workspace_rx = Some(rx);
-
-        // 1. Cancel any existing workspace scan
-        if let Some(token) = &self.state.workspace_cancel_token {
-            token.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        // 2. Create a new cancellation token for this scan
-        let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        self.state.workspace_cancel_token = Some(new_token.clone());
-
-        let settings = self.state.settings.settings().workspace.clone();
-        let in_memory_dirs = self.state.in_memory_dirs.clone();
-
-        std::thread::spawn(move || {
-            let fs = katana_platform::FilesystemService::new();
-            let result = fs.open_workspace(
-                &root,
-                &settings.ignored_directories,
-                settings.max_depth,
-                &settings.visible_extensions,
-                &settings.extensionless_excludes,
-                new_token,
-                &in_memory_dirs,
-            );
-            let _ = tx.send((WorkspaceLoadType::Refresh, root, result));
-        });
-    }
-
-    pub(crate) fn poll_workspace_load(&mut self, ctx: &egui::Context) {
-        const WORKSPACE_LOAD_POLL_INTERVAL_MS: u64 = 50;
-        let done = if let Some(rx) = &self.workspace_rx {
-            match rx.try_recv() {
-                Ok((WorkspaceLoadType::Open, path, Ok(ws))) => {
-                    self.state.is_loading_workspace = false;
-                    self.finish_open_workspace(path, ws);
-                    true
-                }
-                Ok((WorkspaceLoadType::Refresh, _path, Ok(ws))) => {
-                    self.state.is_loading_workspace = false;
-                    self.state.workspace = Some(ws);
-                    self.state.filter_cache = None;
-                    true
-                }
-                Ok((_load_type, _path, Err(e))) => {
-                    self.state.is_loading_workspace = false;
-                    let error = e.to_string();
-                    self.state.status_message = Some((
-                        crate::i18n::tf(
-                            &crate::i18n::get().status.cannot_open_workspace,
-                            &vec![("error", error.as_str())],
-                        ),
-                        crate::app_state::StatusType::Error,
-                    ));
-                    true
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    tracing::debug!("[CPU_LEAK] shell.rs Workspace load polling requested repaint");
-                    ctx.request_repaint_after(std::time::Duration::from_millis(
-                        WORKSPACE_LOAD_POLL_INTERVAL_MS,
-                    ));
-                    false
-                }
-                Err(_) => {
-                    tracing::debug!("[CPU_LEAK] shell.rs workspace_rx disconnected (err)");
-                    self.state.is_loading_workspace = false;
-                    true
-                }
-            }
-        } else {
-            false
-        };
-        if done {
-            self.workspace_rx = None;
-        }
-
-        // Feature: Automatically show the changelog after updating the app.
-        // We defer this action until the initial workspace has finished loading so that
-        // the newly opened changelog tab doesn't get wiped by `finish_open_workspace`.
-        if self.needs_changelog_display
-            && !self.state.is_loading_workspace
-            && self.workspace_rx.is_none()
-            && matches!(self.pending_action, AppAction::None)
-        {
-            self.needs_changelog_display = false;
-            self.pending_action = AppAction::ShowReleaseNotes;
-        }
-    }
-
-    pub(crate) fn handle_select_document(&mut self, path: std::path::PathBuf, activate: bool) {
-        // Auto-expand parents only when a file is explicitly activated (not during lazy background loads)
-        if activate {
-            let mut parent = path.parent();
-            while let Some(p) = parent {
-                if p == std::path::Path::new("") {
-                    break;
-                }
-                self.state.expanded_directories.insert(p.to_path_buf());
-                parent = p.parent();
-            }
-        }
-
-        if let Some(idx) = self
-            .state
-            .open_documents
-            .iter()
-            .position(|d| d.path == path)
-        {
-            if activate {
-                self.state.active_doc_idx = Some(idx);
-                let doc = &mut self.state.open_documents[idx];
-                if !doc.is_loaded {
-                    if let Ok(loaded_doc) = self.fs.load_document(&path) {
-                        *doc = loaded_doc;
-                    }
-                }
-                let src = self.state.open_documents[idx].buffer.clone();
-                let concurrency = self
-                    .state
-                    .settings
-                    .settings()
-                    .performance
-                    .diagram_concurrency;
-                self.full_refresh_preview(&path, &src, false, concurrency);
-            }
-            return;
-        }
-
-        if activate {
-            match self.fs.load_document(&path) {
-                Ok(doc) => {
-                    let src = doc.buffer.clone();
-                    let concurrency = self
-                        .state
-                        .settings
-                        .settings()
-                        .performance
-                        .diagram_concurrency;
-                    self.full_refresh_preview(&path, &src, false, concurrency);
-                    self.state.open_documents.push(doc);
-                    self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
-                    self.state.initialize_tab_split_state(path.clone());
-                    self.save_workspace_state();
-                }
-                Err(e) => {
-                    let error = e.to_string();
-                    self.state.status_message = Some((
-                        crate::i18n::tf(
-                            &crate::i18n::get().status.cannot_open_file,
-                            &vec![("error", error.as_str())],
-                        ),
-                        crate::app_state::StatusType::Error,
-                    ));
-                }
-            }
-        } else {
-            // Lazy load: just add to tabs
-            self.state
-                .open_documents
-                .push(katana_core::document::Document::new_empty(path.clone()));
-            self.state.initialize_tab_split_state(path);
-            self.save_workspace_state();
-        }
-    }
-
-    fn handle_remove_workspace(&mut self, path: String) {
-        let settings = self.state.settings.settings_mut();
-        settings.workspace.paths.retain(|p| p != &path);
-
-        if settings.workspace.last_workspace.as_deref() == Some(path.as_str()) {
-            settings.workspace.last_workspace = None;
-        }
-
-        if let Err(e) = self.state.settings.save() {
-            tracing::warn!("Failed to save settings after removing workspace: {e}");
-        }
-    }
-
-    pub(crate) fn force_close_document(&mut self, idx: usize) {
-        if idx < self.state.open_documents.len() {
-            let closed_doc = self.state.open_documents.remove(idx);
-            self.state.push_recently_closed(closed_doc.path);
-            self.state.active_doc_idx = if self.state.open_documents.is_empty() {
-                None
-            } else {
-                Some(
-                    self.state
-                        .active_doc_idx
-                        .unwrap_or(0)
-                        .saturating_sub(if self.state.active_doc_idx == Some(idx) {
-                            1
-                        } else {
-                            0
-                        })
-                        .min(self.state.open_documents.len().saturating_sub(1)),
-                )
-            };
-        }
-        self.save_workspace_state();
-        self.cleanup_closed_tab_previews();
-    }
-
-    pub(crate) fn save_workspace_state(&mut self) {
-        let open_tabs: Vec<String> = self
-            .state
-            .open_documents
-            .iter()
-            .map(|d| d.path.display().to_string())
-            .filter(|p| !p.starts_with("Katana://"))
-            .collect();
-        let idx = self.state.active_doc_idx;
-        let expanded: std::collections::HashSet<String> = self
-            .state
-            .expanded_directories
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect();
-
-        let settings = self.state.settings.settings_mut();
-        settings.workspace.open_tabs = open_tabs.clone();
-        settings.workspace.active_tab_idx = idx;
-        if let Err(e) = self.state.settings.save() {
-            tracing::warn!("Failed to save workspace tab state: {e}");
-        }
-
-        if let Some(ws) = &self.state.workspace {
-            let key = format!("workspace_tabs:{}", ws.root.display());
-            #[derive(serde::Serialize)]
-            struct TabState {
-                tabs: Vec<String>,
-                active_idx: Option<usize>,
-                expanded_directories: std::collections::HashSet<String>,
-            }
-            let state = TabState {
-                tabs: open_tabs,
-                active_idx: idx,
-                expanded_directories: expanded,
-            };
-            if let Ok(json) = serde_json::to_string(&state) {
-                let _ = self.state.cache.set_persistent(&key, json);
-            }
-        }
-    }
-
-    fn handle_update_buffer(&mut self, content: String) {
-        let path = if let Some(doc) = self.state.active_document_mut() {
-            doc.update_buffer(content.clone());
-            doc.path.clone()
-        } else {
-            return;
-        };
-        self.refresh_preview(&path, &content);
-    }
-
-    fn handle_toggle_task_list(&mut self, global_index: usize, new_state: char) {
-        let (path, content) = if let Some(doc) = self.state.active_document_mut() {
-            let spans = egui_commonmark::extract_task_list_spans(&doc.buffer);
-            if let Some(span) = spans.get(global_index) {
-                let replacement = format!("[{}]", new_state);
-                if span.start <= span.end && span.end <= doc.buffer.len() {
-                    doc.buffer.replace_range(span.clone(), &replacement);
-                    doc.is_dirty = true;
-                }
-            } else {
-                tracing::warn!(
-                    "Interactive Task List out of bounds: global_index {} vs {}",
-                    global_index,
-                    spans.len()
-                );
-            }
-            (doc.path.clone(), doc.buffer.clone())
-        } else {
-            return;
-        };
-        self.refresh_preview(&path, &content);
-    }
-
-    fn handle_replace_text(&mut self, span: std::ops::Range<usize>, replacement: String) {
-        let (path, content) = if let Some(doc) = self.state.active_document_mut() {
-            // Ensure the span is within bounds
-            if span.start <= span.end && span.end <= doc.buffer.len() {
-                doc.buffer.replace_range(span, &replacement);
-                doc.is_dirty = true;
-            }
-            (doc.path.clone(), doc.buffer.clone())
-        } else {
-            return;
-        };
-        self.refresh_preview(&path, &content);
-    }
-
-    fn handle_save_document(&mut self) {
-        let Some(doc) = self.state.active_document_mut() else {
-            return;
-        };
-        match self.fs.save_document(doc) {
-            Ok(()) => {
-                self.state.status_message = Some((
-                    crate::i18n::get().status.saved.clone(),
-                    crate::app_state::StatusType::Success,
-                ));
-                self.save_workspace_state();
-            }
-            Err(e) => {
-                let error = e.to_string();
-                self.state.status_message = Some((
-                    crate::i18n::tf(
-                        &crate::i18n::get().status.save_failed,
-                        &vec![("error", error.as_str())],
-                    ),
-                    crate::app_state::StatusType::Error,
-                ));
-            }
-        }
-    }
-    /// Drops `PreviewPane` caches for tabs that are no longer open.
-    pub(crate) fn cleanup_closed_tab_previews(&mut self) {
-        let open_paths: std::collections::HashSet<_> =
-            self.state.open_documents.iter().map(|d| &d.path).collect();
-        self.tab_previews.retain(|t| open_paths.contains(&t.path));
-    }
-
-    /// Aborts background rendering jobs for all tabs EXCEPT the currently active one.
-    /// This prevents \"zombie\" threads from pegging the CPU when rapidly switching tabs.
-    pub(crate) fn cancel_inactive_renders(&mut self) {
-        let active_path = self.state.active_document().map(|d| d.path.clone());
-        for pane in &mut self.tab_previews {
-            if Some(&pane.path) != active_path.as_ref() {
-                pane.pane.abort_renders();
-            }
-        }
-    }
-
-    pub(crate) fn process_action(&mut self, ctx: &egui::Context, action: AppAction) {
-        match action {
-            AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
-            AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
-            AppAction::SelectDocument(p) => self.handle_select_document(p, true),
-            AppAction::OpenMultipleDocuments(paths) => {
-                // When recursively opening a directory, activate the first file
-                // and open the rest lazily (no load, no activate) in subsequent frames
-                // to prevent UI freezing and show progressive tab increase.
-                let mut iter = paths.into_iter();
-                if let Some(first_path) = iter.next() {
-                    self.handle_select_document(first_path, true);
-                }
-                for path in iter {
-                    self.pending_document_loads.push_back(path);
-                }
-            }
-            AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
-            AppAction::CloseDocument(idx) => {
-                // A1: If confirm_close_dirty_tab is enabled and the doc is dirty,
-                // show a confirmation dialog instead of closing immediately.
-                let should_confirm = self
-                    .state
-                    .settings
-                    .settings()
-                    .behavior
-                    .confirm_close_dirty_tab
-                    && idx < self.state.open_documents.len()
-                    && self.state.open_documents[idx].is_dirty;
-
-                if should_confirm {
-                    self.state.pending_close_confirm = Some(idx);
-                } else {
-                    self.force_close_document(idx);
-                }
-            }
-            AppAction::ForceCloseDocument(idx) => {
-                self.state.pending_close_confirm = None;
-                self.force_close_document(idx);
-            }
-            AppAction::UpdateBuffer(c) => self.handle_update_buffer(c),
-            AppAction::ReplaceText { span, replacement } => {
-                self.handle_replace_text(span, replacement)
-            }
-            AppAction::ToggleTaskList {
-                global_index,
-                new_state,
-            } => self.handle_toggle_task_list(global_index, new_state),
-            AppAction::SaveDocument => self.handle_save_document(),
-            AppAction::RefreshDiagrams => {
-                // Clear all egui texture caches (e.g. diagrams, network images)
-                ctx.forget_all_images();
-                // Reinstall UI icon SVGs so they aren't lost to the cache clear
-                crate::icon::IconRegistry::install(ctx);
-
-                // Invalidate hashes so non-active tabs re-render on next switch
-                for tab in &mut self.tab_previews {
-                    tab.hash = 0;
-                    for viewer in tab.pane.viewer_states.iter_mut() {
-                        viewer.texture = None;
-                    }
-                    tab.pane.fullscreen_viewer_state.texture = None;
-                }
-
-                // Re-render the active tab without reading from disk, to avoid wiping unsaved changes!
-                if let Some(doc) = self.state.active_document_mut() {
-                    let path = doc.path.clone();
-                    let src = doc.buffer.clone();
-                    let concurrency = self
-                        .state
-                        .settings
-                        .settings()
-                        .performance
-                        .diagram_concurrency;
-                    self.full_refresh_preview(&path, &src, true, concurrency);
-                }
-            }
-            AppAction::ChangeLanguage(lang) => {
-                crate::i18n::set_language(&lang);
-                crate::shell_ui::update_native_menu_strings_from_i18n();
-                self.state.settings.settings_mut().language = lang;
-                if let Err(e) = self.state.settings.save() {
-                    tracing::warn!("Failed to save settings: {e}");
-                }
-            }
-            AppAction::ToggleSettings => {
-                self.state.show_settings = !self.state.show_settings;
-            }
-            AppAction::ToggleAbout => {
-                self.show_about = !self.show_about;
-            }
-            AppAction::ToggleToc => {
-                self.state.show_toc = !self.state.show_toc;
-            }
-            AppAction::SetSplitDirection(dir) => {
-                // Keep toolbar toggles temporary and scoped to the active tab.
-                self.state.set_active_split_direction(dir);
-            }
-            AppAction::SetPaneOrder(order) => {
-                // Keep toolbar toggles temporary and scoped to the active tab.
-                self.state.set_active_pane_order(order);
-            }
-            AppAction::CloseOtherDocuments(idx) => {
-                if idx < self.state.open_documents.len() {
-                    let mut keep = Vec::new();
-                    let old_docs = std::mem::take(&mut self.state.open_documents);
-                    for (i, doc) in old_docs.into_iter().enumerate() {
-                        if i == idx {
-                            keep.push(doc);
-                        } else {
-                            self.state.push_recently_closed(doc.path);
-                        }
-                    }
-                    self.state.open_documents = keep;
-                    self.state.active_doc_idx = Some(0);
-                }
-                self.save_workspace_state();
-            }
-            AppAction::CloseAllDocuments => {
-                let old_docs = std::mem::take(&mut self.state.open_documents);
-                for doc in old_docs.into_iter() {
-                    self.state.push_recently_closed(doc.path);
-                }
-                self.state.active_doc_idx = None;
-                self.save_workspace_state();
-                self.cleanup_closed_tab_previews();
-            }
-            AppAction::CloseDocumentsToRight(idx) => {
-                let mut keep = Vec::new();
-                let old_docs = std::mem::take(&mut self.state.open_documents);
-                for (i, doc) in old_docs.into_iter().enumerate() {
-                    if i <= idx {
-                        keep.push(doc);
-                    } else {
-                        self.state.push_recently_closed(doc.path);
-                    }
-                }
-                self.state.open_documents = keep;
-                if let Some(a_idx) = self.state.active_doc_idx {
-                    if a_idx > idx {
-                        self.state.active_doc_idx = Some(idx);
-                    }
-                }
-                self.save_workspace_state();
-                self.cleanup_closed_tab_previews();
-            }
-            AppAction::CloseDocumentsToLeft(idx) => {
-                let mut keep = Vec::new();
-                let new_active_idx = self.state.active_doc_idx;
-                let old_docs = std::mem::take(&mut self.state.open_documents);
-                for (i, doc) in old_docs.into_iter().enumerate() {
-                    if i >= idx {
-                        keep.push(doc);
-                    } else {
-                        self.state.push_recently_closed(doc.path);
-                    }
-                }
-                self.state.open_documents = keep;
-                if let Some(a_idx) = new_active_idx {
-                    if a_idx < idx {
-                        self.state.active_doc_idx = Some(0);
-                    } else {
-                        self.state.active_doc_idx = Some(a_idx - idx);
-                    }
-                }
-                self.save_workspace_state();
-                self.cleanup_closed_tab_previews();
-            }
-            AppAction::TogglePinDocument(idx) => {
-                if idx < self.state.open_documents.len() {
-                    let active_path = self.state.active_document().map(|d| d.path.clone());
-                    let doc = &mut self.state.open_documents[idx];
-                    doc.is_pinned = !doc.is_pinned;
-                    // Stable sort to move pinned tabs to the front
-                    self.state.open_documents.sort_by_key(|d| !d.is_pinned);
-                    if let Some(path) = active_path {
-                        if let Some(new_idx) = self
-                            .state
-                            .open_documents
-                            .iter()
-                            .position(|d| d.path == path)
-                        {
-                            self.state.active_doc_idx = Some(new_idx);
-                        }
-                    }
-                }
-                self.save_workspace_state();
-            }
-            AppAction::RestoreClosedDocument => {
-                if let Some(path) = self.state.recently_closed_tabs.pop_back() {
-                    self.handle_select_document(path, true);
-                }
-            }
-            AppAction::ReorderDocument { from, to } => {
-                let len = self.state.open_documents.len();
-                if from < len && to <= len && from != to {
-                    let active_path = self.state.active_document().map(|d| d.path.clone());
-                    let doc = self.state.open_documents.remove(from);
-                    let actual_to = if to > from { to - 1 } else { to };
-                    self.state.open_documents.insert(actual_to, doc);
-                    if let Some(path) = active_path {
-                        if let Some(new_idx) = self
-                            .state
-                            .open_documents
-                            .iter()
-                            .position(|d| d.path == path)
-                        {
-                            self.state.active_doc_idx = Some(new_idx);
-                        }
-                    }
-                }
-                self.save_workspace_state();
-            }
-            AppAction::CheckForUpdates => {
-                self.start_update_check(true);
-            }
-            AppAction::ExportDocument(fmt) => {
-                self.handle_export_document(ctx, fmt);
-            }
-            AppAction::AcceptTerms(version) => {
-                self.state.settings.settings_mut().terms_accepted_version = Some(version);
-                if let Err(e) = self.state.settings.save() {
-                    tracing::warn!("Failed to save terms acceptance: {e}");
-                }
-            }
-            AppAction::DeclineTerms => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            }
-            AppAction::ShowMetaInfo(path) => {
-                self.show_meta_info_for = Some(path);
-            }
-            AppAction::SkipVersion(version) => {
-                self.state.settings.settings_mut().updates.skipped_version = Some(version);
-                let _ = self.state.settings.save();
-                self.show_update_dialog = false;
-            }
-            AppAction::DismissUpdate => {
-                self.show_update_dialog = false;
-            }
-            AppAction::ConfirmRelaunch => {
-                if let Some(_prep) = self.pending_relaunch.take() {
-                    #[cfg(all(not(test), not(coverage)))]
-                    {
-                        let _ = katana_core::update::execute_relauncher(_prep);
-                        std::process::exit(0);
-                    }
-                }
-            }
-            AppAction::ShowReleaseNotes => {
-                self.handle_show_release_notes();
-            }
-            AppAction::ClearAllCaches => {
-                use egui::load::BytesLoader;
-                katana_platform::cache::DefaultCacheService::clear_all_directories();
-                crate::http_cache_loader::PersistentHttpLoader::default().forget_all();
-                ctx.forget_all_images();
-                crate::icon::IconRegistry::install(ctx);
-
-                // Assuming `clear_http_cache` is a decent message for "Successfully cleared" or "Clear cache" button label. Use it as Status msg.
-                self.state.status_message = Some((
-                    crate::i18n::get()
-                        .settings
-                        .behavior
-                        .clear_http_cache
-                        .clone(),
-                    crate::app_state::StatusType::Success,
-                ));
-            }
-            AppAction::RequestNewFile(path) => {
-                let ext = self
-                    .state
-                    .settings
-                    .settings()
-                    .workspace
-                    .visible_extensions
-                    .first()
-                    .cloned();
-                self.state.create_fs_node_modal_state = Some((path, String::new(), ext, false));
-            }
-            AppAction::RequestNewDirectory(path) => {
-                self.state.create_fs_node_modal_state = Some((path, String::new(), None, true));
-            }
-            AppAction::RequestRename(path) => {
-                let name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-                self.state.rename_modal_state = Some((path, name));
-            }
-            AppAction::RequestDelete(path) => {
-                self.state.delete_modal_state = Some(path);
-            }
-            AppAction::CopyPathToClipboard(path) => {
-                ctx.copy_text(path.to_string_lossy().to_string());
-            }
-            AppAction::CopyRelativePathToClipboard(path) => {
-                let rel_path = if let Some(ws) = &self.state.workspace {
-                    path.strip_prefix(&ws.root).unwrap_or(&path).to_path_buf()
-                } else {
-                    path.clone()
-                };
-                ctx.copy_text(rel_path.to_string_lossy().to_string());
-            }
-            AppAction::RevealInOs(path) => {
-                #[cfg(target_os = "macos")]
-                {
-                    let _ = std::process::Command::new("open")
-                        .arg("-R")
-                        .arg(&path)
-                        .spawn();
-                }
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = std::process::Command::new("explorer")
-                        .arg("/select,")
-                        .arg(&path)
-                        .spawn();
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    let dir = if path.is_file() {
-                        path.parent().unwrap_or(&path)
-                    } else {
-                        &path
-                    };
-                    let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
-                }
-            }
-            AppAction::None => {}
-            AppAction::InstallUpdate => {
-                if let Some(release) = &self.state.update_available {
-                    self.state.checking_for_updates = true;
-                    self.state.update_phase =
-                        Some(crate::app_state::UpdatePhase::Downloading { progress: 0.0 });
-                    let exe_path = std::env::current_exe().unwrap();
-                    let target_app_path = if exe_path.to_string_lossy().contains("MacOS") {
-                        const MACOS_BUNDLE_LEVELS: usize = 3;
-                        exe_path
-                            .ancestors()
-                            .nth(MACOS_BUNDLE_LEVELS)
-                            .unwrap()
-                            .to_path_buf()
-                    } else {
-                        exe_path.clone()
-                    };
-
-                    let download_url = release.download_url.clone();
-                    let (tx, rx) = std::sync::mpsc::channel();
-                    self.update_install_rx = Some(rx);
-
-                    std::thread::spawn(move || {
-                        let tx_clone = tx.clone();
-                        let res = katana_core::update::prepare_update(
-                            &download_url,
-                            &target_app_path,
-                            move |progress| {
-                                let _ = tx_clone.send(UpdateInstallEvent::Progress(progress));
-                            },
-                        )
-                        .map_err(|e| e.to_string());
-                        let _ = tx.send(UpdateInstallEvent::Finished(res));
-                    });
-                }
-            }
-        }
-
-        // Clean up resources whenever an action completes.
-        // Specifically, ensure inactive tabs give up their background CPU,
-        // and closed tabs drop their previews entirely.
-        self.cleanup_closed_tab_previews();
-
-        // Ensure the newly active document is loaded and has a preview.
-        // This handles cases where tabs are closed and the active tab silently shifts.
-        let mut inactive_but_focused_path = None;
-        if let Some(active_idx) = self.state.active_doc_idx {
-            if let Some(doc) = self.state.open_documents.get(active_idx) {
-                let has_preview = self.tab_previews.iter().any(|t| t.path == doc.path);
-                if !doc.is_loaded || !has_preview {
-                    inactive_but_focused_path = Some(doc.path.clone());
-                }
-            }
-        }
-        if let Some(path) = inactive_but_focused_path {
-            self.handle_select_document(path, true);
-        }
-
-        self.cancel_inactive_renders();
-    }
-
-    fn handle_show_release_notes(&mut self) {
-        let current_version = env!("CARGO_PKG_VERSION").to_string();
-        let previous = self.old_app_version.clone().or_else(|| {
-            self.state
-                .settings
-                .settings()
-                .updates
-                .previous_app_version
-                .clone()
-        });
-        let lang = self.state.settings.settings().language.clone();
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.changelog_rx = Some(rx);
-
-        crate::changelog::fetch_changelog(&lang, current_version, previous, tx);
-        tracing::info!("Triggered ShowReleaseNotes background fetch.");
-
-        // Open/select the changelog tab immediately (it will show a loading state until data arrives)
-        let virtual_path =
-            std::path::PathBuf::from(format!("Katana://ChangeLog v{}", env!("CARGO_PKG_VERSION")));
-        if !self
-            .state
-            .open_documents
-            .iter()
-            .any(|d| d.path == virtual_path)
-        {
-            self.state
-                .open_documents
-                .push(katana_core::document::Document::new_empty(
-                    virtual_path.clone(),
-                ));
-        }
-        self.handle_select_document(virtual_path, true);
-    }
-
-    pub(crate) fn poll_changelog(&mut self, _ctx: &egui::Context) {
-        if let Some(rx) = &self.changelog_rx {
-            if let Ok(event) = rx.try_recv() {
-                self.changelog_rx = None;
-                match event {
-                    crate::changelog::ChangelogEvent::Success(sections) => {
-                        self.changelog_sections = sections;
-                        let virtual_path = std::path::PathBuf::from(format!(
-                            "Katana://ChangeLog v{}",
-                            env!("CARGO_PKG_VERSION")
-                        ));
-                        if let Some(pos) = self
-                            .state
-                            .open_documents
-                            .iter()
-                            .position(|d| d.path == virtual_path)
-                        {
-                            self.state.active_doc_idx = Some(pos);
-                        } else {
-                            self.state
-                                .open_documents
-                                .push(katana_core::document::Document::new_empty(virtual_path));
-                            self.state.active_doc_idx = Some(self.state.open_documents.len() - 1);
-                        }
-                    }
-                    crate::changelog::ChangelogEvent::Error(err) => {
-                        tracing::error!("Failed to fetch changelog: {}", err);
-                        self.state.status_message = Some((
-                            format!("Failed to fetch release notes: {err}"),
-                            crate::app_state::StatusType::Error,
-                        ));
-                    }
-                }
-            }
-        }
-    }
-
-    fn handle_export_document(&mut self, ctx: &egui::Context, fmt: crate::app_state::ExportFormat) {
-        tracing::info!("Export document requested: {:?}", fmt);
-
-        let Some(doc) = self.state.active_document() else {
-            return;
-        };
-        let buffer = doc.buffer.clone();
-        let doc_path = doc.path.clone();
-
-        match fmt {
-            crate::app_state::ExportFormat::Html => self.export_as_html(ctx, &buffer, &doc_path),
-            crate::app_state::ExportFormat::Pdf => {
-                self.export_with_tool(ctx, &buffer, "pdf", &doc_path)
-            }
-            crate::app_state::ExportFormat::Png => {
-                self.export_with_tool(ctx, &buffer, "png", &doc_path)
-            }
-            crate::app_state::ExportFormat::Jpg => {
-                self.export_with_tool(ctx, &buffer, "jpg", &doc_path)
-            }
-        }
-    }
-
-    /// Generates an export filename from the document's path.
-    ///
-    /// The filename is composed of:
-    /// 1. A prefix from the workspace root's directory initials (first char of each component)
-    /// 2. The relative path within the workspace, with separators replaced by `_`
-    ///
-    /// Example: workspace `/Users/hiroyuki/works/private/katana`,
-    ///          doc `docs/readme.md`, ext `pdf`
-    ///          → `Uhwpk_docs_readme.pdf`
-    fn export_filename(&self, doc_path: &std::path::Path, ext: &str) -> String {
-        let (prefix, relative) = if let Some(ws) = &self.state.workspace {
-            // Build prefix from workspace root path initials
-            let initials: String = ws
-                .root
-                .components()
-                .filter_map(|c| match c {
-                    std::path::Component::Normal(s) => s.to_string_lossy().chars().next(),
-                    _ => None, // skip RootDir, Prefix, CurDir, ParentDir
-                })
-                .collect();
-
-            let rel = doc_path.strip_prefix(&ws.root).unwrap_or(doc_path);
-            (initials, rel.to_path_buf())
-        } else {
-            (String::new(), doc_path.to_path_buf())
-        };
-
-        let stem = relative
-            .with_extension("")
-            .to_string_lossy()
-            .replace([std::path::MAIN_SEPARATOR, '/'], "_");
-
-        if stem.is_empty() {
-            format!("export.{}", ext)
-        } else if prefix.is_empty() {
-            format!("{}.{}", stem, ext)
-        } else {
-            format!("{}_{}.{}", prefix, stem, ext)
-        }
-    }
 }
 
 /// Converts markdown source to HTML and writes it to the system temp directory.
@@ -1389,7 +271,7 @@ impl KatanaApp {
 ///
 /// This is a pure function (no UI state) suitable for background threads and unit tests.
 /// Steps: 1) markdown→HTML  2) write to /tmp  3) return path
-fn export_html_to_tmp(
+pub(crate) fn export_html_to_tmp(
     source: &str,
     filename: &str,
     preset: &katana_core::markdown::color_preset::DiagramColorPreset,
@@ -1404,364 +286,6 @@ fn export_html_to_tmp(
 }
 
 impl KatanaApp {
-    fn export_as_html(&mut self, _ctx: &egui::Context, source: &str, doc_path: &std::path::Path) {
-        let preset = katana_core::markdown::color_preset::DiagramColorPreset::current().clone();
-        let source = source.to_string();
-        let base_dir = doc_path.parent().map(|p| p.to_path_buf());
-        let filename = self.export_filename(doc_path, "html");
-
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        let fname = filename.clone();
-        std::thread::spawn(move || {
-            let result = export_html_to_tmp(&source, &fname, &preset, base_dir.as_deref());
-            let _ = tx.send(result);
-        });
-
-        self.export_tasks.push(ExportTask {
-            filename,
-            rx,
-            open_on_complete: true,
-        });
-    }
-
-    fn export_with_tool(
-        &mut self,
-        _ctx: &egui::Context,
-        source: &str,
-        ext: &str,
-        doc_path: &std::path::Path,
-    ) {
-        let (is_available, tool_name) = match ext {
-            "pdf" => (true, "headless_chrome"),
-            _ => (true, "headless_chrome"),
-        };
-
-        if !is_available {
-            let msg = crate::i18n::tf(
-                &crate::i18n::get().export.tool_missing,
-                &[("tool", tool_name), ("format", &ext.to_uppercase())],
-            );
-            self.state.status_message = Some((msg, crate::app_state::StatusType::Error));
-            return;
-        }
-
-        let default_name = self.export_filename(doc_path, ext);
-        let path = rfd::FileDialog::new()
-            .set_file_name(&default_name)
-            .add_filter(ext, &[ext])
-            .save_file();
-
-        if let Some(output_path) = path {
-            self.perform_tool_export(source, ext, output_path, doc_path);
-        }
-    }
-
-    fn perform_tool_export(
-        &mut self,
-        source: &str,
-        ext: &str,
-        output_path: std::path::PathBuf,
-        doc_path: &std::path::Path,
-    ) {
-        let preset = katana_core::markdown::color_preset::DiagramColorPreset::current().clone();
-        let source = source.to_string();
-        let ext = ext.to_string();
-        let base_dir = doc_path.parent().map(|p| p.to_path_buf());
-        let filename = output_path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "export".to_string());
-
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        std::thread::spawn(move || {
-            let renderer = katana_core::markdown::KatanaRenderer;
-            let html = match katana_core::markdown::HtmlExporter::export(
-                &source,
-                &renderer,
-                &preset,
-                base_dir.as_deref(),
-            ) {
-                Ok(h) => h,
-                Err(e) => {
-                    let _ = tx.send(Err(e.to_string()));
-                    return;
-                }
-            };
-
-            let result = match ext.as_str() {
-                "pdf" => katana_core::markdown::PdfExporter::export(&html, &output_path),
-                _ => katana_core::markdown::ImageExporter::export(&html, &output_path),
-            };
-
-            let _ = tx.send(
-                result
-                    .map(|()| output_path.clone())
-                    .map_err(|e| e.to_string()),
-            );
-        });
-
-        self.export_tasks.push(ExportTask {
-            filename,
-            rx,
-            open_on_complete: false,
-        });
-    }
-
-    /// Polls all background export tasks for completion. Called every frame.
-    pub(crate) fn poll_export(&mut self, ctx: &egui::Context) {
-        const EXPORT_POLL_INTERVAL_MS: u64 = 50;
-        let mut has_pending = false;
-
-        // Collect completed tasks first (borrow checker workaround).
-        let mut completed: Vec<(usize, Result<std::path::PathBuf, String>)> = Vec::new();
-        for (i, task) in self.export_tasks.iter().enumerate() {
-            match task.rx.try_recv() {
-                Ok(result) => {
-                    completed.push((i, result));
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    has_pending = true;
-                }
-                Err(_) => {
-                    completed.push((i, Err("Export thread disconnected".to_string())));
-                }
-            }
-        }
-
-        // Process completed tasks in reverse order to maintain correct indices.
-        for (i, result) in completed.into_iter().rev() {
-            let task = self.export_tasks.remove(i);
-            match result {
-                Ok(output_path) => {
-                    let ext = output_path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_uppercase())
-                        .unwrap_or_default();
-                    let msg = crate::i18n::tf(
-                        &crate::i18n::get().export.success,
-                        &[
-                            ("format", &ext),
-                            ("path", &output_path.display().to_string()),
-                        ],
-                    );
-                    self.state.status_message = Some((msg, crate::app_state::StatusType::Success));
-                    if task.open_on_complete {
-                        if let Err(e) = open::that(&output_path) {
-                            tracing::warn!("Failed to open {}: {e}", output_path.display());
-                        }
-                    }
-                    tracing::info!(
-                        "Export complete: {} → {}",
-                        task.filename,
-                        output_path.display()
-                    );
-                }
-                Err(error) => {
-                    let msg = crate::i18n::tf(
-                        &crate::i18n::get().export.failed,
-                        &[("format", &task.filename), ("error", &error)],
-                    );
-                    self.state.status_message = Some((msg, crate::app_state::StatusType::Error));
-                }
-            }
-        }
-
-        if has_pending {
-            ctx.request_repaint_after(std::time::Duration::from_millis(EXPORT_POLL_INTERVAL_MS));
-        }
-    }
-
-    /// Processes a download request in a background thread.
-    pub(crate) fn start_download(&mut self, req: DownloadRequest) {
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.download_rx = Some(rx);
-        self.state.status_message = Some((
-            crate::i18n::get().plantuml.downloading_plantuml.clone(),
-            crate::app_state::StatusType::Info,
-        ));
-        let url = req.url;
-        let dest = req.dest;
-        std::thread::spawn(move || {
-            let result = download_with_curl(&url, &dest);
-            let _ = tx.send(result);
-        });
-    }
-
-    /// Polls for download completion and re-renders the preview when done.
-    pub(crate) fn poll_download(&mut self, ctx: &egui::Context) {
-        let done = if let Some(rx) = &self.download_rx {
-            match rx.try_recv() {
-                Ok(Ok(())) => {
-                    self.state.status_message = Some((
-                        crate::i18n::get().plantuml.plantuml_installed.clone(),
-                        crate::app_state::StatusType::Success,
-                    ));
-                    self.pending_action = AppAction::RefreshDiagrams;
-                    true
-                }
-                Ok(Err(e)) => {
-                    self.state.status_message = Some((
-                        format!(
-                            "{}{}",
-                            crate::i18n::get().plantuml.download_error.clone(),
-                            e
-                        ),
-                        crate::app_state::StatusType::Error,
-                    ));
-                    true
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    ctx.request_repaint_after(std::time::Duration::from_millis(
-                        DOWNLOAD_STATUS_CHECK_INTERVAL_MS,
-                    ));
-                    false
-                }
-                Err(_) => true,
-            }
-        } else {
-            false
-        };
-        if done {
-            self.download_rx = None;
-        }
-    }
-
-    /// Triggers a background check for the latest KatanA release on GitHub.
-    pub(crate) fn start_update_check(&mut self, is_manual: bool) {
-        if self.state.checking_for_updates {
-            if is_manual {
-                // Already checking, just show the dialog to let the user see the progress
-                self.show_update_dialog = true;
-            }
-            return;
-        }
-        self.state.checking_for_updates = true;
-        self.state.update_check_error = None;
-        self.state.update_available = None;
-
-        if is_manual {
-            self.show_update_dialog = true;
-            self.update_notified = true; // Pretend we've notified them so it doesn't pop up AGAIN
-        }
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.update_rx = Some(rx);
-
-        std::thread::spawn(move || {
-            let result = katana_core::update::check_for_updates(env!("CARGO_PKG_VERSION"), None)
-                .map_err(|e| e.to_string());
-            let _ = tx.send(result);
-        });
-    }
-
-    /// Polls for update installation completion.
-    pub(crate) fn poll_update_install(&mut self, ctx: &egui::Context) {
-        if let Some(rx) = &self.update_install_rx {
-            while let Ok(event) = rx.try_recv() {
-                match event {
-                    UpdateInstallEvent::Progress(prog) => {
-                        match prog {
-                            katana_core::update::UpdateProgress::Downloading {
-                                downloaded,
-                                total,
-                            } => {
-                                let progress = if let Some(t) = total {
-                                    if t > 0 {
-                                        downloaded as f32 / t as f32
-                                    } else {
-                                        0.0
-                                    }
-                                } else {
-                                    // Indeterminate progress if no Content-Length
-                                    0.0
-                                };
-                                self.state.update_phase =
-                                    Some(crate::app_state::UpdatePhase::Downloading { progress });
-                            }
-                            katana_core::update::UpdateProgress::Extracting { current, total } => {
-                                let progress = if total > 0 {
-                                    current as f32 / total as f32
-                                } else {
-                                    0.0
-                                };
-                                self.state.update_phase =
-                                    Some(crate::app_state::UpdatePhase::Installing { progress });
-                            }
-                        }
-                        ctx.request_repaint();
-                    }
-                    UpdateInstallEvent::Finished(Ok(prep)) => {
-                        self.state.checking_for_updates = false;
-                        self.state.update_phase =
-                            Some(crate::app_state::UpdatePhase::ReadyToRelaunch);
-                        self.pending_relaunch = Some(prep);
-                        self.show_update_dialog = true;
-                        self.update_install_rx = None;
-                        ctx.request_repaint();
-                        break;
-                    }
-                    UpdateInstallEvent::Finished(Err(err)) => {
-                        self.state.checking_for_updates = false;
-                        self.state.update_phase = None;
-                        self.state.update_check_error = Some(err);
-                        self.show_update_dialog = true;
-                        self.update_install_rx = None;
-                        ctx.request_repaint();
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    pub(crate) fn poll_update_check(&mut self, _ctx: &egui::Context) {
-        if let Some(rx) = &self.update_rx {
-            match rx.try_recv() {
-                Ok(Ok(Some(release_info))) => {
-                    self.state.checking_for_updates = false;
-                    self.update_rx = None;
-                    if katana_core::update::is_newer_version(
-                        env!("CARGO_PKG_VERSION"),
-                        &release_info.tag_name,
-                    ) {
-                        self.state.update_available = Some(release_info);
-                        if !self.update_notified {
-                            self.show_update_dialog = true;
-                            self.update_notified = true;
-                        }
-                    } else {
-                        self.state.update_available = None;
-                        if !self.update_notified {
-                            self.update_notified = true;
-                        }
-                    }
-                }
-                Ok(Ok(None)) => {
-                    self.state.checking_for_updates = false;
-                    self.update_rx = None;
-                    self.state.update_available = None;
-                    if !self.update_notified {
-                        self.update_notified = true;
-                    }
-                }
-                Ok(Err(err)) => {
-                    self.state.checking_for_updates = false;
-                    self.state.update_check_error = Some(err);
-                    self.update_rx = None;
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    // Update still in progress.
-                }
-                Err(_) => {
-                    self.state.checking_for_updates = false;
-                    self.update_rx = None;
-                }
-            }
-        }
-    }
-
     /// Method for injecting actions from the program, e.g., during testing
     pub fn trigger_action(&mut self, action: AppAction) {
         self.pending_action = action;
@@ -1775,7 +299,7 @@ impl KatanaApp {
 }
 
 /// Calls `curl` as a subprocess to download a file.
-fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
+pub(crate) fn download_with_curl(url: &str, dest: &std::path::Path) -> Result<(), String> {
     _download_with_cmd("curl", url, dest)
 }
 
@@ -1845,8 +369,8 @@ mod tests {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.workspace.data.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // handle_open_workspace: Error with invalid path (L161-167)
@@ -1858,7 +382,7 @@ mod tests {
         // Non-existent path, so workspace might be None (or opened as an empty directory)
         // Either an error is recorded or an empty workspace is opened
         assert!(
-            app.state.workspace.is_some() || app.state.status_message.is_some(),
+            app.state.workspace.data.is_some() || app.state.layout.status_message.is_some(),
             "Error or workspace should be set"
         );
     }
@@ -1869,7 +393,7 @@ mod tests {
         let mut app = make_app();
         app.handle_select_document(PathBuf::from("/nonexistent/file.md"), true);
         // Load error -> recorded in status_message
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // handle_select_document: Move focus by selecting existing tab (L173-188)
@@ -1881,13 +405,13 @@ mod tests {
 
         // Initial load
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.active_doc_idx, Some(0));
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         // Re-select the same file -> does not open a new tab
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert_eq!(app.state.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
     }
 
     // handle_update_buffer: No active document (L213)
@@ -1896,7 +420,7 @@ mod tests {
         let mut app = make_app();
         // UpdateBuffer without opening a document -> does not panic
         app.handle_update_buffer("new content".to_string());
-        assert!(app.state.open_documents.is_empty());
+        assert!(app.state.document.open_documents.is_empty());
     }
 
     // handle_update_buffer: Active document exists (L209-215)
@@ -1919,7 +443,7 @@ mod tests {
         let mut app = make_app();
         app.handle_save_document();
         // Status message is not set (no document)
-        assert!(app.state.status_message.is_none());
+        assert!(app.state.layout.status_message.is_none());
     }
 
     #[test]
@@ -1931,13 +455,16 @@ mod tests {
 
         // 1. Open lazily
         app.handle_select_document(path.clone(), false);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert!(!app.state.open_documents[0].is_loaded);
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert!(!app.state.document.open_documents[0].is_loaded);
 
         // 2. Activate
         app.handle_select_document(path.clone(), true);
-        assert!(app.state.open_documents[0].is_loaded);
-        assert_eq!(app.state.open_documents[0].buffer, "# Lazy content");
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert_eq!(
+            app.state.document.open_documents[0].buffer,
+            "# Lazy content"
+        );
     }
 
     // handle_save_document: Successful save (L222-223)
@@ -1950,7 +477,7 @@ mod tests {
         app.handle_update_buffer("# Modified".to_string());
 
         app.handle_save_document();
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // process_action: CloseDocument (L236-244)
@@ -1960,11 +487,11 @@ mod tests {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         app.process_action(&egui::Context::default(), AppAction::CloseDocument(0));
-        assert!(app.state.open_documents.is_empty());
-        assert!(app.state.active_doc_idx.is_none());
+        assert!(app.state.document.open_documents.is_empty());
+        assert!(app.state.document.active_doc_idx.is_none());
     }
 
     // process_action: CloseDocument - out of bounds does not panic (L237)
@@ -1972,7 +499,7 @@ mod tests {
     fn process_action_close_document_out_of_bounds_does_nothing() {
         let mut app = make_app();
         app.process_action(&egui::Context::default(), AppAction::CloseDocument(99));
-        assert!(app.state.open_documents.is_empty());
+        assert!(app.state.document.open_documents.is_empty());
     }
 
     // process_action: RefreshDiagrams (L248-253)
@@ -2014,7 +541,7 @@ mod tests {
             &egui::Context::default(),
             AppAction::ExportDocument(crate::app_state::ExportFormat::Pdf),
         );
-        let (msg, kind) = app.state.status_message.as_ref().unwrap();
+        let (msg, kind) = app.state.layout.status_message.as_ref().unwrap();
         assert_eq!(*kind, crate::app_state::StatusType::Error);
         assert!(msg.contains("headless_chrome"), "msg = {msg}");
     }
@@ -2033,7 +560,7 @@ mod tests {
             &egui::Context::default(),
             AppAction::ExportDocument(crate::app_state::ExportFormat::Png),
         );
-        let (msg, kind) = app.state.status_message.as_ref().unwrap();
+        let (msg, kind) = app.state.layout.status_message.as_ref().unwrap();
         assert_eq!(*kind, crate::app_state::StatusType::Error);
         assert!(msg.contains("headless_chrome"), "msg = {msg}");
     }
@@ -2102,26 +629,26 @@ mod tests {
     #[test]
     fn process_action_toggle_toc_toggles_flag() {
         let mut app = make_app();
-        assert!(!app.state.show_toc);
+        assert!(!app.state.layout.show_toc);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleToc);
-        assert!(app.state.show_toc);
+        assert!(app.state.layout.show_toc);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleToc);
-        assert!(!app.state.show_toc);
+        assert!(!app.state.layout.show_toc);
     }
 
     // process_action: ToggleSettings
     #[test]
     fn process_action_toggle_settings_toggles_flag() {
         let mut app = make_app();
-        assert!(!app.state.show_settings);
+        assert!(!app.state.layout.show_settings);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
-        assert!(app.state.show_settings);
+        assert!(app.state.layout.show_settings);
 
         app.process_action(&egui::Context::default(), AppAction::ToggleSettings);
-        assert!(!app.state.show_settings);
+        assert!(!app.state.layout.show_settings);
     }
 
     // process_action: None (L258)
@@ -2160,26 +687,26 @@ mod tests {
             AppAction::UpdateBuffer("saved content".to_string()),
         );
         app.process_action(&egui::Context::default(), AppAction::SaveDocument);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // start_download: Thread starts (L263-273)
     #[test]
     fn start_download_sets_download_state() {
         let mut app = make_app();
-        app.start_download(DownloadRequest {
+        app.start_download(crate::preview_pane::DownloadRequest {
             url: "http://example.com/plantuml.jar".to_string(),
             dest: PathBuf::from("/tmp/test_plantuml.jar"),
         });
         // status_message is set
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         // download_rx is set
         assert!(app.download_rx.is_some());
     }
 
     // download_with_curl: Parent directory creation required (L319-320)
     #[test]
-    fn download_with_curl_creates_parent_dir() {
+    pub(crate) fn download_with_curl_creates_parent_dir() {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("subdir").join("file.jar");
         // Parent directory is created even if curl fails
@@ -2250,7 +777,7 @@ mod tests_extra {
 
         // Initial load
         app.handle_select_document(path.clone(), true);
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
 
         // Set an old hash in tab_hashes (different from buffer)
         app.tab_previews.push(TabPreviewCache {
@@ -2263,7 +790,7 @@ mod tests_extra {
         app.handle_select_document(path.clone(), true);
 
         // Tab count remains unchanged
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
     // handle_save_document: Case where fs.save_document fails (L224-228)
@@ -2284,7 +811,7 @@ mod tests_extra {
         app.handle_save_document();
 
         // Write failure -> recorded in status_message
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
 
         // Cleanup: restore writability
         let perms = std::fs::Permissions::from_mode(0o644);
@@ -2293,7 +820,7 @@ mod tests_extra {
 
     // download_with_curl: Success case (L326-327) — local file:// URL
     #[test]
-    fn download_with_curl_success_with_local_file_url() {
+    pub(crate) fn download_with_curl_success_with_local_file_url() {
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("source.txt");
         let dest = dir.path().join("dest.txt");
@@ -2307,7 +834,7 @@ mod tests_extra {
     }
 
     #[test]
-    fn download_with_curl_launch_error() {
+    pub(crate) fn download_with_curl_launch_error() {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("dest.txt");
         let result = super::_download_with_cmd(
@@ -2332,7 +859,7 @@ mod tests_extra {
             AppAction::OpenWorkspace(dir.path().to_path_buf()),
         );
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
 
     // process_action: SelectDocument (L235)
@@ -2342,7 +869,7 @@ mod tests_extra {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
         app.process_action(&egui::Context::default(), AppAction::SelectDocument(path));
-        assert_eq!(app.state.open_documents.len(), 1);
+        assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
     // full_refresh_preview: Hash is updated (L140-147)
@@ -2421,7 +948,7 @@ mod tests_extra {
         drop(tx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         assert!(app.download_rx.is_none());
         assert_eq!(
             format!("{:?}", app.pending_action),
@@ -2439,7 +966,7 @@ mod tests_extra {
         drop(tx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
         assert!(app.download_rx.is_none());
     }
 
@@ -2469,7 +996,7 @@ mod tests_extra {
 
     // download_with_curl: Failure path (invalid URL -> non-zero exit code)
     #[test]
-    fn download_with_curl_failure_returns_error() {
+    pub(crate) fn download_with_curl_failure_returns_error() {
         let dir = tempfile::TempDir::new().unwrap();
         let dest = dir.path().join("nonexistent.jar");
         // Non-existent file URL -> curl fails
@@ -2479,7 +1006,7 @@ mod tests_extra {
 
     // download_with_curl: Covers create_dir_all path (when parent directory doesn't exist)
     #[test]
-    fn download_with_curl_creates_parent_dirs() {
+    pub(crate) fn download_with_curl_creates_parent_dirs() {
         let dir = tempfile::TempDir::new().unwrap();
         let src = dir.path().join("source.txt");
         std::fs::write(&src, "hello").unwrap();
@@ -2494,14 +1021,14 @@ mod tests_extra {
 
     // download_with_curl: Case where parent() is None (path with only a root-level filename)
     #[test]
-    fn download_with_curl_no_parent_path() {
+    pub(crate) fn download_with_curl_no_parent_path() {
         let result = download_with_curl("file:///nonexistent/file", std::path::Path::new(""));
         assert!(result.is_err());
     }
 
     // download_with_curl: Case where create_dir_all returns an error (covering map_err closure)
     #[test]
-    fn download_with_curl_create_dir_error() {
+    pub(crate) fn download_with_curl_create_dir_error() {
         // Cause create_dir_all to fail using a read-only path like /proc/...
         // On macOS, new directories cannot be created under /dev/
         let dest = std::path::Path::new("/dev/null/impossible_dir/file.jar");
@@ -2551,7 +1078,7 @@ mod tests_extra {
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
         // Workspace is still opened despite save failure
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
 
     // ChangeLanguage: settings.save() error is logged, not panicked
@@ -2623,14 +1150,14 @@ mod tests_extra {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
 
         // Add a new file to the workspace
         std::fs::write(dir.path().join("new.md"), "# New").unwrap();
 
         app.handle_refresh_workspace();
         wait_for_workspace(&mut app);
-        let ws = app.state.workspace.as_ref().unwrap();
+        let ws = app.state.workspace.data.as_ref().unwrap();
         let paths: Vec<_> = ws
             .tree
             .iter()
@@ -2644,7 +1171,7 @@ mod tests_extra {
     fn handle_refresh_workspace_no_workspace_does_nothing() {
         let mut app = make_app();
         app.handle_refresh_workspace();
-        assert!(app.state.workspace.is_none());
+        assert!(app.state.workspace.data.is_none());
     }
 
     // handle_refresh_workspace: Error case — workspace root is no longer valid
@@ -2654,15 +1181,15 @@ mod tests_extra {
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
 
         // Overwrite the workspace root to a non-existent path
-        app.state.workspace.as_mut().unwrap().root =
+        app.state.workspace.data.as_mut().unwrap().root =
             std::path::PathBuf::from("/nonexistent/deleted/workspace");
 
         app.handle_refresh_workspace();
         wait_for_workspace(&mut app);
-        assert!(app.state.status_message.is_some());
+        assert!(app.state.layout.status_message.is_some());
     }
 
     // process_action: RefreshWorkspace
@@ -2674,7 +1201,7 @@ mod tests_extra {
         wait_for_workspace(&mut app);
         app.process_action(&egui::Context::default(), AppAction::RefreshWorkspace);
         wait_for_workspace(&mut app);
-        assert!(app.state.workspace.is_some());
+        assert!(app.state.workspace.data.is_some());
     }
     #[test]
     fn test_open_workspace_file_updates_buffer() {
@@ -2710,7 +1237,7 @@ mod tests_extra {
 
         let (tx, rx) = std::sync::mpsc::channel();
         app.workspace_rx = Some(rx);
-        app.state.is_loading_workspace = true;
+        app.state.workspace.is_loading = true;
 
         // Drop the transmitter to simulate thread panic / disconnect
         drop(tx);
@@ -2718,7 +1245,7 @@ mod tests_extra {
         let ui_ctx = egui::Context::default();
         app.poll_workspace_load(&ui_ctx);
 
-        assert!(!app.state.is_loading_workspace);
+        assert!(!app.state.workspace.is_loading);
     }
 
     #[test]
@@ -2730,13 +1257,16 @@ mod tests_extra {
 
         // 1. Open lazily
         app.handle_select_document(path.clone(), false);
-        assert_eq!(app.state.open_documents.len(), 1);
-        assert!(!app.state.open_documents[0].is_loaded);
+        assert_eq!(app.state.document.open_documents.len(), 1);
+        assert!(!app.state.document.open_documents[0].is_loaded);
 
         // 2. Activate
         app.handle_select_document(path.clone(), true);
-        assert!(app.state.open_documents[0].is_loaded);
-        assert_eq!(app.state.open_documents[0].buffer, "# Lazy content");
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert_eq!(
+            app.state.document.open_documents[0].buffer,
+            "# Lazy content"
+        );
     }
 
     #[test]
@@ -2744,7 +1274,7 @@ mod tests_extra {
         let mut app = make_app();
         // Path with no parent (relative) should not crash and hit the break
         app.handle_select_document(std::path::PathBuf::from("root_file.md"), true);
-        assert!(app.state.expanded_directories.is_empty());
+        assert!(app.state.workspace.expanded_directories.is_empty());
     }
 
     #[test]
@@ -2755,7 +1285,7 @@ mod tests_extra {
 
         // Ensure no directories were added to expanded_directories
         assert!(
-            app.state.expanded_directories.is_empty(),
+            app.state.workspace.expanded_directories.is_empty(),
             "Expanded directories should be empty on lazy load"
         );
     }
@@ -2782,12 +1312,12 @@ mod tests_extra {
         }
 
         // Both documents are opened
-        assert_eq!(app.state.open_documents.len(), 2);
+        assert_eq!(app.state.document.open_documents.len(), 2);
         // First document is activated (loaded) and second stays lazy
-        assert!(app.state.open_documents[0].is_loaded);
-        assert!(!app.state.open_documents[1].is_loaded);
+        assert!(app.state.document.open_documents[0].is_loaded);
+        assert!(!app.state.document.open_documents[1].is_loaded);
         // Active index points to the first document
-        assert_eq!(app.state.active_doc_idx, Some(0));
+        assert_eq!(app.state.document.active_doc_idx, Some(0));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -2850,7 +1380,7 @@ mod tests_extra {
     #[test]
     fn test_check_for_updates_manual_trigger() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         // manually trigger again while already checking
         app.start_update_check(true);
         // should have skipped spawning another one but set dialog=true
@@ -2861,14 +1391,14 @@ mod tests_extra {
     fn test_check_for_updates_action() {
         let mut app = setup_test_app();
         assert!(!app.show_update_dialog);
-        assert!(!app.state.checking_for_updates);
+        assert!(!app.state.update.checking);
 
         // trigger manual update check
         app.process_action(&egui::Context::default(), AppAction::CheckForUpdates);
 
         // it should immediately set show_update_dialog = true for manual checks
         assert!(app.show_update_dialog);
-        assert!(app.state.checking_for_updates);
+        assert!(app.state.update.checking);
 
         // Emulate an update channel response
         let (tx, rx) = std::sync::mpsc::channel();
@@ -2884,9 +1414,9 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert!(app.state.update_available.is_some());
+        assert!(app.state.update.available.is_some());
         assert_eq!(
-            app.state.update_available.as_ref().unwrap().tag_name,
+            app.state.update.available.as_ref().unwrap().tag_name,
             "100.0.0"
         );
         assert!(app.update_rx.is_none());
@@ -2896,7 +1426,7 @@ mod tests_extra {
     #[test]
     fn test_update_check_error_action() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         let (tx, rx) = std::sync::mpsc::channel();
         tx.send(Err("Network failure".to_string())).unwrap();
         app.update_rx = Some(rx);
@@ -2904,14 +1434,14 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert_eq!(app.state.update_check_error.unwrap(), "Network failure");
+        assert_eq!(app.state.update.check_error.unwrap(), "Network failure");
         assert!(app.update_rx.is_none());
     }
 
     #[test]
     fn test_update_check_channel_closed() {
         let mut app = setup_test_app();
-        app.state.checking_for_updates = true;
+        app.state.update.checking = true;
         let (tx, rx) =
             std::sync::mpsc::channel::<Result<Option<katana_core::update::ReleaseInfo>, String>>();
         drop(tx); // cause Err(RecvError) or Disconnected
@@ -2920,7 +1450,7 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        assert!(!app.state.checking_for_updates);
+        assert!(!app.state.update.checking);
         assert!(app.update_rx.is_none());
     }
 
@@ -2952,7 +1482,7 @@ mod tests_extra {
     // ── export_html_to_tmp tests ──
 
     #[test]
-    fn export_html_to_tmp_writes_html_file() {
+    pub(crate) fn export_html_to_tmp_writes_html_file() {
         let preset = katana_core::markdown::color_preset::DiagramColorPreset::dark();
         let filename = "katana_test_export.html";
         let result = super::export_html_to_tmp("# Hello", filename, preset, None);
@@ -2969,7 +1499,7 @@ mod tests_extra {
     }
 
     #[test]
-    fn export_html_to_tmp_path_is_in_temp_dir() {
+    pub(crate) fn export_html_to_tmp_path_is_in_temp_dir() {
         let preset = katana_core::markdown::color_preset::DiagramColorPreset::dark();
         let filename = "katana_path_check.html";
         let path = super::export_html_to_tmp("test", filename, preset, None).unwrap();
@@ -3082,7 +1612,7 @@ mod tests_extra {
     // Failure mode 2: Path cannot be resolved / opened
 
     #[test]
-    fn export_html_to_tmp_path_is_canonicalizable() {
+    pub(crate) fn export_html_to_tmp_path_is_canonicalizable() {
         // If this fails, the generated path has unresolvable symlinks / broken components.
         let preset = katana_core::markdown::color_preset::DiagramColorPreset::dark();
         let path = super::export_html_to_tmp("# Test", "katana_canon_test.html", preset, None)

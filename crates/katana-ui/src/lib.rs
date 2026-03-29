@@ -10,24 +10,12 @@
     clippy::todo,
     clippy::unimplemented
 )]
-#![warn(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::missing_errors_doc
-)]
-#![allow(missing_docs)]
-#![allow(clippy::too_many_lines)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::indexing_slicing)]
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::panic)]
 //! KatanA UI library.
 //!
 //! Exposes main editor components, allowing access for testing and external tools.
 
 pub mod about_info;
+pub mod app;
 pub mod app_state;
 pub mod font_loader;
 pub mod html_renderer;
@@ -46,3 +34,6 @@ pub mod shell_ui;
 pub mod svg_loader;
 pub mod theme_bridge;
 pub mod widgets;
+
+pub mod state;
+pub mod views;

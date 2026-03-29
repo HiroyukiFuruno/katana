@@ -237,7 +237,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] 全ファイルの関数が30行以下
 - [x] `katana-platform/src` が AST Linter の構造/コーディングルール対象に含まれている
 - [x] `make check` がパス
-- [ ] Execute `/openspec-delivery` workflow
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
@@ -248,9 +248,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Ready (DoR)
 
-- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
-- [ ] Base branch is synced, and a new branch is explicitly created for this task.
-- [ ] Restore Task 6 (formerly Task 5) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
+- [x] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [x] Base branch is synced, and a new branch is explicitly created for this task.
+- [x] Restore Task 6 (formerly Task 5) WIP files from stash (`git stash pop` or `git stash apply stash@{...}`)
 
 ### 6-A. God Object (`KatanaApp`) の解体
 
@@ -273,14 +273,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 6-C. shell_ui.rs（5,118行）の完全解体
 
-- [ ] 6.3 メニューバー系（`render_menu_bar`, `render_file_menu`, `render_settings_menu`, `render_help_menu`）→ `ui/menu/`
-- [ ] 6.4 ヘッダー・ステータスバー → `ui/header.rs`, `ui/status_bar.rs`
-- [ ] 6.5 ワークスペースパネル・ファイルツリー → `ui/workspace/`
-- [ ] 6.6 タブバー → `ui/tab_bar.rs`
-- [ ] 6.7 ビューモード・エディター → `ui/view_mode.rs`, `ui/editor.rs`
-- [ ] 6.8 スプリットビュー → `ui/split/`
-- [ ] 6.9 検索モーダル・ToCパネル → `ui/search_modal.rs`, `ui/toc_panel.rs`
-- [ ] 6.10 各種モーダル → `ui/modals/`（about, meta_info, update, create_node, rename, delete, terms）
+- [x] 6.3 メニューバー系（`render_menu_bar`, `render_file_menu`, `render_settings_menu`, `render_help_menu`）→ `ui/menu/`
+- [x] 6.4 ヘッダー・ステータスバー → `ui/header.rs`, `ui/status_bar.rs`
+- [x] 6.5 ワークスペースパネル・ファイルツリー → `ui/workspace/`
+- [x] 6.6 タブバー → `ui/tab_bar.rs`
+- [x] 6.7 ビューモード・エディター → `ui/view_mode.rs`, `ui/editor.rs`
+- [x] 6.8 スプリットビュー → `ui/split/`
+- [x] 6.9 検索モーダル・ToCパネル → `ui/search_modal.rs`, `ui/toc_panel.rs`
+- [x] 6.10 各種モーダル → `ui/modals/`（about, meta_info, update, create_node, rename, delete, terms）
 
 ### 6-D. その他UIファイルの分割
 
