@@ -1,7 +1,5 @@
-//! HTML parser that converts HTML fragments into `HtmlNode` trees.
-//!
-//! Works with `comrak` AST's `HtmlBlock` / `HtmlInline` content,
-//! extracting tag attributes via regex for shallow-nested HTML structures.
+/* WHY: Works with `comrak` AST's `HtmlBlock` / `HtmlInline` content,
+extracting tag attributes via regex for shallow-nested HTML structures. */
 
 pub mod inline;
 pub mod regex;
@@ -12,23 +10,15 @@ use std::path::Path;
 
 use crate::html::node::{HtmlNode, LinkTarget, TextAlign};
 
-/// Parser that converts HTML strings into structured `HtmlNode` trees.
-///
-/// Holds the base directory for resolving relative link paths.
 pub struct HtmlParser<'a> {
     base_dir: &'a Path,
 }
 
 impl<'a> HtmlParser<'a> {
-    /// Creates a new parser with the given base directory for link resolution.
     pub fn new(base_dir: &'a Path) -> Self {
         Self { base_dir }
     }
 
-    /// Parses an HTML fragment into a list of `HtmlNode`s.
-    ///
-    /// The input is typically the content of a `<p align="center">...</p>` block
-    /// or similar HTML extracted from a Markdown document.
     pub fn parse(&self, html: &str) -> Vec<HtmlNode> {
         self.parse_fragment(html)
     }
@@ -76,8 +66,6 @@ impl<'a> HtmlParser<'a> {
         }
     }
 
-    /// Tries to parse a known HTML tag at the beginning of `s`.
-    /// Returns `(HtmlNode, bytes_consumed)`.
     fn try_parse_tag(&self, s: &str) -> Option<(HtmlNode, usize)> {
         self.try_parse_br_or_img(s)
             .or_else(|| self.try_parse_a(s))
