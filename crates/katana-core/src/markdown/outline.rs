@@ -6,7 +6,7 @@ use comrak::{parse_document, Arena, Options};
 pub struct OutlineItem {
     pub level: u8,
     pub text: String,
-    pub index: usize, // Represents the order of the heading in the document
+    pub index: usize,
 }
 
 fn extract_text<'a>(node: &'a AstNode<'a>) -> String {

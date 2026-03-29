@@ -20,7 +20,9 @@ fn process_markdown_section(text: &str, img_re: &Regex, temp: &mut Vec<PreviewSe
     for cap in img_re.captures_iter(text) {
         let m = cap.get(0).unwrap();
         let before = &text[last_end..m.start()];
-        if !before.trim().is_empty() { temp.push(PreviewSection::Markdown(before.to_string())); }
+        if !before.trim().is_empty() {
+            temp.push(PreviewSection::Markdown(before.to_string()));
+        }
         temp.push(PreviewSection::LocalImage {
             path: cap.get(2).unwrap().as_str().to_string(),
             alt: cap.get(1).unwrap().as_str().to_string(),
@@ -29,5 +31,7 @@ fn process_markdown_section(text: &str, img_re: &Regex, temp: &mut Vec<PreviewSe
         last_end = m.end();
     }
     let after = &text[last_end..];
-    if !after.trim().is_empty() { temp.push(PreviewSection::Markdown(after.to_string())); }
+    if !after.trim().is_empty() {
+        temp.push(PreviewSection::Markdown(after.to_string()));
+    }
 }

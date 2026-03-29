@@ -10,8 +10,10 @@ static MMDC_RESOLVED_PATH: OnceLock<PathBuf> = OnceLock::new();
 /// Returns the `mmdc` binary path using a fast multi-tier strategy.
 pub fn resolve_mmdc_binary() -> PathBuf {
     // WHY: Always check env var first (not cached — allows runtime override)
-    if let Some(p) = std::env::var("MERMAID_MMDC").ok() {
-        return PathBuf::from(p);
+    #[allow(clippy::single_match)]
+    match std::env::var("MERMAID_MMDC") {
+        Ok(p) => return PathBuf::from(p),
+        Err(_) => {}
     }
 
     MMDC_RESOLVED_PATH

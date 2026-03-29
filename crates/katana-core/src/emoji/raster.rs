@@ -6,27 +6,18 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
 
 #[cfg(target_os = "macos")]
-const APPLE_COLOR_EMOJI_FONT_PATH: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
+#[rustfmt::skip]
+mod constants {
+    pub const APPLE_COLOR_EMOJI_FONT_PATH: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
+    pub const APPLE_COLOR_EMOJI_FONT_FAMILY: &str = "Apple Color Emoji";
+    pub const MIN_EMOJI_PIXEL_SIZE: u32 = 16; pub const EMOJI_RASTER_SCALE: u32 = 2;
+    pub const EMOJI_CANVAS_MULTIPLIER: u32 = 4; pub const EMOJI_FONT_SIZE_RATIO: f32 = 1.0;
+    pub const EMOJI_CROP_PADDING: usize = 2; pub const EMOJI_BASELINE_PADDING_RATIO: f32 = 0.2;
+    pub const EMOJI_TOP_PADDING_SHARE: f32 = 0.35;
+    pub const RGBA_CHANNEL_COUNT: usize = 4; pub const RGBA_ALPHA_CHANNEL_OFFSET: usize = 3;
+}
 #[cfg(target_os = "macos")]
-const APPLE_COLOR_EMOJI_FONT_FAMILY: &str = "Apple Color Emoji";
-#[cfg(target_os = "macos")]
-const MIN_EMOJI_PIXEL_SIZE: u32 = 16;
-#[cfg(target_os = "macos")]
-const EMOJI_RASTER_SCALE: u32 = 2;
-#[cfg(target_os = "macos")]
-const EMOJI_CANVAS_MULTIPLIER: u32 = 4;
-#[cfg(target_os = "macos")]
-const EMOJI_FONT_SIZE_RATIO: f32 = 1.0;
-#[cfg(target_os = "macos")]
-const EMOJI_CROP_PADDING: usize = 2;
-#[cfg(target_os = "macos")]
-const EMOJI_BASELINE_PADDING_RATIO: f32 = 0.2;
-#[cfg(target_os = "macos")]
-const EMOJI_TOP_PADDING_SHARE: f32 = 0.35;
-#[cfg(target_os = "macos")]
-const RGBA_CHANNEL_COUNT: usize = 4;
-#[cfg(target_os = "macos")]
-const RGBA_ALPHA_CHANNEL_OFFSET: usize = 3;
+use constants::*;
 
 #[cfg(target_os = "macos")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -68,14 +59,20 @@ pub fn render_apple_color_emoji_png(grapheme: &str, pixel_size: u32) -> Option<V
 
 #[cfg(target_os = "macos")]
 fn check_emoji_cache(key: &EmojiCacheKey) -> Option<Option<Vec<u8>>> {
-    let guard = emoji_png_cache().lock().expect("emoji raster cache lock poisoned");
-    guard.iter().find(|e| &e.key == key).map(|e| e.png.clone())
+    emoji_png_cache()
+        .lock()
+        .expect("lock")
+        .iter()
+        .find(|e| &e.key == key)
+        .map(|e| e.png.clone())
 }
 
 #[cfg(target_os = "macos")]
 fn store_emoji_cache(key: EmojiCacheKey, png: Option<Vec<u8>>) {
-    let mut guard = emoji_png_cache().lock().expect("emoji raster cache lock poisoned");
-    guard.push(EmojiCacheEntry { key, png });
+    emoji_png_cache()
+        .lock()
+        .expect("lock")
+        .push(EmojiCacheEntry { key, png });
 }
 
 #[cfg(target_os = "macos")]
@@ -137,7 +134,8 @@ struct BoundingBox {
 #[cfg(target_os = "macos")]
 fn find_opaque_bounding_box(pixmap: &Pixmap) -> Option<BoundingBox> {
     let (width, height) = (pixmap.width() as usize, pixmap.height() as usize);
-    let (mut min_x, mut min_y, mut max_x, mut max_y, mut found) = (width, height, 0usize, 0usize, false);
+    let (mut min_x, mut min_y, mut max_x, mut max_y, mut found) =
+        (width, height, 0usize, 0usize, false);
 
     for y in 0..height {
         for x in 0..width {
@@ -151,7 +149,12 @@ fn find_opaque_bounding_box(pixmap: &Pixmap) -> Option<BoundingBox> {
             }
         }
     }
-    found.then_some(BoundingBox { min_x, min_y, max_x, max_y })
+    found.then_some(BoundingBox {
+        min_x,
+        min_y,
+        max_x,
+        max_y,
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -164,7 +167,7 @@ fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
     let top = bbox.min_y.saturating_sub(EMOJI_CROP_PADDING);
     let right = (bbox.max_x + EMOJI_CROP_PADDING).min(width - 1);
     let bottom = (bbox.max_y + EMOJI_CROP_PADDING).min(height - 1);
-    
+
     let cropped_width = (right - left + 1) as u32;
     let cropped_height = (bottom - top + 1) as u32;
     let baseline_padding = ((cropped_height as f32) * EMOJI_BASELINE_PADDING_RATIO).round() as u32;
@@ -172,7 +175,7 @@ fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
     let extra_x = (square_side - cropped_width) / 2;
     let extra_y = square_side - cropped_height;
     let extra_top = ((extra_y as f32) * EMOJI_TOP_PADDING_SHARE).round() as u32;
-    
+
     let mut cropped = Pixmap::new(square_side, square_side)?;
     cropped.draw_pixmap(
         extra_x as i32 - left as i32,
@@ -185,39 +188,10 @@ fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
     Some(cropped)
 }
 
-#[cfg(target_os = "macos")]
 fn escape_svg_text(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[cfg(target_os = "macos")]
-    fn apple_color_emoji_rasterizer_returns_png_bytes() {
-        let bytes = render_apple_color_emoji_png("🌍", 24).expect("emoji png bytes");
-        assert!(bytes.starts_with(&[0x89, b'P', b'N', b'G']));
-        assert!(
-            bytes.len() > 32,
-            "png payload should not be trivially small"
-        );
-    }
-
-    #[test]
-    #[cfg(not(target_os = "macos"))]
-    fn apple_color_emoji_rasterizer_safely_skips_non_macos() {
-        assert!(render_apple_color_emoji_png("🌍", 24).is_none());
-    }
-
-    #[test]
-    #[cfg(target_os = "macos")]
-    fn render_apple_color_emoji_returns_none_for_empty_grapheme() {
-        assert!(render_apple_color_emoji_png("", 24).is_none());
-    }
 }

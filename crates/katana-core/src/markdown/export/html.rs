@@ -20,7 +20,7 @@ impl HtmlExporter {
         let bg_color = Self::get_bg_color(preset);
         let props = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'";
         let monos = "SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace";
-        
+
         let css = Self::generate_css(preset, bg_color, props, monos);
         let body = match base_dir {
             Some(dir) => Self::resolve_relative_paths(&output.html, dir),
@@ -81,13 +81,23 @@ impl HtmlExporter {
         }
     }
 
-    fn generate_css(preset: &DiagramColorPreset, bg_color: &str, props: &str, monos: &str) -> String {
+    fn generate_css(
+        preset: &DiagramColorPreset,
+        bg_color: &str,
+        props: &str,
+        monos: &str,
+    ) -> String {
         let base = Self::generate_base_css(preset, bg_color, props, monos);
         let elems = Self::generate_elements_css(preset, bg_color);
         format!("{base}{elems}")
     }
 
-    fn generate_base_css(preset: &DiagramColorPreset, bg_color: &str, props: &str, monos: &str) -> String {
+    fn generate_base_css(
+        preset: &DiagramColorPreset,
+        bg_color: &str,
+        props: &str,
+        monos: &str,
+    ) -> String {
         format!(
             r#"
 body {{ font-family: {props}; background-color: {bg_color}; color: {text}; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; }}
@@ -99,7 +109,12 @@ pre {{ background-color: {fill}; border: 1px solid {stroke}; border-radius: 6px;
 code {{ font-family: {monos}; background-color: {fill}; border-radius: 3px; padding: 0.2em 0.4em; font-size: 85%; }}
 pre code {{ background-color: transparent; padding: 0; }}
 "#,
-            props = props, bg_color = bg_color, text = preset.text, stroke = preset.stroke, fill = preset.fill, monos = monos
+            props = props,
+            bg_color = bg_color,
+            text = preset.text,
+            stroke = preset.stroke,
+            fill = preset.fill,
+            monos = monos
         )
     }
 
@@ -113,7 +128,9 @@ img {{ max-width: 100%; box-sizing: content-box; background-color: {bg_color}; }
 .katana-diagram img {{ background-color: transparent; }}
 hr {{ height: 0.25em; padding: 0; margin: 24px 0; background-color: {stroke}; border: 0; }}
 "#,
-            bg_color = bg_color, text = preset.text, stroke = preset.stroke
+            bg_color = bg_color,
+            text = preset.text,
+            stroke = preset.stroke
         )
     }
 }

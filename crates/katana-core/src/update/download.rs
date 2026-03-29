@@ -20,13 +20,13 @@ where
     let mut out_file = std::fs::File::create(dest_path)?;
 
     const DOWNLOAD_BUFFER_SIZE: usize = 65536;
-    let mut buffer = [0; DOWNLOAD_BUFFER_SIZE]; // 64KB buffer
+    let mut buffer = [0; DOWNLOAD_BUFFER_SIZE];
     let mut downloaded = 0;
 
     loop {
         let bytes_read = reader.read(&mut buffer)?;
         if bytes_read == 0 {
-            break; // EOF
+            break;
         }
         use std::io::Write;
         out_file.write_all(&buffer[..bytes_read])?;
@@ -54,7 +54,9 @@ where
 
     for i in 0..total {
         let mut file = archive.by_index(i)?;
-        let Some(path) = file.enclosed_name() else { continue };
+        let Some(path) = file.enclosed_name() else {
+            continue;
+        };
         let outpath = extract_to_dir.as_ref().join(path);
 
         if (*file.name()).ends_with('/') {
@@ -68,13 +70,19 @@ where
 
         #[cfg(unix)]
         apply_unix_permissions(&file, &outpath)?;
-        on_progress(UpdateProgress::Extracting { current: i + 1, total });
+        on_progress(UpdateProgress::Extracting {
+            current: i + 1,
+            total,
+        });
     }
     Ok(())
 }
 
 #[cfg(unix)]
-fn apply_unix_permissions(file: &zip::read::ZipFile, outpath: &std::path::Path) -> anyhow::Result<()> {
+fn apply_unix_permissions(
+    file: &zip::read::ZipFile,
+    outpath: &std::path::Path,
+) -> anyhow::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     if let Some(mode) = file.unix_mode() {
         std::fs::set_permissions(outpath, std::fs::Permissions::from_mode(mode))?;
@@ -98,17 +106,19 @@ mod tests {
 
         thread::spawn(move || {
             use std::io::Read;
-            let Ok((mut stream, _)) = listener.accept() else { return };
-                let mut buf = [0; 1024];
-                let _ = stream.read(&mut buf);
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buf = [0; 1024];
+            let _ = stream.read(&mut buf);
 
-                let body = b"mock zip payload";
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
-                );
-                let _ = stream.write_all(response.as_bytes());
-                let _ = stream.write_all(body);
+            let body = b"mock zip payload";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(body);
         });
 
         let temp_dir = tempfile::tempdir().unwrap();

@@ -54,7 +54,9 @@ pub fn flatten_list_code_blocks(source: &str) -> String {
         result.push('\n');
     }
 
-    if !source.ends_with('\n') && result.ends_with('\n') { result.pop(); }
+    if !source.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
     result
 }
 

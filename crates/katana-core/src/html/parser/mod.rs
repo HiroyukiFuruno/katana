@@ -53,7 +53,12 @@ impl<'a> HtmlParser<'a> {
         nodes
     }
 
-    fn parse_inline_before_tag(&self, nodes: &mut Vec<HtmlNode>, remaining: &str, tag_start: usize) {
+    fn parse_inline_before_tag(
+        &self,
+        nodes: &mut Vec<HtmlNode>,
+        remaining: &str,
+        tag_start: usize,
+    ) {
         let trimmed = remaining[..tag_start].trim();
         if !trimmed.is_empty() {
             inline::parse_inline_text(trimmed, self.base_dir, nodes);
@@ -99,7 +104,9 @@ impl<'a> HtmlParser<'a> {
     }
     fn try_parse_a(&self, s: &str) -> Option<(HtmlNode, usize)> {
         let caps = regex::regex_a().captures(s)?;
-        if caps.get(0)?.start() != 0 { return None; }
+        if caps.get(0)?.start() != 0 {
+            return None;
+        }
         let href = caps.get(1)?.as_str();
         let inner = caps.get(2)?.as_str();
         let children = self.parse_fragment(inner);
@@ -109,7 +116,9 @@ impl<'a> HtmlParser<'a> {
 
     fn try_parse_paragraph(&self, s: &str) -> Option<(HtmlNode, usize)> {
         let caps = regex::regex_p().captures(s)?;
-        if caps.get(0)?.start() != 0 { return None; }
+        if caps.get(0)?.start() != 0 {
+            return None;
+        }
 
         let attrs = caps.get(1)?.as_str();
         let inner = caps.get(2)?.as_str();
@@ -125,7 +134,9 @@ impl<'a> HtmlParser<'a> {
 
     fn try_parse_heading(&self, s: &str) -> Option<(HtmlNode, usize)> {
         let caps = regex::regex_heading().captures(s)?;
-        if caps.get(0)?.start() != 0 { return None; }
+        if caps.get(0)?.start() != 0 {
+            return None;
+        }
 
         let level: u8 = caps.get(1)?.as_str().parse().ok()?;
         let attrs = caps.get(2).map(|m| m.as_str()).unwrap_or("");
@@ -141,7 +152,14 @@ impl<'a> HtmlParser<'a> {
         const CAP_HEADING_INNER: usize = 3;
         let inner = caps.get(CAP_HEADING_INNER)?.as_str();
         let children = self.parse_fragment(inner);
-        Some((HtmlNode::Heading { level, align, children }, caps.get(0)?.end()))
+        Some((
+            HtmlNode::Heading {
+                level,
+                align,
+                children,
+            },
+            caps.get(0)?.end(),
+        ))
     }
 
     fn try_parse_em_or_strong(&self, s: &str) -> Option<(HtmlNode, usize)> {
@@ -160,5 +178,67 @@ impl<'a> HtmlParser<'a> {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod additional_tests {
+    use super::*;
+
+    #[test]
+    fn test_try_parse_paragraph() {
+        let parser = HtmlParser::new(std::path::Path::new("."));
+        let (node, len) = parser
+            .try_parse_paragraph(r#"<p align="center">center</p>"#)
+            .unwrap();
+        assert!(matches!(
+            node,
+            HtmlNode::Paragraph {
+                align: Some(TextAlign::Center),
+                ..
+            }
+        ));
+        assert_eq!(len, 28);
+    }
+
+    #[test]
+    fn test_try_parse_heading_alignments() {
+        let parser = HtmlParser::new(std::path::Path::new("."));
+
+        let (n1, _) = parser
+            .try_parse_heading(r#"<h1 align="center">center</h1>"#)
+            .unwrap();
+        if let HtmlNode::Heading { level, align, .. } = n1 {
+            assert_eq!(level, 1);
+            assert_eq!(align, Some(TextAlign::Center));
+        } else {
+            panic!("Expected heading");
+        }
+
+        let (n2, _) = parser
+            .try_parse_heading(r#"<h2 align="left">left</h2>"#)
+            .unwrap();
+        if let HtmlNode::Heading { align, .. } = n2 {
+            assert_eq!(align, Some(TextAlign::Left));
+        } else {
+            panic!("Expected heading");
+        }
+
+        let (n3, _) = parser
+            .try_parse_heading(r#"<h3 align="right">right</h3>"#)
+            .unwrap();
+        if let HtmlNode::Heading { align, .. } = n3 {
+            assert_eq!(align, Some(TextAlign::Right));
+        } else {
+            panic!("Expected heading");
+        }
+    }
+
+    #[test]
+    fn test_try_parse_tag_fallback() {
+        let parser = HtmlParser::new(std::path::Path::new("."));
+        assert!(parser
+            .try_parse_tag(r#"<p align="left">test</p>"#)
+            .is_some());
     }
 }

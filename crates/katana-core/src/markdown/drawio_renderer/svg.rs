@@ -28,7 +28,7 @@ fn build_geo_map(cells: &[&Element]) -> Vec<(String, (f64, f64, f64, f64))> {
     let mut geo_map = Vec::new();
     for cell in cells {
         if let (Some(id), Some(geo)) = (cell.attributes.get("id"), cell.get_child("mxGeometry")) {
-            let is_vertex = cell.attributes.get("vertex").map_or(false, |v| v == "1");
+            let is_vertex = cell.attributes.get("vertex").is_some_and(|v| v == "1");
             if is_vertex {
                 let x = attr_f64(geo, "x");
                 let y = attr_f64(geo, "y");

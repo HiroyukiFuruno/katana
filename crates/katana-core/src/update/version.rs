@@ -29,24 +29,44 @@ pub fn is_newer_version(current: &str, upstream: &str) -> bool {
     }
 }
 
+fn build_release_info(tag_name: String) -> ReleaseInfo {
+    let html_url = format!(
+        "https://github.com/HiroyukiFuruno/KatanA/releases/tag/{}",
+        tag_name
+    );
+    let download_url = format!(
+        "https://github.com/HiroyukiFuruno/KatanA/releases/download/{}/KatanA-macOS.zip",
+        tag_name
+    );
+    let body = format!("### 🚀 New version {} is available\n\nPlease check the [GitHub Releases page]({}) for detailed changes and release notes.\nClick \"Install and Restart\" to automatically apply the update.", &tag_name, html_url);
+    ReleaseInfo {
+        tag_name,
+        html_url,
+        body,
+        download_url,
+    }
+}
+
 /// Checks the upstream API for a newer version than the `current_version`.
 pub fn check_for_updates(
     current_version: &str,
     api_url_override: Option<&str>,
 ) -> anyhow::Result<Option<ReleaseInfo>> {
-    let check_url = api_url_override.unwrap_or("https://github.com/HiroyukiFuruno/KatanA/releases/latest");
+    let check_url =
+        api_url_override.unwrap_or("https://github.com/HiroyukiFuruno/KatanA/releases/latest");
+    let response = ureq::get(check_url)
+        .set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION")))
+        .call()?;
 
-    // WHY: Do not use the GitHub API to avoid rate limits. Send a direct HTTP GET request to the latest endpoint.
-    let response = ureq::get(check_url).set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION"))).call()?;
     let final_url = response.get_url();
-
-    let tag_name = final_url.split('/').next_back().ok_or_else(|| anyhow::anyhow!("Failed to parse release tag ({})", final_url))?.to_string();
+    let tag_name = final_url
+        .split('/')
+        .next_back()
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse release tag ({})", final_url))?
+        .to_string();
 
     if is_newer_version(current_version, &tag_name) {
-        let html_url = format!("https://github.com/HiroyukiFuruno/KatanA/releases/tag/{}", tag_name);
-        let download_url = format!("https://github.com/HiroyukiFuruno/KatanA/releases/download/{}/KatanA-macOS.zip", tag_name);
-        let body = format!("### 🚀 New version {} is available\n\nPlease check the [GitHub Releases page]({}) for detailed changes and release notes.\nClick \"Install and Restart\" to automatically apply the update.", &tag_name, html_url);
-        Ok(Some(ReleaseInfo { tag_name, html_url, body, download_url }))
+        Ok(Some(build_release_info(tag_name)))
     } else {
         Ok(None)
     }
@@ -77,25 +97,27 @@ mod tests {
         thread::spawn(move || {
             use std::io::Read;
             for _ in 0..2 {
-                let Ok((mut stream, _)) = listener.accept() else { return };
-                    let mut buf = [0u8; 2048];
-                    let n = stream.read(&mut buf).unwrap_or(0);
-                    let request = std::str::from_utf8(&buf[..n]).unwrap_or("");
+                let Ok((mut stream, _)) = listener.accept() else {
+                    return;
+                };
+                let mut buf = [0u8; 2048];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let request = std::str::from_utf8(&buf[..n]).unwrap_or("");
 
-                    if request.contains("GET /releases/latest") {
-                        let location = format!("http://127.0.0.1:{}/releases/tag/v0.7.0", port);
-                        let _ = stream.write_all(
+                if request.contains("GET /releases/latest") {
+                    let location = format!("http://127.0.0.1:{}/releases/tag/v0.7.0", port);
+                    let _ = stream.write_all(
                             format!(
                                 "HTTP/1.1 302 Found\r\nLocation: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
                                 location
                             )
                             .as_bytes(),
                         );
-                    } else {
-                        let _ = stream.write_all(
-                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
-                        );
-                    }
+                } else {
+                    let _ = stream.write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                    );
+                }
             }
         });
 

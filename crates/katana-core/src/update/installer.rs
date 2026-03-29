@@ -29,16 +29,27 @@ where
     std::fs::create_dir_all(&extract_dir)?;
     extract_update(&zip_path, &extract_dir, &mut on_progress)?;
 
-    let app_name = target_app_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("KatanA.app"));
+    let app_name = target_app_path
+        .file_name()
+        .unwrap_or_else(|| std::ffi::OsStr::new("KatanA.app"));
     let extracted_app_path = extract_dir.join(app_name);
     if !extracted_app_path.exists() {
         anyhow::bail!("Extracted update does not contain the expected application bundle");
     }
 
     let script_path = temp_dir.path().join("relauncher.sh");
-    generate_relauncher_script(&extracted_app_path, target_app_path, &script_path, temp_dir.path())?;
+    generate_relauncher_script(
+        &extracted_app_path,
+        target_app_path,
+        &script_path,
+        temp_dir.path(),
+    )?;
 
-    Ok(UpdatePreparation { temp_dir, app_bundle_path: extracted_app_path, script_path })
+    Ok(UpdatePreparation {
+        temp_dir,
+        app_bundle_path: extracted_app_path,
+        script_path,
+    })
 }
 
 /// Executes the background relauncher and exits the current process.
@@ -147,25 +158,27 @@ mod tests {
 
         thread::spawn(move || {
             use std::io::Read;
-            let Ok((mut stream, _)) = listener.accept() else { return };
-                let mut buf = [0; 1024];
-                let _ = stream.read(&mut buf);
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buf = [0; 1024];
+            let _ = stream.read(&mut buf);
 
-                let mut zip_buf = Vec::new();
-                {
-                    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_buf));
-                    let options = SimpleFileOptions::default()
-                        .compression_method(zip::CompressionMethod::Stored);
-                    zip.add_directory("KatanA.app/", options).unwrap();
-                    zip.finish().unwrap();
-                }
+            let mut zip_buf = Vec::new();
+            {
+                let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_buf));
+                let options =
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+                zip.add_directory("KatanA.app/", options).unwrap();
+                zip.finish().unwrap();
+            }
 
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    zip_buf.len()
-                );
-                let _ = stream.write_all(response.as_bytes());
-                let _ = stream.write_all(&zip_buf);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                zip_buf.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(&zip_buf);
         });
 
         let target_app = std::path::Path::new("/Applications/KatanA.app");
@@ -189,25 +202,27 @@ mod tests {
 
         thread::spawn(move || {
             use std::io::Read;
-            let Ok((mut stream, _)) = listener.accept() else { return };
-                let mut buf = [0; 1024];
-                let _ = stream.read(&mut buf);
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buf = [0; 1024];
+            let _ = stream.read(&mut buf);
 
-                let mut zip_buf = Vec::new();
-                {
-                    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_buf));
-                    let options = SimpleFileOptions::default()
-                        .compression_method(zip::CompressionMethod::Stored);
-                    zip.add_directory("Wrong.app/", options).unwrap();
-                    zip.finish().unwrap();
-                }
+            let mut zip_buf = Vec::new();
+            {
+                let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_buf));
+                let options =
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+                zip.add_directory("Wrong.app/", options).unwrap();
+                zip.finish().unwrap();
+            }
 
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    zip_buf.len()
-                );
-                let _ = stream.write_all(response.as_bytes());
-                let _ = stream.write_all(&zip_buf);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                zip_buf.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(&zip_buf);
         });
 
         let target_app = std::path::Path::new("/Applications/KatanA.app");

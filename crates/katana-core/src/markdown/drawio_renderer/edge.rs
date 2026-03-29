@@ -101,15 +101,25 @@ fn append_edge_label(
 
 /// Collects waypoint coordinates from `Array` > `mxPoint` elements within `mxGeometry`.
 fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
-    let Some(geo) = cell.get_child("mxGeometry") else { return Vec::new(); };
+    let Some(geo) = cell.get_child("mxGeometry") else {
+        return Vec::new();
+    };
     let mut points = Vec::new();
     for child in &geo.children {
-        let Some(el) = child.as_element() else { continue; };
-        if el.name != "Array" { continue; }
-        
+        let Some(el) = child.as_element() else {
+            continue;
+        };
+        if el.name != "Array" {
+            continue;
+        }
+
         for pt_node in &el.children {
-            let Some(pt) = pt_node.as_element() else { continue; };
-            if pt.name != "mxPoint" { continue; }
+            let Some(pt) = pt_node.as_element() else {
+                continue;
+            };
+            if pt.name != "mxPoint" {
+                continue;
+            }
             let x = attr_f64(pt, "x");
             let y = attr_f64(pt, "y");
             points.push((x, y));

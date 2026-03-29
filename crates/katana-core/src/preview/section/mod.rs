@@ -40,31 +40,36 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
 }
 
 fn parse_initial_sections(source: &str) -> Vec<PreviewSection> {
-    let mut initial_sections = Vec::new();
-    let mut markdown_acc = String::new();
-    let mut remaining = source;
+    let mut secs = Vec::new();
+    let mut acc = String::new();
+    let mut rem = source;
 
-    while let Some(offset) = if remaining.starts_with("```") { Some(0) } else { remaining.find("\n```").map(|pos| pos + 1) } {
-        markdown_acc.push_str(&remaining[..offset]);
-        remaining = &remaining[offset..];
-        if let Some((kind, fence_source, after)) = try_parse_diagram_fence(remaining) {
-            if !markdown_acc.is_empty() {
-                initial_sections.push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
+    while let Some(o) = if rem.starts_with("```") {
+        Some(0)
+    } else {
+        rem.find("\n```").map(|p| p + 1)
+    } {
+        acc.push_str(&rem[..o]);
+        rem = &rem[o..];
+        if let Some((kind, fence, after)) = try_parse_diagram_fence(rem) {
+            if !acc.is_empty() {
+                secs.push(PreviewSection::Markdown(std::mem::take(&mut acc)));
             }
-            let lines = fence_source.chars().filter(|c| *c == '\n').count();
-            initial_sections.push(PreviewSection::Diagram { kind, source: fence_source, lines });
-            remaining = after;
+            #[rustfmt::skip]
+            let lines = fence.chars().filter(|c| *c == '\n').count();
+            #[rustfmt::skip]
+            secs.push(PreviewSection::Diagram { kind, source: fence, lines });
+            rem = after;
         } else {
-            markdown_acc.push_str("```");
-            remaining = &remaining["```".len()..];
+            acc.push_str("```");
+            rem = &rem["```".len()..];
         }
     }
-
-    markdown_acc.push_str(remaining);
-    if !markdown_acc.is_empty() {
-        initial_sections.push(PreviewSection::Markdown(markdown_acc));
+    acc.push_str(rem);
+    if !acc.is_empty() {
+        secs.push(PreviewSection::Markdown(acc));
     }
-    initial_sections
+    secs
 }
 
 fn merge_and_wrap_sections(sections: Vec<PreviewSection>) -> Vec<PreviewSection> {

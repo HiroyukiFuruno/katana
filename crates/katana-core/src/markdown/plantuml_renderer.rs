@@ -19,8 +19,10 @@ use super::diagram::{DiagramBlock, DiagramResult};
 /// Returns candidate paths to search for the PlantUML JAR.
 pub fn jar_candidate_paths() -> Vec<PathBuf> {
     // WHY: If the environment variable is set, use only that path (ignore other candidates).
-    if let Some(env_path) = std::env::var("PLANTUML_JAR").ok() {
-        return vec![PathBuf::from(env_path)];
+    #[allow(clippy::single_match)]
+    match std::env::var("PLANTUML_JAR") {
+        Ok(env_path) => return vec![PathBuf::from(env_path)],
+        Err(_) => {}
     }
     let mut paths = Vec::new();
     // WHY: Homebrew (Apple Silicon / Intel)
@@ -29,11 +31,15 @@ pub fn jar_candidate_paths() -> Vec<PathBuf> {
         paths.push(PathBuf::from(prefix).join("opt/plantuml/libexec/plantuml.jar"));
     }
     // WHY: Same directory as the binary
-    if let Some(exe) = std::env::current_exe().ok() {
-        if let Some(dir) = exe.parent() {
-            paths.push(dir.join("plantuml.jar"));
-            paths.push(dir.join("renderers").join("plantuml.jar"));
+    #[allow(clippy::single_match)]
+    match std::env::current_exe() {
+        Ok(exe) => {
+            if let Some(dir) = exe.parent() {
+                paths.push(dir.join("plantuml.jar"));
+                paths.push(dir.join("renderers").join("plantuml.jar"));
+            }
         }
+        Err(_) => {}
     }
     // WHY: XDG / macOS app data
     if let Some(home) = dirs_sys::home_dir() {
@@ -80,8 +86,16 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
 fn inject_theme(source: &str, preset: &DiagramColorPreset) -> String {
     let skinparams = generate_skinparams(preset);
     if let Some(pos) = source.find("@startuml") {
-        let insert_at = source[pos..].find('\n').map(|n| pos + n + 1).unwrap_or(source.len());
-        format!("{}{}{}", &source[..insert_at], skinparams, &source[insert_at..])
+        let insert_at = source[pos..]
+            .find('\n')
+            .map(|n| pos + n + 1)
+            .unwrap_or(source.len());
+        format!(
+            "{}{}{}",
+            &source[..insert_at],
+            skinparams,
+            &source[insert_at..]
+        )
     } else {
         format!("@startuml\n{skinparams}{source}\n@enduml")
     }
@@ -130,10 +144,14 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
         .map_err(|e| format!("java startup failed: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(themed_source.as_bytes()).map_err(|e| format!("stdin write failed: {e}"))?;
+        stdin
+            .write_all(themed_source.as_bytes())
+            .map_err(|e| format!("stdin write failed: {e}"))?;
     }
 
-    let output = child.wait_with_output().map_err(|e| format!("process wait failed: {e}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("process wait failed: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         return Err(format!("PlantUML rendering error: {stderr}"));
