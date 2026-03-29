@@ -69,10 +69,10 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Done (DoD)
 
-- [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）が `make check` で実行される
+- [x] 新規linterルール（file_length, function_length, pub_free_fn, nesting_depth）の基盤実装が完了し、`katana-linter` / `katana-core` を対象に `make check` で実行される
 - [x] clippy `#![deny]` が全クレートで統一設定済み
 - [x] 既存の6 Visitorが個別ファイルに分離済み
-- [x] linterクレート内の全ファイルが200行以下（テスト除外）← Phase 2で達成予定
+- [x] linterクレート内の全ファイルが200行以下（テスト除外）
 - [x] Execute `/openspec-delivery` workflow
 
 ---
@@ -151,6 +151,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 4. katana-platform レイヤーのリファクタリング
 
+> Task 1-3 は実施済みであり、今回追加した React 的 UI コンポーネント化要件の影響範囲外であることを確認済みである。
+>
+> - Task 1: ast_linter / clippy の品質ガードレール基盤整備は完了済みだが、`katana-platform` / `katana-ui` への rollout はこのフェーズ以降で完了させる
+> - Task 2: `katana-linter` 内部の分割であり、egui UI を含まない
+> - Task 3: `katana-core` の分割であり、UI の Props / `show()` / typed response 設計とは無関係
+>
+> したがって、この計画更新で追加した要件の実対応は Task 4 以降で行う。
+
 - [ ] 4.1 `settings.rs`（653行）の完全移行
   - 旧 `settings.rs` の内容を `settings/` サブモジュールに完全移行
   - `pub use` による外部API互換性の維持
@@ -171,10 +179,15 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [ ] 4.8 `settings/defaults.rs`（201行）のボーダーライン確認
 
+- [ ] 4.9 AST Linter の構造/コーディングルール対象を `katana-platform/src` へ拡大し、既存違反を解消する
+  - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
+  - `crates/katana-linter/tests/ast_linter.rs` の target 範囲に `katana-platform/src` を追加する
+
 ### Definition of Done (DoD)
 
 - [ ] platformクレート内の全ファイルが200行以下（テスト除外）
 - [ ] 全ファイルの関数が30行以下
+- [ ] `katana-platform/src` が AST Linter の構造/コーディングルール対象に含まれている
 - [ ] `make check` がパス
 - [ ] Execute `/openspec-delivery` workflow
 
@@ -182,7 +195,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ## 5. katana-ui レイヤーのリファクタリング（最重要・最大規模）
 
-> UIレイヤーは最も深刻な技術的負債を抱えている。coreとplatformのリファクタリングで手法を確立してから着手する。
+> UIレイヤーは最も深刻な技術的負債を抱えている。coreとplatformのリファクタリングで手法を確立してから着手する。追加した React的コンポーネント化要件は、このフェーズで回収する。
 
 ### 5-A. God Object (`KatanaApp`) の解体
 
@@ -230,11 +243,29 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 5.22 `about_info.rs`（335行）→ 分割
 - [ ] 5.23 `theme_bridge.rs`（313行）→ 分割
 
+### 5-E. React的な再利用可能UIコンポーネント化（UI最終フェーズ）
+
+> 5-A 〜 5-D の「構造分割」が終わった後、UI を単なる free function の寄せ集めではなく、再利用可能で再現性の高い component 境界に揃える。
+
+- [ ] 5.24 `ui/menu`, `ui/header`, `ui/status_bar`, `ui/workspace`, `ui/tab_bar`, `ui/modals` を `struct + impl show() -> Response` パターンへ統一
+- [ ] 5.25 `settings/`, `preview/`, `widgets/` の各UIを props + typed response を持つ自己完結コンポーネントへ統一
+- [ ] 5.26 親子 UI 間の依存を最小 props + typed response に整理し、巨大な `AppState` / `KatanaApp` の横流しを段階的に排除
+- [ ] 5.27 release-critical UI 導線の統合テストを、component 境界再編後の構造に合わせて更新・追加
+- [ ] 5.28 `shell_ui.rs`, `settings_window.rs`, `preview_pane_ui.rs`, `widgets.rs` 起点の parameter-heavy な `render_*` free function が end-state に残っていないことを確認
+- [ ] 5.29 AST Linter の構造/コーディングルール対象を `katana-ui/src` へ拡大し、既存違反を解消する
+  - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
+  - `crates/katana-linter/tests/ast_linter.rs` の target 範囲に `katana-ui/src` を追加する
+- [ ] 5.30 `pub_free_fn` の統合テストから `#[ignore]` を外し、最終ルールとして有効化する
+
 ### Definition of Done (DoD)
 
 - [ ] uiクレート内の全ファイルが200行以下（テスト除外）
 - [ ] 全ファイルの関数が30行以下
 - [ ] God Object（KatanaApp, AppState）が責務ごとのサブ構造体・モジュールに分離済み
+- [ ] UI分割が単なる free function の移設ではなく、自己完結コンポーネント化として完了している
+- [ ] release-critical UI 導線が component 境界を前提にした統合テストで検証済み
+- [ ] `katana-ui/src` が AST Linter の構造/コーディングルール対象に含まれている
+- [ ] `pub_free_fn` の統合テストが `#[ignore]` なしで有効化されている
 - [ ] `make check` がパス
 - [ ] Execute `/openspec-delivery` workflow
 
@@ -260,11 +291,15 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [ ] 7.2 Ensure `make check` passes with exit code 0
 - [ ] 7.3 全ファイルが200行以下（テスト除外）であることをast_linterで最終確認
 - [ ] 7.4 全関数が30行以下であることをast_linterで最終確認
-- [ ] 7.5 Merge the intermediate base branch into the `master` branch
-- [ ] 7.6 Create a PR targeting `master`
-- [ ] 7.7 Merge into master (※ `--admin` is permitted)
-- [ ] 7.8 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md`
-- [ ] 7.9 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
+- [ ] 7.5 `katana-linter`, `katana-core`, `katana-platform`, `katana-ui` の対象クレートすべてが AST Linter の構造/コーディングルール対象に含まれていることを最終確認
+- [ ] 7.6 `pub_free_fn` の統合テストが `#[ignore]` なしで `make check` に含まれていることを最終確認
+- [ ] 7.7 `menu`, `workspace`, `tab_bar`, `settings`, `preview`, `modals`, `widgets` の主要導線が自己完結コンポーネントとして完了していることを最終確認
+- [ ] 7.8 component 化後の release-critical UI interaction tests が全てパスすることを最終確認
+- [ ] 7.9 Merge the intermediate base branch into the `master` branch
+- [ ] 7.10 Create a PR targeting `master`
+- [ ] 7.11 Merge into master (※ `--admin` is permitted)
+- [ ] 7.12 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md`
+- [ ] 7.13 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
 
 ---
 

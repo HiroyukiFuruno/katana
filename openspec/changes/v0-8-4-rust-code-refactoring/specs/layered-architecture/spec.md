@@ -19,6 +19,33 @@
 - **ISP違反**: `PreviewPane` の全責務保持の解消
 - **DIP未整備**: レイヤー間の具象型直接参照 → trait抽象の検討
 
+### Requirement: UIは再利用可能な自己完結コンポーネントへ分解する
+
+UIレイヤーの分割は、単なる free function のファイル移設であってはならず、Reactコンポーネントのように再利用可能で再現性の高い自己完結コンポーネントとして構成しなければならない。
+
+- `Props` に相当する入力境界を持つ
+- 描画は `show(...)` などの明示的なコンポーネント入口に集約する
+- ユーザー操作は typed response / action として親へ返す
+- 親子 compose は最小限の依存だけを受け渡す
+
+#### Scenario: `shell_ui.rs` から UI を抽出する
+
+- **WHEN** `shell_ui.rs` のメニュー、ワークスペース、タブ、モーダル等を分割する
+- **THEN** 分割先は component `struct` または同等の typed UI module として定義される
+- **THEN** 既存の `render_*` free function を別ファイルへ再配置しただけの状態は完了とみなされない
+
+#### Scenario: `settings_window.rs` / `preview_pane_ui.rs` / `widgets.rs` を分割する
+
+- **WHEN** 設定タブ、プレビューセクション、共通ウィジェットを分割する
+- **THEN** 各モジュールは最小限の props と typed response を持つ再利用可能コンポーネントになる
+- **THEN** 親コンポーネントは巨大な state 全体をそのまま子へ渡さない
+
+#### Scenario: UIリファクタリング完了を判定する
+
+- **WHEN** katana-ui レイヤーのリファクタリングを完了判定する
+- **THEN** `menu`, `workspace`, `tab_bar`, `settings`, `preview`, `modals`, `widgets` の主要導線が自己完結コンポーネントとして構成されている
+- **THEN** representative な UI interaction tests で component 境界越しの操作が検証されている
+
 ### Requirement: レイヤー間依存方向の維持
 
 リファクタリング後も以下の依存方向を維持する：

@@ -37,7 +37,12 @@ fn process_line(ctx: &mut CommentContext, idx: usize, line: &str, trimmed: &str)
     if ctx.in_block {
         let check_line = trimmed.strip_suffix("*/").unwrap_or(trimmed).trim();
         if !ctx.block_allow && !is_allowed(check_line) {
-            ctx.violations.push(build_viol(ctx.path, line.trim(), idx, "Multi-line block comment must start with `/* WHY:` or `/* SAFETY:`.",));
+            ctx.violations.push(build_viol(
+                ctx.path,
+                line.trim(),
+                idx,
+                "Multi-line block comment must start with `/* WHY:` or `/* SAFETY:`.",
+            ));
         }
         if line.contains("*/") {
             ctx.in_block = false;
@@ -84,7 +89,12 @@ fn handle_block_comment(ctx: &mut CommentContext, idx: usize, text: &str) {
     if b.starts_with("WHY:") || b.starts_with("SAFETY:") {
         ctx.block_allow = true;
     } else if !is_allowed(b) {
-        ctx.violations.push(build_viol(ctx.path, text.trim(), idx, "Block comment must start with `/* WHY:` or `/* SAFETY:`.",));
+        ctx.violations.push(build_viol(
+            ctx.path,
+            text.trim(),
+            idx,
+            "Block comment must start with `/* WHY:` or `/* SAFETY:`.",
+        ));
         ctx.block_allow = false;
     } else {
         ctx.block_allow = true; // WHY: explicitly allowed symbol strings like /* --- */

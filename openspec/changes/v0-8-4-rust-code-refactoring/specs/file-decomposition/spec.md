@@ -24,6 +24,8 @@
 | `changelog.rs` | 515 | 分割 |
 | `about_info.rs` | 335 | 分割 |
 
+katana-ui の対象ファイルは、単なる `render_*` free function の別ファイル移設ではなく、Reactコンポーネント相当の component 境界に沿って分割する。
+
 #### katana-core（7ファイルが200行超）
 
 | 対象ファイル | 現在の行数 | 分割先 |
