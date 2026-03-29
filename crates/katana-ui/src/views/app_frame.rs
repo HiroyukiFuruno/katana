@@ -40,7 +40,12 @@ impl<'a> MainPanels<'a> {
             .map(|t| t.filename.clone())
             .collect();
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
-            crate::views::top_bar::StatusBar::new(&app.state, &export_filenames).show(ui);
+            crate::views::top_bar::StatusBar::new(
+                app.state.layout.status_message.as_ref(),
+                app.state.is_dirty(),
+                &export_filenames,
+            )
+            .show(ui);
         });
 
         // Window title

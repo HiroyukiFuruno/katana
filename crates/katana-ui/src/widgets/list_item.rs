@@ -104,7 +104,7 @@ impl<'a> ListItem<'a> {
             }
 
             let response = ui.interact(rect, ui.next_auto_id(), sense);
-            
+
             // Apply background on hover
             if self.interactive && response.hovered() {
                 ui.painter().rect_filled(

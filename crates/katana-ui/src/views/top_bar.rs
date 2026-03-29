@@ -10,23 +10,28 @@ use crate::shell_ui::{
 use eframe::egui;
 
 pub(crate) struct StatusBar<'a> {
-    pub state: &'a AppState,
+    pub status: Option<&'a (String, crate::app_state::StatusType)>,
+    pub is_dirty: bool,
     pub export_filenames: &'a [String],
 }
 
 impl<'a> StatusBar<'a> {
-    pub fn new(state: &'a AppState, export_filenames: &'a [String]) -> Self {
+    pub fn new(
+        status: Option<&'a (String, crate::app_state::StatusType)>,
+        is_dirty: bool,
+        export_filenames: &'a [String],
+    ) -> Self {
         Self {
-            state,
+            status,
+            is_dirty,
             export_filenames,
         }
     }
 
     pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
-        let state = self.state;
         let export_filenames = self.export_filenames;
         ui.horizontal(|ui| {
-            let (msg, kind) = if let Some((msg, kind)) = &state.layout.status_message {
+            let (msg, kind) = if let Some((msg, kind)) = self.status {
                 (msg.as_str(), Some(kind))
             } else {
                 (crate::i18n::get().status.ready.as_str(), None)
@@ -78,7 +83,7 @@ impl<'a> StatusBar<'a> {
                     }
                 }
                 const DIRTY_DOT_MAX_HEIGHT: f32 = 10.0;
-                if state.is_dirty() {
+                if self.is_dirty {
                     ui.add(
                         egui::Image::new(crate::Icon::Dot.uri())
                             .tint(ui.visuals().text_color())
