@@ -1,54 +1,6 @@
+use crate::theme::palettes::*;
 use crate::theme::types::{
     CodeColors, PresetColorData, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode,
-};
-
-const DEFAULT_ACTIVE_FILE_HIGHLIGHT_ALPHA: u8 = 30;
-const DEFAULT_BUTTON_ACTIVE_ALPHA: u8 = 80;
-const DEFAULT_CODE_CURRENT_LINE_DARK_ALPHA: u8 = 50;
-const DEFAULT_CODE_CURRENT_LINE_LIGHT_ALPHA: u8 = 15;
-const DEFAULT_HOVER_LINE_HIGHLIGHT_ALPHA: u8 = 25;
-
-const DEFAULT_TEXT_SECONDARY_DARKEN: u8 = 70;
-const DEFAULT_TEXT_SECONDARY_LIGHTEN: u8 = 50;
-const DEFAULT_BORDER_DARKEN: u8 = 25;
-const DEFAULT_BORDER_LIGHTEN: u8 = 25;
-const DEFAULT_SELECTION_DARKEN: u8 = 15;
-const DEFAULT_SELECTION_LIGHTEN: u8 = 45;
-const DEFAULT_PANEL_BG_DARKEN_DARK: u8 = 5;
-const DEFAULT_PANEL_BG_DARKEN_LIGHT: u8 = 10;
-const DEFAULT_CODE_BG_LIGHTEN_DARK: u8 = 5;
-const DEFAULT_CODE_BG_DARKEN_LIGHT: u8 = 5;
-const DEFAULT_BUTTON_BACKGROUND_ALPHA: u8 = 255;
-
-const DEFAULT_SUCCESS_DARK: Rgb = Rgb {
-    r: 153,
-    g: 204,
-    b: 153,
-};
-const DEFAULT_SUCCESS_LIGHT: Rgb = Rgb {
-    r: 60,
-    g: 130,
-    b: 60,
-};
-const DEFAULT_WARNING_DARK: Rgb = Rgb {
-    r: 255,
-    g: 204,
-    b: 102,
-};
-const DEFAULT_WARNING_LIGHT: Rgb = Rgb {
-    r: 160,
-    g: 110,
-    b: 20,
-};
-const DEFAULT_ERROR_DARK: Rgb = Rgb {
-    r: 242,
-    g: 119,
-    b: 122,
-};
-const DEFAULT_ERROR_LIGHT: Rgb = Rgb {
-    r: 180,
-    g: 40,
-    b: 40,
 };
 
 pub(crate) const fn lighten(color: Rgb, amount: u8) -> Rgb {

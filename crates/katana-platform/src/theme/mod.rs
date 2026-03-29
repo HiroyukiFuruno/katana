@@ -4,6 +4,7 @@
 pub mod builder;
 pub mod impls;
 pub mod migration;
+pub mod palettes;
 pub mod presets;
 pub mod types;
 
