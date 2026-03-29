@@ -16,31 +16,35 @@ pub fn build_locale_baseline(
     ja_path: &Path,
     en_path: &Path,
 ) -> Result<LocaleBaseline, Vec<Violation>> {
-    let ja_value = parse_json_file(ja_path)?;
-    let en_value = parse_json_file(en_path)?;
+    match parse_json_file(ja_path).and_then(|ja| parse_json_file(en_path).map(|en| (ja, en))) {
+        Ok((ja_val, en_val)) => {
+            let mut ja_sh = BTreeMap::new();
+            let mut en_sh = BTreeMap::new();
+            collect_json_shape(&ja_val, None, &mut ja_sh);
+            collect_json_shape(&en_val, None, &mut en_sh);
 
-    let mut ja_shape = BTreeMap::new();
-    let mut en_shape = BTreeMap::new();
-    collect_json_shape(&ja_value, None, &mut ja_shape);
-    collect_json_shape(&en_value, None, &mut en_shape);
+            let mut v = compare_locale_shape(ja_path, &en_sh, &ja_sh);
+            v.extend(compare_locale_shape(en_path, &ja_sh, &en_sh));
 
-    let mut violations = compare_locale_shape(ja_path, &en_shape, &ja_shape);
-    violations.extend(compare_locale_shape(en_path, &ja_shape, &en_shape));
+            let mut ja_pl = BTreeMap::new();
+            let mut en_pl = BTreeMap::new();
+            collect_json_placeholders(&ja_val, None, &mut ja_pl);
+            collect_json_placeholders(&en_val, None, &mut en_pl);
 
-    let mut ja_placeholders = BTreeMap::new();
-    let mut en_placeholders = BTreeMap::new();
-    collect_json_placeholders(&ja_value, None, &mut ja_placeholders);
-    collect_json_placeholders(&en_value, None, &mut en_placeholders);
+            let mut en_values = BTreeMap::new();
+            collect_json_values(&en_val, None, &mut en_values);
 
-    let mut en_values = BTreeMap::new();
-    collect_json_values(&en_value, None, &mut en_values);
+            validate_baseline_placeholders(
+                ja_path, en_path, &mut v, &ja_sh, &en_sh, &ja_pl, &en_pl,
+            );
 
-    validate_baseline_placeholders(ja_path, en_path, &mut violations, &ja_shape, &en_shape, &ja_placeholders, &en_placeholders);
-
-    if violations.is_empty() {
-        Ok((ja_shape, ja_placeholders, en_values))
-    } else {
-        Err(violations)
+            if v.is_empty() {
+                Ok((ja_sh, ja_pl, en_values))
+            } else {
+                Err(v)
+            }
+        }
+        Err(e) => Err(e),
     }
 }
 

@@ -73,14 +73,24 @@ impl<'ast> Visit<'ast> for IconFacadeVisitor {
 
 impl IconFacadeVisitor {
     fn check_ui_func_call(&mut self, node: &syn::ExprCall) {
-        let syn::Expr::Path(expr_path) = &*node.func else { return };
-        let Some(last_segment) = expr_path.path.segments.last() else { return };
+        let syn::Expr::Path(expr_path) = &*node.func else {
+            return;
+        };
+        let Some(last_segment) = expr_path.path.segments.last() else {
+            return;
+        };
 
         let func_name = last_segment.ident.to_string();
-        if !ui_functions().contains(&func_name.as_str()) { return; }
+        if !ui_functions().contains(&func_name.as_str()) {
+            return;
+        }
 
-        let Some(type_name) = extract_type_from_call(&node.func) else { return; };
-        if !ui_types_for_new().contains(&type_name.as_str()) { return; }
+        let Some(type_name) = extract_type_from_call(&node.func) else {
+            return;
+        };
+        if !ui_types_for_new().contains(&type_name.as_str()) {
+            return;
+        }
 
         for arg in node.args.iter() {
             self.check_expr_for_raw_icon(arg, &format!("{}::{}", type_name, func_name));

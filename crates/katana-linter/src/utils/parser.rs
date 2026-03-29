@@ -5,9 +5,10 @@ use std::path::Path;
 pub fn has_cfg_test_attr(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
         if attr.path().is_ident("cfg") {
-            if let Some(syn::Meta::Path(path)) = attr.parse_args::<syn::Meta>().ok() {
-                return path.is_ident("test");
-            }
+            let Ok(syn::Meta::Path(path)) = attr.parse_args::<syn::Meta>() else {
+                return false;
+            };
+            return path.is_ident("test");
         }
         attr.path().is_ident("test")
     })

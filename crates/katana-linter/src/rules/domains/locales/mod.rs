@@ -1,8 +1,8 @@
 use crate::utils::{
     collect_json_placeholders, collect_json_shape, collect_json_values, parse_json_file,
 };
-use crate::Violation;
 use crate::JsonNodeKind;
+use crate::Violation;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -54,12 +54,16 @@ fn get_locale_files_or_error(locale_dir: &Path) -> Result<Vec<std::path::PathBuf
     if locale_files.is_empty() {
         return Err(vec![crate::utils::locale_violation(
             locale_dir,
-            format!("No locale JSON files found for analysis: {}", locale_dir.display()),
+            format!(
+                "No locale JSON files found for analysis: {}",
+                locale_dir.display()
+            ),
         )]);
     }
     Ok(locale_files)
 }
 
+#[allow(clippy::type_complexity)]
 fn load_locale_baseline(
     ja_path: &Path,
     en_path: &Path,

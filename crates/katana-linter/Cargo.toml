@@ -13,3 +13,7 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "katana-coverage"
+path = "src/bin/coverage.rs"

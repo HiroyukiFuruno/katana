@@ -29,7 +29,9 @@ pub fn extract_markdown_headings(path: &Path) -> Result<Vec<MarkdownHeading>, Ve
             in_fence = !in_fence;
             continue;
         }
-        if in_fence { continue; }
+        if in_fence {
+            continue;
+        }
 
         if let Some(heading) = parse_markdown_heading(trimmed, index) {
             headings.push(heading);
@@ -72,7 +74,11 @@ pub fn compare_markdown_heading_structure(pair: &MarkdownPair) -> Vec<Violation>
     violations
 }
 
-fn check_heading_counts(pair: &MarkdownPair, base: &[MarkdownHeading], ja: &[MarkdownHeading]) -> Vec<Violation> {
+fn check_heading_counts(
+    pair: &MarkdownPair,
+    base: &[MarkdownHeading],
+    ja: &[MarkdownHeading],
+) -> Vec<Violation> {
     if base.len() != ja.len() {
         vec![locale_violation(
             &pair.ja,
@@ -89,7 +95,11 @@ fn check_heading_counts(pair: &MarkdownPair, base: &[MarkdownHeading], ja: &[Mar
     }
 }
 
-fn check_heading_levels(pair: &MarkdownPair, base: &[MarkdownHeading], ja: &[MarkdownHeading]) -> Vec<Violation> {
+fn check_heading_levels(
+    pair: &MarkdownPair,
+    base: &[MarkdownHeading],
+    ja: &[MarkdownHeading],
+) -> Vec<Violation> {
     let mut violations = Vec::new();
     for (index, (base_heading, ja_heading)) in base.iter().zip(ja.iter()).enumerate() {
         if base_heading.level != ja_heading.level {

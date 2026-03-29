@@ -92,14 +92,15 @@ pub fn lint_no_hardcoded_colors(workspace_root: &Path) -> Vec<Violation> {
             continue;
         }
 
-        if let Some(ast) = parse_file(&file).ok() {
-            let mut visitor = HardcodedColorVisitor {
-                file_path: &file,
-                violations: Vec::new(),
-            };
-            visitor.visit_file(&ast);
-            violations.extend(visitor.violations);
-        }
+        let Ok(ast) = parse_file(&file) else {
+            continue;
+        };
+        let mut visitor = HardcodedColorVisitor {
+            file_path: &file,
+            violations: Vec::new(),
+        };
+        visitor.visit_file(&ast);
+        violations.extend(visitor.violations);
     }
 
     violations

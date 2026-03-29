@@ -34,15 +34,23 @@ impl I18nHardcodeVisitor {
         match expr {
             syn::Expr::Lit(expr_lit) => self.check_lit_str(expr_lit, method_name),
             syn::Expr::Macro(expr_macro) => self.check_format_macro(expr_macro, method_name),
-            syn::Expr::Reference(expr_ref) => self.check_expr_for_hardcoded_string(&expr_ref.expr, method_name),
-            syn::Expr::Paren(expr_paren) => self.check_expr_for_hardcoded_string(&expr_paren.expr, method_name),
-            syn::Expr::Group(expr_group) => self.check_expr_for_hardcoded_string(&expr_group.expr, method_name),
+            syn::Expr::Reference(expr_ref) => {
+                self.check_expr_for_hardcoded_string(&expr_ref.expr, method_name)
+            }
+            syn::Expr::Paren(expr_paren) => {
+                self.check_expr_for_hardcoded_string(&expr_paren.expr, method_name)
+            }
+            syn::Expr::Group(expr_group) => {
+                self.check_expr_for_hardcoded_string(&expr_group.expr, method_name)
+            }
             _ => {}
         }
     }
 
     fn check_lit_str(&mut self, expr_lit: &syn::ExprLit, method_name: &str) {
-        let syn::Lit::Str(lit_str) = &expr_lit.lit else { return; };
+        let syn::Lit::Str(lit_str) = &expr_lit.lit else {
+            return;
+        };
         let value = lit_str.value();
         if !is_allowed_string(&value) {
             let (line, column) = span_location(lit_str.span());
@@ -59,8 +67,10 @@ impl I18nHardcodeVisitor {
     }
 
     fn check_format_macro(&mut self, expr_macro: &syn::ExprMacro, method_name: &str) {
-        if !is_format_macro(&expr_macro.mac) { return; }
-        
+        if !is_format_macro(&expr_macro.mac) {
+            return;
+        }
+
         let (line, column) = span_location(
             expr_macro
                 .mac
@@ -70,7 +80,7 @@ impl I18nHardcodeVisitor {
                 .map(|it| it.ident.span())
                 .unwrap_or_else(proc_macro2::Span::call_site),
         );
-        
+
         self.violations.push(Violation {
             file: self.file.clone(),
             line,

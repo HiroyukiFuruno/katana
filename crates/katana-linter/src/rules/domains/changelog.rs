@@ -66,10 +66,16 @@ fn parse_workspace_version_from_str(source: &str, path: &Path) -> Result<String,
 
 fn extract_version_value(line: &str, path: &Path) -> Result<Option<String>, Vec<Violation>> {
     let line = line.split('#').next().unwrap_or_default().trim();
-    if line.is_empty() { return Ok(None); }
+    if line.is_empty() {
+        return Ok(None);
+    }
 
-    let Some((key, value)) = line.split_once('=') else { return Ok(None); };
-    if key.trim() != "version" { return Ok(None); }
+    let Some((key, value)) = line.split_once('=') else {
+        return Ok(None);
+    };
+    if key.trim() != "version" {
+        return Ok(None);
+    }
 
     let value = value.trim();
     let Some(value) = value.strip_prefix('"').and_then(|it| it.strip_suffix('"')) else {

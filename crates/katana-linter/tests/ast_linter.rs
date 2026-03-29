@@ -11,7 +11,6 @@ use katana_linter::rules::{
 use katana_linter::run_ast_lint;
 use katana_linter::utils::{panic_with_violations, workspace_root};
 
-
 fn target_crates(root: &std::path::Path) -> Vec<std::path::PathBuf> {
     vec![
         root.join("crates/katana-linter/src"),
