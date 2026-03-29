@@ -9,18 +9,14 @@ pub use html::wrap_standalone_inline_html;
 use local_image::extract_standalone_images;
 use math::process_relaxed_math;
 
-/// The type of section that makes up a document.
 #[derive(Debug, Clone)]
 pub enum PreviewSection {
-    /// Normal Markdown text.
     Markdown(String),
-    /// A diagram fence block.
     Diagram {
         kind: DiagramKind,
         source: String,
         lines: usize,
     },
-    /// A standalone local image.
     LocalImage {
         path: String,
         alt: String,
@@ -28,10 +24,6 @@ pub enum PreviewSection {
     },
 }
 
-/// Splits the source text into a list of `PreviewSection`s.
-///
-/// Detects diagram fences (` ```mermaid` / ` ```plantuml` / ` ```drawio` ),
-/// and groups the rest as Markdown sections.
 pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
     let source_cow = process_relaxed_math(source);
     let initial_sections = parse_initial_sections(source_cow.as_ref());

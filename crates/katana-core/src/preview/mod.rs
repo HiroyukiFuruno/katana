@@ -1,7 +1,3 @@
-//! Pre-processing logic for the markdown preview pipeline.
-//!
-//! Handles diagram fence detection, image resolution, and HTML inline wrapping
-//! before passing to the markdown renderer.
 
 pub mod image;
 pub mod section;
@@ -11,22 +7,18 @@ mod tests;
 pub use image::*;
 pub use section::*;
 
-/// Strips indentation from code fences that appear inside list items so
-/// that `pulldown_cmark` treats them as top-level block elements.
-///
-/// # Why this is needed
-///
-/// `egui_commonmark` (v0.22) renders list item content inside
-/// `ui.horizontal_wrapped()`, which forces **all** child elements—including
-/// code blocks—into a single horizontal line. This is a fundamental
-/// limitation of `egui`'s layout system and cannot be fixed by patching the
-/// renderer (tested with multiple patch strategies, all failed due to egui
-/// not re-allocating width after block elements).
-///
-/// By removing the leading whitespace from indented code fences,
-/// `pulldown_cmark` sees them as top-level code blocks outside the list.
-/// The list is split around the code block, which is the correct visual
-/// result: the code block appears between list items as a standalone block.
+/* WHY: Strips indentation from code fences that appear inside list items so
+that `pulldown_cmark` treats them as top-level block elements.
+
+`egui_commonmark` (v0.22) renders list item content inside `ui.horizontal_wrapped()`,
+which forces **all** child elements—including code blocks—into a single horizontal line.
+This is a fundamental limitation of `egui`'s layout system and cannot be fixed by patching
+the renderer (tested with multiple patch strategies, all failed due to egui not re-allocating
+width after block elements).
+
+By removing the leading whitespace from indented code fences, `pulldown_cmark` sees them
+as top-level code blocks outside the list. The list is split around the code block, which
+is the correct visual result: the code block appears between list items as a standalone block. */
 pub fn flatten_list_code_blocks(source: &str) -> String {
     let mut result = String::with_capacity(source.len());
     let mut in_indented_fence = false;

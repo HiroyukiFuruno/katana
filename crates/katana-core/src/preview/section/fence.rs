@@ -1,6 +1,5 @@
 use crate::markdown::diagram::DiagramKind;
 
-/// If the start is a diagram fence, returns `(kind, source, after)`.
 pub fn try_parse_diagram_fence(s: &str) -> Option<(DiagramKind, String, &str)> {
     let body = s.strip_prefix("```")?;
     let info_end = body.find('\n')?;

@@ -1,7 +1,6 @@
 use super::PreviewSection;
 use regex::Regex;
 
-/// Extracts standalone images from the markdown blocks.
 pub fn extract_standalone_images(initial_sections: Vec<PreviewSection>) -> Vec<PreviewSection> {
     let img_re = Regex::new(r"(?m)^[ \t]*!\[([^\]]*)\]\(([^\)]+)\)[ \t]*$").unwrap();
     let mut temp = Vec::new();

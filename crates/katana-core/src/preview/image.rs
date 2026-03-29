@@ -1,12 +1,6 @@
 use regex::Regex;
 use std::path::Path;
 
-/// Resolves relative image paths in Markdown source to absolute `file://` URIs.
-///
-/// Given the path to the Markdown file being previewed, rewrites image references
-/// like `![alt](../assets/image.png)` to `![alt](file:///absolute/path/assets/image.png)`.
-///
-/// Already-absolute paths, URLs (`http://`, `https://`), and `file://` URIs are left unchanged.
 pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> (String, Vec<std::path::PathBuf>) {
     use comrak::{parse_document, Arena, Options};
 
@@ -113,16 +107,9 @@ fn process_image_node(
     }
 }
 
-/// Resolves relative `src` attributes in HTML `<img>` tags to absolute `file://` URIs.
-///
-/// This is the HTML counterpart of [`resolve_image_paths`], handling raw HTML
-/// image tags within `HtmlBlock` sections.
 pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
-    /// Regex capture group index for the `<img ... src="` prefix.
     const CAP_PREFIX: usize = 1;
-    /// Regex capture group index for the `src` attribute value.
     const CAP_SRC: usize = 2;
-    /// Regex capture group index for the `" ...>` suffix.
     const CAP_SUFFIX: usize = 3;
 
     let base_dir = md_file_path.parent().unwrap_or(Path::new("."));

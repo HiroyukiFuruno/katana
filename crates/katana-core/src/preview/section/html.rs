@@ -1,13 +1,11 @@
 use regex::Regex;
 
-/// Wraps standalone lines containing only `<a>` or `<img>` tags in `<div>` blocks.
-///
-/// A "standalone" line is one where the trimmed content starts with `<a ` or `<img `
-/// and ends with the corresponding closing (`</a>` or `>`), with no surrounding
-/// Markdown text on adjacent non-blank lines that would make it part of a paragraph.
-///
-/// This converts inline-level HTML into block-level HTML so that pulldown-cmark
-/// emits `Tag::HtmlBlock` events and our `render_html_fn` callback can handle them.
+/* WHY: Wraps standalone lines containing only `<a>` or `<img>` tags in `<div>` blocks.
+A "standalone" line is one where the trimmed content starts with `<a ` or `<img `
+and ends with the corresponding closing (`</a>` or `>`), with no surrounding
+Markdown text on adjacent non-blank lines that would make it part of a paragraph.
+This converts inline-level HTML into block-level HTML so that pulldown-cmark
+emits `Tag::HtmlBlock` events and our `render_html_fn` callback can handle them. */
 pub fn wrap_standalone_inline_html(text: &str) -> String {
     #[rustfmt::skip]
     let inline_re = Regex::new(r"^[ \t]*(<a\s[^>]*>.*?</a>|<img\s[^>]*>)[ \t]*$").expect("ok");
