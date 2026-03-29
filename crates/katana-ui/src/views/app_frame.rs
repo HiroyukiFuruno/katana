@@ -33,8 +33,7 @@ impl<'a> MainPanels<'a> {
     pub fn show(self, ctx: &egui::Context) -> Option<DownloadRequest> {
         let app = self.app;
         let theme_colors = self.theme_colors;
-        // Menu bar & status bar
-        crate::views::top_bar::MenuBar::new(&mut app.state, &mut app.pending_action).show(ctx);
+        // Menu bar is removed as it's delegated to macOS native menu.
         let export_filenames: Vec<String> = app
             .export_tasks
             .iter()
