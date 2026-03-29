@@ -1,5 +1,7 @@
 //! Serde default value functions and `Default` implementations for each struct.
-
+//!
+//! // WHY: Consolidates all settings default value generators to keep types.rs clean. Extracted to handle Serde defaults safely.
+//! // SAFETY: Contains no stateful logic or new type definitions, only purely functional value generation and `Default` trait implementations.
 use crate::theme::ThemePreset;
 
 use super::types::{

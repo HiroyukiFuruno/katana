@@ -222,7 +222,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
   - `FilesystemService` を `filesystem/service.rs` へ分離
   - ディレクトリ走査ロジックを `filesystem/scanner.rs` へ分離
 
-- [ ] 5.8 `settings/defaults.rs`（201行）のボーダーライン確認
+- [x] 5.8 `settings/defaults.rs`（201行）のボーダーライン確認
+  - 構造体・列挙型の定義が0個（関数と`impl Default`のみ）であるため、linterの`num_types > 1`制約に抵触しないことを確認。
+  - 将来のコード追加に備え、ファイル先頭に `WHY/SAFETY` コメントを明記して対応完了。
 
 - [ ] 5.9 AST Linter の構造/コーディングルール対象を `katana-platform/src` へ拡大し、Task 4.2 で棚卸しした既存違反を解消する
   - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`

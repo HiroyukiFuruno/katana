@@ -52,8 +52,7 @@ pub(crate) fn scan_directory(
                 )
                 .unwrap_or_default();
                 // Show directory if it has visible files OR it is an explicitly created empty directory.
-                if has_any_visible(&children, visible_extensions)
-                    || in_memory_dirs.contains(&path)
+                if has_any_visible(&children, visible_extensions) || in_memory_dirs.contains(&path)
                 {
                     Some(TreeEntry::Directory { path, children })
                 } else {
