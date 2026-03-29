@@ -149,6 +149,53 @@ impl DiagramColorPreset {
     }
 }
 
+pub(crate) fn default_proportional_fonts() -> Vec<&'static str> {
+    vec![
+        // WHY: macOS — Hiragino Sans (high-quality CJK + Latin rendering)
+        "/System/Library/Fonts/\u{30d2}\u{30e9}\u{30ae}\u{30ce}\u{89d2}\u{30b4}\u{30b7}\u{30c3}\u{30af} W3.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/AquaKana.ttc",
+        // WHY: Windows — Yu Gothic UI / Meiryo (CJK + Latin)
+        "C:/Windows/Fonts/YuGothR.ttc",
+        "C:/Windows/Fonts/yugothic.ttf",
+        "C:/Windows/Fonts/meiryo.ttc",
+        "C:/Windows/Fonts/segoeui.ttf",
+        // WHY: Linux — Noto Sans (widely available via distro packages)
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+}
+
+pub(crate) fn default_monospace_fonts() -> Vec<&'static str> {
+    vec![
+        // WHY: macOS — Menlo (standard monospace since OS X 10.6)
+        "/System/Library/Fonts/Menlo.ttc",
+        "/System/Library/Fonts/SFMono-Regular.otf",
+        "/System/Library/Fonts/Monaco.ttf",
+        // WHY: Windows — Consolas (standard monospace since Vista)
+        "C:/Windows/Fonts/consola.ttf",
+        "C:/Windows/Fonts/cour.ttf",
+        // WHY: Linux — standard monospace fonts
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+    ]
+}
+
+pub(crate) fn default_emoji_fonts() -> Vec<&'static str> {
+    vec![
+        // WHY: macOS — Apple Color Emoji
+        "/System/Library/Fonts/Apple Color Emoji.ttc",
+        // WHY: Windows — Segoe UI Emoji (standard since Windows 8.1)
+        "C:/Windows/Fonts/seguiemj.ttf",
+        // WHY: Linux — Noto Color Emoji (widely available via distro packages)
+        "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+        "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+    ]
+}
+
 // WHY: ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

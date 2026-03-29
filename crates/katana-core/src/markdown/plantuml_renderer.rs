@@ -78,7 +78,17 @@ pub fn render_plantuml(block: &DiagramBlock) -> DiagramResult {
 /// Inserts background + color defaults right after `@startuml`
 /// so that SVG renders blend naturally with the host UI theme.
 fn inject_theme(source: &str, preset: &DiagramColorPreset) -> String {
-    let skinparams = format!(
+    let skinparams = generate_skinparams(preset);
+    if let Some(pos) = source.find("@startuml") {
+        let insert_at = source[pos..].find('\n').map(|n| pos + n + 1).unwrap_or(source.len());
+        format!("{}{}{}", &source[..insert_at], skinparams, &source[insert_at..])
+    } else {
+        format!("@startuml\n{skinparams}{source}\n@enduml")
+    }
+}
+
+fn generate_skinparams(preset: &DiagramColorPreset) -> String {
+    format!(
         "\
 skinparam backgroundColor {bg}
 skinparam defaultFontColor {text}
@@ -102,28 +112,36 @@ skinparam sequenceArrowColor {arrow}
         arrow = preset.arrow,
         note_bg = preset.plantuml_note_bg,
         note_text = preset.plantuml_note_text,
-    );
-    if let Some(pos) = source.find("@startuml") {
-        let insert_at = source[pos..]
-            .find('\n')
-            .map(|n| pos + n + 1)
-            .unwrap_or(source.len());
-        format!(
-            "{}{}{}",
-            &source[..insert_at],
-            skinparams,
-            &source[insert_at..]
-        )
-    } else {
-        // WHY: If no @startuml delimiter, wrap the source.
-        format!("@startuml\n{skinparams}{source}\n@enduml")
-    }
+    )
 }
 
 /// Runs `java -jar plantuml.jar`, passes the source, and returns the SVG.
 pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> {
     let preset = DiagramColorPreset::current();
     let themed_source = inject_theme(source, preset);
+    let args = build_plantuml_args(jar);
+
+    let mut child = Command::new("java")
+        .args(&args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("java startup failed: {e}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(themed_source.as_bytes()).map_err(|e| format!("stdin write failed: {e}"))?;
+    }
+
+    let output = child.wait_with_output().map_err(|e| format!("process wait failed: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(format!("PlantUML rendering error: {stderr}"));
+    }
+    String::from_utf8(output.stdout).map_err(|e| format!("SVG decode error: {e}"))
+}
+
+fn build_plantuml_args(jar: &Path) -> Vec<String> {
     let mut args = vec![
         "-Djava.awt.headless=true".to_string(),
         "-jar".to_string(),
@@ -134,30 +152,7 @@ pub fn run_plantuml_process(jar: &Path, source: &str) -> Result<String, String> 
     if DiagramColorPreset::is_dark_mode() {
         args.push("-darkmode".to_string());
     }
-    let mut child = Command::new("java")
-        .args(&args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("java startup failed: {e}"))?;
-
-    // WHY: Write to stdin in a separate scope to drop it and send EOF.
-    {
-        let stdin = child.stdin.as_mut().ok_or("stdin acquisition failed")?;
-        stdin
-            .write_all(themed_source.as_bytes())
-            .map_err(|e| format!("stdin write failed: {e}"))?;
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("process wait failed: {e}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(format!("PlantUML rendering error: {stderr}"));
-    }
-    String::from_utf8(output.stdout).map_err(|e| format!("SVG decode error: {e}"))
+    args
 }
 
 /// Converts SVG text into an HTML fragment for preview embedding.

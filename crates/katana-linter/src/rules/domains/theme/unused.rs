@@ -69,65 +69,81 @@ impl<'ast> Visit<'ast> for FieldAccessVisitor {
 
 pub fn lint_unused_theme_colors(workspace_root: &Path) -> Vec<Violation> {
     let types_rs_path = workspace_root.join("crates/katana-platform/src/theme/types.rs");
-    let types_ast = parse_file(&types_rs_path).unwrap_or_else(|e| {
-        panic!(
-            "Failed to parse theme/types.rs for ast_linter_no_unused_theme_colors: {:?}",
-            e
-        )
-    });
+    let types_ast = get_types_ast(&types_rs_path);
 
-    let mut extractor = ThemePropertyExtractor {
-        properties: Vec::new(),
-    };
+    let mut extractor = ThemePropertyExtractor { properties: Vec::new() };
     extractor.visit_file(&types_ast);
 
+    let (general_access, settings_access) = scan_ui_files(workspace_root);
+    let mut violations = Vec::new();
+
+    for (prop_name, line, col) in extractor.properties {
+        check_unused_property(&prop_name, line, col, &types_rs_path, &general_access, &mut violations);
+        check_unexposed_property(&prop_name, line, col, &types_rs_path, &settings_access, &mut violations);
+    }
+    violations
+}
+
+fn get_types_ast(path: &Path) -> syn::File {
+    parse_file(path).unwrap_or_else(|e| {
+        panic!("Failed to parse theme/types.rs for ast_linter_no_unused_theme_colors: {:?}", e)
+    })
+}
+
+fn scan_ui_files(workspace_root: &Path) -> (FieldAccessVisitor, FieldAccessVisitor) {
     let ui_dir = workspace_root.join("crates/katana-ui/src");
-    let ui_files = collect_rs_files(&ui_dir);
+    let mut general_access = FieldAccessVisitor { used_fields: HashSet::new() };
+    let mut settings_access = FieldAccessVisitor { used_fields: HashSet::new() };
 
-    let mut general_access = FieldAccessVisitor {
-        used_fields: HashSet::new(),
-    };
-    let mut settings_access = FieldAccessVisitor {
-        used_fields: HashSet::new(),
-    };
-
-    for file in ui_files {
+    for file in collect_rs_files(&ui_dir) {
         if let Some(ast) = parse_file(&file).ok() {
             general_access.visit_file(&ast);
-
             if file.file_name().unwrap_or_default() == "settings_window.rs" {
                 settings_access.visit_file(&ast);
             }
         }
     }
+    (general_access, settings_access)
+}
 
-    let mut violations = Vec::new();
-
-    for (prop_name, line, col) in extractor.properties {
-        if !general_access.used_fields.contains(&prop_name) {
-            violations.push(Violation {
-                file: types_rs_path.clone(),
-                line,
-                column: col,
-                message: format!(
-                    "Theme color property `{}` is defined in ThemeColors but never accessed in UI code. Please wire it up to `katana-ui` or remove it.",
-                    prop_name
-                ),
-            });
-        }
-
-        if !settings_access.used_fields.contains(&prop_name) {
-            violations.push(Violation {
-                file: types_rs_path.clone(),
-                line,
-                column: col,
-                message: format!(
-                    "Theme color property `{}` is not exposed in `settings_window.rs`. All custom colors must be editable by the user.",
-                    prop_name
-                ),
-            });
-        }
+fn check_unused_property(
+    prop_name: &str,
+    line: usize,
+    col: usize,
+    types_rs_path: &std::path::PathBuf,
+    general_access: &FieldAccessVisitor,
+    violations: &mut Vec<Violation>,
+) {
+    if !general_access.used_fields.contains(prop_name) {
+        violations.push(Violation {
+            file: types_rs_path.clone(),
+            line,
+            column: col,
+            message: format!(
+                "Theme color property `{}` is defined in ThemeColors but never accessed in UI code. Please wire it up to `katana-ui` or remove it.",
+                prop_name
+            ),
+        });
     }
+}
 
-    violations
+fn check_unexposed_property(
+    prop_name: &str,
+    line: usize,
+    col: usize,
+    types_rs_path: &std::path::PathBuf,
+    settings_access: &FieldAccessVisitor,
+    violations: &mut Vec<Violation>,
+) {
+    if !settings_access.used_fields.contains(prop_name) {
+        violations.push(Violation {
+            file: types_rs_path.clone(),
+            line,
+            column: col,
+            message: format!(
+                "Theme color property `{}` is not exposed in `settings_window.rs`. All custom colors must be editable by the user.",
+                prop_name
+            ),
+        });
+    }
 }

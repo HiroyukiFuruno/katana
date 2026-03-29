@@ -17,16 +17,10 @@ use structure::{build_locale_baseline, compare_locale_placeholders, compare_loca
 use values::compare_locale_values;
 
 pub fn lint_locale_files(locale_dir: &Path) -> Vec<Violation> {
-    let locale_files = collect_locale_json_files(locale_dir);
-    if locale_files.is_empty() {
-        return vec![crate::utils::locale_violation(
-            locale_dir,
-            format!(
-                "No locale JSON files found for analysis: {}",
-                locale_dir.display()
-            ),
-        )];
-    }
+    let locale_files = match get_locale_files_or_error(locale_dir) {
+        Ok(files) => files,
+        Err(v) => return v,
+    };
 
     let language_codes = match parse_languages_catalog(locale_dir) {
         Ok(codes) => codes,
@@ -36,14 +30,11 @@ pub fn lint_locale_files(locale_dir: &Path) -> Vec<Violation> {
 
     let ja_path = locale_dir.join("ja.json");
     let en_path = locale_dir.join("en.json");
-    let (baseline_shape, baseline_placeholders, en_values) =
-        match build_locale_baseline(&ja_path, &en_path) {
-            Ok(baseline) => baseline,
-            Err(violations) => {
-                all_violations.extend(violations);
-                return all_violations;
-            }
-        };
+    let Some((baseline_shape, baseline_placeholders, en_values)) =
+        load_locale_baseline(&ja_path, &en_path, &mut all_violations)
+    else {
+        return all_violations;
+    };
 
     for file in locale_files {
         process_single_locale_file(
@@ -56,6 +47,35 @@ pub fn lint_locale_files(locale_dir: &Path) -> Vec<Violation> {
     }
 
     all_violations
+}
+
+fn get_locale_files_or_error(locale_dir: &Path) -> Result<Vec<std::path::PathBuf>, Vec<Violation>> {
+    let locale_files = collect_locale_json_files(locale_dir);
+    if locale_files.is_empty() {
+        return Err(vec![crate::utils::locale_violation(
+            locale_dir,
+            format!("No locale JSON files found for analysis: {}", locale_dir.display()),
+        )]);
+    }
+    Ok(locale_files)
+}
+
+fn load_locale_baseline(
+    ja_path: &Path,
+    en_path: &Path,
+    all_violations: &mut Vec<Violation>,
+) -> Option<(
+    BTreeMap<String, JsonNodeKind>,
+    BTreeMap<String, BTreeSet<String>>,
+    BTreeMap<String, String>,
+)> {
+    match build_locale_baseline(ja_path, en_path) {
+        Ok(baseline) => Some(baseline),
+        Err(violations) => {
+            all_violations.extend(violations);
+            None
+        }
+    }
 }
 
 fn process_single_locale_file(

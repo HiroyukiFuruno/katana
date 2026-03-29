@@ -21,32 +21,8 @@ pub fn render_edge(
     geo_map: &[(String, (f64, f64, f64, f64))],
     preset: &DiagramColorPreset,
 ) {
-    let src_id = match cell.attributes.get("source") {
-        Some(id) => id.as_str(),
-        None => return,
-    };
-    let tgt_id = match cell.attributes.get("target") {
-        Some(id) => id.as_str(),
-        None => return,
-    };
-    let Some(&(_, (sx, sy, sw, sh))) = geo_map.iter().find(|(k, _)| k == src_id) else {
+    let Some((src, tgt)) = resolve_edge_rects(cell, geo_map) else {
         return;
-    };
-    let Some(&(_, (tx, ty, tw, th))) = geo_map.iter().find(|(k, _)| k == tgt_id) else {
-        return;
-    };
-
-    let src = Rect {
-        x: sx,
-        y: sy,
-        w: sw,
-        h: sh,
-    };
-    let tgt = Rect {
-        x: tx,
-        y: ty,
-        w: tw,
-        h: th,
     };
     let (scx, scy) = src.center();
     let (tcx, tcy) = tgt.center();
@@ -76,6 +52,30 @@ fn build_polyline_points(x1: f64, y1: f64, waypoints: &[(f64, f64)], x2: f64, y2
     s
 }
 
+fn resolve_edge_rects(
+    cell: &Element,
+    geo_map: &[(String, (f64, f64, f64, f64))],
+) -> Option<(Rect, Rect)> {
+    let src_id = cell.attributes.get("source")?;
+    let tgt_id = cell.attributes.get("target")?;
+    let (_, (sx, sy, sw, sh)) = geo_map.iter().find(|(k, _)| k == src_id)?;
+    let (_, (tx, ty, tw, th)) = geo_map.iter().find(|(k, _)| k == tgt_id)?;
+    Some((
+        Rect {
+            x: *sx,
+            y: *sy,
+            w: *sw,
+            h: *sh,
+        },
+        Rect {
+            x: *tx,
+            y: *ty,
+            w: *tw,
+            h: *th,
+        },
+    ))
+}
+
 /// Renders the edge label at the midpoint, if it exists.
 fn append_edge_label(
     cell: &Element,
@@ -101,25 +101,18 @@ fn append_edge_label(
 
 /// Collects waypoint coordinates from `Array` > `mxPoint` elements within `mxGeometry`.
 fn collect_waypoints(cell: &Element) -> Vec<(f64, f64)> {
-    let Some(geo) = cell.get_child("mxGeometry") else {
-        return Vec::new();
-    };
+    let Some(geo) = cell.get_child("mxGeometry") else { return Vec::new(); };
     let mut points = Vec::new();
     for child in &geo.children {
-        let Some(el) = child.as_element() else {
-            continue;
-        };
-        if el.name == "Array" {
-            for pt_node in &el.children {
-                let Some(pt) = pt_node.as_element() else {
-                    continue;
-                };
-                if pt.name == "mxPoint" {
-                    let x = attr_f64(pt, "x");
-                    let y = attr_f64(pt, "y");
-                    points.push((x, y));
-                }
-            }
+        let Some(el) = child.as_element() else { continue; };
+        if el.name != "Array" { continue; }
+        
+        for pt_node in &el.children {
+            let Some(pt) = pt_node.as_element() else { continue; };
+            if pt.name != "mxPoint" { continue; }
+            let x = attr_f64(pt, "x");
+            let y = attr_f64(pt, "y");
+            points.push((x, y));
         }
     }
     points

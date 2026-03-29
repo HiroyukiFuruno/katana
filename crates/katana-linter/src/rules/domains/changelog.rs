@@ -34,6 +34,10 @@ fn parse_workspace_version_from_cargo_toml(path: &Path) -> Result<String, Vec<Vi
         }]
     })?;
 
+    parse_workspace_version_from_str(&source, path)
+}
+
+fn parse_workspace_version_from_str(source: &str, path: &Path) -> Result<String, Vec<Violation>> {
     let mut in_workspace_package = false;
 
     for raw_line in source.lines() {

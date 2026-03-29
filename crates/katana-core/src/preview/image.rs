@@ -8,80 +8,63 @@ use std::path::Path;
 ///
 /// Already-absolute paths, URLs (`http://`, `https://`), and `file://` URIs are left unchanged.
 pub fn resolve_image_paths(source: &str, md_file_path: &Path) -> (String, Vec<std::path::PathBuf>) {
-    use comrak::nodes::NodeValue;
     use comrak::{parse_document, Arena, Options};
 
     let arena = Arena::new();
     let root = parse_document(&arena, source, &Options::default());
-
-    let mut line_offsets = vec![0];
-    for (i, c) in source.char_indices() {
-        if c == '\n' {
-            line_offsets.push(i + 1);
-        }
-    }
-
-    // WHY: Collect all Image AST nodes' source positions
-    let mut replacements = Vec::new();
-    for node in root.descendants() {
-        if let NodeValue::Image(ref img) = node.data.borrow().value {
-            let pos = node.data.borrow().sourcepos;
-            let start_line_idx = pos.start.line.saturating_sub(1);
-            let start_col_offset = pos.start.column.saturating_sub(1);
-            let end_line_idx = pos.end.line.saturating_sub(1);
-            let end_col_offset = pos.end.column.saturating_sub(1);
-
-            let start_byte = line_offsets.get(start_line_idx).unwrap_or(&0) + start_col_offset;
-            let end_byte = line_offsets.get(end_line_idx).unwrap_or(&0) + end_col_offset;
-
-            if start_byte < source.len() && end_byte <= source.len() && start_byte <= end_byte {
-                let node_str = &source[start_byte..end_byte];
-                // WHY: We know node_str is something like `![alt](url)` or `![alt][ref]`
-                // WHY: Let's find the URL portion. This is complex if `alt` texts contain parens.
-                // WHY: However, we know `img.url` is exactly the URL string from the AST.
-                let url_str = &img.url;
-                if !url_str.is_empty() {
-                    // WHY: Find the exact occurrence of `url_str` inside `node_str` searching from the end
-                    if let Some(url_idx) = node_str.rfind(url_str.as_str()) {
-                        replacements.push((
-                            start_byte + url_idx,
-                            start_byte + url_idx + url_str.len(),
-                            url_str.to_string(),
-                        ));
-                    }
-                }
-            }
-        }
-    }
-
-    // WHY: Sort replacements by start byte in reverse order to safely perform string replacements from the end
+    let mut replacements = find_image_replacements(root, source);
     replacements.sort_by_key(|&(start, _, _)| std::cmp::Reverse(start));
 
     let base_dir = md_file_path.parent().unwrap_or(Path::new("."));
     let mut result = source.to_string();
-
     let mut extracted_paths = Vec::new();
 
     for (start, end, raw_path) in replacements {
-        if raw_path.starts_with("http://")
-            || raw_path.starts_with("https://")
-            || raw_path.starts_with("file://")
-            || raw_path.starts_with("data:")
-            || raw_path.starts_with('/')
-        {
-            continue;
-        }
-
+        if is_absolute_url(&raw_path) { continue; }
         let resolved = base_dir.join(&raw_path);
         let canonical = resolved.canonicalize().unwrap_or(resolved);
-        let absolute_url = format!("file://{}", canonical.display());
-
-        extracted_paths.push(canonical);
-
-        result.replace_range(start..end, &absolute_url);
+        extracted_paths.push(canonical.clone());
+        result.replace_range(start..end, &format!("file://{}", canonical.display()));
     }
-
     (result, extracted_paths)
+}
+
+fn is_absolute_url(url: &str) -> bool {
+    url.starts_with("http://")
+        || url.starts_with("https://")
+        || url.starts_with("file://")
+        || url.starts_with("data:")
+        || url.starts_with('/')
+}
+
+fn find_image_replacements<'a>(root: &'a comrak::nodes::AstNode<'a>, source: &str) -> Vec<(usize, usize, String)> {
+    let mut offsets = vec![0];
+    for (i, c) in source.char_indices() {
+        if c == '\n' { offsets.push(i + 1); }
+    }
+    let mut replacements = Vec::new();
+    for node in root.descendants() {
+        process_image_node(node, source, &offsets, &mut replacements);
+    }
+    replacements
+}
+
+fn process_image_node(
+    node: &comrak::nodes::AstNode<'_>,
+    source: &str,
+    offsets: &[usize],
+    replacements: &mut Vec<(usize, usize, String)>,
+) {
+    let comrak::nodes::NodeValue::Image(ref img) = node.data.borrow().value else { return; };
+    let pos = node.data.borrow().sourcepos;
+    let start = offsets.get(pos.start.line.saturating_sub(1)).unwrap_or(&0) + pos.start.column.saturating_sub(1);
+    let end = offsets.get(pos.end.line.saturating_sub(1)).unwrap_or(&0) + pos.end.column.saturating_sub(1);
+
+    if start > end || end > source.len() || img.url.is_empty() { return; }
+
+    if let Some(idx) = source[start..end].rfind(img.url.as_str()) {
+        replacements.push((start + idx, start + idx + img.url.len(), img.url.to_string()));
+    }
 }
 
 /// Resolves relative `src` attributes in HTML `<img>` tags to absolute `file://` URIs.
@@ -102,12 +85,7 @@ pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
         let prefix = caps.get(CAP_PREFIX).unwrap().as_str();
         let src = caps.get(CAP_SRC).unwrap().as_str();
         let suffix = caps.get(CAP_SUFFIX).unwrap().as_str();
-        if src.starts_with("http://")
-            || src.starts_with("https://")
-            || src.starts_with("file://")
-            || src.starts_with("data:")
-            || src.starts_with('/')
-        {
+        if is_absolute_url(src) {
             format!("{prefix}{src}{suffix}")
         } else {
             let resolved = base_dir.join(src);
@@ -115,5 +93,5 @@ pub fn resolve_html_image_paths(html: &str, md_file_path: &Path) -> String {
             format!("{prefix}file://{}{suffix}", canonical.display())
         }
     })
-    .into_owned()
+    .to_string()
 }

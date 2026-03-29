@@ -28,45 +28,33 @@ pub use section::*;
 /// The list is split around the code block, which is the correct visual
 /// result: the code block appears between list items as a standalone block.
 pub fn flatten_list_code_blocks(source: &str) -> String {
-    let lines: Vec<&str> = source.lines().collect();
     let mut result = String::with_capacity(source.len());
     let mut in_indented_fence = false;
     let mut fence_indent = 0;
 
-    for line in &lines {
+    for line in source.lines() {
         if in_indented_fence {
-            // WHY: Strip up to `fence_indent` spaces from the front.
             let stripped = strip_leading_spaces(line, fence_indent);
-            let trimmed = stripped.trim_start();
-            if trimmed.starts_with("```") {
-                // WHY: Closing fence — also de-indent, then leave fence mode.
-                result.push_str(trimmed);
-                result.push('\n');
+            if stripped.trim_start().starts_with("```") {
+                result.push_str(stripped.trim_start());
                 in_indented_fence = false;
             } else {
                 result.push_str(stripped);
-                result.push('\n');
             }
         } else {
             let indent = count_leading_spaces(line);
-            let trimmed = line.trim_start();
-            if indent >= 2 && trimmed.starts_with("```") {
-                // WHY: Indented opening fence — de-indent it.
+            if indent >= 2 && line.trim_start().starts_with("```") {
                 in_indented_fence = true;
                 fence_indent = indent;
-                result.push_str(trimmed);
-                result.push('\n');
+                result.push_str(line.trim_start());
             } else {
                 result.push_str(line);
-                result.push('\n');
             }
         }
+        result.push('\n');
     }
 
-    // WHY: Preserve the original trailing-newline behaviour.
-    if !source.ends_with('\n') && result.ends_with('\n') {
-        result.pop();
-    }
+    if !source.ends_with('\n') && result.ends_with('\n') { result.pop(); }
     result
 }
 

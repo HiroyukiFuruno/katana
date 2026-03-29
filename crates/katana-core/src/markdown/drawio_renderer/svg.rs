@@ -7,23 +7,7 @@ use super::{edge::render_edge, utils::attr_f64, vertex::render_vertex};
 /// Assembles the entire SVG document.
 pub fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
     // WHY: Builds a map of cell ID -> (x, y, w, h).
-    let mut geo_map: Vec<(String, (f64, f64, f64, f64))> = Vec::new();
-    for cell in cells {
-        if let (Some(id), Some(geo)) = (cell.attributes.get("id"), cell.get_child("mxGeometry")) {
-            let is_vertex = cell
-                .attributes
-                .get("vertex")
-                .map(|v| v == "1")
-                .unwrap_or(false);
-            if is_vertex {
-                let x = attr_f64(geo, "x");
-                let y = attr_f64(geo, "y");
-                let w = attr_f64(geo, "width").max(1.0);
-                let h = attr_f64(geo, "height").max(1.0);
-                geo_map.push((id.clone(), (x, y, w, h)));
-            }
-        }
-    }
+    let geo_map = build_geo_map(cells);
     let preset = DiagramColorPreset::current();
     let mut shapes = String::new();
     let mut labels = String::new();
@@ -38,6 +22,23 @@ pub fn build_svg(cells: &[&Element], width: f64, height: f64) -> String {
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">{shapes}{labels}</svg>"#
     )
+}
+
+fn build_geo_map(cells: &[&Element]) -> Vec<(String, (f64, f64, f64, f64))> {
+    let mut geo_map = Vec::new();
+    for cell in cells {
+        if let (Some(id), Some(geo)) = (cell.attributes.get("id"), cell.get_child("mxGeometry")) {
+            let is_vertex = cell.attributes.get("vertex").map_or(false, |v| v == "1");
+            if is_vertex {
+                let x = attr_f64(geo, "x");
+                let y = attr_f64(geo, "y");
+                let w = attr_f64(geo, "width").max(1.0);
+                let h = attr_f64(geo, "height").max(1.0);
+                geo_map.push((id.clone(), (x, y, w, h)));
+            }
+        }
+    }
+    geo_map
 }
 
 /// Writes a single `<mxCell>` to the shapes/labels buffers.

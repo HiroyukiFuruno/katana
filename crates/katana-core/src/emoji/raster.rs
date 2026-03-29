@@ -42,43 +42,40 @@ struct EmojiCacheEntry {
 }
 
 /// Rasterizes a single emoji grapheme into PNG bytes using Apple Color Emoji on macOS.
+#[cfg(not(target_os = "macos"))]
+pub fn render_apple_color_emoji_png(_grapheme: &str, _pixel_size: u32) -> Option<Vec<u8>> {
+    None
+}
+
+#[cfg(target_os = "macos")]
 pub fn render_apple_color_emoji_png(grapheme: &str, pixel_size: u32) -> Option<Vec<u8>> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = grapheme;
-        let _ = pixel_size;
-        None
+    if grapheme.is_empty() || !std::path::Path::new(APPLE_COLOR_EMOJI_FONT_PATH).exists() {
+        return None;
+    }
+    let key = EmojiCacheKey {
+        grapheme: grapheme.to_owned(),
+        pixel_size: pixel_size.max(MIN_EMOJI_PIXEL_SIZE),
+    };
+
+    if let Some(cached) = check_emoji_cache(&key) {
+        return cached;
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        if grapheme.is_empty() || !std::path::Path::new(APPLE_COLOR_EMOJI_FONT_PATH).exists() {
-            return None;
-        }
+    let rendered = render_apple_color_emoji_png_uncached(&key.grapheme, key.pixel_size);
+    store_emoji_cache(key, rendered.clone());
+    rendered
+}
 
-        let key = EmojiCacheKey {
-            grapheme: grapheme.to_owned(),
-            pixel_size: pixel_size.max(MIN_EMOJI_PIXEL_SIZE),
-        };
+#[cfg(target_os = "macos")]
+fn check_emoji_cache(key: &EmojiCacheKey) -> Option<Option<Vec<u8>>> {
+    let guard = emoji_png_cache().lock().expect("emoji raster cache lock poisoned");
+    guard.iter().find(|e| &e.key == key).map(|e| e.png.clone())
+}
 
-        let cache = emoji_png_cache();
-        {
-            let guard = cache.lock().expect("emoji raster cache lock poisoned");
-            if let Some(entry) = guard.iter().find(|e| e.key == key) {
-                return entry.png.clone();
-            }
-        }
-
-        let rendered = render_apple_color_emoji_png_uncached(&key.grapheme, key.pixel_size);
-        cache
-            .lock()
-            .expect("emoji raster cache lock poisoned")
-            .push(EmojiCacheEntry {
-                key,
-                png: rendered.clone(),
-            });
-        rendered
-    }
+#[cfg(target_os = "macos")]
+fn store_emoji_cache(key: EmojiCacheKey, png: Option<Vec<u8>>) {
+    let mut guard = emoji_png_cache().lock().expect("emoji raster cache lock poisoned");
+    guard.push(EmojiCacheEntry { key, png });
 }
 
 #[cfg(target_os = "macos")]
@@ -130,21 +127,23 @@ fn emoji_font_db() -> Arc<usvg::fontdb::Database> {
 }
 
 #[cfg(target_os = "macos")]
-fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
-    let width = pixmap.width() as usize;
-    let height = pixmap.height() as usize;
-    let mut min_x = width;
-    let mut min_y = height;
-    let mut max_x = 0usize;
-    let mut max_y = 0usize;
-    let mut found_opaque_pixel = false;
+struct BoundingBox {
+    min_x: usize,
+    min_y: usize,
+    max_x: usize,
+    max_y: usize,
+}
+
+#[cfg(target_os = "macos")]
+fn find_opaque_bounding_box(pixmap: &Pixmap) -> Option<BoundingBox> {
+    let (width, height) = (pixmap.width() as usize, pixmap.height() as usize);
+    let (mut min_x, mut min_y, mut max_x, mut max_y, mut found) = (width, height, 0usize, 0usize, false);
 
     for y in 0..height {
         for x in 0..width {
-            let alpha =
-                pixmap.data()[(y * width + x) * RGBA_CHANNEL_COUNT + RGBA_ALPHA_CHANNEL_OFFSET];
-            if alpha > 0 {
-                found_opaque_pixel = true;
+            let offset = (y * width + x) * RGBA_CHANNEL_COUNT + RGBA_ALPHA_CHANNEL_OFFSET;
+            if pixmap.data()[offset] > 0 {
+                found = true;
                 min_x = min_x.min(x);
                 min_y = min_y.min(y);
                 max_x = max_x.max(x);
@@ -152,15 +151,20 @@ fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
             }
         }
     }
+    found.then_some(BoundingBox { min_x, min_y, max_x, max_y })
+}
 
-    if !found_opaque_pixel {
-        return None;
-    }
+#[cfg(target_os = "macos")]
+fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
+    let bbox = find_opaque_bounding_box(pixmap)?;
+    let width = pixmap.width() as usize;
+    let height = pixmap.height() as usize;
 
-    let left = min_x.saturating_sub(EMOJI_CROP_PADDING);
-    let top = min_y.saturating_sub(EMOJI_CROP_PADDING);
-    let right = (max_x + EMOJI_CROP_PADDING).min(width - 1);
-    let bottom = (max_y + EMOJI_CROP_PADDING).min(height - 1);
+    let left = bbox.min_x.saturating_sub(EMOJI_CROP_PADDING);
+    let top = bbox.min_y.saturating_sub(EMOJI_CROP_PADDING);
+    let right = (bbox.max_x + EMOJI_CROP_PADDING).min(width - 1);
+    let bottom = (bbox.max_y + EMOJI_CROP_PADDING).min(height - 1);
+    
     let cropped_width = (right - left + 1) as u32;
     let cropped_height = (bottom - top + 1) as u32;
     let baseline_padding = ((cropped_height as f32) * EMOJI_BASELINE_PADDING_RATIO).round() as u32;
@@ -168,6 +172,7 @@ fn crop_non_transparent(pixmap: &Pixmap) -> Option<Pixmap> {
     let extra_x = (square_side - cropped_width) / 2;
     let extra_y = square_side - cropped_height;
     let extra_top = ((extra_y as f32) * EMOJI_TOP_PADDING_SHARE).round() as u32;
+    
     let mut cropped = Pixmap::new(square_side, square_side)?;
     cropped.draw_pixmap(
         extra_x as i32 - left as i32,

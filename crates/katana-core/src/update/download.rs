@@ -49,44 +49,36 @@ pub fn extract_update<P: AsRef<std::path::Path>, D: AsRef<std::path::Path>, F>(
 where
     F: FnMut(UpdateProgress),
 {
-    let file = std::fs::File::open(zip_path)?;
-    let mut archive = zip::ZipArchive::new(file)?;
-    let total_files = archive.len();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(zip_path)?)?;
+    let total = archive.len();
 
-    for i in 0..total_files {
+    for i in 0..total {
         let mut file = archive.by_index(i)?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => extract_to_dir.as_ref().join(path),
-            None => continue,
-        };
+        let Some(path) = file.enclosed_name() else { continue };
+        let outpath = extract_to_dir.as_ref().join(path);
 
         if (*file.name()).ends_with('/') {
             std::fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    std::fs::create_dir_all(p)?;
-                }
+                std::fs::create_dir_all(p)?;
             }
-            let mut outfile = std::fs::File::create(&outpath)?;
-            std::io::copy(&mut file, &mut outfile)?;
+            std::io::copy(&mut file, &mut std::fs::File::create(&outpath)?)?;
         }
 
         #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Some(mode) = file.unix_mode() {
-                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
-            }
-        }
-
-        // WHY: Send progress ticks to the UI layer, 1-indexed to show natural counts
-        on_progress(UpdateProgress::Extracting {
-            current: i + 1,
-            total: total_files,
-        });
+        apply_unix_permissions(&file, &outpath)?;
+        on_progress(UpdateProgress::Extracting { current: i + 1, total });
     }
+    Ok(())
+}
 
+#[cfg(unix)]
+fn apply_unix_permissions(file: &zip::read::ZipFile, outpath: &std::path::Path) -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    if let Some(mode) = file.unix_mode() {
+        std::fs::set_permissions(outpath, std::fs::Permissions::from_mode(mode))?;
+    }
     Ok(())
 }
 

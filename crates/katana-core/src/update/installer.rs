@@ -22,38 +22,23 @@ where
     F: FnMut(UpdateProgress),
 {
     let temp_dir = tempfile::tempdir()?;
-
     let zip_path = temp_dir.path().join("update.zip");
-    download_update(download_url, &zip_path, |progress| {
-        on_progress(progress);
-    })?;
+    download_update(download_url, &zip_path, &mut on_progress)?;
 
     let extract_dir = temp_dir.path().join("extracted");
     std::fs::create_dir_all(&extract_dir)?;
-    extract_update(&zip_path, &extract_dir, |progress| {
-        on_progress(progress);
-    })?;
+    extract_update(&zip_path, &extract_dir, &mut on_progress)?;
 
-    let app_name = target_app_path
-        .file_name()
-        .unwrap_or_else(|| std::ffi::OsStr::new("KatanA.app"));
-
+    let app_name = target_app_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("KatanA.app"));
     let extracted_app_path = extract_dir.join(app_name);
     if !extracted_app_path.exists() {
         anyhow::bail!("Extracted update does not contain the expected application bundle");
     }
 
     let script_path = temp_dir.path().join("relauncher.sh");
-    let target = target_app_path;
-    let extracted = &extracted_app_path;
-    let temp = temp_dir.path();
-    generate_relauncher_script(extracted, target, &script_path, temp)?;
+    generate_relauncher_script(&extracted_app_path, target_app_path, &script_path, temp_dir.path())?;
 
-    Ok(UpdatePreparation {
-        temp_dir,
-        app_bundle_path: extracted_app_path,
-        script_path,
-    })
+    Ok(UpdatePreparation { temp_dir, app_bundle_path: extracted_app_path, script_path })
 }
 
 /// Executes the background relauncher and exits the current process.
@@ -76,39 +61,7 @@ pub fn generate_relauncher_script(
 ) -> anyhow::Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
-    let content = format!(
-        r#"#!/bin/bash
-# KatanA Auto-Update Relauncher Script
-set -e
-
-sleep 1
-
-if command -v brew >/dev/null 2>&1; then
-    if brew list --cask | grep -q "^katana-desktop$"; then
-        echo "Removing KatanA from Homebrew management..."
-        brew uninstall --cask katana-desktop --force || true
-        brew untap HiroyukiFuruno/katana || true
-    fi
-fi
-
-echo "Replacing application..."
-rm -rf "{target}"
-mv "{extracted}" "{target}"
-
-echo "Removing Gatekeeper quarantine attributes..."
-xattr -cr "{target}"
-
-echo "Relaunching application..."
-open "{target}"
-
-echo "Cleaning up..."
-rm -rf "{temp_dir}"
-"#,
-        target = target_app.display(),
-        extracted = extracted_app.display(),
-        temp_dir = temp_dir_path.display()
-    );
-
+    let content = generate_script_content(target_app, extracted_app, temp_dir_path);
     std::fs::write(script_path, content)?;
 
     const RELAUNCHER_SCRIPT_PERMISSIONS: u32 = 0o755;
@@ -118,6 +71,34 @@ rm -rf "{temp_dir}"
     std::fs::set_permissions(script_path, perms)?;
 
     Ok(())
+}
+
+fn generate_script_content(
+    target_app: &std::path::Path,
+    extracted_app: &std::path::Path,
+    temp_dir_path: &std::path::Path,
+) -> String {
+    format!(
+        r#"#!/bin/bash
+set -e
+sleep 1
+if command -v brew >/dev/null 2>&1; then
+    if brew list --cask | grep -q "^katana-desktop$"; then
+        echo "Removing KatanA from Homebrew management..."
+        brew uninstall --cask katana-desktop --force || true
+        brew untap HiroyukiFuruno/katana || true
+    fi
+fi
+rm -rf "{target}"
+mv "{extracted}" "{target}"
+xattr -cr "{target}"
+open "{target}"
+rm -rf "{temp_dir}"
+"#,
+        target = target_app.display(),
+        extracted = extracted_app.display(),
+        temp_dir = temp_dir_path.display()
+    )
 }
 
 #[cfg(test)]

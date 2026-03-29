@@ -9,21 +9,14 @@ use regex::Regex;
 /// This converts inline-level HTML into block-level HTML so that pulldown-cmark
 /// emits `Tag::HtmlBlock` events and our `render_html_fn` callback can handle them.
 pub fn wrap_standalone_inline_html(text: &str) -> String {
-    let inline_re =
-        Regex::new(r"^[ \t]*(<a\s[^>]*>.*?</a>|<img\s[^>]*>)[ \t]*$").expect("valid regex");
-    // WHY: Block-level HTML elements whose children should not be wrapped.
-    let open_re =
-        Regex::new(r"(?i)^[ \t]*<(p|div|h[1-6]|section|article|header|footer|nav|main|aside)\b")
-            .expect("valid regex");
-    let close_re =
-        Regex::new(r"(?i)</(p|div|h[1-6]|section|article|header|footer|nav|main|aside)>")
-            .expect("valid regex");
+    let inline_re = Regex::new(r"^[ \t]*(<a\s[^>]*>.*?</a>|<img\s[^>]*>)[ \t]*$").expect("valid regex");
+    let open_re = Regex::new(r"(?i)^[ \t]*<(p|div|h[1-6]|section|article|header|footer|nav|main|aside)\b").expect("valid regex");
+    let close_re = Regex::new(r"(?i)</(p|div|h[1-6]|section|article|header|footer|nav|main|aside)>").expect("valid regex");
 
     let mut result = String::with_capacity(text.len());
     let mut block_depth: usize = 0;
 
     for line in text.lines() {
-        // WHY: Track nesting: count opens before closes on this line.
         if open_re.is_match(line) {
             block_depth += 1;
         }
@@ -35,13 +28,11 @@ pub fn wrap_standalone_inline_html(text: &str) -> String {
             result.push_str(line);
         }
         result.push('\n');
-
         if is_close && block_depth > 0 {
             block_depth -= 1;
         }
     }
 
-    // WHY: Remove trailing newline added by the loop if the original didn't end with one.
     if !text.ends_with('\n') && result.ends_with('\n') {
         result.pop();
     }

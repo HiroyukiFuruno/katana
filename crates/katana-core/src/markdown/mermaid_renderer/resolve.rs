@@ -68,24 +68,24 @@ fn probe_nvm_mmdc(nvm_dir: &str) -> Option<PathBuf> {
     }
 
     let versions_dir = PathBuf::from(format!("{nvm_dir}/versions/node"));
-    // WHY: Try exact match first
     let exact = versions_dir.join(alias).join("bin/mmdc");
     if exact.is_file() {
         return Some(exact);
     }
 
-    // WHY: Prefix match
+    find_mmdc_by_prefix(&versions_dir, alias)
+}
+
+fn find_mmdc_by_prefix(versions_dir: &std::path::Path, alias: &str) -> Option<PathBuf> {
     let prefix = if alias.starts_with('v') {
         alias.to_string()
     } else {
         format!("v{alias}")
     };
-    let entries = std::fs::read_dir(&versions_dir).ok()?;
+    let entries = std::fs::read_dir(versions_dir).ok()?;
     let mut best: Option<PathBuf> = None;
     for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if name.starts_with(&prefix) {
+        if entry.file_name().to_string_lossy().starts_with(&prefix) {
             let candidate = entry.path().join("bin/mmdc");
             if candidate.is_file() {
                 best = Some(candidate);

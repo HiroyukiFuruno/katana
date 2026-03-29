@@ -34,44 +34,19 @@ pub fn check_for_updates(
     current_version: &str,
     api_url_override: Option<&str>,
 ) -> anyhow::Result<Option<ReleaseInfo>> {
-    let check_url =
-        api_url_override.unwrap_or("https://github.com/HiroyukiFuruno/KatanA/releases/latest");
+    let check_url = api_url_override.unwrap_or("https://github.com/HiroyukiFuruno/KatanA/releases/latest");
 
     // WHY: Do not use the GitHub API to avoid rate limits. Send a direct HTTP GET request to the latest endpoint.
-    // WHY: ureq securely follows the 302 redirect by default, landing at the actual tagged release URL.
-    let response = ureq::get(check_url)
-        .set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION")))
-        .call()?;
-
+    let response = ureq::get(check_url).set("User-Agent", concat!("KatanA/", env!("CARGO_PKG_VERSION"))).call()?;
     let final_url = response.get_url();
 
-    let tag_name = final_url
-        .split('/')
-        .next_back()
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse release tag ({})", final_url))?
-        .to_string();
+    let tag_name = final_url.split('/').next_back().ok_or_else(|| anyhow::anyhow!("Failed to parse release tag ({})", final_url))?.to_string();
 
     if is_newer_version(current_version, &tag_name) {
-        let html_url = format!(
-            "https://github.com/HiroyukiFuruno/KatanA/releases/tag/{}",
-            tag_name
-        );
-        let download_url = format!(
-            "https://github.com/HiroyukiFuruno/KatanA/releases/download/{}/KatanA-macOS.zip",
-            tag_name
-        );
-
-        let body = format!(
-            "### 🚀 New version {} is available\n\nPlease check the [GitHub Releases page]({}) for detailed changes and release notes.\nClick \"Install and Restart\" to automatically apply the update.",
-            &tag_name, html_url
-        );
-
-        Ok(Some(ReleaseInfo {
-            tag_name,
-            html_url,
-            body,
-            download_url,
-        }))
+        let html_url = format!("https://github.com/HiroyukiFuruno/KatanA/releases/tag/{}", tag_name);
+        let download_url = format!("https://github.com/HiroyukiFuruno/KatanA/releases/download/{}/KatanA-macOS.zip", tag_name);
+        let body = format!("### 🚀 New version {} is available\n\nPlease check the [GitHub Releases page]({}) for detailed changes and release notes.\nClick \"Install and Restart\" to automatically apply the update.", &tag_name, html_url);
+        Ok(Some(ReleaseInfo { tag_name, html_url, body, download_url }))
     } else {
         Ok(None)
     }

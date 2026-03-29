@@ -33,62 +33,44 @@ pub enum PreviewSection {
 /// Detects diagram fences (` ```mermaid` / ` ```plantuml` / ` ```drawio` ),
 /// and groups the rest as Markdown sections.
 pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
-    // WHY: Pre-processing: Relaxed inline math delimiters
     let source_cow = process_relaxed_math(source);
-    let source_processed = source_cow.as_ref();
+    let initial_sections = parse_initial_sections(source_cow.as_ref());
+    let temp = extract_standalone_images(initial_sections);
+    merge_and_wrap_sections(temp)
+}
 
+fn parse_initial_sections(source: &str) -> Vec<PreviewSection> {
     let mut initial_sections = Vec::new();
     let mut markdown_acc = String::new();
-    let mut remaining = source_processed;
+    let mut remaining = source;
 
-    loop {
-        // WHY: Find the next fence: either at the very start of remaining, or after a newline.
-        let fence_offset = if remaining.starts_with("```") {
-            Some(0)
-        } else {
-            remaining.find("\n```").map(|pos| pos + 1)
-        };
-        let Some(offset) = fence_offset else {
-            break;
-        };
-
+    while let Some(offset) = if remaining.starts_with("```") { Some(0) } else { remaining.find("\n```").map(|pos| pos + 1) } {
         markdown_acc.push_str(&remaining[..offset]);
         remaining = &remaining[offset..];
-        match try_parse_diagram_fence(remaining) {
-            Some((kind, fence_source, after)) => {
-                // WHY: Do not wrap here, we will wrap in the final merge pass
-                if !markdown_acc.is_empty() {
-                    initial_sections
-                        .push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
-                }
-                let lines = fence_source.chars().filter(|c| *c == '\n').count();
-                initial_sections.push(PreviewSection::Diagram {
-                    kind,
-                    source: fence_source,
-                    lines,
-                });
-                remaining = after;
+        if let Some((kind, fence_source, after)) = try_parse_diagram_fence(remaining) {
+            if !markdown_acc.is_empty() {
+                initial_sections.push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
             }
-            None => {
-                // WHY: If not a diagram, treat as plain Markdown.
-                markdown_acc.push_str("```");
-                remaining = &remaining["```".len()..];
-            }
+            let lines = fence_source.chars().filter(|c| *c == '\n').count();
+            initial_sections.push(PreviewSection::Diagram { kind, source: fence_source, lines });
+            remaining = after;
+        } else {
+            markdown_acc.push_str("```");
+            remaining = &remaining["```".len()..];
         }
     }
 
     markdown_acc.push_str(remaining);
     if !markdown_acc.is_empty() {
-        initial_sections.push(PreviewSection::Markdown(std::mem::take(&mut markdown_acc)));
+        initial_sections.push(PreviewSection::Markdown(markdown_acc));
     }
+    initial_sections
+}
 
-    // WHY: We need to pull standalone images to apply different HTML/Markdown transformations on them
-    let temp = extract_standalone_images(initial_sections);
-
-    // WHY: Merge adjacent text sections together to prevent fragmented parsing, and apply HTML wrapping for standalone inline elements so they render correctly
+fn merge_and_wrap_sections(sections: Vec<PreviewSection>) -> Vec<PreviewSection> {
     let mut merged = Vec::new();
     let mut md_acc = String::new();
-    for sec in temp {
+    for sec in sections {
         match sec {
             PreviewSection::Markdown(t) => {
                 md_acc.push_str(&t);
@@ -108,6 +90,5 @@ pub fn split_into_sections(source: &str) -> Vec<PreviewSection> {
         let processed = wrap_standalone_inline_html(&md_acc);
         merged.push(PreviewSection::Markdown(processed));
     }
-
     merged
 }
