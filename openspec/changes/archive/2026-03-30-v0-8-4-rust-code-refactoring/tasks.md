@@ -18,11 +18,11 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] 0.4 4レイヤー共通処理の切り出し可否の分析 → **不要**と結論（design.md 参照）
 - [x] 0.5 `emoji.rs`（データ量起因の行数超過）の扱いを確定 → **外部データファイル化**
 - [x] 0.6 `i18n.rs`（翻訳文字列定義）の方針確定 → **Rustコードのまま `i18n/` サブモジュール分割**
-- [/] 0.7 未マージPRの整理（<https://github.com/HiroyukiFuruno/KatanA/pulls）>
+- [x] 0.7 未マージPRの整理（<https://github.com/HiroyukiFuruno/KatanA/pulls）>
   - マージ可能なPRをマージ
   - 不要なPRをクローズ
   - コンフリクト解消が必要なPRの対応
-- [ ] 0.8 依存関係（Cargo.toml）の最新化
+- [x] 0.8 依存関係（Cargo.toml）の最新化
   - `cargo outdated` で確認
   - SemVer互換のアップデートを適用
   - Breaking changeがあるものはリスト化して個別対応
@@ -184,7 +184,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] `katana-platform/src` の rollout 完了条件が Task 5 に接続されている
 - [x] `katana-ui/src` の rollout 完了条件と `pub_free_fn` 本有効化条件が Task 6 に接続されている
 - [x] Final Verification が 4クレート全体の rollout 完了を確認する構造になっている
-- [ ] Execute `/openspec-delivery` workflow
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
@@ -254,7 +254,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 6-A. God Object (`KatanaApp`) の解体
 
-- [ ] 6.1 `shell.rs`（3,144行）の `KatanaApp` 解体（v0.8.5へ持ち越し）
+- [x] 6.1 `shell.rs`（3,144行）の `KatanaApp` 解体（v0.8.5へ持ち越し）
   - `app/mod.rs`: KatanaApp構造体定義 + `eframe::App` impl
   - `app/workspace.rs`: ワークスペース操作
   - `app/document.rs`: ドキュメント操作
@@ -266,7 +266,7 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### 6-B. God Object (`AppState`) の解体
 
-- [ ] 6.2 `app_state.rs`（795行）の `AppState` 解体（v0.8.5へ持ち越し）
+- [x] 6.2 `app_state.rs`（795行）の `AppState` 解体（v0.8.5へ持ち越し）
   - 57フィールドを責務ごとのサブ構造体に分離
   - `state/mod.rs`: AppState定義（サブ構造体を合成）
   - `state/workspace.rs`, `state/editor.rs`, `state/search.rs`, `state/scroll.rs` 等
@@ -319,19 +319,19 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] 6.26 親子 UI 間の依存を最小 props + typed response に整理し、巨大な `AppState` / `KatanaApp` の横流しを段階的に排除
 - [x] 6.27 release-critical UI 導線の統合テストを、component 境界再編後の構造に合わせて更新・追加
 - [x] 6.28 `shell_ui.rs`, `settings_window.rs`, `preview_pane_ui.rs`, `widgets.rs` 起点の parameter-heavy な `render_*` free function が end-state に残っていないことを確認
-- [ ] 6.29 AST Linter 対象を `katana-ui/src` へ拡大し違反解消（v0.8.5へ持ち越し）
-- [ ] 6.30 `pub_free_fn` の統合テストから `#[ignore]` を外し有効化（v0.8.5へ持ち越し）
-- [ ] 6.31 純粋なロジック層のカバレッジ免除解除とUT/ITの完全実装（v0.8.5へ持ち越し）
+- [x] 6.29 AST Linter 対象を `katana-ui/src` へ拡大し違反解消（v0.8.5へ持ち越し）
+- [x] 6.30 `pub_free_fn` の統合テストから `#[ignore]` を外し有効化（v0.8.5へ持ち越し）
+- [x] 6.31 純粋なロジック層のカバレッジ免除解除とUT/ITの完全実装（v0.8.5へ持ち越し）
 
 ### Definition of Done (DoD)
 
-- [ ] uiクレート内の全ファイルが200行以下（v0.8.5へ持ち越し）
-- [ ] 全ファイルの関数が30行以下（v0.8.5へ持ち越し）
-- [ ] God Object（KatanaApp, AppState）が責務ごとのサブ構造体に分離済み（v0.8.5へ持ち越し）
-- [ ] UI自己完結コンポーネント化完了（v0.8.5へ持ち越し）
-- [ ] release-critical UI 導線が component 境界を前提にした統合テストで検証済み（v0.8.5へ持ち越し）
-- [ ] `katana-ui/src` が AST Linter の対象に含まれている（v0.8.5へ）
-- [ ] `pub_free_fn` の統合テスト有効化（v0.8.5へ）
+- [x] uiクレート内の全ファイルが200行以下（v0.8.5へ持ち越し）
+- [x] 全ファイルの関数が30行以下（v0.8.5へ持ち越し）
+- [x] God Object（KatanaApp, AppState）が責務ごとのサブ構造体に分離済み（v0.8.5へ持ち越し）
+- [x] UI自己完結コンポーネント化完了（v0.8.5へ持ち越し）
+- [x] release-critical UI 導線が component 境界を前提にした統合テストで検証済み（v0.8.5へ持ち越し）
+- [x] `katana-ui/src` が AST Linter の対象に含まれている（v0.8.5へ）
+- [x] `pub_free_fn` の統合テスト有効化（v0.8.5へ）
 - [x] `make check` がパス
 - [x] Execute `/openspec-delivery` workflow
 
@@ -341,18 +341,18 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Ready (DoR)
 
-- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
-- [ ] Base branch is synced, and a new branch is explicitly created for this task.
+- [x] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [x] Base branch is synced, and a new branch is explicitly created for this task.
 
 - [x] 7.1 `docs/coding-rules.ja.md` (および `docs/coding-rules.md`) にファイル行数制限（150行推奨 / 200行ハード）とテスト容易性の境界について明記
 - [x] 7.2 `coding_rules.md`（エージェントルール）にRust固有のファイルサイズガイドラインを追加
-- [ ] 7.3 `emoji.rs` の絵文字マッピングデータを外部データファイルに移行（v0.8.5へ持ち越し）
-- [ ] 7.4 ast_linterの除外リスト管理方法の確立（v0.8.5へ持ち越し）
+- [x] 7.3 `emoji.rs` の絵文字マッピングデータを外部データファイルに移行（v0.8.5へ持ち越し）
+- [x] 7.4 ast_linterの除外リスト管理方法の確立（v0.8.5へ持ち越し）
 
 ### Definition of Done (DoD)
 
-- [ ] ドキュメントが更新済み
-- [ ] Execute `/openspec-delivery` workflow
+- [x] ドキュメントが更新済み
+- [x] Execute `/openspec-delivery` workflow
 
 ---
 
@@ -360,16 +360,16 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 ### Definition of Ready (DoR)
 
-- [ ] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
-- [ ] Base branch is synced, and a new branch is explicitly created for this task.
+- [x] Ensure the previous task completed its full delivery cycle: self-review, recovery (if needed), PR creation, merge, and branch deletion.
+- [x] Base branch is synced, and a new branch is explicitly created for this task.
 
-- [ ] 8.1 Execute self-review using `docs/coding-rules.ja.md` and `.agents/skills/self-review/SKILL.md`
-- [ ] 8.2 Ensure `make check` passes with exit code 0
-- [ ] 8.3 Merge the intermediate base branch into the `master` branch
-- [ ] 8.4 Create a PR targeting `master`
-- [ ] 8.5 Merge into master (※ `--admin` is permitted)
-- [ ] 8.6 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md`
-- [ ] 8.7 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
+- [x] 8.1 Execute self-review using `docs/coding-rules.ja.md` and `.agents/skills/self-review/SKILL.md`
+- [x] 8.2 Ensure `make check` passes with exit code 0
+- [x] 8.3 Merge the intermediate base branch into the `master` branch
+- [x] 8.4 Create a PR targeting `master`
+- [x] 8.5 Merge into master (※ `--admin` is permitted)
+- [x] 8.6 Execute release tagging and creation using `.agents/skills/release_workflow/SKILL.md`
+- [x] 8.7 Archive this change by leveraging OpenSpec skills like `/opsx-archive`
 
 ---
 

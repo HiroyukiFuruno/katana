@@ -2,6 +2,13 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.4] - 2026-03-30 02:00:00 (UTC)
+
+### 🔧 System
+
+- Re-architected the internal application foundation to dramatically improve the responsiveness and maintainability of the user interface.
+- Upgraded internal code hygiene standards by introducing strict architectural limits and autonomous quality enforcement mechanisms.
+
 ## [0.8.3] - 2026-03-28 18:56:00 (UTC)
 
 ### ✨ Improvements
