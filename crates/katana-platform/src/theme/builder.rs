@@ -1,4 +1,6 @@
-use crate::theme::types::*;
+use crate::theme::types::{
+    CodeColors, PresetColorData, PreviewColors, Rgb, Rgba, SystemColors, ThemeMode,
+};
 
 const DEFAULT_ACTIVE_FILE_HIGHLIGHT_ALPHA: u8 = 30;
 const DEFAULT_BUTTON_ACTIVE_ALPHA: u8 = 80;
