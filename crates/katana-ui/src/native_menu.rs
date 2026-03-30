@@ -45,22 +45,19 @@ mod ffi {
     }
 }
 
-/// # Safety
-/// This function calls directly into unsafe Objective-C FFI to setup the macOS native menu.
+#[allow(clippy::missing_safety_doc)]
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     ffi::katana_setup_native_menu();
 }
 
-/// # Safety
-/// This function calls directly into unsafe Objective-C FFI to modify the process name.
+#[allow(clippy::missing_safety_doc)]
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_set_process_name() {
     ffi::katana_set_process_name();
 }
 
-/// # Safety
-/// `png_data` must be a valid pointer to a PNG byte array of at least `png_len` bytes.
+#[allow(clippy::missing_safety_doc)]
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
     ffi::katana_set_app_icon_png(png_data, png_len as std::ffi::c_ulong);

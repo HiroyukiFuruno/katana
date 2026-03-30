@@ -1,8 +1,10 @@
-use crate::app_state::AppAction;
-use crate::shell::{NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING, RECENT_WORKSPACES_SPACING};
-use crate::shell_ui::{TreeRenderContext, open_folder_dialog};
-use eframe::egui;
 use super::tree_node::TreeEntryNode;
+use crate::app_state::AppAction;
+use crate::shell::{
+    NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING, RECENT_WORKSPACES_SPACING,
+};
+use crate::shell_ui::{open_folder_dialog, TreeRenderContext};
+use eframe::egui;
 
 pub(crate) struct WorkspaceContent<'a> {
     pub workspace: &'a mut crate::app_state::WorkspaceState,
@@ -134,4 +136,3 @@ impl<'a> WorkspaceContent<'a> {
         }
     }
 }
-
