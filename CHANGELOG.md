@@ -2,6 +2,12 @@
 
 All notable changes to KatanA Desktop. This file records the major changes to KatanA Desktop.
 
+## [0.8.4-1] - 2026-03-30 02:35:00 (UTC)
+
+### 🐛 Bug Fixes
+
+- Fixed a UI regression where the left vertical guideline in expandable accordion (details) blocks was missing when opened.
+
 ## [0.8.4] - 2026-03-30 02:00:00 (UTC)
 
 ### 🔧 System
