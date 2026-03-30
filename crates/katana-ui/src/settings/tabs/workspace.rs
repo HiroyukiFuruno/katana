@@ -41,10 +41,11 @@ pub(crate) fn render_workspace_tab(ui: &mut egui::Ui, state: &mut crate::app_sta
             };
 
             let mut is_enabled = extensions.contains(&ext.to_string());
+            const ALIGNMENT_OFFSET: f32 = 8.0;
             if ui
                 .add(
                     crate::widgets::LabeledToggle::new(label_text, &mut is_enabled)
-                        .alignment(crate::widgets::ToggleAlignment::Attached(8.0)),
+                        .alignment(crate::widgets::ToggleAlignment::Attached(ALIGNMENT_OFFSET)),
                 )
                 .changed()
             {

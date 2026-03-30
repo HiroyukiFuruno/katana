@@ -160,22 +160,24 @@ pub(crate) fn show_local_image(
 ) {
     let texture_handle = if let Some(state) = viewer_state.as_mut() {
         if state.texture.is_none() {
-            if let Ok(bytes) = std::fs::read(path) { if let Ok(dyn_img) = image::load_from_memory(&bytes) {
-                let rgba = dyn_img.into_rgba8();
-                let size = std::array::from_fn(|i| {
-                    if i == 0 {
-                        rgba.width() as usize
-                    } else {
-                        rgba.height() as usize
-                    }
-                });
-                let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
-                state.texture = Some(ui.ctx().load_texture(
-                    format!("local_image_{id}"),
-                    color_img,
-                    egui::TextureOptions::LINEAR,
-                ));
-            } }
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Ok(dyn_img) = image::load_from_memory(&bytes) {
+                    let rgba = dyn_img.into_rgba8();
+                    let size = std::array::from_fn(|i| {
+                        if i == 0 {
+                            rgba.width() as usize
+                        } else {
+                            rgba.height() as usize
+                        }
+                    });
+                    let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
+                    state.texture = Some(ui.ctx().load_texture(
+                        format!("local_image_{id}"),
+                        color_img,
+                        egui::TextureOptions::LINEAR,
+                    ));
+                }
+            }
         }
         state.texture.clone()
     } else {

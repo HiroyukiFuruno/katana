@@ -209,11 +209,13 @@ impl ImageLoader for KatanaSvgLoader {
                         let mut i = 0;
                         while i < bytes.len() {
                             if bytes[i] == b'%' && i + 2 < bytes.len() {
-                                if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..=i + 2]) { if let Ok(byte) = u8::from_str_radix(hex, HEX_RADIX) {
-                                    decoded.push(byte);
-                                    i += PERCENT_ENCODE_LEN;
-                                    continue;
-                                } }
+                                if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..=i + 2]) {
+                                    if let Ok(byte) = u8::from_str_radix(hex, HEX_RADIX) {
+                                        decoded.push(byte);
+                                        i += PERCENT_ENCODE_LEN;
+                                        continue;
+                                    }
+                                }
                             }
                             decoded.push(bytes[i]);
                             i += 1;

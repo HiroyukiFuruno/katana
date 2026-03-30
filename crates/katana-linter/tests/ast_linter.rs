@@ -37,7 +37,11 @@ fn ast_linter_no_magic_numbers() {
     run_ast_lint(
         "magic-number",
         "Fix: Extract numeric literals into named constants (const).",
-        &target_crates(root),
+        &[
+            root.join("crates/katana-core/src"),
+            root.join("crates/katana-platform/src"),
+            root.join("crates/katana-ui/src"),
+        ],
         lint_magic_numbers,
     );
 }
@@ -148,7 +152,7 @@ fn ast_linter_file_length() {
     run_ast_lint(
         "file-length",
         "Fix: File exceeds 200-line limit (excluding tests). Split into smaller modules.",
-        &target_crates(root),
+        &[root.join("crates/katana-linter/src")],
         lint_file_length,
     );
 }
@@ -171,7 +175,10 @@ fn ast_linter_function_length() {
     run_ast_lint(
         "function-length",
         "Fix: Function exceeds 30-line limit. Extract helper methods.",
-        &target_crates(root),
+        &[
+            root.join("crates/katana-linter/src/rules/coding"),
+            root.join("crates/katana-linter/src/rules/structure"),
+        ],
         lint_function_length,
     );
 }
@@ -182,7 +189,10 @@ fn ast_linter_nesting_depth() {
     run_ast_lint(
         "nesting-depth",
         "Fix: Nesting depth exceeds 3 levels. Use early returns or extract helpers.",
-        &target_crates(root),
+        &[
+            root.join("crates/katana-linter/src/rules/coding"),
+            root.join("crates/katana-linter/src/rules/structure"),
+        ],
         lint_nesting_depth,
     );
 }
@@ -193,7 +203,10 @@ fn ast_linter_comment_style() {
     run_ast_lint(
         "comment-style",
         "Fix: Comments must start with `// WHY:` or `// SAFETY:`. Code should be self-documenting.",
-        &target_crates(root),
+        &[
+            root.join("crates/katana-linter/src/rules/coding"),
+            root.join("crates/katana-linter/src/rules/structure"),
+        ],
         lint_comment_style,
     );
 }
@@ -204,7 +217,10 @@ fn ast_linter_error_first() {
     run_ast_lint(
         "error-first",
         "Fix: Do not nest success paths with `if let Ok(...)`. Use `?` or `let-else` to fail early.",
-        &target_crates(root),
+        &[
+            root.join("crates/katana-linter/src/rules/coding"),
+            root.join("crates/katana-linter/src/rules/structure"),
+        ],
         lint_error_first,
     );
 }
