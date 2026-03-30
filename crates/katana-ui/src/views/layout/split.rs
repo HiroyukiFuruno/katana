@@ -128,9 +128,6 @@ impl<'a> HorizontalSplit<'a> {
                 }
             });
 
-        // Sync preview's scroll state to app.state BEFORE the editor renders.
-        // The editor reads/writes app.state directly; writing back after the
-        // editor would overwrite the editor's consumption of scroll signals.
         app.state.scroll.fraction = scroll_state.0;
         app.state.scroll.source = scroll_state.1;
         app.state.scroll.preview_max = scroll_state.2;
@@ -195,7 +192,6 @@ impl<'a> VerticalSplit<'a> {
             }
         };
 
-        // EditorFirst: editor on top, preview on bottom; PreviewFirst: reversed.
         let show_preview_top = pane_order == PaneOrder::PreviewFirst;
         let scroll_sync = app.state.scroll.sync_override.unwrap_or(
             app.state
@@ -234,10 +230,6 @@ impl<'a> VerticalSplit<'a> {
                     }
                 });
 
-            // Sync preview's scroll state to app.state BEFORE the editor renders.
-            // The editor reads from app.state directly, so it must see the preview's
-            // latest scroll_source/fraction. After the editor runs, its writes to
-            // app.state are preserved (no subsequent overwrite).
             app.state.scroll.fraction = scroll_state.0;
             app.state.scroll.source = scroll_state.1;
             app.state.scroll.preview_max = scroll_state.2;

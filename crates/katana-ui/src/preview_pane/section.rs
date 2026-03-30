@@ -4,8 +4,6 @@ use eframe::egui::{self};
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 use katana_core::markdown::color_preset::DiagramColorPreset;
 
-/// Renders a single section.
-/// Returns `Some(DownloadRequest)` if the download button is pressed.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn show_section(
     ui: &mut egui::Ui,
@@ -25,15 +23,11 @@ pub(crate) fn show_section(
     match section {
         RenderedSection::Markdown(md) => {
             with_preview_text_style(ui, |ui| {
-                // Negative margin offset is no longer needed since we removed forced newlines from egui_commonmark
                 let preset = if ui.visuals().dark_mode {
                     DiagramColorPreset::dark()
                 } else {
                     DiagramColorPreset::light()
                 };
-                // Retrieve the preview-specific text colour from the cached ThemeColors.
-                // egui::Visuals::override_text_color was global to all UI,
-                // so we use preview.text to achieve independent colour assignment.
                 let theme_colors = ui.ctx().data(|d| {
                     d.get_temp::<katana_platform::theme::ThemeColors>(egui::Id::new(
                         "katana_theme_colors",
@@ -250,11 +244,6 @@ pub(crate) fn show_section(
     }
 }
 
-/// Renders the section list sequentially and returns a download request if any.
-///
-/// No automatic separators are inserted between sections.
-/// Horizontal rules (`---`) are rendered by CommonMarkViewer as part of the markdown content.
-/// Extended version of `render_sections` with viewer state support.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_sections(
     ui: &mut egui::Ui,
@@ -294,7 +283,6 @@ pub(crate) fn render_sections(
             };
             match section {
                 RenderedSection::Image { svg_data, alt, .. } => {
-                    // Auto-extend viewer_states Vec if needed and take a mutable reference.
                     let state = viewer_states.as_mut().map(|vs| {
                         if vs.len() <= i {
                             vs.resize_with(i + 1, ViewerState::default);

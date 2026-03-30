@@ -12,7 +12,6 @@
     clippy::unimplemented,
     clippy::cognitive_complexity
 )]
-//! KatanA UI application entry point.
 
 #[cfg(not(test))]
 use katana_core::ai::AiProviderRegistry;
@@ -62,12 +61,10 @@ fn load_icon() -> std::sync::Arc<egui::IconData> {
     })
 }
 
-/// Resolves a macOS locale string (e.g. "ja-JP", "zh-Hans") to a supported language code.
 #[cfg(all(target_os = "macos", not(test)))]
 fn resolve_locale_to_lang(locale: &str) -> String {
     let lower = locale.to_lowercase();
 
-    // Chinese variants require special handling due to script subtags.
     if lower.starts_with("zh-hans") || lower.contains("hans") {
         return "zh-CN".to_string();
     }
@@ -79,7 +76,6 @@ fn resolve_locale_to_lang(locale: &str) -> String {
         return "zh-TW".to_string();
     }
 
-    // Simple prefix-based lookup for all other languages.
     const PREFIX_MAP: &[(&str, &str)] = &[
         ("ja", "ja"),
         ("ko", "ko"),
@@ -116,7 +112,6 @@ fn detect_initial_language() -> Option<String> {
 
 #[cfg(not(test))]
 fn main() -> eframe::Result<()> {
-    // Initialize tracing.
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -126,30 +121,22 @@ fn main() -> eframe::Result<()> {
 
     tracing::info!("Starting KatanA");
 
-    // macOS: Set process name before any window is created.
-    // This ensures the Dock label shows "KatanA" instead of "katana".
     #[cfg(target_os = "macos")]
     unsafe {
         shell_ui::native_set_process_name();
     }
 
-    // Initialize AI provider registry (no providers configured in MVP).
     let ai_registry = AiProviderRegistry::new();
 
-    // Initialize plugin registry with static built-in registrations.
     let mut plugin_registry = PluginRegistry::new();
     register_builtin_plugins(&mut plugin_registry);
 
-    // Initialize settings with JSON file persistence.
     let repo = JsonFileRepository::with_default_path();
     let mut settings = SettingsService::new(Box::new(repo));
 
-    // On first launch (no settings.json), automatically select the OS-matching theme.
-    // Existing users keep their saved preset unchanged.
     settings.apply_os_default_theme();
     settings.apply_os_default_language(detect_initial_language());
 
-    // Read saved values before moving settings into AppState.
     let saved_language = settings.settings().language.clone();
     let saved_workspace = settings.settings().workspace.last_workspace.clone();
 
@@ -172,13 +159,10 @@ fn main() -> eframe::Result<()> {
         native_options,
         Box::new(|cc| {
             setup_fonts(&cc.egui_ctx);
-            // Install lazy, parallel image loaders for file:// URIs in preview.
             katana_ui::svg_loader::install_image_loaders(&cc.egui_ctx);
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            // Register all SVG icon bytes so the image loader can resolve them.
             katana_ui::icon::IconRegistry::install(&cc.egui_ctx);
 
-            // macOS: Construct the native menu bar and set app icon.
             #[cfg(target_os = "macos")]
             unsafe {
                 shell_ui::native_menu_setup();
@@ -186,28 +170,28 @@ fn main() -> eframe::Result<()> {
                 shell_ui::native_set_app_icon_png(png_bytes.as_ptr(), png_bytes.len());
             }
 
-            // Restore saved language.
             katana_ui::i18n::set_language(&saved_language);
             katana_ui::shell_ui::update_native_menu_strings_from_i18n();
 
             let mut app = KatanaApp::new(state);
 
-            // Load icon texture for About dialog.
             let icon_png = include_bytes!("../../../assets/icon.iconset/icon_128x128.png");
-            if let Ok(icon_image) = image::load_from_memory(icon_png) {
-                let rgba = icon_image.to_rgba8();
-                let size = [rgba.width() as usize, rgba.height() as usize];
-                let pixels = rgba.into_raw();
-                let color_image = egui::ColorImage::from_rgba_unmultiplied(size, &pixels);
-                let texture = cc.egui_ctx.load_texture(
-                    "about_icon",
-                    color_image,
-                    egui::TextureOptions::LINEAR,
-                );
-                app.about_icon = Some(texture);
+            match image::load_from_memory(icon_png) {
+                Ok(icon_image) => {
+                    let rgba = icon_image.to_rgba8();
+                    let size = [rgba.width() as usize, rgba.height() as usize];
+                    let pixels = rgba.into_raw();
+                    let color_image = egui::ColorImage::from_rgba_unmultiplied(size, &pixels);
+                    let texture = cc.egui_ctx.load_texture(
+                        "about_icon",
+                        color_image,
+                        egui::TextureOptions::LINEAR,
+                    );
+                    app.about_icon = Some(texture);
+                }
+                Err(_) => {}
             }
 
-            // Restore last opened workspace.
             if let Some(ws_path) = saved_workspace {
                 let path = std::path::PathBuf::from(&ws_path);
                 if path.is_dir() {
@@ -221,17 +205,11 @@ fn main() -> eframe::Result<()> {
     )
 }
 
-/// Loads system fonts from the current preset and registers them with egui.
-///
-/// - **Proportional**: Uses `proportional_font_candidates` from preset (inserted at front).
-/// - **Monospace**: Uses `monospace_font_candidates` from preset (inserted at front).
-/// - Each loaded font is also added as a fallback in the OTHER family for CJK coverage.
 pub fn setup_fonts(ctx: &egui::Context) {
     let preset = katana_core::markdown::color_preset::DiagramColorPreset::current();
     setup_fonts_from_preset(ctx, preset);
 }
 
-/// Configures fonts from a given preset. Testable.
 pub fn setup_fonts_from_preset(
     ctx: &egui::Context,
     preset: &katana_core::markdown::color_preset::DiagramColorPreset,
@@ -239,8 +217,6 @@ pub fn setup_fonts_from_preset(
     katana_ui::font_loader::SystemFontLoader::setup_fonts(ctx, preset, None, None);
 }
 
-/// Receives a list of font candidates and sets the fonts. Testable.
-/// Kept for backward compatibility with existing tests.
 pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
     let normalized = build_font_definitions(candidates, &[], &[]);
     ctx.set_fonts(normalized.into_inner());
@@ -254,16 +230,6 @@ pub fn setup_fonts_with_candidates(ctx: &egui::Context, candidates: &[&str]) {
     });
 }
 
-/// Builds `FontDefinitions` with system fonts inserted at the correct family positions.
-///
-/// - **Proportional**: loaded from `proportional_candidates`, inserted at position 0.
-///   Also appended to Monospace as CJK fallback.
-/// - **Monospace**: loaded from `monospace_candidates`, inserted at position 0 in Monospace family.
-///   Also appended to Proportional as fallback.
-/// - **Emoji**: candidates are retained for preview-specific loaders, but are not injected
-///   into the global egui font families.
-///
-/// This is a pure function for testability.
 pub fn build_font_definitions(
     proportional_candidates: &[&str],
     monospace_candidates: &[&str],
@@ -278,27 +244,20 @@ pub fn build_font_definitions(
     )
 }
 
-/// Returns the first readable font from the list of candidate paths.
 pub fn load_first_font(candidates: &[&str]) -> Option<(String, Vec<u8>)> {
     for &path in candidates {
-        if let Ok(data) = std::fs::read(path) {
-            let name = std::path::Path::new(path)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("cjk_font")
-                .to_string();
-            return Some((name, data));
-        }
+        let Ok(data) = std::fs::read(path) else { continue };
+        let name = std::path::Path::new(path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("cjk_font")
+            .to_string();
+        return Some((name, data));
     }
     None
 }
 
-/// Register all built-in plugins at startup.
-///
-/// In the MVP, all plugin registrations are static compile-time definitions.
-/// No runtime manifest file is required.
 pub fn register_builtin_plugins(registry: &mut PluginRegistry) {
-    // Built-in Mermaid renderer plugin (placeholder; actual renderer bound in Task 4.2).
     registry.register(
         PluginMeta {
             id: "builtin-mermaid-renderer".to_string(),
@@ -306,10 +265,9 @@ pub fn register_builtin_plugins(registry: &mut PluginRegistry) {
             api_version: PLUGIN_API_VERSION,
             extension_points: vec![ExtensionPoint::RendererEnhancement],
         },
-        || Ok(()), // Renderer logic is wired directly in the markdown pipeline.
+        || Ok(()), // WHY: Renderer logic is wired directly in the markdown pipeline.
     );
 
-    // Built-in PlantUML renderer plugin (placeholder; actual renderer bound in Task 4.4).
     registry.register(
         PluginMeta {
             id: "builtin-plantuml-renderer".to_string(),
@@ -320,7 +278,6 @@ pub fn register_builtin_plugins(registry: &mut PluginRegistry) {
         || Ok(()),
     );
 
-    // Built-in Draw.io renderer plugin (placeholder; actual renderer bound in Task 4.3).
     registry.register(
         PluginMeta {
             id: "builtin-drawio-renderer".to_string(),
@@ -349,13 +306,11 @@ mod tests {
 
     #[test]
     fn test_load_first_font_found() {
-        // Cover the success path using fonts that exist on macOS
         let candidates = vec![
             "/System/Library/Fonts/AquaKana.ttc",
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
         ];
         let result = load_first_font(&candidates);
-        // One of them should be found in a macOS environment
         if let Some((name, data)) = result {
             assert!(!name.is_empty());
             assert!(!data.is_empty());
@@ -373,7 +328,6 @@ mod tests {
     fn test_setup_fonts_without_cjk() {
         init_tracing();
         let ctx = egui::Context::default();
-        // Only non-existent paths -> take the else (warn) path
         setup_fonts_with_candidates(&ctx, &["/nonexistent/font.ttc"]);
     }
 
@@ -385,7 +339,6 @@ mod tests {
         assert_eq!(registry.active_count(), 3);
     }
 
-    // ── Smoke Test: image loaders can be installed ──
 
     #[test]
     fn test_install_image_loaders_does_not_panic() {
@@ -394,7 +347,6 @@ mod tests {
         assert!(ctx.is_loader_installed(katana_ui::svg_loader::KatanaSvgLoader::ID));
     }
 
-    // ── Font Family Ordering Tests ──
 
     const PROP_CANDIDATES: &[&str] = &[
         "/System/Library/Fonts/\u{30d2}\u{30e9}\u{30ae}\u{30ce}\u{89d2}\u{30b4}\u{30b7}\u{30c3}\u{30af} W3.ttc",
@@ -500,13 +452,11 @@ mod tests {
         setup_fonts_from_preset(&ctx, preset);
     }
 
-    // ── Preset Integration Tests ──
 
     #[test]
     fn test_preset_syntax_themes_are_valid_identifiers() {
         use katana_core::markdown::color_preset::DiagramColorPreset;
         let preset = DiagramColorPreset::current();
-        // Syntect themes must not be empty.
         assert!(
             !preset.syntax_theme_dark.is_empty(),
             "syntax_theme_dark must not be empty"
@@ -539,7 +489,6 @@ mod tests {
         );
     }
 
-    // ── Emoji Font Tests ──
 
     const EMOJI_CANDIDATES: &[&str] = &[
         "/System/Library/Fonts/Apple Color Emoji.ttc",

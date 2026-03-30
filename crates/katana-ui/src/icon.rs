@@ -1,5 +1,3 @@
-/// Generates the Icon enum, name(), svg_bytes(), and ALL_ICONS from a single
-/// declaration table, eliminating path duplication.
 macro_rules! define_icons {
     ( $( $(#[$meta:meta])* $variant:ident => $file:literal ),+ $(,)? ) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,14 +6,12 @@ macro_rules! define_icons {
         }
 
         impl Icon {
-            /// Returns the lowercase name used in SVG asset paths.
             pub const fn name(&self) -> &'static str {
                 match self {
                     $( Self::$variant => $file, )+
                 }
             }
 
-            /// Returns raw SVG bytes embedded at compile time.
             pub fn svg_bytes(&self) -> &'static [u8] {
                 match self {
                     $( Self::$variant => include_bytes!(
@@ -25,7 +21,6 @@ macro_rules! define_icons {
             }
         }
 
-        /// All icon variants for iteration.
         pub const ALL_ICONS: &[Icon] = &[
             $( Icon::$variant, )+
         ];
@@ -37,9 +32,7 @@ define_icons! {
     ChevronLeft     => "chevron_left",
     ChevronRight    => "chevron_right",
     Refresh         => "refresh",
-    /// 'x'
     Close           => "close",
-    /// '×' (U+00D7)
     Remove          => "remove",
     ExternalLink    => "external_link",
     TriangleDown    => "triangle_down",
@@ -49,7 +42,6 @@ define_icons! {
     Plus            => "plus",
     Minus           => "minus",
     Toc             => "toc",
-    // Viewer overlay controls
     PanUp           => "pan_up",
     PanDown         => "pan_down",
     PanLeft         => "pan_left",
@@ -65,7 +57,6 @@ define_icons! {
     Error           => "error",
     Export          => "export",
     Filter          => "filter",
-    // File tree & layout icons
     SplitVertical   => "split_vertical",
     SplitHorizontal => "split_horizontal",
     Preview         => "preview",
@@ -80,19 +71,14 @@ define_icons! {
     Bug             => "bug",
 }
 
-/// Predefined icon sizes for consistent rendering across the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IconSize {
-    /// 12×12 — compact controls (tab close, small toolbar buttons).
     Small,
-    /// 16×16 — standard toolbar and sidebar icons.
     Medium,
-    /// 20×20 — prominent actions and diagram controls.
     Large,
 }
 
 impl IconSize {
-    /// Returns the pixel dimensions as an `egui::Vec2`.
     const SMALL: f32 = 12.0;
     const MEDIUM: f32 = 16.0;
     const LARGE: f32 = 20.0;
@@ -107,29 +93,22 @@ impl IconSize {
 }
 
 impl Icon {
-    /// Returns the `bytes://` URI used by the egui image loader.
     pub fn uri(&self) -> String {
         format!("bytes://icon/{}.svg", self.name())
     }
 
-    /// Returns an `egui::Image` sized and tinted for the given parameters.
-    /// Use `ui_image()` for automatic theme color tinting.
     pub fn image(&self, size: IconSize) -> egui::Image<'static> {
         egui::Image::new(self.uri()).fit_to_exact_size(size.to_vec2())
     }
 
-    /// Returns an `egui::Image` tinted with the current UI text color.
-    /// Preferred method for most icon usages.
     pub fn ui_image(&self, ui: &egui::Ui, size: IconSize) -> egui::Image<'static> {
         self.image(size).tint(ui.visuals().text_color())
     }
 }
 
-/// Registers all icon SVG bytes with the egui context for lazy loading.
 pub struct IconRegistry;
 
 impl IconRegistry {
-    /// Registers all icon SVGs with the given context via `include_bytes`.
     pub fn install(ctx: &egui::Context) {
         for icon in ALL_ICONS {
             ctx.include_bytes(icon.uri(), icon.svg_bytes());
@@ -194,8 +173,6 @@ mod tests {
     fn icon_registry_install_registers_all_icons() {
         let ctx = egui::Context::default();
         IconRegistry::install(&ctx);
-        // egui does not expose a public API to query registered bytes,
-        // but install should not panic for any icon.
     }
 
     #[test]
@@ -204,13 +181,10 @@ mod tests {
         crate::svg_loader::install_image_loaders(&ctx);
         IconRegistry::install(&ctx);
 
-        // Simulate RefreshDiagrams: forget_all_images clears byte registrations
         ctx.forget_all_images();
 
-        // Re-register icon bytes (the fix)
         IconRegistry::install(&ctx);
 
-        // Verify the SVG loader can still load an icon after re-install
         let result = ctx.try_load_bytes(&Icon::Refresh.uri());
         assert!(
             result.is_ok(),

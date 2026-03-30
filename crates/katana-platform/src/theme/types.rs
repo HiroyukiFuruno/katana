@@ -208,7 +208,6 @@ mod tests {
         let theme = ThemePreset::KatanaDark.colors();
         let original_hover = theme.preview.hover_line_background.a;
         let modified_theme = theme.with_contrast_offset(50.0);
-        // Since original could be near 255, we just test it changed or clamped
         assert!(modified_theme.preview.hover_line_background.a >= original_hover);
 
         let theme2 = ThemePreset::KatanaDark.colors();

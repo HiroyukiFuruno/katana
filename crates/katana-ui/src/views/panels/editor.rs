@@ -161,7 +161,6 @@ impl<'a> EditorContent<'a> {
                             scroll.active_editor_line = None;
                         }
 
-                        // Hover highlights from preview pane
                         const HOVER_HIGHLIGHT_ALPHA: u8 = 10;
                         let hover_color = hover_line_bg.unwrap_or_else(|| {
                             if ui.visuals().dark_mode {
@@ -197,7 +196,6 @@ impl<'a> EditorContent<'a> {
                                     index: start_idx,
                                     prefer_next_row: false,
                                 };
-                                // Ensure we don't highlight beyond the actual characters
                                 let cursor_end = egui::text::CCursor {
                                     index: end_idx.saturating_sub(1),
                                     prefer_next_row: false,
@@ -220,7 +218,6 @@ impl<'a> EditorContent<'a> {
                             }
                         }
 
-                        // Draw line numbers
                         let clip_rect = ui.clip_rect().expand(100.0);
                         let mut p = 0;
                         let mut is_start_of_para = true;
@@ -262,7 +259,6 @@ impl<'a> EditorContent<'a> {
 
                                 let label_for_measuring =
                                     egui::Label::new(text_rt.clone()).selectable(false);
-                                // align right
                                 let galley_ln = label_for_measuring.layout_in_ui(ui);
                                 let offset_x =
                                     (label_rect.width() - galley_ln.1.rect.width()).max(0.0);

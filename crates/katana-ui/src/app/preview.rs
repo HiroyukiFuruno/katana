@@ -108,8 +108,6 @@ impl PreviewOps for KatanaApp {
             .iter_mut()
             .find(|t| t.path == path_buf)
             .expect("just fetched pane");
-        // If force, also reset hash to 0 so it redraws on switch, or update it now.
-        // We update to true hash since we re-rendered anyway.
         tab.hash = h;
     }
 }

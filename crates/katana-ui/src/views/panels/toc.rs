@@ -38,7 +38,6 @@ impl<'a> TocPanel<'a> {
                 ui.heading(crate::i18n::get().toc.title.clone());
                 ui.separator();
 
-                // Prevent text from wrapping or pushing the SidePanel width. Text will truncate with `...`
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
 
                 egui::ScrollArea::vertical()

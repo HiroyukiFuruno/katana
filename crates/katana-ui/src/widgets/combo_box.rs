@@ -1,30 +1,10 @@
-/// A styled combobox wrapper ensuring vertical center alignment of icon and text.
-///
-/// Wraps `egui::ComboBox` with consistent styling across the application.
-/// All dropdown selectors should use this component instead of raw `egui::ComboBox`.
-///
-/// # Example
-///
-/// ```ignore
-/// use katana_ui::widgets::StyledComboBox;
-///
-/// StyledComboBox::new("my_selector", "Currently Selected")
-///     .width(150.0)
-///     .show(ui, |ui| {
-///         ui.selectable_value(&mut value, Option::A, "Option A");
-///     });
-/// ```
 pub struct StyledComboBox<'a> {
-    /// Unique ID salt for the egui combobox (prevents ID collisions).
     id: &'a str,
-    /// Text displayed when the combobox is collapsed.
     selected_text: String,
-    /// Optional fixed width in pixels.
     width: Option<f32>,
 }
 
 impl<'a> StyledComboBox<'a> {
-    /// Creates a new styled combobox with the given ID and selected text.
     pub fn new(id: &'a str, selected_text: impl Into<String>) -> Self {
         Self {
             id,
@@ -33,15 +13,11 @@ impl<'a> StyledComboBox<'a> {
         }
     }
 
-    /// Sets a fixed width for the combobox in pixels.
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self
     }
 
-    /// Renders the combobox with vertically centered icon and text.
-    ///
-    /// The `content` closure receives a `&mut Ui` for adding selectable items.
     pub fn show(self, ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
         let mut combo = egui::ComboBox::from_id_salt(self.id).selected_text(self.selected_text);
 
@@ -59,7 +35,6 @@ impl<'a> StyledComboBox<'a> {
 mod tests {
     use super::*;
 
-    // ── StyledComboBox tests ─────────────────────────────────────────
 
     #[test]
     fn test_styled_combobox_builder_defaults() {

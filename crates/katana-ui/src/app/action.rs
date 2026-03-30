@@ -152,9 +152,6 @@ impl ActionOps for KatanaApp {
                 }
             }
             AppAction::OpenMultipleDocuments(paths) => {
-                // When recursively opening a directory, activate the first file
-                // and open the rest lazily (no load, no activate) in subsequent frames
-                // to prevent UI freezing and show progressive tab increase.
                 let mut iter = paths.into_iter();
                 if let Some(first_path) = iter.next() {
                     self.handle_select_document(first_path, true);
@@ -165,8 +162,6 @@ impl ActionOps for KatanaApp {
             }
             AppAction::RemoveWorkspace(path) => self.handle_remove_workspace(path),
             AppAction::CloseDocument(idx) => {
-                // A1: If confirm_close_dirty_tab is enabled and the doc is dirty,
-                // show a confirmation dialog instead of closing immediately.
                 let should_confirm = self
                     .state
                     .config
@@ -197,12 +192,9 @@ impl ActionOps for KatanaApp {
             } => self.handle_toggle_task_list(global_index, new_state),
             AppAction::SaveDocument => self.handle_save_document(),
             AppAction::RefreshDiagrams => {
-                // Clear all egui texture caches (e.g. diagrams, network images)
                 ctx.forget_all_images();
-                // Reinstall UI icon SVGs so they aren't lost to the cache clear
                 crate::icon::IconRegistry::install(ctx);
 
-                // Invalidate hashes so non-active tabs re-render on next switch
                 for tab in &mut self.tab_previews {
                     tab.hash = 0;
                     for viewer in tab.pane.viewer_states.iter_mut() {
@@ -211,7 +203,6 @@ impl ActionOps for KatanaApp {
                     tab.pane.fullscreen_viewer_state.texture = None;
                 }
 
-                // Re-render the active tab without reading from disk, to avoid wiping unsaved changes!
                 if let Some(doc) = self.state.active_document_mut() {
                     let path = doc.path.clone();
                     let src = doc.buffer.clone();
@@ -252,11 +243,9 @@ impl ActionOps for KatanaApp {
                 self.state.search.filter_enabled = !self.state.search.filter_enabled;
             }
             AppAction::SetSplitDirection(dir) => {
-                // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_split_direction(dir);
             }
             AppAction::SetPaneOrder(order) => {
-                // Keep toolbar toggles temporary and scoped to the active tab.
                 self.state.set_active_pane_order(order);
             }
             AppAction::SetViewMode(mode) => {
@@ -336,7 +325,6 @@ impl ActionOps for KatanaApp {
                     let active_path = self.state.active_document().map(|d| d.path.clone());
                     let doc = &mut self.state.document.open_documents[idx];
                     doc.is_pinned = !doc.is_pinned;
-                    // Stable sort to move pinned tabs to the front
                     self.state
                         .document
                         .open_documents
@@ -435,7 +423,6 @@ impl ActionOps for KatanaApp {
                 ctx.forget_all_images();
                 crate::icon::IconRegistry::install(ctx);
 
-                // Assuming `clear_http_cache` is a decent message for "Successfully cleared" or "Clear cache" button label. Use it as Status msg.
                 self.state.layout.status_message = Some((
                     crate::i18n::get()
                         .settings
@@ -544,13 +531,8 @@ impl ActionOps for KatanaApp {
             }
         }
 
-        // Clean up resources whenever an action completes.
-        // Specifically, ensure inactive tabs give up their background CPU,
-        // and closed tabs drop their previews entirely.
         self.cleanup_closed_tab_previews();
 
-        // Ensure the newly active document is loaded and has a preview.
-        // This handles cases where tabs are closed and the active tab silently shifts.
         let mut inactive_but_focused_path = None;
         if let Some(active_idx) = self.state.document.active_doc_idx {
             if let Some(doc) = self.state.document.open_documents.get(active_idx) {
@@ -585,7 +567,6 @@ impl ActionOps for KatanaApp {
         crate::changelog::fetch_changelog(&lang, current_version, previous, tx);
         tracing::info!("Triggered ShowReleaseNotes background fetch.");
 
-        // Open/select the changelog tab immediately (it will show a loading state until data arrives)
         let virtual_path =
             std::path::PathBuf::from(format!("Katana://ChangeLog v{}", env!("CARGO_PKG_VERSION")));
         if !self
@@ -605,41 +586,40 @@ impl ActionOps for KatanaApp {
         self.handle_select_document(virtual_path, true);
     }
     fn poll_changelog(&mut self, _ctx: &egui::Context) {
-        if let Some(rx) = &self.changelog_rx {
-            if let Ok(event) = rx.try_recv() {
-                self.changelog_rx = None;
-                match event {
-                    crate::changelog::ChangelogEvent::Success(sections) => {
-                        self.changelog_sections = sections;
-                        let virtual_path = std::path::PathBuf::from(format!(
-                            "Katana://ChangeLog v{}",
-                            env!("CARGO_PKG_VERSION")
-                        ));
-                        if let Some(pos) = self
-                            .state
-                            .document
-                            .open_documents
-                            .iter()
-                            .position(|d| d.path == virtual_path)
-                        {
-                            self.state.document.active_doc_idx = Some(pos);
-                        } else {
-                            self.state
-                                .document
-                                .open_documents
-                                .push(katana_core::document::Document::new_empty(virtual_path));
-                            self.state.document.active_doc_idx =
-                                Some(self.state.document.open_documents.len() - 1);
-                        }
-                    }
-                    crate::changelog::ChangelogEvent::Error(err) => {
-                        tracing::error!("Failed to fetch changelog: {}", err);
-                        self.state.layout.status_message = Some((
-                            format!("Failed to fetch release notes: {err}"),
-                            crate::app_state::StatusType::Error,
-                        ));
-                    }
+        let Some(rx) = &self.changelog_rx else { return };
+        let Ok(event) = rx.try_recv() else { return };
+
+        self.changelog_rx = None;
+        match event {
+            crate::changelog::ChangelogEvent::Success(sections) => {
+                self.changelog_sections = sections;
+                let virtual_path = std::path::PathBuf::from(format!(
+                    "Katana://ChangeLog v{}",
+                    env!("CARGO_PKG_VERSION")
+                ));
+                if let Some(pos) = self
+                    .state
+                    .document
+                    .open_documents
+                    .iter()
+                    .position(|d| d.path == virtual_path)
+                {
+                    self.state.document.active_doc_idx = Some(pos);
+                } else {
+                    self.state
+                        .document
+                        .open_documents
+                        .push(katana_core::document::Document::new_empty(virtual_path));
+                    self.state.document.active_doc_idx =
+                        Some(self.state.document.open_documents.len() - 1);
                 }
+            }
+            crate::changelog::ChangelogEvent::Error(err) => {
+                tracing::error!("Failed to fetch changelog: {}", err);
+                self.state.layout.status_message = Some((
+                    format!("Failed to fetch release notes: {err}"),
+                    crate::app_state::StatusType::Error,
+                ));
             }
         }
     }
@@ -690,7 +670,6 @@ impl ActionOps for KatanaApp {
                     show_changelog = true;
                 }
             } else {
-                // First launch ever or first launch since v0.8.0
                 show_changelog = true;
             }
             if show_changelog {

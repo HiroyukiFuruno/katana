@@ -32,36 +32,38 @@ pub(crate) fn render_workspace_tab(ui: &mut egui::Ui, state: &mut crate::app_sta
     let mut extensions = settings.settings().workspace.visible_extensions.clone();
     let mut changed_ext = false;
 
-    for ext in &["md", "markdown", "mdx", "txt", "adr", ""] {
-        let label_text = if ext.is_empty() {
-            workspace_msgs.no_extension_label.as_str()
-        } else {
-            *ext
-        };
+    ui.horizontal_wrapped(|ui| {
+        for ext in &["md", "markdown", "mdx", "txt", "adr", ""] {
+            let label_text = if ext.is_empty() {
+                workspace_msgs.no_extension_label.as_str()
+            } else {
+                *ext
+            };
 
-        let mut is_enabled = extensions.contains(&ext.to_string());
-        if ui
-            .add(crate::widgets::LabeledToggle::new(
-                label_text,
-                &mut is_enabled,
-            ))
-            .changed()
-        {
-            if is_enabled {
-                if ext.is_empty() {
-                    ui.data_mut(|d| {
-                        d.insert_temp(egui::Id::new("show_no_extension_warning"), true)
-                    });
-                } else if !extensions.contains(&ext.to_string()) {
-                    extensions.push(ext.to_string());
+            let mut is_enabled = extensions.contains(&ext.to_string());
+            if ui
+                .add(
+                    crate::widgets::LabeledToggle::new(label_text, &mut is_enabled)
+                        .alignment(crate::widgets::ToggleAlignment::Attached(8.0)),
+                )
+                .changed()
+            {
+                if is_enabled {
+                    if ext.is_empty() {
+                        ui.data_mut(|d| {
+                            d.insert_temp(egui::Id::new("show_no_extension_warning"), true)
+                        });
+                    } else if !extensions.contains(&ext.to_string()) {
+                        extensions.push(ext.to_string());
+                        changed_ext = true;
+                    }
+                } else {
+                    extensions.retain(|e| e != ext);
                     changed_ext = true;
                 }
-            } else {
-                extensions.retain(|e| e != ext);
-                changed_ext = true;
             }
         }
-    }
+    });
 
     if changed_ext {
         settings.settings_mut().workspace.visible_extensions = extensions;

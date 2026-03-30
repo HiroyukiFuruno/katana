@@ -235,7 +235,6 @@ impl<'a> TabBar<'a> {
                                     let drag_offset = pointer_pos - press_origin;
                                     let ghost_rect = full_tab_rect.translate(drag_offset);
 
-                                    // Save the ghost center X for the exact moment of drop!
                                     ui.memory_mut(|mem| {
                                         mem.data.insert_temp(
                                             egui::Id::new("drag_ghost_x").with(idx),
@@ -243,10 +242,8 @@ impl<'a> TabBar<'a> {
                                         )
                                     });
 
-                                    // Auto-scroll the horizontal scroll area to ensure the dragged tab is visible
                                     ui.scroll_to_rect(ghost_rect, None);
 
-                                    // 1. Render ghost tab following the cursor
                                     egui::Area::new(egui::Id::new("tab_ghost").with(idx))
                                         .fixed_pos(ghost_rect.min)
                                         .order(egui::Order::Tooltip)
@@ -289,12 +286,10 @@ impl<'a> TabBar<'a> {
                                 }
                             }
 
-                            // Task 3.7: Only scroll when navigated via left/right buttons.
                             if is_active && should_scroll {
                                 tab_interact.scroll_to_me(Some(egui::Align::Center));
                             }
 
-                            // Retrieve the saved ghost_x purely from memory because pointer input might be cleared
                             if tab_interact.drag_stopped() {
                                 if let Some(ghost_x) = ui.memory(|mem| {
                                     mem.data
@@ -386,7 +381,6 @@ impl<'a> TabBar<'a> {
                             }
                         }
 
-                        // Draw animated (lerp) insertion marker
                         if let Some((target_x, y_range)) = current_hovered_drop_x {
                             let indicator_id = egui::Id::new("tab_drop_indicator");
                             let animated_x = ui.ctx().animate_value_with_time(
@@ -550,7 +544,6 @@ impl ViewModeBar {
             egui::vec2(available_width, bar_height),
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
-                // Render non-intrusive Update Available Badge
                 if self.update_available && !self.update_checking {
                     const COLOR_SUCCESS_G: u8 = 200;
                     let badge_str = format!("✨ {}", crate::i18n::get().update.update_available);
@@ -568,7 +561,6 @@ impl ViewModeBar {
                     ui.separator();
                 }
 
-                // Omit View Mode controls for virtual tabs like ChangeLog since they are native documents
                 let is_changelog = self.is_changelog;
 
                 let prev_is_split = prev == ViewMode::Split;
@@ -595,11 +587,9 @@ impl ViewModeBar {
                     );
                 }
 
-                // Show split controls only while split mode is active.
                 if !is_changelog && is_split && (is_split == prev_is_split) {
                     ui.separator();
 
-                    // Toggle split direction.
                     let current_dir = self.split_direction;
                     let (dir_icon, dir_tip) = match current_dir {
                         katana_platform::SplitDirection::Horizontal => (
@@ -638,7 +628,6 @@ impl ViewModeBar {
                         action = Some(AppAction::SetSplitDirection(new_dir));
                     }
 
-                    // Toggle pane order.
                     let current_order = self.pane_order;
                     let (order_text, order_tip) = match current_order {
                         katana_platform::PaneOrder::EditorFirst => (

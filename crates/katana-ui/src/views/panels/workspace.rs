@@ -90,7 +90,6 @@ impl<'a> WorkspacePanel<'a> {
                         crate::theme_bridge::TRANSPARENT
                     } else {
                         crate::theme_bridge::from_gray(LIGHT_MODE_ICON_BG)
-                        // Always gray for icons in light mode
                     };
 
                     if !recent_paths.is_empty() {
@@ -148,7 +147,6 @@ impl<'a> WorkspacePanel<'a> {
                             ui.visuals().selection.bg_fill
                         } else {
                             crate::theme_bridge::from_gray(LIGHT_MODE_ICON_ACTIVE_BG)
-                            // Darker gray when active in light mode
                         }
                     } else {
                         icon_bg
@@ -279,20 +277,23 @@ impl<'a> WorkspaceContent<'a> {
                     &search.filter_query
                 };
 
-                if let Ok(regex) = regex::Regex::new(query_str) {
-                    if search.filter_cache.as_ref().map(|(q, _)| q) != Some(&search.filter_query) {
-                        let mut visible = std::collections::HashSet::new();
-                        crate::views::panels::tree::gather_visible_paths(
-                            &entries,
-                            &regex,
-                            is_negated,
-                            &ws_root,
-                            &mut visible,
-                        );
-                        search.filter_cache = Some((search.filter_query.clone(), visible));
+                match regex::Regex::new(query_str) {
+                    Ok(regex) => {
+                        if search.filter_cache.as_ref().map(|(q, _)| q) != Some(&search.filter_query) {
+                            let mut visible = std::collections::HashSet::new();
+                            crate::views::panels::tree::gather_visible_paths(
+                                &entries,
+                                &regex,
+                                is_negated,
+                                &ws_root,
+                                &mut visible,
+                            );
+                            search.filter_cache = Some((search.filter_query.clone(), visible));
+                        }
                     }
-                } else {
-                    search.filter_cache = None;
+                    Err(_) => {
+                        search.filter_cache = None;
+                    }
                 }
             } else {
                 search.filter_cache = None;
@@ -416,10 +417,8 @@ impl<'a, 'b, 'c> DirectoryEntryNode<'a, 'b, 'c> {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
         let id = ui.make_persistent_id(format!("dir:{}", path.display()));
 
-        // Check programmatic state for expansion
         let is_open = ctx.expanded_directories.contains(path);
 
-        // Sync egui animation state with programmatic state
         let mut state =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, is_open);
         state.set_open(is_open);
@@ -469,7 +468,6 @@ impl<'a, 'b, 'c> DirectoryEntryNode<'a, 'b, 'c> {
 
             child_ui.add(egui::Label::new(prefix).selectable(false));
 
-            // Add spacing equivalent to item_spacing.x = 2.0 manually or rely on default layout
             child_ui.add(
                 arrow_icon
                     .image(crate::icon::IconSize::Small)
@@ -485,11 +483,8 @@ impl<'a, 'b, 'c> DirectoryEntryNode<'a, 'b, 'c> {
                     .selectable(false)
                     .truncate(),
             );
-            // We do not union because resp already covers the whole area and the
-            // children don't have interactive senses that would steal hover/clicks.
         }
 
-        // Context Menu for directories
         if !ctx.disable_context_menu {
             resp.context_menu(|ui| {
                 crate::views::panels::tree::TreeContextMenu::new(
@@ -545,9 +540,7 @@ impl<'a, 'b, 'c> FileEntryNode<'a, 'b, 'c> {
         let path = self.path;
         let ctx = self.ctx;
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-        // Prepend two spaces to align with the directory's arrow and its following space ("▶ ").
 
-        // Accessibility label without leading indentation (used for widget_info / test queries).
         let accessible_label = format!("file {}", name);
 
         let is_active = ctx.active_path.is_some_and(|ap| ap == path);
@@ -589,7 +582,6 @@ impl<'a, 'b, 'c> FileEntryNode<'a, 'b, 'c> {
                     .selectable(false),
             );
 
-            // Allocate empty space exactly matching the directory arrow icon's size
             child_ui.allocate_response(
                 egui::vec2(crate::icon::IconSize::Small.to_vec2().x, 0.0),
                 egui::Sense::hover(),
@@ -602,7 +594,6 @@ impl<'a, 'b, 'c> FileEntryNode<'a, 'b, 'c> {
                         .tint(text_color),
                 );
             } else {
-                // For non-markdown, we might want a raw file icon, but for now we fallback to invisible space to match old behavior
                 child_ui.allocate_response(
                     egui::vec2(crate::icon::IconSize::Medium.to_vec2().x, 0.0),
                     egui::Sense::hover(),

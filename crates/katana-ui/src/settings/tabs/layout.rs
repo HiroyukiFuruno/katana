@@ -135,7 +135,6 @@ pub(crate) fn render_pane_order_selector(
     });
 }
 
-// ── Workspace tab ───────────────────────────────────────────────────
 
 pub(crate) fn render_string_list_editor(ui: &mut egui::Ui, list: &mut Vec<String>) -> bool {
     let mut changed = false;
@@ -167,7 +166,5 @@ pub(crate) fn render_string_list_editor(ui: &mut egui::Ui, list: &mut Vec<String
         }
     });
 
-    // Option: The empty strings remain in the UI, enabling UX.
-    // They are filtered implicitly in filesystem scanning.
     changed
 }

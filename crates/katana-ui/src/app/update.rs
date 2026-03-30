@@ -23,7 +23,6 @@ impl UpdateOps for KatanaApp {
     fn start_update_check(&mut self, is_manual: bool) {
         if self.state.update.checking {
             if is_manual {
-                // Already checking, just show the dialog to let the user see the progress
                 self.show_update_dialog = true;
             }
             return;
@@ -34,7 +33,7 @@ impl UpdateOps for KatanaApp {
 
         if is_manual {
             self.show_update_dialog = true;
-            self.update_notified = true; // Pretend we've notified them so it doesn't pop up AGAIN
+            self.update_notified = true;
         }
 
         let (tx, rx) = std::sync::mpsc::channel();
@@ -63,7 +62,6 @@ impl UpdateOps for KatanaApp {
                                         0.0
                                     }
                                 } else {
-                                    // Indeterminate progress if no Content-Length
                                     0.0
                                 };
                                 self.state.update.phase =
@@ -140,7 +138,6 @@ impl UpdateOps for KatanaApp {
                     self.update_rx = None;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    // Update still in progress.
                 }
                 Err(_) => {
                     self.state.update.checking = false;

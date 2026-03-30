@@ -1,8 +1,6 @@
-//! Splash screen overlay — shown briefly on application startup.
 
 use eframe::egui;
 
-/// Splash screen animation repaint interval (~30fps).
 const SPLASH_REPAINT_INTERVAL_MS: u64 = 32;
 
 const SPLASH_BG_DARK: u8 = 30;
@@ -23,7 +21,6 @@ const SPLASH_PROGRESS_BAR_MARGIN: f32 = 4.0;
 const SPLASH_PROGRESS_BG_LIGHT: u8 = 100;
 const SPLASH_PROGRESS_BG_DARK: u8 = 200;
 
-/// Approximate total height for vertical centering of splash content.
 const SPLASH_CONTENT_HEIGHT: f32 = SPLASH_ICON_SIZE
     + SPLASH_ICON_SPACING
     + SPLASH_HEADING_SIZE
@@ -34,10 +31,6 @@ const SPLASH_CONTENT_HEIGHT: f32 = SPLASH_ICON_SIZE
     + SPLASH_PROGRESS_BAR_MARGIN
     + SPLASH_PROGRESS_SPACING;
 
-/// Renders the splash screen overlay if active.
-///
-/// Returns `true` if the splash was dismissed in this frame and should be
-/// cleared from the caller's state.
 pub(crate) struct SplashOverlay<'a> {
     pub elapsed: f32,
     pub about_icon: Option<&'a egui::TextureHandle>,
@@ -58,7 +51,7 @@ impl<'a> SplashOverlay<'a> {
         let any_pressed = ctx.input(|i| i.key_pressed(egui::Key::Escape));
 
         if opacity <= 0.0 || any_pressed {
-            return true; // splash dismissed
+            return true; // WHY: splash dismissed
         }
 
         egui::Area::new(egui::Id::new("splash_screen_area"))
@@ -155,9 +148,8 @@ impl<'a> SplashOverlay<'a> {
                 });
             });
 
-        // Animate splash screen (fade in/out, progress text)
         ctx.request_repaint_after(std::time::Duration::from_millis(SPLASH_REPAINT_INTERVAL_MS));
 
-        false // splash still active
+        false // WHY: splash still active
     }
 }

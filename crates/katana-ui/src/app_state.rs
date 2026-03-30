@@ -1,8 +1,3 @@
-//! Shared application state.
-//!
-//! A single `AppState` container is owned by the egui application. UI
-//! components render from this state and dispatch `AppAction` values back
-//! through the update loop.
 
 pub use crate::state::config::{ConfigState, SettingsSection, SettingsTab};
 pub use crate::state::document::{
@@ -20,7 +15,6 @@ use katana_core::{ai::AiProviderRegistry, document::Document, plugin::PluginRegi
 use katana_platform::SettingsService;
 use std::path::PathBuf;
 
-/// User-visible actions dispatched from UI components to the core update loop.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ExportFormat {
     Html,
@@ -111,7 +105,6 @@ pub enum StatusType {
     Error,
 }
 
-/// Top-level application state shared across all UI components.
 pub struct AppState {
     pub document: DocumentState,
     pub workspace: WorkspaceState,

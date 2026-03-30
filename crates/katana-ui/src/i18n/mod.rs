@@ -3,16 +3,12 @@ pub use types::*;
 
 use std::sync::{OnceLock, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-/// Language definition JSON entry.
 #[derive(serde::Deserialize)]
 struct LanguageEntry {
     code: String,
     name: String,
 }
 
-/// List of supported languages. Loaded from `locales/languages.json`.
-/// Each element is a pair of (language code, endonym).
-/// To add a language, simply add a line to `languages.json`.
 pub fn supported_languages() -> &'static [(String, String)] {
     static LANGS: OnceLock<Vec<(String, String)>> = OnceLock::new();
     LANGS.get_or_init(|| {
@@ -23,7 +19,6 @@ pub fn supported_languages() -> &'static [(String, String)] {
     })
 }
 
-/// Returns the endonym from the language code.
 pub fn display_name(lang_code: &str) -> &'static str {
     supported_languages()
         .iter()
@@ -32,7 +27,6 @@ pub fn display_name(lang_code: &str) -> &'static str {
         .unwrap_or("???")
 }
 
-/// Definition of locale JSON data.
 const EN_JSON: &str = include_str!("../../locales/en.json");
 const JA_JSON: &str = include_str!("../../locales/ja.json");
 const ZH_CN_JSON: &str = include_str!("../../locales/zh-CN.json");
@@ -92,19 +86,16 @@ fn get_dictionary() -> &'static Vec<I18nDictionaryEntry> {
     })
 }
 
-/// Sets the current language.
 pub fn set_language(lang: &str) {
     let mut current = write_guard(&CURRENT_LANGUAGE);
     *current = lang.to_string();
 }
 
-/// Gets the current language.
 pub fn get_language() -> String {
     init_current_language();
     read_guard(&CURRENT_LANGUAGE).clone()
 }
 
-/// Access the strongly-typed message hierarchy.
 pub fn get() -> &'static I18nMessages {
     let lang = get_language();
     let dict = get_dictionary();
@@ -115,9 +106,6 @@ pub fn get() -> &'static I18nMessages {
         .unwrap_or(fallback)
 }
 
-/// Gets the parameter-substituted translated string.
-///
-/// Replaces `{param}` placeholders in the template string with `params` values.
 pub fn tf(template: &str, params: &[(&str, &str)]) -> String {
     let mut text = template.to_string();
     for (k, v) in params {
@@ -159,12 +147,9 @@ mod tests {
 
     #[test]
     fn test_get_fallback_to_en() {
-        // Test that an unsupported language defaults to 'en' dictionary without failing.
         set_language("unsupported-lang-code");
         let msgs = get();
-        // Just verify it returned a valid dictionary (falling back to "en").
         assert!(!msgs.menu.file.is_empty());
-        // Restore to avoid polluting global state for other tests running in parallel.
         set_language("en");
     }
 
@@ -214,7 +199,6 @@ mod tests {
 
     #[test]
     fn test_export_menu_keys_exist() {
-        // Red phase: testing that export menu strings are present
         let msgs = super::get();
         assert!(!msgs.menu.export.is_empty());
         assert!(!msgs.menu.export_html.is_empty());
@@ -225,8 +209,6 @@ mod tests {
 
     #[test]
     fn test_update_messages_serde_defaults_backward_compat() {
-        // Exercises all serde(default) fallback functions for UpdateMessages,
-        // simulating a locale file that predates the v0.7.2 update keys.
         let minimal_json = r#"{
             "title": "T",
             "checking_for_updates": "C",
@@ -287,7 +269,6 @@ mod additional_coverage_tests {
             default_no_extension_warning(),
             "There is no guarantee that files without extensions can be displayed correctly as Markdown. Furthermore, the application may crash due to unexpected behavior. Are you sure you want to enable this?"
         );
-        // Color section defaults
         assert_eq!(default_section_system(), "System");
         assert_eq!(default_section_code(), "Code");
         assert_eq!(default_section_preview(), "Preview");

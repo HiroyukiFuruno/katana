@@ -1,4 +1,3 @@
-//! Unit tests for theme_bridge module (visuals_from_theme, rgb_to_color32, rgba_to_color32).
 
 use katana_platform::theme::{Rgb, Rgba, ThemeMode, ThemePreset};
 use katana_ui::theme_bridge::{rgb_to_color32, rgba_to_color32, visuals_from_theme};
@@ -29,13 +28,9 @@ fn panel_fill_matches_theme_panel_bg() {
 
 #[test]
 fn text_color_override_is_not_set() {
-    // override_text_color is intentionally None.
-    // system.text is applied via widget fg_stroke,
-    // and preview/code paths read their own text colour from ThemeColors.
     let colors = ThemePreset::Dracula.colors();
     let visuals = visuals_from_theme(&colors);
     assert_eq!(visuals.override_text_color, None);
-    // system.text is the primary text colour applied to noninteractive widget fg_stroke
     assert_eq!(
         visuals.widgets.noninteractive.fg_stroke.color,
         rgb_to_color32(colors.system.text)
@@ -47,7 +42,6 @@ fn all_presets_produce_valid_visuals() {
     for preset in ThemePreset::builtins() {
         let colors = preset.colors();
         let visuals = visuals_from_theme(&colors);
-        // override_text_color must be None (prevents scope contamination)
         assert_eq!(
             visuals.override_text_color,
             None,

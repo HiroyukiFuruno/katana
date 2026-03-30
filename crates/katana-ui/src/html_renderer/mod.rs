@@ -1,8 +1,3 @@
-//! egui renderer for `HtmlNode` trees.
-//!
-//! Provides `HtmlRenderer`, a method-chaining builder that renders
-//! structured HTML nodes into egui widgets with proper inline/block
-//! flow, centering support, and link click detection.
 
 use std::path::Path;
 
@@ -11,44 +6,24 @@ use eframe::egui::text::LayoutJob;
 
 use katana_core::html::{HtmlNode, LinkAction, TextAlign};
 
-// ───────────────────── HTML Renderer ─────────────────────
 
-/// Known badge service hosts that always return SVG content.
-/// egui's SVG loader requires URIs to end with `.svg`.
 fn svg_badge_hosts() -> Vec<&'static str> {
     vec!["img.shields.io"]
 }
 
-/// Vertical spacing (in points) for line breaks.
 const LINE_BREAK_SPACING: f32 = 4.0;
 
-/// Font size (in points) for H2 headings.
 const HEADING_H2_SIZE: f32 = 20.0;
 
-/// Font size (in points) for H3 headings.
 const HEADING_H3_SIZE: f32 = 16.0;
-/// Browser-like block spacing for top-level paragraphs.
 const PARAGRAPH_BLOCK_MARGIN_Y: f32 = 5.0;
-/// Browser-like block spacing for top-level headings.
 const HEADING_BLOCK_MARGIN_Y: f32 = 6.0;
 
-/// Heading level constants for match arms.
 const HEADING_LEVEL_1: u8 = 1;
 const HEADING_LEVEL_2: u8 = 2;
 const HEADING_LEVEL_3: u8 = 3;
 
-// ───────────────────── HtmlRenderer ─────────────────────
 
-/// Renders `HtmlNode` trees into egui widgets.
-///
-/// # Usage
-///
-/// ```ignore
-/// HtmlRenderer::new(ui, base_dir)
-///     .text_color(color)
-///     .max_image_width(400.0)
-///     .render(&nodes);
-/// ```
 pub struct HtmlRenderer<'a> {
     ui: &'a mut egui::Ui,
     _base_dir: &'a Path,
@@ -57,7 +32,6 @@ pub struct HtmlRenderer<'a> {
 }
 
 impl<'a> HtmlRenderer<'a> {
-    /// Creates a new renderer for the given UI context and base directory.
     pub fn new(ui: &'a mut egui::Ui, base_dir: &'a Path) -> Self {
         let max_w = ui.available_width();
         Self {
@@ -68,39 +42,32 @@ impl<'a> HtmlRenderer<'a> {
         }
     }
 
-    /// Sets the text color for rendered content.
     pub fn text_color(mut self, color: egui::Color32) -> Self {
         self.text_color = Some(color);
         self
     }
 
-    /// Sets the maximum width for rendered images.
     pub fn max_image_width(mut self, width: f32) -> Self {
         self.max_image_width = width;
         self
     }
 
-    /// Renders the given nodes and returns a link action if any link was clicked.
     pub fn render(mut self, nodes: &[HtmlNode]) -> Option<LinkAction> {
         self.render_nodes(nodes)
     }
 
-    // ───────────────── Internal rendering ─────────────────
 
-    /// Renders a slice of nodes, handling inline grouping.
     fn render_nodes(&mut self, nodes: &[HtmlNode]) -> Option<LinkAction> {
         let mut action: Option<LinkAction> = None;
         let mut inline_batch: Vec<&HtmlNode> = Vec::new();
 
         for (i, node) in nodes.iter().enumerate() {
             if node.is_block() {
-                // Flush any pending inline elements
                 if let Some(a) = self.flush_inline_batch(&inline_batch) {
                     action = Some(a);
                 }
                 inline_batch.clear();
 
-                // Render the block element
                 if let Some(a) = self.render_block(node) {
                     action = Some(a);
                 }
@@ -117,7 +84,6 @@ impl<'a> HtmlRenderer<'a> {
             }
         }
 
-        // Flush remaining inline elements
         if let Some(a) = self.flush_inline_batch(&inline_batch) {
             action = Some(a);
         }
@@ -125,14 +91,10 @@ impl<'a> HtmlRenderer<'a> {
         action
     }
 
-    /// Renders a block-level node.
     fn render_block(&mut self, node: &HtmlNode) -> Option<LinkAction> {
         match node {
             HtmlNode::Paragraph { align, children } => match align {
                 Some(TextAlign::Center) => {
-                    // Don't use vertical_centered here — it doesn't work for
-                    // scope_ui groups (horizontal). Centering is handled per-batch
-                    // inside render_centered_children.
                     self.render_centered_children(children)
                 }
                 _ => self.render_nodes(children),
@@ -174,7 +136,7 @@ impl<'a> HtmlRenderer<'a> {
                 }
                 None
             }
-            _ => None, // Non-block nodes handled by inline path
+            _ => None,
         }
     }
 
@@ -212,8 +174,6 @@ impl<'a> HtmlRenderer<'a> {
         }
     }
 
-    /// Renders children within a centered paragraph.
-    /// Groups consecutive inline elements and renders them horizontally.
     fn render_centered_children(&mut self, children: &[HtmlNode]) -> Option<LinkAction> {
         let mut action: Option<LinkAction> = None;
         let mut inline_batch: Vec<&HtmlNode> = Vec::new();
@@ -241,7 +201,6 @@ impl<'a> HtmlRenderer<'a> {
         action
     }
 
-    /// Flushes a batch of inline nodes as a horizontal group.
     fn flush_inline_batch(&mut self, batch: &[&HtmlNode]) -> Option<LinkAction> {
         if batch.is_empty() {
             return None;
@@ -268,13 +227,6 @@ impl<'a> HtmlRenderer<'a> {
         action
     }
 
-    /// Flushes a batch of inline nodes within a centered layout.
-    ///
-    /// For single elements, uses `vertical_centered` which handles centering
-    /// and vertical space allocation automatically for individual widgets.
-    ///
-    /// For multi-element batches (e.g. badge rows), uses egui's "measure-then-position"
-    /// pattern: sizing_pass() → request_discard() → new_child(centered_rect).
     fn flush_centered_inline_batch(
         &mut self,
         batch: &[&HtmlNode],
@@ -289,8 +241,6 @@ impl<'a> HtmlRenderer<'a> {
             return None;
         }
 
-        // Single element: vertical_centered handles centering and space allocation
-        // correctly for individual widgets (images, text labels, etc.).
         if batch.len() == 1 {
             let mut action = None;
             self.ui.vertical_centered(|ui| {
@@ -300,14 +250,8 @@ impl<'a> HtmlRenderer<'a> {
             return action;
         }
 
-        // Multi-element: center the group by positioning a child UI at the centered rect.
         let mut action = None;
 
-        // Generate a more robust ID. Since `flush_centered_inline_batch` is
-        // called *per paragraph* with batch_index starting at 0, multiple
-        // multi-element centered paragraphs in the same document will have
-        // colliding IDs. This causes the bounding box sizes to be reused
-        // incorrectly across completely different paragraphs.
         use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         hasher.write_usize(batch_index);
@@ -321,7 +265,6 @@ impl<'a> HtmlRenderer<'a> {
 
         let id = self.ui.id().with("centered_batch").with(hash);
 
-        // Read content size from previous frame (if available).
         let mut memorized = true;
         let bounds = self.ui.available_rect_before_wrap();
         let content_size: egui::Vec2 =
@@ -330,10 +273,8 @@ impl<'a> HtmlRenderer<'a> {
                 bounds.size()
             });
 
-        // Calculate centered rect for the content.
         let centered_rect = egui::Align2::CENTER_TOP.align_size_within_rect(content_size, bounds);
 
-        // Create child UI at the centered position with horizontal layout.
         let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(false);
         let child_max_rect = egui::Rect::from_min_size(
             centered_rect.min,
@@ -361,13 +302,11 @@ impl<'a> HtmlRenderer<'a> {
             }
         }
 
-        // Store measured content size for next frame.
         let new_size = child_ui.min_size();
         if new_size != content_size || !memorized {
             self.ui.ctx().data_mut(|w| w.insert_temp(id, new_size));
         }
 
-        // Allocate a full-width row in the parent so the cursor advances correctly.
         let row_height = new_size.y;
         self.ui
             .allocate_space(egui::vec2(bounds.width(), row_height));
@@ -375,7 +314,6 @@ impl<'a> HtmlRenderer<'a> {
         action
     }
 
-    /// Renders a single inline node.
     fn render_inline(&mut self, node: &HtmlNode) -> Option<LinkAction> {
         match node {
             HtmlNode::Text(text) => {
@@ -401,10 +339,8 @@ impl<'a> HtmlRenderer<'a> {
                 let color = self.ui.visuals().hyperlink_color;
                 let tooltip = target.tooltip_text();
 
-                // Check if children contain images (badge pattern)
                 let has_images = children.iter().any(|c| matches!(c, HtmlNode::Image { .. }));
                 if has_images {
-                    // Render images directly (badge links)
                     let mut clicked = false;
                     for child in children {
                         if let HtmlNode::Image { src, alt: _ } = child {
@@ -427,7 +363,6 @@ impl<'a> HtmlRenderer<'a> {
                         return Some(action);
                     }
                 } else {
-                    // Render as underlined colored text
                     let rt = egui::RichText::new(&text).underline().color(color);
                     let response = self
                         .ui
@@ -512,7 +447,6 @@ impl<'a> HtmlRenderer<'a> {
         }
     }
 
-    /// Creates a child renderer sharing the parent's settings but with a new UI context.
     fn new_inner(ui: &'a mut egui::Ui, text_color: Option<egui::Color32>, max_w: f32) -> Self {
         Self {
             ui,
@@ -523,9 +457,7 @@ impl<'a> HtmlRenderer<'a> {
     }
 }
 
-// ───────────────────── Helpers ─────────────────────
 
-/// Recursively collects all text content from a node tree.
 fn collect_text(nodes: &[HtmlNode]) -> String {
     let mut s = String::new();
     for node in nodes {
@@ -543,10 +475,6 @@ fn collect_text(nodes: &[HtmlNode]) -> String {
     s
 }
 
-/// Ensures that URLs from known SVG badge services end with `.svg`.
-///
-/// egui's SVG loader only accepts URIs ending with `.svg`.
-/// Some badge service URLs omit the extension but still return SVG content.
 fn ensure_svg_extension(url: &str) -> String {
     let (path, suffix) = split_url_suffix(url);
     if path.ends_with(".svg") {
@@ -622,10 +550,6 @@ mod tests {
             .raw_bounds()
             .expect("heading must have bounds");
 
-        // The text is rendered inside a 600px wide area.
-        // If centered, the left edge (x0) should be roughly (600 - text_width) / 2.
-        // If it's left-aligned, it will be close to 0.0.
-        // debug log for bounds
         assert!(
             bounds.x0 > 200.0,
             "Heading with align='center' should be centered, but its x0 is {:.1}",

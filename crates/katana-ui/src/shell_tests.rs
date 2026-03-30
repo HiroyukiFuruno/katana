@@ -18,7 +18,6 @@ mod tests {
 
     fn make_temp_workspace() -> TempDir {
         let dir = tempfile::tempdir().unwrap();
-        // Create an md file in the workspace
         std::fs::write(dir.path().join("test.md"), "# Test").unwrap();
         dir
     }
@@ -34,7 +33,6 @@ mod tests {
         }
     }
 
-    // handle_open_workspace: Success with valid path (L149-160)
     #[test]
     fn handle_open_workspace_success_sets_workspace() {
         let mut app = make_app();
@@ -45,57 +43,46 @@ mod tests {
         assert!(app.state.layout.status_message.is_some());
     }
 
-    // handle_open_workspace: Error with invalid path (L161-167)
     #[test]
     fn handle_open_workspace_error_sets_status_message() {
         let mut app = make_app();
         app.handle_open_workspace(PathBuf::from("/nonexistent/path/that/cannot/exist"));
         wait_for_workspace(&mut app);
-        // Non-existent path, so workspace might be None (or opened as an empty directory)
-        // Either an error is recorded or an empty workspace is opened
         assert!(
             app.state.workspace.data.is_some() || app.state.layout.status_message.is_some(),
             "Error or workspace should be set"
         );
     }
 
-    // handle_select_document: Load error for non-existent file (L198-204)
     #[test]
     fn handle_select_document_file_not_found_sets_status_message() {
         let mut app = make_app();
         app.handle_select_document(PathBuf::from("/nonexistent/file.md"), true);
-        // Load error -> recorded in status_message
         assert!(app.state.layout.status_message.is_some());
     }
 
-    // handle_select_document: Move focus by selecting existing tab (L173-188)
     #[test]
     fn handle_select_document_switches_to_existing_tab() {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
 
-        // Initial load
         app.handle_select_document(path.clone(), true);
         assert_eq!(app.state.document.active_doc_idx, Some(0));
         assert_eq!(app.state.document.open_documents.len(), 1);
 
-        // Re-select the same file -> does not open a new tab
         app.handle_select_document(path.clone(), true);
         assert_eq!(app.state.document.open_documents.len(), 1);
         assert_eq!(app.state.document.active_doc_idx, Some(0));
     }
 
-    // handle_update_buffer: No active document (L213)
     #[test]
     fn handle_update_buffer_without_active_doc_does_nothing() {
         let mut app = make_app();
-        // UpdateBuffer without opening a document -> does not panic
         app.handle_update_buffer("new content".to_string());
         assert!(app.state.document.open_documents.is_empty());
     }
 
-    // handle_update_buffer: Active document exists (L209-215)
     #[test]
     fn handle_update_buffer_updates_active_doc_buffer() {
         let mut app = make_app();
@@ -109,12 +96,10 @@ mod tests {
         assert!(doc.is_dirty);
     }
 
-    // handle_save_document: No active document (L219-220)
     #[test]
     fn handle_save_document_without_active_doc_does_nothing() {
         let mut app = make_app();
         app.handle_save_document();
-        // Status message is not set (no document)
         assert!(app.state.layout.status_message.is_none());
     }
 
@@ -125,12 +110,10 @@ mod tests {
         let path = dir.path().join("lazy.md");
         std::fs::write(&path, "# Lazy content").unwrap();
 
-        // 1. Open lazily
         app.handle_select_document(path.clone(), false);
         assert_eq!(app.state.document.open_documents.len(), 1);
         assert!(!app.state.document.open_documents[0].is_loaded);
 
-        // 2. Activate
         app.handle_select_document(path.clone(), true);
         assert!(app.state.document.open_documents[0].is_loaded);
         assert_eq!(
@@ -139,7 +122,6 @@ mod tests {
         );
     }
 
-    // handle_save_document: Successful save (L222-223)
     #[test]
     fn handle_save_document_success_sets_status() {
         let mut app = make_app();
@@ -152,7 +134,6 @@ mod tests {
         assert!(app.state.layout.status_message.is_some());
     }
 
-    // process_action: CloseDocument (L236-244)
     #[test]
     fn process_action_close_document_removes_tab() {
         let mut app = make_app();
@@ -166,7 +147,6 @@ mod tests {
         assert!(app.state.document.active_doc_idx.is_none());
     }
 
-    // process_action: CloseDocument - out of bounds does not panic (L237)
     #[test]
     fn process_action_close_document_out_of_bounds_does_nothing() {
         let mut app = make_app();
@@ -174,7 +154,6 @@ mod tests {
         assert!(app.state.document.open_documents.is_empty());
     }
 
-    // process_action: RefreshDiagrams (L248-253)
     #[test]
     fn process_action_refresh_diagrams_does_not_crash() {
         let mut app = make_app();
@@ -183,7 +162,6 @@ mod tests {
         app.handle_select_document(path.clone(), true);
 
         app.process_action(&egui::Context::default(), AppAction::RefreshDiagrams);
-        // OK as long as no crash occurs
     }
 
     #[test]
@@ -193,15 +171,11 @@ mod tests {
             &egui::Context::default(),
             AppAction::ExportDocument(crate::app_state::ExportFormat::Html),
         );
-        // Coverage satisfied. Actual export validation will happen in subsequent PR steps.
     }
 
     #[test]
     fn process_action_export_pdf_without_tool_shows_error() {
-        // When headless_chrome is not available, export_with_tool sets an error
-        // status_message WITHOUT opening rfd::FileDialog.
         if katana_core::markdown::PdfExporter::is_available() {
-            // In CI with Chrome installed, skip gracefully (not "ignore").
             return;
         }
         let mut app = make_app();
@@ -237,12 +211,10 @@ mod tests {
         assert!(msg.contains("headless_chrome"), "msg = {msg}");
     }
 
-    // process_action: RefreshDiagrams no document (L249 early return)
     #[test]
     fn process_action_refresh_diagrams_no_doc_does_nothing() {
         let mut app = make_app();
         app.process_action(&egui::Context::default(), AppAction::RefreshDiagrams);
-        // No document -> does not crash
     }
 
     #[test]
@@ -253,7 +225,6 @@ mod tests {
         std::fs::write(&path, "# Something").unwrap();
         app.handle_select_document(path.clone(), true);
 
-        // Pre-populate realistic cached textures that would otherwise persist through a refresh
         let ctx = egui::Context::default();
         let dummy_img = egui::ColorImage::example();
         let texture = ctx.load_texture("fake", dummy_img, egui::TextureOptions::LINEAR);
@@ -271,10 +242,8 @@ mod tests {
             panic!("Tab not found");
         }
 
-        // Action!
         app.process_action(&ctx, AppAction::RefreshDiagrams);
 
-        // Verify the texture caches are properly wiped so Egui recreates them!
         let tab = app.tab_previews.iter().find(|p| p.path == path).unwrap();
         assert!(
             tab.pane.viewer_states[0].texture.is_none(),
@@ -286,7 +255,6 @@ mod tests {
         );
     }
 
-    // process_action: ChangeLanguage (L255-257)
     #[test]
     fn process_action_change_language_sets_language() {
         let mut app = make_app();
@@ -294,10 +262,8 @@ mod tests {
             &egui::Context::default(),
             AppAction::ChangeLanguage("ja".to_string()),
         );
-        // Verify i18n language was changed (since direct access is hard, ensure no panic)
     }
 
-    // process_action: ToggleToc
     #[test]
     fn process_action_toggle_toc_toggles_flag() {
         let mut app = make_app();
@@ -310,7 +276,6 @@ mod tests {
         assert!(!app.state.layout.show_toc);
     }
 
-    // process_action: ToggleSettings
     #[test]
     fn process_action_toggle_settings_toggles_flag() {
         let mut app = make_app();
@@ -323,14 +288,12 @@ mod tests {
         assert!(!app.state.layout.show_settings);
     }
 
-    // process_action: None (L258)
     #[test]
     fn process_action_none_does_nothing() {
         let mut app = make_app();
         app.process_action(&egui::Context::default(), AppAction::None);
     }
 
-    // process_action: UpdateBuffer (L246)
     #[test]
     fn process_action_update_buffer_calls_handler() {
         let mut app = make_app();
@@ -347,7 +310,6 @@ mod tests {
         );
     }
 
-    // process_action: SaveDocument (L247)
     #[test]
     fn process_action_save_document_calls_handler() {
         let mut app = make_app();
@@ -362,7 +324,6 @@ mod tests {
         assert!(app.state.layout.status_message.is_some());
     }
 
-    // start_download: Thread starts (L263-273)
     #[test]
     fn start_download_sets_download_state() {
         let mut app = make_app();
@@ -370,25 +331,18 @@ mod tests {
             url: "http://example.com/plantuml.jar".to_string(),
             dest: PathBuf::from("/tmp/test_plantuml.jar"),
         });
-        // status_message is set
         assert!(app.state.layout.status_message.is_some());
-        // download_rx is set
         assert!(app.download_rx.is_some());
     }
 
-    // download_with_curl: Parent directory creation required (L319-320)
     #[test]
     pub(crate) fn download_with_curl_creates_parent_dir() {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("subdir").join("file.jar");
-        // Parent directory is created even if curl fails
-        // (curl fails with a non-existent URL, but dir_all succeeds)
         let _ = download_with_curl("http://127.0.0.1:0/nonexistent", &dest);
-        // Verify that the parent directory was created
         assert!(dest.parent().unwrap().exists());
     }
 
-    // take_action: Return pending_action and reset (L127-129)
     #[test]
     fn take_action_returns_and_resets_pending_action() {
         let mut app = make_app();
@@ -404,18 +358,13 @@ mod tests {
         );
     }
 
-    // poll_download: If no download_rx (L297-299)
     #[test]
     fn poll_download_without_rx_does_nothing() {
         let app = make_app();
         assert!(app.download_rx.is_none());
-        // Polling without download_rx is fine
-        // Internal poll cannot be called without an egui Context, but
-        // it early exits if download_rx = None (L297-299)
     }
 }
 
-// shell.rs additional tests: separated from previous module to increase coverage
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests_extra {
@@ -440,32 +389,26 @@ mod tests_extra {
         dir
     }
 
-    // handle_select_document: Re-render on hash mismatch (L184-185)
     #[test]
     fn handle_select_document_rerenders_when_hash_changed() {
         let mut app = make_app();
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
 
-        // Initial load
         app.handle_select_document(path.clone(), true);
         assert_eq!(app.state.document.open_documents.len(), 1);
 
-        // Set an old hash in tab_hashes (different from buffer)
         app.tab_previews.push(TabPreviewCache {
             path: path.clone(),
             pane: PreviewPane::default(),
             hash: 0xDEADBEEF,
         });
 
-        // Re-select -> full_refresh_preview is called due to hash mismatch (L184-185)
         app.handle_select_document(path.clone(), true);
 
-        // Tab count remains unchanged
         assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
-    // handle_save_document: Case where fs.save_document fails (L224-228)
     #[test]
     fn handle_save_document_error_sets_error_status_message() {
         use std::os::unix::fs::PermissionsExt;
@@ -476,21 +419,17 @@ mod tests_extra {
         app.handle_select_document(path.clone(), true);
         app.handle_update_buffer("# Modified content".to_string());
 
-        // Make file read-only
         let perms = std::fs::Permissions::from_mode(0o444);
         std::fs::set_permissions(&path, perms).unwrap();
 
         app.handle_save_document();
 
-        // Write failure -> recorded in status_message
         assert!(app.state.layout.status_message.is_some());
 
-        // Cleanup: restore writability
         let perms = std::fs::Permissions::from_mode(0o644);
         let _ = std::fs::set_permissions(&path, perms);
     }
 
-    // download_with_curl: Success case (L326-327) — local file:// URL
     #[test]
     pub(crate) fn download_with_curl_success_with_local_file_url() {
         let dir = tempfile::tempdir().unwrap();
@@ -500,7 +439,6 @@ mod tests_extra {
 
         let url = format!("file://{}", src.display());
         let result = download_with_curl(&url, &dest);
-        // curl is available on macOS
         assert!(result.is_ok());
         assert!(dest.exists());
     }
@@ -517,11 +455,9 @@ mod tests_extra {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        // Just verify it uses the mapped error message from the locale
         assert!(err.contains(&crate::i18n::get().error.curl_launch_failed));
     }
 
-    // process_action: OpenWorkspace (L234)
     #[test]
     fn process_action_open_workspace_calls_handler() {
         let mut app = make_app();
@@ -534,7 +470,6 @@ mod tests_extra {
         assert!(app.state.workspace.data.is_some());
     }
 
-    // process_action: SelectDocument (L235)
     #[test]
     fn process_action_select_document_calls_handler() {
         let mut app = make_app();
@@ -544,7 +479,6 @@ mod tests_extra {
         assert_eq!(app.state.document.open_documents.len(), 1);
     }
 
-    // full_refresh_preview: Hash is updated (L140-147)
     #[test]
     fn full_refresh_preview_updates_tab_hash() {
         let mut app = make_app();
@@ -560,7 +494,6 @@ mod tests_extra {
         let dir = make_temp_workspace();
         let path = dir.path().join("test.md");
 
-        // 1. Initial render -> tab preview created
         app.full_refresh_preview(&path, "# Initial", false, 4);
         let initial_hash = app
             .tab_previews
@@ -569,16 +502,11 @@ mod tests_extra {
             .unwrap()
             .hash;
 
-        // 2. Force is_loading to true (simulating an in-progress render)
         let pane = super::KatanaApp::get_preview_pane(&mut app.tab_previews, path.clone());
         pane.is_loading = true;
 
-        // 3. Force refresh with new content.
-        //    PreviewPane::full_render handles cancellation of the old render internally
-        //    via cancel_token, so full_refresh_preview should NOT skip.
         app.full_refresh_preview(&path, "# Updated", true, 4);
 
-        // 4. Assert that the hash WAS updated (new content applied)
         let final_hash = app
             .tab_previews
             .iter()
@@ -591,7 +519,6 @@ mod tests_extra {
         );
     }
 
-    // refresh_preview: Existing entry is updated (L131-137)
     #[test]
     fn refresh_preview_updates_existing_pane() {
         let mut app = make_app();
@@ -601,7 +528,6 @@ mod tests_extra {
         app.refresh_preview(&path, "# Updated");
     }
 
-    // poll_download: Does nothing if download_rx is None
     #[test]
     fn poll_download_does_nothing_when_no_rx() {
         let mut app = make_app();
@@ -610,7 +536,6 @@ mod tests_extra {
         assert!(app.download_rx.is_none());
     }
 
-    // poll_download: Completes with Ok(Ok(())) -> sets status_message, download_rx=None
     #[test]
     fn poll_download_sets_status_on_success() {
         let mut app = make_app();
@@ -628,7 +553,6 @@ mod tests_extra {
         );
     }
 
-    // poll_download: Errors with Ok(Err(e)) -> error status_message
     #[test]
     fn poll_download_sets_error_on_failure() {
         let mut app = make_app();
@@ -642,7 +566,6 @@ mod tests_extra {
         assert!(app.download_rx.is_none());
     }
 
-    // poll_download: Err(Empty) -> Still receiving
     #[test]
     fn poll_download_keeps_rx_when_empty() {
         let mut app = make_app();
@@ -650,11 +573,9 @@ mod tests_extra {
         app.download_rx = Some(rx);
         let ctx = egui::Context::default();
         app.poll_download(&ctx);
-        // rx is maintained because it's Empty
         assert!(app.download_rx.is_some());
     }
 
-    // poll_download: Err(Disconnected) -> Processed as complete
     #[test]
     fn poll_download_clears_rx_on_disconnect() {
         let mut app = make_app();
@@ -666,17 +587,14 @@ mod tests_extra {
         assert!(app.download_rx.is_none());
     }
 
-    // download_with_curl: Failure path (invalid URL -> non-zero exit code)
     #[test]
     pub(crate) fn download_with_curl_failure_returns_error() {
         let dir = tempfile::TempDir::new().unwrap();
         let dest = dir.path().join("nonexistent.jar");
-        // Non-existent file URL -> curl fails
         let result = download_with_curl("file:///nonexistent/path/to/file", &dest);
         assert!(result.is_err());
     }
 
-    // download_with_curl: Covers create_dir_all path (when parent directory doesn't exist)
     #[test]
     pub(crate) fn download_with_curl_creates_parent_dirs() {
         let dir = tempfile::TempDir::new().unwrap();
@@ -685,30 +603,24 @@ mod tests_extra {
         let dest = dir.path().join("subdir").join("deep").join("dest.txt");
         let url = format!("file://{}", src.display());
         let result = download_with_curl(&url, &dest);
-        // Directory is created
         assert!(dest.parent().unwrap().exists());
         assert!(result.is_ok());
         assert!(dest.exists());
     }
 
-    // download_with_curl: Case where parent() is None (path with only a root-level filename)
     #[test]
     pub(crate) fn download_with_curl_no_parent_path() {
         let result = download_with_curl("file:///nonexistent/file", std::path::Path::new(""));
         assert!(result.is_err());
     }
 
-    // download_with_curl: Case where create_dir_all returns an error (covering map_err closure)
     #[test]
     pub(crate) fn download_with_curl_create_dir_error() {
-        // Cause create_dir_all to fail using a read-only path like /proc/...
-        // On macOS, new directories cannot be created under /dev/
         let dest = std::path::Path::new("/dev/null/impossible_dir/file.jar");
         let result = download_with_curl("file:///nonexistent/file", dest);
         assert!(result.is_err());
     }
 
-    /// A mock repository that always fails on save, for testing error paths.
     struct FailingRepository;
 
     impl katana_platform::SettingsRepository for FailingRepository {
@@ -742,18 +654,15 @@ mod tests_extra {
         }
     }
 
-    // handle_open_workspace: settings.save() error is logged, not panicked
     #[test]
     fn handle_open_workspace_save_error_does_not_panic() {
         let mut app = make_app_with_failing_repo();
         let dir = make_temp_workspace();
         app.handle_open_workspace(dir.path().to_path_buf());
         wait_for_workspace(&mut app);
-        // Workspace is still opened despite save failure
         assert!(app.state.workspace.data.is_some());
     }
 
-    // ChangeLanguage: settings.save() error is logged, not panicked
     #[test]
     fn change_language_save_error_does_not_panic() {
         let mut app = make_app_with_failing_repo();
@@ -761,26 +670,15 @@ mod tests_extra {
             &egui::Context::default(),
             AppAction::ChangeLanguage("ja".to_string()),
         );
-        // Language change still proceeds despite save failure
     }
 
-    // Regression: trigger_action(OpenWorkspace) must not be overwritten before take_action().
-    //
-    // Background: shell_ui.rs::update() sets pending_action = RefreshDiagrams on the first
-    // frame (cold theme cache). If trigger_action() is called from the eframe setup_cc closure
-    // (workspace restore at startup), the unconditional assignment silently discards the
-    // OpenWorkspace action, causing the saved workspace to not be restored on reopen.
     #[test]
     fn trigger_action_is_not_overwritten_before_take_action() {
         let mut app = make_app();
         let dir = make_temp_workspace();
 
-        // Simulate startup: workspace restore sets pending_action via trigger_action().
         app.trigger_action(AppAction::OpenWorkspace(dir.path().to_path_buf()));
 
-        // Verify the action is still intact before take_action() is called.
-        // The fix in shell_ui.rs guards the RefreshDiagrams assignment with
-        // `if matches!(self.pending_action, AppAction::None)`.
         assert!(
             matches!(app.pending_action, AppAction::OpenWorkspace(_)),
             "pending_action must still be OpenWorkspace before take_action(); \
@@ -794,17 +692,14 @@ mod tests_extra {
              Regression: shell_ui theme guard was overwriting pending_action on first frame."
         );
 
-        // After take_action(), pending_action is reset to None.
         assert!(matches!(app.pending_action, AppAction::None));
     }
 
-    // Verify that RefreshDiagrams IS set when no action is pending (normal theme-change path).
     #[test]
     fn refresh_diagrams_is_set_when_no_action_is_pending() {
         let mut app = make_app();
         assert!(matches!(app.pending_action, AppAction::None));
 
-        // Reproduce the fixed guard: only assign when pending is None.
         if matches!(app.pending_action, AppAction::None) {
             app.pending_action = AppAction::RefreshDiagrams;
         }
@@ -815,7 +710,6 @@ mod tests_extra {
         );
     }
 
-    // handle_refresh_workspace: Success case — re-scans the workspace tree
     #[test]
     fn handle_refresh_workspace_rescans_tree() {
         let mut app = make_app();
@@ -824,7 +718,6 @@ mod tests_extra {
         wait_for_workspace(&mut app);
         assert!(app.state.workspace.data.is_some());
 
-        // Add a new file to the workspace
         std::fs::write(dir.path().join("new.md"), "# New").unwrap();
 
         app.handle_refresh_workspace();
@@ -838,7 +731,6 @@ mod tests_extra {
         assert!(paths.iter().any(|it| it.contains("new.md")));
     }
 
-    // handle_refresh_workspace: No workspace open — early return
     #[test]
     fn handle_refresh_workspace_no_workspace_does_nothing() {
         let mut app = make_app();
@@ -846,7 +738,6 @@ mod tests_extra {
         assert!(app.state.workspace.data.is_none());
     }
 
-    // handle_refresh_workspace: Error case — workspace root is no longer valid
     #[test]
     fn handle_refresh_workspace_error_sets_status_message() {
         let mut app = make_app();
@@ -855,7 +746,6 @@ mod tests_extra {
         wait_for_workspace(&mut app);
         assert!(app.state.workspace.data.is_some());
 
-        // Overwrite the workspace root to a non-existent path
         app.state.workspace.data.as_mut().unwrap().root =
             std::path::PathBuf::from("/nonexistent/deleted/workspace");
 
@@ -864,7 +754,6 @@ mod tests_extra {
         assert!(app.state.layout.status_message.is_some());
     }
 
-    // process_action: RefreshWorkspace
     #[test]
     fn process_action_refresh_workspace_calls_handler() {
         let mut app = make_app();
@@ -911,7 +800,6 @@ mod tests_extra {
         app.workspace_rx = Some(rx);
         app.state.workspace.is_loading = true;
 
-        // Drop the transmitter to simulate thread panic / disconnect
         drop(tx);
 
         let ui_ctx = egui::Context::default();
@@ -927,12 +815,10 @@ mod tests_extra {
         let path = dir.path().join("lazy.md");
         std::fs::write(&path, "# Lazy content").unwrap();
 
-        // 1. Open lazily
         app.handle_select_document(path.clone(), false);
         assert_eq!(app.state.document.open_documents.len(), 1);
         assert!(!app.state.document.open_documents[0].is_loaded);
 
-        // 2. Activate
         app.handle_select_document(path.clone(), true);
         assert!(app.state.document.open_documents[0].is_loaded);
         assert_eq!(
@@ -944,7 +830,6 @@ mod tests_extra {
     #[test]
     fn test_auto_expansion_relative_path() {
         let mut app = make_app();
-        // Path with no parent (relative) should not crash and hit the break
         app.handle_select_document(std::path::PathBuf::from("root_file.md"), true);
         assert!(app.state.workspace.expanded_directories.is_empty());
     }
@@ -955,7 +840,6 @@ mod tests_extra {
         let path = std::path::PathBuf::from("/a/b/c.md");
         app.handle_select_document(path, false); // Lazy load
 
-        // Ensure no directories were added to expanded_directories
         assert!(
             app.state.workspace.expanded_directories.is_empty(),
             "Expanded directories should be empty on lazy load"
@@ -978,23 +862,18 @@ mod tests_extra {
             AppAction::OpenMultipleDocuments(vec![f1.clone(), f2.clone()]),
         );
 
-        // Simulate frame updates clearing the background pending document queue
         while let Some(path) = app.pending_document_loads.pop_front() {
             app.handle_select_document(path, false);
         }
 
-        // Both documents are opened
         assert_eq!(app.state.document.open_documents.len(), 2);
-        // First document is activated (loaded) and second stays lazy
         assert!(app.state.document.open_documents[0].is_loaded);
         assert!(!app.state.document.open_documents[1].is_loaded);
-        // Active index points to the first document
         assert_eq!(app.state.document.active_doc_idx, Some(0));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
-    // Removed redundant AiProviderRegistry and PluginRegistry imports
     use crate::app_state::AppState;
     use crate::preview_pane::PreviewPane;
     use katana_platform::FilesystemService;
@@ -1053,9 +932,7 @@ mod tests_extra {
     fn test_check_for_updates_manual_trigger() {
         let mut app = setup_test_app();
         app.state.update.checking = true;
-        // manually trigger again while already checking
         app.start_update_check(true);
-        // should have skipped spawning another one but set dialog=true
         assert!(app.show_update_dialog);
     }
 
@@ -1065,14 +942,11 @@ mod tests_extra {
         assert!(!app.show_update_dialog);
         assert!(!app.state.update.checking);
 
-        // trigger manual update check
         app.process_action(&egui::Context::default(), AppAction::CheckForUpdates);
 
-        // it should immediately set show_update_dialog = true for manual checks
         assert!(app.show_update_dialog);
         assert!(app.state.update.checking);
 
-        // Emulate an update channel response
         let (tx, rx) = std::sync::mpsc::channel();
         tx.send(Ok(Some(katana_core::update::ReleaseInfo {
             tag_name: "100.0.0".to_string(),
@@ -1146,12 +1020,10 @@ mod tests_extra {
         let ctx = eframe::egui::Context::default();
         app.poll_update_check(&ctx);
 
-        // Now since it's newer and we weren't notified, it should pop up
         assert!(app.show_update_dialog);
         assert!(app.update_notified);
     }
 
-    // ── export_html_to_tmp tests ──
 
     #[test]
     pub(crate) fn export_html_to_tmp_writes_html_file() {
@@ -1166,7 +1038,6 @@ mod tests_extra {
             "Output must be valid HTML"
         );
         assert!(contents.contains("Hello"), "Output must contain heading");
-        // Cleanup
         let _ = std::fs::remove_file(&path);
     }
 
@@ -1180,7 +1051,6 @@ mod tests_extra {
         let _ = std::fs::remove_file(&path);
     }
 
-    // ── export_as_html integration tests ──
 
     #[test]
     fn export_as_html_creates_task_with_open_on_complete() {
@@ -1223,14 +1093,12 @@ mod tests_extra {
             &md_path,
         );
 
-        // Wait for the background thread to finish (max 5s).
         let task = &app.export_tasks[0];
         let result = task.rx.recv_timeout(std::time::Duration::from_secs(5));
         let path = result
             .expect("channel must receive within 5s")
             .expect("export must succeed");
 
-        // Verify the file is in /tmp
         assert!(
             path.starts_with("/tmp"),
             "path must be under /tmp, got {}",
@@ -1238,7 +1106,6 @@ mod tests_extra {
         );
         assert!(path.exists(), "HTML file must exist at {}", path.display());
 
-        // Verify content is valid HTML
         let html = std::fs::read_to_string(&path).unwrap();
         assert!(
             html.contains("<!DOCTYPE html>"),
@@ -1247,7 +1114,6 @@ mod tests_extra {
         assert!(html.contains("Real Document"), "must contain the heading");
         assert!(html.contains("Paragraph content"), "must contain body text");
 
-        // Cleanup
         let _ = std::fs::remove_file(&path);
     }
 
@@ -1270,7 +1136,6 @@ mod tests_extra {
             "two exports must create two tasks"
         );
 
-        // Both complete successfully
         for task in &app.export_tasks {
             let result = task.rx.recv_timeout(std::time::Duration::from_secs(5));
             let path = result.unwrap().unwrap();
@@ -1279,13 +1144,9 @@ mod tests_extra {
         }
     }
 
-    // ── RED: HTML export bug detection tests ──
-    // Failure mode 1: HTML generation itself fails
-    // Failure mode 2: Path cannot be resolved / opened
 
     #[test]
     pub(crate) fn export_html_to_tmp_path_is_canonicalizable() {
-        // If this fails, the generated path has unresolvable symlinks / broken components.
         let preset = katana_core::markdown::color_preset::DiagramColorPreset::dark();
         let path = super::export_html_to_tmp("# Test", "katana_canon_test.html", preset, None)
             .expect("generation must succeed");
@@ -1302,21 +1163,17 @@ mod tests_extra {
 
     #[test]
     fn export_html_file_url_is_valid_and_openable() {
-        // Reproduces the exact URL construction from poll_export.
         let preset = katana_core::markdown::color_preset::DiagramColorPreset::dark();
         let path = super::export_html_to_tmp("# URL Test", "katana_url_test.html", preset, None)
             .expect("generation must succeed");
 
-        // Construct URL exactly as poll_export does (line ~1035)
         let url = format!("file://{}", path.display());
 
-        // file:// + absolute path (/tmp/...) = file:///tmp/... — must have 3 slashes
         assert!(
             url.starts_with("file:///"),
             "URL must start with file:/// (3 slashes), got: {url}"
         );
 
-        // Extract path from URL and verify it exists
         let file_path = std::path::Path::new(url.strip_prefix("file://").unwrap());
         assert!(
             file_path.exists(),
@@ -1324,7 +1181,6 @@ mod tests_extra {
             file_path.display()
         );
 
-        // Canonicalize to catch symlink issues (macOS /var -> /private/var)
         let canonical = path.canonicalize().unwrap();
         let canonical_url = format!("file://{}", canonical.display());
         let canonical_file_path =

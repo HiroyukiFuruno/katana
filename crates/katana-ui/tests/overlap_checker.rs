@@ -23,7 +23,6 @@ fn main() {
     let mut overlap_values = HashSet::new();
 
     fn get_leaves(val: &serde_json::Value, path: &str, leaves: &mut HashMap<String, String>) {
-        // Ignore internal keys
         if path.contains(".key") && path.starts_with("settings.tabs[") {
             return;
         }

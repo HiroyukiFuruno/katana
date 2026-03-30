@@ -1,13 +1,7 @@
-//! Settings window rendered as an `egui::Window` overlay.
-//!
-//! The window uses a split layout:
-//!   - **Left pane**: Tab bar + settings controls (scrollable)
-//!   - **Right pane**: Live markdown preview using `PreviewPane` (scrollable independently)
 
 use crate::app_state::{AppAction, SettingsTab};
 use crate::preview_pane::PreviewPane;
 
-// ── Window layout constants ──────────────────────────────────────────
 
 pub(crate) const SETTINGS_WINDOW_DEFAULT_WIDTH: f32 = 1000.0;
 pub(crate) const SETTINGS_WINDOW_DEFAULT_HEIGHT: f32 = 500.0;
@@ -24,14 +18,12 @@ pub(crate) const AUTO_SAVE_INTERVAL_MIN: f64 = 0.0;
 pub(crate) const AUTO_SAVE_INTERVAL_MAX: f64 = 300.0;
 pub(crate) const AUTO_SAVE_INTERVAL_STEP: f64 = 0.1;
 
-// ── Spacing & sizing constants ───────────────────────────────────────
 
 pub(crate) const SECTION_SPACING: f32 = 12.0;
 pub(crate) const SUBSECTION_SPACING: f32 = 6.0;
 pub(crate) const INNER_MARGIN: f32 = 12.0;
 
 pub(crate) const FONT_SIZE_STEP: f64 = 1.0;
-/// Spacing between layout selectors (split direction / pane order) within the Layout tab.
 pub(crate) const LAYOUT_SELECTOR_SPACING: f32 = 4.0;
 pub(crate) const PRESET_SWATCH_SIZE: f32 = 14.0;
 pub(crate) const COLOR_GRID_LABEL_WIDTH: f32 = 130.0;
@@ -39,18 +31,14 @@ pub(crate) const SECTION_HEADER_SIZE: f32 = 14.0;
 pub(crate) const SECTION_HEADER_MARGIN: f32 = 4.0;
 pub(crate) const SWATCH_CORNER_DIVISOR: f32 = 4.0;
 pub(crate) const FONT_FAMILY_COMBOBOX_WIDTH: f32 = 200.0;
-/// Maximum height of the scrollable font list inside the search popup.
 pub(crate) const FONT_DROPDOWN_MAX_HEIGHT: f32 = 200.0;
-/// Opacity for the inactive slider rail (0–255). Provides visible contrast on both light and dark themes.
 pub(crate) const SLIDER_RAIL_OPACITY: u8 = 80;
-/// Border width for the slider handle and rail for visibility on all themes.
 pub(crate) const SLIDER_BORDER_WIDTH: f32 = 1.0;
-/// Font size for hint text in the settings window.
 pub(crate) const HINT_FONT_SIZE: f32 = 10.0;
 
-// ── Sample markdown for settings preview ─────────────────────────────
 
-pub(crate) const SAMPLE_MARKDOWN: &str = r#"# Heading 1
+pub(crate) const SAMPLE_MARKDOWN: &str = concat!(
+    r#"# Heading 1
 
 ## Heading 2
 
@@ -74,12 +62,11 @@ fn main() {
 
 ---
 
-Secondary text and [a link](https://example.com) for reference.
-"#;
+"#,
+    "Secondary text and [a link](https://example.com) for reference.\n"
+);
 
-// ── Public rendering entry-point ─────────────────────────────────────
 
-/// Render the settings window. Returns an action to dispatch if triggered from settings.
 pub mod tabs;
 pub(crate) use self::tabs::behavior::*;
 pub(crate) use self::tabs::font::*;
@@ -114,7 +101,6 @@ impl<'a> SettingsWindow<'a> {
 
         let mut triggered_action: Option<AppAction> = None;
 
-        // Ensure preview pane has content loaded
         if preview_pane.sections.is_empty() {
             preview_pane.update_markdown_sections(
                 SAMPLE_MARKDOWN,
@@ -140,7 +126,6 @@ impl<'a> SettingsWindow<'a> {
                     .min_width(SETTINGS_SIDE_PANEL_DEFAULT_WIDTH)
                     .max_width(SETTINGS_SIDE_PANEL_DEFAULT_WIDTH)
                     .show_inside(ui, |ui| {
-                        // Expand All / Collapse All toolbar
                         ui.horizontal(|ui| {
                             const TAB_SPACING: f32 = 4.0;
                             ui.add_space(TAB_SPACING);
@@ -261,7 +246,6 @@ impl<'a> SettingsWindow<'a> {
                         });
                 });
 
-                // Clear the force open flag after rendering the tree once
                 if state.config.settings_tree_force_open.is_some() {
                     state.config.settings_tree_force_open = None;
                 }
@@ -270,14 +254,11 @@ impl<'a> SettingsWindow<'a> {
         triggered_action
     }
 }
-// ── Tree Navigation ──────────────────────────────────────────────────
 
 pub(crate) fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_state::AppState) {
     let settings_msgs = &crate::i18n::get().settings;
 
-    // Group 1: Appearance (Theme, Font, Layout)
     let appearance_key = "group_appearance";
-    // Fallback to English if "group_appearance" key is not found
     let title = settings_msgs
         .tabs
         .iter()
@@ -322,7 +303,6 @@ pub(crate) fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_sta
 
     ui.add_space(SETTINGS_GROUP_SPACING);
 
-    // Group 2: System/Behavior (Workspace)
     let system_key = "group_system";
     let title = settings_msgs
         .tabs
@@ -367,7 +347,6 @@ pub(crate) fn render_settings_tree(ui: &mut egui::Ui, state: &mut crate::app_sta
     .show(ui);
 }
 
-// ── Section header helper ────────────────────────────────────────────
 
 pub(crate) fn section_header(ui: &mut egui::Ui, text: &str) {
     ui.add_space(SECTION_HEADER_MARGIN);
@@ -377,7 +356,6 @@ pub(crate) fn section_header(ui: &mut egui::Ui, text: &str) {
     ui.add_space(SUBSECTION_SPACING);
 }
 
-// ── Theme tab ────────────────────────────────────────────────────────
 
 pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>) -> egui::Response {
     let selection_color = ui.visuals().selection.bg_fill;
@@ -387,7 +365,6 @@ pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>)
 
     ui.visuals_mut().widgets.active.bg_fill = selection_color;
     ui.visuals_mut().widgets.hovered.bg_fill = selection_color;
-    // Semi-transparent selection color for the unfilled portion of the rail.
     ui.visuals_mut().widgets.inactive.bg_fill = crate::theme_bridge::from_rgba_unmultiplied(
         selection_color.r(),
         selection_color.g(),
@@ -395,7 +372,6 @@ pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>)
         SLIDER_RAIL_OPACITY,
     );
 
-    // Add visible border to the slider handle/rail on all themes.
     let border_stroke = egui::Stroke::new(SLIDER_BORDER_WIDTH, selection_color);
     let saved_active_stroke = ui.visuals().widgets.active.bg_stroke;
     let saved_hovered_stroke = ui.visuals().widgets.hovered.bg_stroke;
@@ -406,7 +382,6 @@ pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>)
 
     let response = ui.add(slider);
 
-    // Restore original visuals.
     ui.visuals_mut().widgets.active.bg_fill = saved_active_bg;
     ui.visuals_mut().widgets.hovered.bg_fill = saved_hovered_bg;
     ui.visuals_mut().widgets.inactive.bg_fill = saved_inactive_bg;
@@ -416,5 +391,3 @@ pub(crate) fn add_styled_slider<'a>(ui: &mut egui::Ui, slider: egui::Slider<'a>)
 
     response
 }
-
-// ── Font tab ─────────────────────────────────────────────────────────

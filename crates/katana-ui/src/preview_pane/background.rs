@@ -4,10 +4,7 @@ use eframe::egui;
 
 use super::pane::PreviewPane;
 impl PreviewPane {
-    /// Polls for background rendering completion and updates sections with received results.
     pub(crate) fn poll_renders(&mut self, ctx: &egui::Context) {
-        // Process local image background loading (trigger egui's background loaders).
-        // This offloads reading and decoding the images to egui_extras' background threads.
         while let Some(path) = self.image_preload_queue.pop() {
             if self.image_cache.insert(path.clone()) {
                 let uri = format!("file://{}", path.display());
@@ -53,8 +50,6 @@ impl PreviewPane {
                 }
             }
 
-            // No repaint requested here — background threads signal directly
-            // via repaint_ctx.request_repaint() when they send messages.
 
             if disconnected {
                 self.is_loading = false;
@@ -65,8 +60,6 @@ impl PreviewPane {
         }
     }
 
-    /// For testing: Block and wait on the background thread until there are no Pending sections.
-    /// Available in release builds too (harmless no-op when no background render is running).
     pub fn wait_for_renders(&mut self) {
         while let Some(rx) = &self.render_rx {
             while let Ok(msg) = rx.try_recv() {

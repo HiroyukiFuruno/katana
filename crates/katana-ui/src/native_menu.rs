@@ -1,14 +1,8 @@
-//! macOS native menu bar integration using Objective-C FFI.
-//!
-//! This module provides the interface to the native macOS menu bar
-//! implemented in `macos_menu.m`. On non-macOS platforms, all public
-//! functions are no-ops.
 
 use crate::app_state::AppAction;
 
 #[cfg(target_os = "macos")]
 mod ffi {
-    // Must match the tag constants defined in macos_menu.m (Objective-C).
     pub const TAG_OPEN_WORKSPACE: i32 = 1;
     pub const TAG_SAVE: i32 = 2;
     pub const TAG_LANG_EN: i32 = 3;
@@ -26,8 +20,6 @@ mod ffi {
     pub const TAG_CHECK_UPDATES: i32 = 15;
     pub const TAG_RELEASE_NOTES: i32 = 16;
 
-    // These FFI symbols are linked from Objective-C (macos_menu.m) and called
-    // only at runtime; the Rust compiler cannot see the call sites.
     #[allow(dead_code)]
     extern "C" {
         pub fn katana_setup_native_menu();
@@ -54,31 +46,16 @@ mod ffi {
     }
 }
 
-/// Initializes the macOS native menu bar.
-/// Called from main.rs after eframe creates the window.
-///
-/// # Safety
-/// Contains Objective-C runtime calls. Must be called only once from the main thread.
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_menu_setup() {
     ffi::katana_setup_native_menu();
 }
 
-/// Sets the macOS process name to "KatanA".
-/// Must be called at the very start of main(), BEFORE eframe creates the window,
-/// so that the Dock label shows "KatanA" instead of the binary name.
-///
-/// # Safety
-/// Contains Objective-C runtime calls. Must be called from the main thread.
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_set_process_name() {
     ffi::katana_set_process_name();
 }
 
-/// Sets the macOS application icon dynamically from PNG data.
-///
-/// # Safety
-/// Contains Objective-C runtime calls. Must be called from the main thread.
 #[cfg(all(target_os = "macos", not(test)))]
 pub unsafe fn native_set_app_icon_png(png_data: *const u8, png_len: usize) {
     ffi::katana_set_app_icon_png(png_data, png_len as std::ffi::c_ulong);
@@ -161,7 +138,6 @@ pub fn update_native_menu_strings_from_i18n() {
 #[cfg(any(not(target_os = "macos"), test))]
 pub fn update_native_menu_strings_from_i18n() {}
 
-/// Polls the native macOS menu bar for user actions and converts them to `AppAction`.
 #[cfg(target_os = "macos")]
 pub(crate) fn poll_native_menu(
     show_about: &mut bool,
@@ -198,7 +174,6 @@ pub(crate) fn poll_native_menu(
     }
 }
 
-/// No-op on non-macOS platforms.
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn poll_native_menu(
     _show_about: &mut bool,

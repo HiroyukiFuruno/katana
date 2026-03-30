@@ -1,20 +1,8 @@
-//! Integration tests verifying that Mermaid, DrawIo, and PlantUML diagrams
-//! are actually rendered (or gracefully fall back) through the full pipeline.
-//!
-//! Each diagram type tests BOTH states idempotently:
-//! 1. Tool hidden via env var → fallback UI snapshot
-//! 2. Tool restored → rendered image UI snapshot (skipped if tool not installed)
-//!
-//! This ensures that regardless of the host environment, fallback UIs are
-//! always verified, and rendering is verified when tools are present.
 
 use egui_kittest::{kittest::Queryable, Harness};
 use katana_ui::preview_pane::{PreviewPane, RenderedSection};
 use std::path::Path;
 
-// ─────────────────────────────────────────────
-// DrawIo: Pure Rust renderer (no external tools)
-// ─────────────────────────────────────────────
 
 const DRAWIO_SOURCE: &str = r#"<mxGraphModel>
   <root>
@@ -26,16 +14,11 @@ const DRAWIO_SOURCE: &str = r#"<mxGraphModel>
   </root>
 </mxGraphModel>"#;
 
-// ─────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────
 
-/// Build markdown source with a single diagram fenced code block.
 fn diagram_md(lang: &str, body: &str) -> String {
     format!("# Diagram Test\n\n```{lang}\n{body}\n```\n\n## Footer\n")
 }
 
-/// Assert that the section at `idx` is an `Image` variant.
 fn assert_image(sections: &[RenderedSection], idx: usize, context: &str) {
     assert!(
         matches!(sections.get(idx), Some(RenderedSection::Image { .. })),
@@ -44,7 +27,6 @@ fn assert_image(sections: &[RenderedSection], idx: usize, context: &str) {
     );
 }
 
-/// Render a diagram and wait for completion, returning the PreviewPane.
 fn render_and_wait(lang: &str, source: &str) -> PreviewPane {
     let md = diagram_md(lang, source);
     let mut pane = PreviewPane::default();
@@ -59,7 +41,6 @@ fn render_and_wait(lang: &str, source: &str) -> PreviewPane {
     pane
 }
 
-/// Build a harness and render the provided sections for semantic UI assertions.
 fn build_harness(sections: Vec<RenderedSection>, width: f32, height: f32) -> Harness<'static> {
     let mut harness = Harness::builder()
         .with_size(egui::vec2(width, height))
@@ -80,10 +61,6 @@ fn assert_standard_diagram_markdown_visible(harness: &Harness) {
     let _footer = harness.get_by_label("Footer");
 }
 
-/// Build a harness, run it, take a snapshot, and return the SnapshotResults
-/// (which must be merged into a parent SnapshotResults if multiple snapshots
-/// are taken within a single test).
-/// Fallback: DrawIo render error fallback UI.
 #[test]
 fn drawio_render_error_ui() {
     let sections = vec![
@@ -97,7 +74,6 @@ fn drawio_render_error_ui() {
         RenderedSection::Markdown("## After diagram\n".to_string()),
     ];
     let harness = build_harness(sections, 600.0, 300.0);
-    // Verify fallback UI text using i18n
     let expected_error = katana_ui::i18n::tf(
         &katana_ui::i18n::get().error.render_error,
         &[
@@ -105,23 +81,16 @@ fn drawio_render_error_ui() {
             ("message", "Failed to extract SVG from rendered HTML"),
         ],
     );
-    // Verify it doesn't panic and error text exists
     let _ = harness.get_by_label(&expected_error);
 }
 
-// ─────────────────────────────────────────────
-// Mermaid: Both states tested idempotently
-// ─────────────────────────────────────────────
 
 const MERMAID_SOURCE: &str = "graph TD\n    A[Start] --> B[End]";
 
-/// Mermaid idempotent test: verifies BOTH fallback and rendering states
-/// by controlling tool visibility via environment variable.
 #[test]
 fn mermaid_both_states_render_semantically() {
     let saved_mmdc = std::env::var("MERMAID_MMDC").ok();
 
-    // ── Phase 1: Hide mmdc → test CommandNotFound fallback ──
     std::env::set_var("MERMAID_MMDC", "nonexistent_mmdc_for_idempotent_test");
 
     let pane = render_and_wait("mermaid", MERMAID_SOURCE);
@@ -151,7 +120,6 @@ fn mermaid_both_states_render_semantically() {
         let _fallback = harness.get_by_label(&expected);
     }
 
-    // ── Phase 2: Restore mmdc → test actual rendering ──
     match &saved_mmdc {
         Some(v) => std::env::set_var("MERMAID_MMDC", v),
         None => std::env::remove_var("MERMAID_MMDC"),
@@ -171,26 +139,19 @@ fn mermaid_both_states_render_semantically() {
         eprintln!("SKIP Phase 2: mmdc not installed — Mermaid rendering semantic UI check skipped");
     }
 
-    // ── Cleanup + handle results ──
     match saved_mmdc {
         Some(v) => std::env::set_var("MERMAID_MMDC", v),
         None => std::env::remove_var("MERMAID_MMDC"),
     }
 }
 
-// ─────────────────────────────────────────────
-// PlantUML: Both states tested idempotently
-// ─────────────────────────────────────────────
 
 const PLANTUML_SOURCE: &str = "@startuml\nAlice -> Bob : Hello\n@enduml";
 
-/// PlantUML idempotent test: verifies BOTH fallback and rendering states
-/// by controlling tool visibility via environment variable.
 #[test]
 fn plantuml_both_states_render_semantically() {
     let saved_jar = std::env::var("PLANTUML_JAR").ok();
 
-    // ── Phase 1: Hide plantuml.jar → test NotInstalled fallback ──
     std::env::set_var("PLANTUML_JAR", "/nonexistent/path/for/idempotent/test.jar");
 
     let pane = render_and_wait("plantuml", PLANTUML_SOURCE);
@@ -217,7 +178,6 @@ fn plantuml_both_states_render_semantically() {
         let _fallback = harness.get_by_label(&tool_msg);
     }
 
-    // ── Phase 2: Restore plantuml.jar → test actual rendering ──
     match &saved_jar {
         Some(v) => std::env::set_var("PLANTUML_JAR", v),
         None => std::env::remove_var("PLANTUML_JAR"),
@@ -239,19 +199,13 @@ fn plantuml_both_states_render_semantically() {
         );
     }
 
-    // ── Cleanup + handle results ──
     match saved_jar {
         Some(v) => std::env::set_var("PLANTUML_JAR", v),
         None => std::env::remove_var("PLANTUML_JAR"),
     }
 }
 
-// ─────────────────────────────────────────────
-// Mixed diagram document: all three types
-// ─────────────────────────────────────────────
 
-/// Verifies that a document containing all three diagram types renders
-/// each one independently — one diagram's failure doesn't affect others.
 #[test]
 fn mixed_diagram_document_renders_all_independently() {
     let source = format!(
@@ -285,7 +239,6 @@ fn mixed_diagram_document_renders_all_independently() {
         "No Pending sections should remain after wait_for_renders"
     );
 
-    // Mermaid (index 1): Image or CommandNotFound
     assert!(
         matches!(
             pane.sections[1],
@@ -295,10 +248,8 @@ fn mixed_diagram_document_renders_all_independently() {
         pane.sections[1]
     );
 
-    // DrawIo (index 3): Always Image (pure Rust)
     assert_image(&pane.sections, 3, "DrawIo in mixed document");
 
-    // PlantUML (index 5): Image or NotInstalled
     assert!(
         matches!(
             pane.sections[5],
@@ -309,11 +260,7 @@ fn mixed_diagram_document_renders_all_independently() {
     );
 }
 
-// ─────────────────────────────────────────────
-// UI semantic check: Mixed document + Pending spinner + all fallbacks
-// ─────────────────────────────────────────────
 
-/// Mixed document fallback UI remains semantically correct without snapshots.
 #[test]
 fn mixed_diagrams_with_fallbacks_render_semantically() {
     let drawio_pane = render_and_wait("drawio", DRAWIO_SOURCE);
@@ -357,7 +304,6 @@ fn mixed_diagrams_with_fallbacks_render_semantically() {
     let _not_installed = harness.get_by_label(&expected_not_installed);
 }
 
-/// Fallback: Diagram in Pending state showing spinner.
 #[test]
 fn snapshot_diagram_pending_spinner() {
     let sections = vec![
@@ -383,16 +329,10 @@ fn snapshot_diagram_pending_spinner() {
             pane.show_content(ui, None, None);
         });
     harness.step();
-    // Use run_steps instead of run() because spin animations loop forever.
     harness.run_steps(5);
 }
 
-// ─────────────────────────────────────────────
-// Regression: full_render → update_markdown_sections preserves diagrams
-// ─────────────────────────────────────────────
 
-/// After `full_render`, calling `update_markdown_sections` should preserve
-/// already-rendered diagram sections while updating only Markdown text.
 #[test]
 fn update_after_render_preserves_diagram_images() {
     let source = format!("# Title\n\n```drawio\n{DRAWIO_SOURCE}\n```\n\n## Footer\n");

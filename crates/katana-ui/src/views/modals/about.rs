@@ -51,7 +51,6 @@ impl<'a> AboutModal<'a> {
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(HEADING_SPACING);
-                    // App icon
                     if let Some(tex) = icon {
                         ui.image(egui::load::SizedTexture::new(
                             tex.id(),
@@ -74,7 +73,6 @@ impl<'a> AboutModal<'a> {
 
                 let i18n_about = &crate::i18n::get().about;
 
-                // ── 1. Basic Info ──
                 about_section_header(
                     ui,
                     &i18n_about.basic_info,
@@ -86,7 +84,6 @@ impl<'a> AboutModal<'a> {
                 about_row(ui, &i18n_about.copyright, info.copyright);
                 ui.add_space(SECTION_SPACING);
 
-                // ── 2. Runtime ──
                 about_section_header(
                     ui,
                     &i18n_about.runtime,
@@ -98,7 +95,6 @@ impl<'a> AboutModal<'a> {
                 about_row(ui, &i18n_about.rust, &info.system.rustc_version);
                 ui.add_space(SECTION_SPACING);
 
-                // ── 3. License ──
                 about_section_header(
                     ui,
                     &i18n_about.license,
@@ -108,7 +104,6 @@ impl<'a> AboutModal<'a> {
                 about_row(ui, &i18n_about.license, info.license);
                 ui.add_space(SECTION_SPACING);
 
-                // ── 4-6. Links ──
                 about_section_header(
                     ui,
                     &i18n_about.links,
@@ -135,7 +130,6 @@ impl<'a> AboutModal<'a> {
                 );
                 ui.add_space(SECTION_SPACING);
 
-                // ── 7. Support / Sponsor ──
                 about_section_header(
                     ui,
                     &i18n_about.support,

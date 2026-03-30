@@ -2,9 +2,6 @@ use eframe::egui;
 
 pub type ListItemNode<'a> = Box<dyn FnOnce(&mut egui::Ui) -> egui::Response + 'a>;
 
-/// A generic layout container (pseudo React.Node array) that aligns children horizontally
-/// and guarantees perfect vertical centering. This aligns with the property-driven
-/// architecture where the parent controls layout metadata, preventing alignment glitches.
 pub struct ListItem<'a> {
     left_nodes: Vec<ListItemNode<'a>>,
     right_nodes: Vec<ListItemNode<'a>>,
@@ -21,11 +18,13 @@ impl<'a> Default for ListItem<'a> {
 }
 
 impl<'a> ListItem<'a> {
+    const DEFAULT_SPACING: f32 = 8.0;
+
     pub fn new() -> Self {
         Self {
             left_nodes: Vec::new(),
             right_nodes: Vec::new(),
-            spacing: 8.0,
+            spacing: Self::DEFAULT_SPACING,
             interactive: false,
             width: None,
             shrink_to_fit: false,
@@ -73,7 +72,6 @@ impl<'a> ListItem<'a> {
         };
 
         if self.shrink_to_fit {
-            // Allocate a child UI that shrinks to contents, but enforces row_height minimums
             let final_response = ui
                 .allocate_ui_with_layout(
                     egui::vec2(0.0, row_height),
@@ -97,7 +95,6 @@ impl<'a> ListItem<'a> {
                 )
                 .response;
 
-            // Expand explicitly to at least row_height to be a good touch target
             let mut rect = final_response.rect;
             if rect.height() < row_height {
                 rect = rect.expand2(egui::vec2(0.0, (row_height - rect.height()) / 2.0));
@@ -105,7 +102,6 @@ impl<'a> ListItem<'a> {
 
             let response = ui.interact(rect, ui.next_auto_id(), sense);
 
-            // Apply background on hover
             if self.interactive && response.hovered() {
                 ui.painter().rect_filled(
                     rect,

@@ -3,7 +3,6 @@ use katana_ui::shell_logic::{
 };
 use std::path::Path;
 
-// ── hash_str tests ──
 
 #[test]
 fn empty_string_hash_is_consistent() {
@@ -44,7 +43,6 @@ fn identical_inputs_always_return_same_hash_value() {
     assert!(results.iter().all(|&h| h == results[0]));
 }
 
-// ── relative_full_path tests ──
 
 #[test]
 fn returns_relative_path_if_root_is_provided() {
@@ -76,7 +74,6 @@ fn returns_empty_string_if_path_and_root_are_identical() {
     assert_eq!(relative_full_path(path, Some(root)), "");
 }
 
-// ── prev_tab_index tests ──
 
 #[test]
 fn prev_tab_index_moves_backward_from_middle() {
@@ -98,7 +95,6 @@ fn prev_tab_index_with_empty_list() {
     assert_eq!(prev_tab_index(0, 0), 0);
 }
 
-// ── next_tab_index tests ──
 
 #[test]
 fn next_tab_index_moves_forward_from_middle() {
@@ -120,7 +116,6 @@ fn next_tab_index_with_empty_list() {
     assert_eq!(next_tab_index(0, 0), 0);
 }
 
-// ── format_tree_tooltip tests ──
 
 #[test]
 fn test_format_tree_tooltip_metadata_unavailable() {

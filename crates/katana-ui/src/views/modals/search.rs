@@ -55,7 +55,6 @@ impl<'a> SearchModal<'a> {
             .resizable(true)
             .default_size(egui::vec2(SEARCH_MODAL_WIDTH, SEARCH_MODAL_HEIGHT))
             .show(ctx, |ui| {
-                // Focus on the text edit automatically
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut search.query)
                         .hint_text(crate::i18n::get().search.query_hint.clone())

@@ -23,7 +23,6 @@ pub(crate) trait DocumentOps {
 
 impl DocumentOps for KatanaApp {
     fn handle_select_document(&mut self, path: std::path::PathBuf, activate: bool) {
-        // Auto-expand parents only when a file is explicitly activated (not during lazy background loads)
         if activate {
             let mut parent = path.parent();
             while let Some(p) = parent {
@@ -49,9 +48,10 @@ impl DocumentOps for KatanaApp {
                 self.state.document.active_doc_idx = Some(idx);
                 let doc = &mut self.state.document.open_documents[idx];
                 if !doc.is_loaded {
-                    if let Ok(loaded_doc) = self.fs.load_document(&path) {
-                        *doc = loaded_doc;
-                    }
+                    let Ok(loaded_doc) = self.fs.load_document(&path) else {
+                        return;
+                    };
+                    *doc = loaded_doc;
                 }
                 let src = self.state.document.open_documents[idx].buffer.clone();
                 let concurrency = self
@@ -96,7 +96,6 @@ impl DocumentOps for KatanaApp {
                 }
             }
         } else {
-            // Lazy load: just add to tabs
             self.state
                 .document
                 .open_documents
@@ -140,7 +139,6 @@ impl DocumentOps for KatanaApp {
     }
     fn handle_replace_text(&mut self, span: std::ops::Range<usize>, replacement: String) {
         let (path, content) = if let Some(doc) = self.state.active_document_mut() {
-            // Ensure the span is within bounds
             if span.start <= span.end && span.end <= doc.buffer.len() {
                 doc.buffer.replace_range(span, &replacement);
                 doc.is_dirty = true;

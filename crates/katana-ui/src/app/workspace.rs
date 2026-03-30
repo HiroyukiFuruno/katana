@@ -29,13 +29,11 @@ pub(crate) trait WorkspaceOps {
 
 impl WorkspaceOps for KatanaApp {
     fn handle_open_workspace(&mut self, path: std::path::PathBuf) {
-        // Save current workspace state (including open tabs) before unloading it
         if self.state.workspace.data.is_some() {
             self.save_workspace_state();
         }
 
         self.state.workspace.is_loading = true;
-        // Temporary feedback
         self.state.layout.status_message = Some((
             crate::i18n::tf(
                 &crate::i18n::get().status.opened_workspace,
@@ -48,12 +46,10 @@ impl WorkspaceOps for KatanaApp {
         self.workspace_rx = Some(rx);
         let path_clone = path.clone();
 
-        // 1. Cancel any existing workspace scan
         if let Some(token) = &self.state.workspace.cancel_token {
             token.store(true, std::sync::atomic::Ordering::Relaxed);
         }
 
-        // 2. Create a new cancellation token for this scan
         let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.state.workspace.cancel_token = Some(new_token.clone());
 
@@ -105,17 +101,21 @@ impl WorkspaceOps for KatanaApp {
                 #[serde(default)]
                 expanded_directories: std::collections::HashSet<String>,
             }
-            if let Ok(state) = serde_json::from_str::<TabState>(&cache_json) {
-                to_open = state.tabs;
-                active_idx = state.active_idx;
-                self.state.workspace.expanded_directories = state
-                    .expanded_directories
-                    .into_iter()
-                    .map(std::path::PathBuf::from)
-                    .collect();
+            match serde_json::from_str::<TabState>(&cache_json) {
+                Ok(state) => {
+                    to_open = state.tabs;
+                    active_idx = state.active_idx;
+                    self.state.workspace.expanded_directories = state
+                        .expanded_directories
+                        .into_iter()
+                        .map(std::path::PathBuf::from)
+                        .collect();
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to deserialize tab state: {}", e);
+                }
             }
         } else {
-            // Fallback for first time after migration
             let is_same_as_last = self
                 .state
                 .config
@@ -133,19 +133,15 @@ impl WorkspaceOps for KatanaApp {
             }
         }
 
-        // Persist the last opened workspace path.
         {
             let settings = self.state.config.settings.settings_mut();
             settings.workspace.last_workspace = Some(path_str.clone());
 
-            // Move to end of history (most recent)
             settings.workspace.paths.retain(|p| p != &path_str);
             settings.workspace.paths.push(path_str);
         }
 
-        // Restore tabs for the opened workspace
         if !to_open.is_empty() {
-            // Retain only files that exist
             to_open.retain(|p| std::path::Path::new(p).exists());
 
             let active_idx_val = active_idx.unwrap_or(0).min(to_open.len().saturating_sub(1));
@@ -153,13 +149,17 @@ impl WorkspaceOps for KatanaApp {
             for (i, p) in to_open.iter().enumerate() {
                 let path = std::path::PathBuf::from(p);
                 if i == active_idx_val {
-                    if let Ok(doc) = self.fs.load_document(path) {
-                        self.state.document.open_documents.push(doc);
-                        self.state
-                            .initialize_tab_split_state(std::path::PathBuf::from(p));
+                    match self.fs.load_document(path) {
+                        Ok(doc) => {
+                            self.state.document.open_documents.push(doc);
+                            self.state
+                                .initialize_tab_split_state(std::path::PathBuf::from(p));
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to load document: {}", e);
+                        }
                     }
                 } else {
-                    // Lazy load non-active tabs
                     self.state
                         .document
                         .open_documents
@@ -202,12 +202,10 @@ impl WorkspaceOps for KatanaApp {
         let (tx, rx) = std::sync::mpsc::channel();
         self.workspace_rx = Some(rx);
 
-        // 1. Cancel any existing workspace scan
         if let Some(token) = &self.state.workspace.cancel_token {
             token.store(true, std::sync::atomic::Ordering::Relaxed);
         }
 
-        // 2. Create a new cancellation token for this scan
         let new_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.state.workspace.cancel_token = Some(new_token.clone());
 
@@ -275,9 +273,6 @@ impl WorkspaceOps for KatanaApp {
             self.workspace_rx = None;
         }
 
-        // Feature: Automatically show the changelog after updating the app.
-        // We defer this action until the initial workspace has finished loading so that
-        // the newly opened changelog tab doesn't get wiped by `finish_open_workspace`.
         if self.needs_changelog_display
             && !self.state.workspace.is_loading
             && self.workspace_rx.is_none()
@@ -337,8 +332,13 @@ impl WorkspaceOps for KatanaApp {
                 active_idx: idx,
                 expanded_directories: expanded,
             };
-            if let Ok(json) = serde_json::to_string(&state) {
-                let _ = self.state.config.cache.set_persistent(&key, json);
+            match serde_json::to_string(&state) {
+                Ok(json) => {
+                    let _ = self.state.config.cache.set_persistent(&key, json);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to serialize tab state: {}", e);
+                }
             }
         }
     }

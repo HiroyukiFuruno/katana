@@ -539,28 +539,17 @@ pub struct SettingsUpdatesMessages {
     pub check_now: String,
 }
 
-/// i18n messages for the Behavior settings tab.
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct SettingsBehaviorMessages {
-    /// Section heading.
     pub section_title: String,
-    /// Label for the confirm-close-dirty-tab toggle.
     pub confirm_close_dirty_tab: String,
-    /// Label for the scroll-sync toggle.
     pub scroll_sync: String,
-    /// Label for the auto-save toggle.
     pub auto_save: String,
-    /// Label for the auto-save interval input.
     pub auto_save_interval: String,
-    /// Unit label for seconds.
     pub seconds: String,
-    /// Confirmation dialog title.
     pub close_confirm_title: String,
-    /// Confirmation dialog message template.
     pub close_confirm_msg: String,
-    /// Confirmation dialog discard button.
     pub close_confirm_discard: String,
-    /// Confirmation dialog cancel button.
     pub close_confirm_cancel: String,
 
     #[serde(default = "default_clear_http_cache")]

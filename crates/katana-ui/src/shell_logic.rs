@@ -1,16 +1,10 @@
-//! Pure logic functions extracted from shell.rs.
-//!
-//! Utility functions that do not depend on egui. Separated for testability.
 
 use std::path::Path;
 
-/// Offset basis value for FNV-1a hash.
 const FNV1A_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
 
-/// Prime value for FNV-1a hash.
 const FNV1A_PRIME: u64 = 0x100000001b3;
 
-/// Converts a string to u64 using FNV-1a hash.
 pub fn hash_str(s: &str) -> u64 {
     let mut h: u64 = FNV1A_OFFSET_BASIS;
     for b in s.bytes() {
@@ -20,8 +14,6 @@ pub fn hash_str(s: &str) -> u64 {
     h
 }
 
-/// Returns the relative full path from the workspace root (for tooltips).
-/// Example: /workspace/specs/auth/spec.md → "specs/auth/spec.md"
 pub fn relative_full_path(path: &Path, ws_root: Option<&Path>) -> String {
     let rel = match ws_root {
         Some(root) => path.strip_prefix(root).unwrap_or(path),
@@ -30,8 +22,6 @@ pub fn relative_full_path(path: &Path, ws_root: Option<&Path>) -> String {
     rel.to_string_lossy().to_string()
 }
 
-/// Returns the new index when navigating tabs forward (left).
-/// Wraparound support: moving left from index 0 goes to the last tab.
 pub fn prev_tab_index(current: usize, count: usize) -> usize {
     if count == 0 {
         return 0;
@@ -43,8 +33,6 @@ pub fn prev_tab_index(current: usize, count: usize) -> usize {
     }
 }
 
-/// Returns the new index when navigating tabs backward (right).
-/// Wraparound support: moving right from the last tab goes to the first tab.
 pub fn next_tab_index(current: usize, count: usize) -> usize {
     if count == 0 {
         return 0;
@@ -67,7 +55,6 @@ pub fn format_window_title(
     }
 }
 
-/// Formats the metadata tooltip string (Size and Modified time).
 pub fn format_metadata_tooltip(
     size: u64,
     sys_time: Option<std::time::SystemTime>,
@@ -93,8 +80,6 @@ pub fn format_metadata_tooltip(
 pub const SPLASH_VISIBLE_DURATION: f32 = 1.5;
 pub const SPLASH_FADE_DURATION: f32 = 0.5;
 
-/// Calculates the splash screen opacity based on elapsed time.
-/// Returns a value between 0.0 and 1.0.
 pub fn calculate_splash_opacity(elapsed_secs: f32) -> f32 {
     if elapsed_secs <= SPLASH_VISIBLE_DURATION {
         1.0
@@ -105,17 +90,11 @@ pub fn calculate_splash_opacity(elapsed_secs: f32) -> f32 {
     }
 }
 
-/// Calculates the splash screen progress bar ratio based on elapsed time.
-/// Returns a value between 0.0 and 1.0.
 pub fn calculate_splash_progress(elapsed_secs: f32) -> f32 {
     (elapsed_secs / SPLASH_VISIBLE_DURATION).clamp(0.0, 1.0)
 }
 
-/// Helper function to format the full tooltip for a file tree entry.
-/// This currently embodies the buggy behavior where `Path` is swallowed.
 pub fn format_tree_tooltip(name: &str, path: &std::path::Path) -> String {
-    // std::fs::canonicalize resolves /Users to /System/Volumes/Data/Users on macOS, producing confusing paths.
-    // Instead we just display the actual path without canonicalizing.
     let path_str = path.display().to_string();
     format!(
         "{name}\n{}: {path_str}\n{}",
@@ -132,7 +111,6 @@ pub fn format_tree_tooltip(name: &str, path: &std::path::Path) -> String {
     )
 }
 
-/// Recursively collects up to 100 matching files from the workspace tree.
 pub fn collect_matches(
     entries: &[katana_core::workspace::TreeEntry],
     query: &str,
@@ -149,7 +127,6 @@ pub fn collect_matches(
             katana_core::workspace::TreeEntry::File { path } => {
                 let rel = relative_full_path(path, Some(ws_root));
 
-                // 1. Exclude check (priority)
                 let mut is_excluded = false;
                 for re in exclude_regexes {
                     if re.is_match(&rel) {
@@ -161,13 +138,11 @@ pub fn collect_matches(
                     continue;
                 }
 
-                // 2. Query check
                 let mut matches_query = true;
                 if !query.is_empty() {
                     matches_query = rel.to_lowercase().contains(query);
                 }
 
-                // 3. Include check
                 let mut matches_include = true;
                 if !include_regexes.is_empty() {
                     matches_include = false;
@@ -258,18 +233,14 @@ mod tests {
 
     #[test]
     fn format_metadata_tooltip_populates_template() {
-        // TDD RED phase test
         let size = 1024;
         let sys_time = Some(std::time::UNIX_EPOCH);
         let template = "Size: {size}\nMod: {mod_time}";
 
         let result = format_metadata_tooltip(size, sys_time, template);
 
-        // It should replace \{size\} with 1024
         assert!(result.contains("1024"));
-        // It should contain 'Size: 1024\nMod: '
         assert!(result.starts_with("Size: 1024"));
-        // Since we are formatting UNIX_EPOCH in local time, exact string match of the year (1970 or 1969 depending on timezone) is enough to check replacement without being flaky.
         assert!(result.contains("1970") || result.contains("1969"));
     }
 
@@ -279,7 +250,6 @@ mod tests {
         let file_path = temp_dir.path().join("test_file.txt");
         std::fs::write(&file_path, "test").unwrap();
 
-        // Use buggy format_tree_tooltip behavior internally replicating what we had
         let tooltip = format_tree_tooltip("test_file.txt", &file_path);
         let expected_path = file_path.display().to_string();
         assert!(
@@ -310,32 +280,27 @@ mod tests {
             },
         ];
 
-        // 1. Empty query matches all files up to 100
         let mut results = Vec::new();
         collect_matches(&entries, "", &[], &[], ws_root, &mut results);
         assert_eq!(results.len(), 3);
 
-        // 2. Query search
         let mut results = Vec::new();
         collect_matches(&entries, "main", &[], &[], ws_root, &mut results);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], ws_root.join("src/main.rs"));
 
-        // 3. Exclude regex
         let mut results = Vec::new();
         let exclude = vec![Regex::new(r"^tests/").unwrap()];
         collect_matches(&entries, "", &[], &exclude, ws_root, &mut results);
         assert_eq!(results.len(), 2);
         assert!(!results.contains(&ws_root.join("tests/integration.rs")));
 
-        // 4. Include regex
         let mut results = Vec::new();
         let include = vec![Regex::new(r"\.md$").unwrap()];
         collect_matches(&entries, "", &include, &[], ws_root, &mut results);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], ws_root.join("docs/readme.md"));
 
-        // 5. Case insensitive query
         let mut results = Vec::new();
         collect_matches(&entries, "readme", &[], &[], ws_root, &mut results);
         assert_eq!(results.len(), 1);
@@ -353,12 +318,10 @@ mod tests {
             });
         }
 
-        // Test early return at start of function
         let mut results = vec![ws_root.join("dummy.txt"); 100];
         collect_matches(&entries, "", &[], &[], ws_root, &mut results);
         assert_eq!(results.len(), 100); // Should not add any more
 
-        // Test early return inside loop
         let mut results = Vec::new();
         collect_matches(&entries, "", &[], &[], ws_root, &mut results);
         assert_eq!(results.len(), 100); // Should stop at 100
@@ -366,15 +329,12 @@ mod tests {
 
     #[test]
     fn test_calculate_splash_opacity() {
-        // Must stay 1.0 up to 1.5 seconds
         assert_eq!(calculate_splash_opacity(0.0), 1.0);
         assert_eq!(calculate_splash_opacity(1.0), 1.0);
         assert_eq!(calculate_splash_opacity(1.5), 1.0);
 
-        // Fades out between 1.5 and 2.0 seconds
         assert_eq!(calculate_splash_opacity(1.75), 0.5);
 
-        // Clamped at 0.0 after 2.0 seconds
         assert_eq!(calculate_splash_opacity(2.0), 0.0);
         assert_eq!(calculate_splash_opacity(2.5), 0.0);
     }

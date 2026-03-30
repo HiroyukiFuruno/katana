@@ -1,11 +1,5 @@
 use eframe::egui::{self};
 
-/// Renders an HTML block using our HtmlParser + HtmlRenderer pipeline.
-///
-/// This function is called from the `render_html_fn` callback registered with
-/// `egui_commonmark::CommonMarkViewer`. `pulldown-cmark` identifies HTML blocks
-/// per CommonMark spec and passes them to this handler. This means we no longer
-/// need custom regex-based HTML block extraction in `split_into_sections`.
 pub(crate) fn render_html_block(
     ui: &mut egui::Ui,
     html: &str,
@@ -26,7 +20,6 @@ pub(crate) fn render_html_block(
         |block_ui| {
             block_ui.set_clip_rect(clip_rect);
 
-            // Adjust margin: shift text 2px up and reduce top padding by 5px
             const HTML_BLOCK_MARGIN_TOP_ADJUST: f32 = -7.0;
             block_ui.add_space(HTML_BLOCK_MARGIN_TOP_ADJUST);
 
@@ -49,7 +42,6 @@ pub(crate) fn render_html_block(
                 }
             }
 
-            // Adjust margin: reduce bottom padding by 5px (with 2px offset applied)
             const HTML_BLOCK_MARGIN_BOTTOM_ADJUST: f32 = -3.0;
             block_ui.add_space(HTML_BLOCK_MARGIN_BOTTOM_ADJUST);
         },

@@ -2,7 +2,6 @@ use crate::preview_pane::{DownloadRequest, ViewerState};
 use eframe::egui::{self, Vec2};
 use katana_core::markdown::svg_rasterize::RasterizedSvg;
 
-/// Download button UI for uninstalled tools.
 pub(crate) fn show_not_installed(
     ui: &mut egui::Ui,
     kind: &str,
@@ -53,9 +52,7 @@ pub(crate) fn show_not_installed(
     request
 }
 
-/// Minimum zoom limit for trackpad pinches.
 const MIN_ZOOM: f32 = 0.1;
-/// Maximum zoom limit for trackpad pinches.
 const MAX_ZOOM: f32 = 10.0;
 
 pub(crate) fn show_rasterized(
@@ -69,20 +66,16 @@ pub(crate) fn show_rasterized(
     let max_w = ui.available_width();
     let base_scale = (max_w / img.width as f32).min(1.0);
 
-    // Apply viewer zoom/pan if state is provided.
     let zoom = state.as_ref().map_or(1.0, |s| s.zoom);
     let pan = state.as_ref().map_or(egui::Vec2::ZERO, |s| s.pan);
 
-    // The base display size (zoom = 1.0)
     let base_size = Vec2::new(
         img.width as f32 * base_scale,
         img.height as f32 * base_scale,
     );
 
-    // Zoomed image size
     let zoomed_size = base_size * zoom;
 
-    // Reserve space for the image container (invariant to zoom!).
     let (container_rect, response) =
         ui.allocate_exact_size(Vec2::new(max_w, base_size.y), egui::Sense::click_and_drag());
 
@@ -135,8 +128,6 @@ pub(crate) fn show_rasterized(
         )
     };
 
-    // Paint the image with pan offset, clipped to the fixed container.
-    // Center the base image horizontally if it's smaller than max_w.
     let x_offset = (max_w - base_size.x).max(0.0) / 2.0;
 
     let image_pos = container_rect.min + egui::vec2(x_offset, 0.0) + pan;
@@ -148,16 +139,13 @@ pub(crate) fn show_rasterized(
         crate::theme_bridge::WHITE,
     );
 
-    // Draw overlay controls only when viewer_state is provided.
     if let Some(state) = state {
-        // Fullscreen button (top-right).
         if crate::diagram_controller::draw_fullscreen_button(ui, container_rect) {
             if let Some(req) = fullscreen_request {
                 *req = Some(idx);
             }
         }
 
-        // Control grid (bottom-right).
         crate::diagram_controller::draw_controls(ui, state, container_rect);
     }
 }
@@ -172,23 +160,27 @@ pub(crate) fn show_local_image(
 ) {
     let texture_handle = if let Some(state) = viewer_state.as_mut() {
         if state.texture.is_none() {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(dyn_img) = image::load_from_memory(&bytes) {
-                    let rgba = dyn_img.into_rgba8();
-                    let size = std::array::from_fn(|i| {
-                        if i == 0 {
-                            rgba.width() as usize
-                        } else {
-                            rgba.height() as usize
-                        }
-                    });
-                    let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
-                    state.texture = Some(ui.ctx().load_texture(
-                        format!("local_image_{id}"),
-                        color_img,
-                        egui::TextureOptions::LINEAR,
-                    ));
-                }
+            match std::fs::read(path) {
+                Ok(bytes) => match image::load_from_memory(&bytes) {
+                    Ok(dyn_img) => {
+                        let rgba = dyn_img.into_rgba8();
+                        let size = std::array::from_fn(|i| {
+                            if i == 0 {
+                                rgba.width() as usize
+                            } else {
+                                rgba.height() as usize
+                            }
+                        });
+                        let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
+                        state.texture = Some(ui.ctx().load_texture(
+                            format!("local_image_{id}"),
+                            color_img,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                    }
+                    Err(_) => {}
+                },
+                Err(_) => {}
             }
         }
         state.texture.clone()
@@ -201,7 +193,7 @@ pub(crate) fn show_local_image(
             let size = t.size();
             (t, size[0], size[1])
         }
-        None => return, // Could not load image
+        None => return, // WHY: Could not load image
     };
 
     let max_w = ui.available_width();

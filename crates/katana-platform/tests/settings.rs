@@ -13,7 +13,6 @@ fn new_settings_service_has_defaults() {
 fn settings_returns_immutable_reference() {
     let svc = SettingsService::default();
     let settings = svc.settings();
-    // Compile-time guarantee that settings cannot be modified because it is an immutable reference
     assert_eq!(settings.extra.len(), 0);
 }
 
@@ -49,7 +48,6 @@ fn settings_mut_allows_modification() {
 fn default_trait_matches_new() {
     let from_default = SettingsService::default();
     let from_new = SettingsService::new(Box::new(katana_platform::InMemoryRepository));
-    // Both should produce equivalent default settings
     assert_eq!(
         from_new.settings().workspace.last_workspace,
         from_default.settings().workspace.last_workspace
@@ -75,7 +73,6 @@ fn json_repository_roundtrip() {
     svc.settings_mut().language = "ja".to_string();
     svc.save().unwrap();
 
-    // Reload from the same file
     let repo2 = katana_platform::JsonFileRepository::new(path);
     let svc2 = SettingsService::new(Box::new(repo2));
     assert_eq!(svc2.settings().theme.theme, "light");

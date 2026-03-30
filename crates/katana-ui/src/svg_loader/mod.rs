@@ -114,9 +114,6 @@ fn rasterize_svg_bytes_with_size(
     }
     .round();
 
-    // Fall back to 2x the SVG's original dimensions when the size hint resolves to zero
-    // (e.g. when the image is placed in a zero-sized rect by egui Button).
-    // Use 2x for Retina display sharpness.
     let width = if scaled_size.x < 1.0 {
         (source_size.x * 2.0) as u32
     } else {
@@ -146,8 +143,6 @@ impl Default for KatanaSvgLoader {
     fn default() -> Self {
         let mut options = resvg::usvg::Options::default();
         options.fontdb_mut().load_system_fonts();
-        // Set an explicit default font family to avoid warnings on systems where Arial is missing
-        // or has character coverage issues.
         options.font_family = "Verdana".to_string();
 
         Self {
@@ -209,18 +204,21 @@ impl ImageLoader for KatanaSvgLoader {
                             }
                         }
                     } else {
-                        // Decode percent-encoded data URI content manually
                         let bytes = content.as_bytes();
                         let mut decoded = Vec::with_capacity(bytes.len());
                         let mut i = 0;
                         while i < bytes.len() {
                             if bytes[i] == b'%' && i + 2 < bytes.len() {
-                                if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..=i + 2]) {
-                                    if let Ok(byte) = u8::from_str_radix(hex, HEX_RADIX) {
-                                        decoded.push(byte);
-                                        i += PERCENT_ENCODE_LEN;
-                                        continue;
-                                    }
+                                match std::str::from_utf8(&bytes[i + 1..=i + 2]) {
+                                    Ok(hex) => match u8::from_str_radix(hex, HEX_RADIX) {
+                                        Ok(byte) => {
+                                            decoded.push(byte);
+                                            i += PERCENT_ENCODE_LEN;
+                                            continue;
+                                        }
+                                        Err(_) => {}
+                                    },
+                                    Err(_) => {}
                                 }
                             }
                             decoded.push(bytes[i]);
@@ -469,7 +467,6 @@ mod tests {
         pixels
     }
 
-    // ── rasterize_svg_bytes_with_size: SizeHint coverage ──
 
     fn sample_svg() -> &'static [u8] {
         br#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50" fill="red"/></svg>"#
@@ -509,8 +506,6 @@ mod tests {
             &sample_options(),
         )
         .expect("rasterize with Size hint (maintain AR)");
-        // Source is 100x50 (2:1). Target maxes at 200x200.
-        // Width-based: 200x100. Height fits (100 <= 200), so final is 200x100.
         assert_eq!(image.size[0], 200);
         assert_eq!(image.size[1], 100);
     }
@@ -527,8 +522,6 @@ mod tests {
             &sample_options(),
         )
         .expect("rasterize with Size hint (height constrained)");
-        // Source is 100x50. Width-based: 400x200 → height 200 > 50,
-        // so re-scale: *= 50/200 → 100x50.
         assert_eq!(image.size[0], 100);
         assert_eq!(image.size[1], 50);
     }
@@ -549,7 +542,6 @@ mod tests {
         assert_eq!(image.size[1], 150);
     }
 
-    // ── ImageLoader trait ──
 
     #[test]
     fn svg_loader_load_unsupported_uri_returns_not_supported() {
@@ -608,7 +600,6 @@ mod tests {
             },
         });
         loader.cache.lock().push(bucket);
-        // 2x2 pixels * 4 bytes per Color32 = 16
         assert_eq!(loader.byte_size(), 4 * size_of::<egui::Color32>());
     }
 
@@ -635,9 +626,6 @@ mod tests {
         let loader = KatanaSvgLoader::default();
         let image = ColorImage::new([1, 1], vec![egui::Color32::RED]);
 
-        // Create a bucket with two size hints:
-        // - Scale(1.0): last used at pass 0 — stale at pass 10
-        // - Scale(2.0): last used at pass 9 — still fresh (10 <= 9+1 = 10)
         let mut bucket = SvgCacheBucket {
             uri: "test.svg".to_owned(),
             entries: Vec::new(),
@@ -658,8 +646,6 @@ mod tests {
         });
         loader.cache.lock().push(bucket);
 
-        // end_pass at index 10 — eviction only runs on buckets with 2+ entries
-        // Keeps entries where pass_index <= last_used + 1
         loader.end_pass(10);
 
         let cache = loader.cache.lock();
@@ -674,21 +660,18 @@ mod tests {
         );
     }
 
-    // ── ImageLoader::load integration (exercising ctx.try_load_bytes) ──
 
     #[test]
     fn svg_loader_load_data_uri_rasterizes_and_caches() {
         let ctx = Context::default();
         install_image_loaders(&ctx);
 
-        // Provide SVG bytes directly via include_bytes so try_load_bytes resolves.
         let svg_bytes: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50" fill="red"/></svg>"#;
         let uri = "bytes://test_red_rect.svg";
         ctx.include_bytes(uri, svg_bytes);
 
         let loader = KatanaSvgLoader::default();
 
-        // First load — cache miss, should rasterize and return Ready
         let result = loader
             .load(&ctx, uri, SizeHint::default())
             .expect("svg should load from included bytes");
@@ -700,7 +683,6 @@ mod tests {
             ImagePoll::Pending { .. } => panic!("expected Ready on first load"),
         }
 
-        // Second load — should hit cache and return Ready immediately
         let result2 = loader
             .load(&ctx, uri, SizeHint::default())
             .expect("cached svg should load");
@@ -715,7 +697,6 @@ mod tests {
         let loader = KatanaSvgLoader::default();
         let ctx = Context::default();
 
-        // Insert an error entry with a .svg URI (must pass is_supported check)
         let uri = "https://example.com/broken.svg";
         let mut bucket = SvgCacheBucket {
             uri: uri.to_owned(),
@@ -740,7 +721,6 @@ mod tests {
         let ctx = Context::default();
         install_image_loaders(&ctx);
 
-        // Provide invalid SVG bytes
         let uri = "bytes://invalid.svg";
         ctx.include_bytes(uri, b"not valid svg at all");
 
@@ -752,9 +732,7 @@ mod tests {
     fn svg_loader_load_error_from_try_load_bytes() {
         let loader = KatanaSvgLoader::default();
         let ctx = Context::default();
-        // Intentionally do NOT install image loaders — ctx has no bytes loader
 
-        // ctx.try_load_bytes("...svg") returns Err(NotSupported) → line 166
         let result = loader.load(&ctx, "https://example.com/image.svg", SizeHint::default());
         assert!(result.is_err());
     }
@@ -780,7 +758,6 @@ mod tests {
     #[test]
     fn test_svg_rasterize_fallback_size() {
         let svg_data = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>"#;
-        // Zero or tiny scale should trigger the fallback
         let result = super::rasterize_svg_bytes_with_size(
             svg_data.as_bytes(),
             egui::load::SizeHint::Width(0),
@@ -788,7 +765,6 @@ mod tests {
         );
         assert!(result.is_ok());
         let image = result.unwrap();
-        // Since original size is 10x10, fallback should be 20x20
         assert_eq!(image.width(), 20);
         assert_eq!(image.height(), 20);
     }

@@ -16,25 +16,21 @@ fn process_entry_skips_invalid_files() {
     let tmp = tempfile::TempDir::new().unwrap();
     let mut fonts = vec![];
 
-    // 1. Directory is skipped even if it has a .ttf extension.
     let dir_path = tmp.path().join("dir.ttf");
     fs::create_dir(&dir_path).unwrap();
     OsFontScanner::process_entry(&dir_path, &mut fonts);
     assert!(fonts.is_empty());
 
-    // 2. File without extension is skipped.
     let no_ext_path = tmp.path().join("no_extension");
     fs::write(&no_ext_path, "").unwrap();
     OsFontScanner::process_entry(&no_ext_path, &mut fonts);
     assert!(fonts.is_empty());
 
-    // 3. File with invalid extension is skipped.
     let invalid_ext_path = tmp.path().join("invalid.txt");
     fs::write(&invalid_ext_path, "").unwrap();
     OsFontScanner::process_entry(&invalid_ext_path, &mut fonts);
     assert!(fonts.is_empty());
 
-    // 4. File with valid .ttf extension is added.
     let valid_path = tmp.path().join("MyFont.ttf");
     fs::write(&valid_path, "").unwrap();
     OsFontScanner::process_entry(&valid_path, &mut fonts);

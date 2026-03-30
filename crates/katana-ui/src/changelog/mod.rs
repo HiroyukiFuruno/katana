@@ -3,16 +3,11 @@ use std::sync::mpsc::Sender;
 const GITHUB_RAW_BASE: &str =
     "https://raw.githubusercontent.com/HiroyukiFuruno/KatanA/refs/heads/master";
 
-/// A single version section parsed from the changelog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangelogSection {
-    /// Version string (e.g. "0.8.0", "Unreleased").
     pub version: String,
-    /// Full heading line (e.g. "## [0.8.0] - 2026-03-28").
     pub heading: String,
-    /// The body content (markdown) for this version.
     pub body: String,
-    /// Whether this section should be initially expanded.
     pub default_open: bool,
 }
 
@@ -21,7 +16,6 @@ pub enum ChangelogEvent {
     Error(String),
 }
 
-/// Start fetching the changelog in the background.
 fn handle_fetch_result(
     result: Result<ehttp::Response, String>,
     tx: &Sender<ChangelogEvent>,
@@ -65,7 +59,6 @@ fn handle_fetch_result(
     }
 }
 
-/// Generates the URL for fetching the changelog, including a cache-busting version parameter.
 pub(crate) fn get_changelog_url(language: &str, current_version: &str) -> String {
     let filename = if language.starts_with("ja") {
         "CHANGELOG.ja.md"
@@ -79,7 +72,6 @@ pub(crate) fn get_changelog_url(language: &str, current_version: &str) -> String
         .unwrap_or_default()
         .as_secs();
 
-    // Append the version string and a timestamp to bypass GitHub's edge cache specifically for new upgrades
     format!(
         "{}/{}?v={}&t={}",
         GITHUB_RAW_BASE, filename, current_version, ts
@@ -114,10 +106,6 @@ pub fn fetch_changelog(
     );
 }
 
-/// Parses raw changelog markdown into structured sections.
-///
-/// Sections between `previous_version` (exclusive) and `current_version`
-/// (inclusive) are marked as `default_open = true`. All others are closed.
 fn parse_changelog(
     raw_markdown: &str,
     current_version: &str,
@@ -127,14 +115,12 @@ fn parse_changelog(
     let mut sections = Vec::new();
     let mut parts = raw_markdown.split("\n## [");
 
-    // Skip the introductory text (title, description, etc.)
     let _ = parts.next();
 
     for part in parts {
         let bracket_end = part.find(']').unwrap_or(0);
         let version_str = part[..bracket_end].trim().to_string();
 
-        // Extract the heading line (up to the first newline)
         let heading_end = part.find('\n').unwrap_or(part.len());
 
         let date_part = if bracket_end + 1 < heading_end {
@@ -151,7 +137,6 @@ fn parse_changelog(
             format!("v{} - {}", version_str, date_part)
         };
 
-        // Everything after the heading line is the body
         let body = if heading_end < part.len() {
             part[heading_end..].trim_end().to_string()
         } else {
@@ -173,7 +158,6 @@ fn parse_changelog(
     sections
 }
 
-/// A naive semantic version comparison for versions like "0.8.0".
 fn is_newer_or_equal(ver_a: &str, ver_b: &str) -> bool {
     let a = ver_a.trim_start_matches('v');
     let b = ver_b.trim_start_matches('v');
@@ -202,7 +186,6 @@ fn compare_versions(a: &str, b: &str) -> i32 {
     0
 }
 
-/// Renders the release notes as a tab content instead of a modal window.
 pub(crate) fn render_release_notes_tab(
     ui: &mut egui::Ui,
     sections: &[ChangelogSection],
@@ -232,7 +215,6 @@ pub(crate) fn render_release_notes_tab(
                 return;
             }
 
-            // Apply padding around the content
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(
                     TAB_OUTER_MARGIN_X,
@@ -258,7 +240,6 @@ pub(crate) fn render_release_notes_tab(
                                         TAB_INNER_MARGIN_Y,
                                     ))
                                     .show(ui, |ui| {
-                                        // Render body as markdown
                                         let mut cache = egui_commonmark::CommonMarkCache::default();
                                         egui_commonmark::CommonMarkViewer::new().show(
                                             ui,
@@ -307,8 +288,6 @@ mod tests {
         let md = "# Changelog\n\n## [0.8.0] - DATE\n### Added\n- A\n\n## [0.7.0] - DATE\n### Fixed\n- B\n\n## [0.6.0] - DATE\n### Changed\n- C";
         let sections = parse_changelog(md, "0.8.0", None);
 
-        // With no previous version (defaults to "0.0.0"), all versions
-        // up to and including current_version are open.
         assert!(sections[0].default_open); // 0.8.0
         assert!(sections[1].default_open); // 0.7.0
         assert!(sections[2].default_open); // 0.6.0
@@ -365,13 +344,10 @@ mod tests {
                     default_open: true,
                 }];
 
-                // Test loading state
                 render_release_notes_tab(ui, &[], true);
 
-                // Test content state
                 render_release_notes_tab(ui, &sections, false);
 
-                // Test empty state
                 render_release_notes_tab(ui, &[], false);
             });
         });
@@ -408,7 +384,6 @@ mod tests {
     #[test]
     fn test_handle_fetch_result_ok_response_decode_error() {
         let (tx, rx) = std::sync::mpsc::channel();
-        // A response with invalid utf8 bytes
         let response = ehttp::Response {
             url: "https://example.com".to_string(),
             ok: true,
@@ -427,7 +402,6 @@ mod tests {
     #[test]
     fn test_handle_fetch_result_failure_response_decode_error() {
         let (tx, rx) = std::sync::mpsc::channel();
-        // A bad status response with invalid utf8 bytes
         let response = ehttp::Response {
             url: "https://example.com".to_string(),
             ok: false,
@@ -467,21 +441,18 @@ mod tests {
 
     #[test]
     fn test_get_changelog_url_cache_busting() {
-        // Assert that the English default is correct and appends the cache buster string
         let url_en = get_changelog_url("en", "0.8.0");
         assert!(
             url_en.starts_with("https://raw.githubusercontent.com/HiroyukiFuruno/KatanA/refs/heads/master/CHANGELOG.md?v=0.8.0&t="),
             "URL {} does not contain expected prefix", url_en
         );
 
-        // Assert that the Japanese localized file is correct and appends the cache buster
         let url_ja = get_changelog_url("ja", "0.8.1-beta");
         assert!(
             url_ja.starts_with("https://raw.githubusercontent.com/HiroyukiFuruno/KatanA/refs/heads/master/CHANGELOG.ja.md?v=0.8.1-beta&t="),
             "URL {} does not contain expected prefix", url_ja
         );
 
-        // Assert that unknown locales fallback to English as intended
         let url_unknown = get_changelog_url("it", "1.0.0");
         assert!(
             url_unknown.starts_with("https://raw.githubusercontent.com/HiroyukiFuruno/KatanA/refs/heads/master/CHANGELOG.md?v=1.0.0&t="),

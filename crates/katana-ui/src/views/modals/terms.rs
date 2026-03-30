@@ -1,4 +1,3 @@
-//! Terms of Service modal — displayed on first launch per version.
 
 use crate::app_state::AppAction;
 use crate::widgets::StyledComboBox;
@@ -21,8 +20,6 @@ const TERMS_SCROLL_HEIGHT_RATIO: f32 = 0.5;
 const TERMS_CENTER_OFFSET_RATIO: f32 = 0.1;
 const TERMS_LANG_SELECT_WIDTH: f32 = 140.0;
 
-/// Renders the Terms of Service modal as a blocking UI overlay.
-/// Returns the `AppAction` the user chose, or `None`.
 pub(crate) struct TermsModal<'a> {
     pub version: &'a str,
     pub pending_action: &'a mut AppAction,

@@ -20,7 +20,6 @@ pub(crate) fn render_theme_tab(ui: &mut egui::Ui, settings: &mut SettingsService
     if add_styled_slider(ui, slider).changed() {
         settings.settings_mut().theme.ui_contrast_offset = offset;
         if offset != original_offset {
-            // Apply the new effective colors dynamically
             let colors = settings.settings().effective_theme_colors();
             ui.ctx()
                 .set_visuals(crate::theme_bridge::visuals_from_theme(&colors));
@@ -77,7 +76,6 @@ pub(crate) fn render_theme_preset_selector(ui: &mut egui::Ui, settings: &mut Set
     }
     render_preset_group(ui, settings, &light_presets);
 
-    // Render Custom Themes if any
     let custom_themes = settings.settings().theme.custom_themes.clone();
     if !custom_themes.is_empty() {
         ui.add_space(SECTION_SPACING);
@@ -175,7 +173,6 @@ pub(crate) fn render_preset_group(
         let accent_color = theme_bridge::rgb_to_color32(colors.system.accent);
 
         ui.horizontal(|ui| {
-            // Colour swatch
             let (rect, _) = ui.allocate_exact_size(
                 egui::vec2(PRESET_SWATCH_SIZE, PRESET_SWATCH_SIZE),
                 egui::Sense::hover(),
@@ -605,7 +602,6 @@ pub(crate) fn render_custom_color_editor(ui: &mut egui::Ui, settings: &mut Setti
     }
 }
 
-/// Renders a single colour picker row inside a Grid, returning `true` if changed.
 pub(crate) enum ColorPropType {
     Rgb(fn(&ThemeColors) -> Rgb, fn(&mut ThemeColors, Rgb)),
     Rgba(fn(&ThemeColors) -> Rgba, fn(&mut ThemeColors, Rgba)),
@@ -656,5 +652,3 @@ pub(crate) fn render_color_row(
 
     changed
 }
-
-// ── Font tab ──────────────────────────────────────────────

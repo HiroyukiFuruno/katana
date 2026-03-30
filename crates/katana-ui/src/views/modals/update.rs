@@ -48,7 +48,6 @@ impl<'a> UpdateModal<'a> {
 
         let msgs = &crate::i18n::get().update;
 
-        // Phase-aware modals (Downloading / Installing / ReadyToRelaunch)
         match &state.update.phase {
             Some(UpdatePhase::Downloading { progress }) => {
                 Modal::new("katana_update_dialog_v6", &msgs.title)
@@ -118,13 +117,10 @@ impl<'a> UpdateModal<'a> {
                 }
                 return;
             }
-            None => {} // Fall through to the standard update dialog
+            None => {} // WHY: Fall through to the standard update dialog
         }
 
-        // Standard update dialog — use Modal to avoid vertical stretch bug.
-        // (egui::Window::open() stores resize state, causing unbounded height growth.)
         if state.update.checking {
-            // Checking spinner — no footer, no close button
             Modal::new("katana_update_dialog_v6", &msgs.title)
                 .width(UPDATE_DIALOG_WIDTH)
                 .show_body_only(ctx, |ui| {
@@ -133,7 +129,6 @@ impl<'a> UpdateModal<'a> {
                     ui.label(msgs.checking_for_updates.clone());
                 });
         } else if let Some(err) = &state.update.check_error {
-            // Error state — OK button to close
             let close = {
                 let err: String = err.clone();
                 Modal::new("katana_update_dialog_v6", &msgs.title)
@@ -171,7 +166,6 @@ impl<'a> UpdateModal<'a> {
                 *open = false;
             }
         } else if let Some(latest) = &state.update.available {
-            // Update available — Install/Skip/Later buttons
             let tag = latest.tag_name.clone();
             let body_text = latest.body.clone();
             let desc = msgs
@@ -207,7 +201,6 @@ impl<'a> UpdateModal<'a> {
                     },
                     |ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            // Primary: Install
                             if ui
                                 .button(
                                     egui::RichText::new(msgs.install_update.clone())
@@ -218,18 +211,15 @@ impl<'a> UpdateModal<'a> {
                             {
                                 return Some(AppAction::InstallUpdate);
                             }
-                            // Release Notes
                             if ui
                                 .button(crate::i18n::get().menu.release_notes.clone())
                                 .clicked()
                             {
                                 return Some(AppAction::ShowReleaseNotes);
                             }
-                            // Skip
                             if ui.button(msgs.action_skip_version.clone()).clicked() {
                                 return Some(AppAction::SkipVersion(tag.clone()));
                             }
-                            // Later
                             if ui.button(msgs.action_later.clone()).clicked() {
                                 return Some(AppAction::DismissUpdate);
                             }
@@ -250,7 +240,6 @@ impl<'a> UpdateModal<'a> {
                 }
             }
         } else {
-            // Up to date — OK button to close
             let close = Modal::new("katana_update_dialog_v6", &msgs.title)
                 .width(UPDATE_DIALOG_WIDTH)
                 .show(

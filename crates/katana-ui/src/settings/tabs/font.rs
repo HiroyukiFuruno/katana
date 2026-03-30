@@ -13,7 +13,6 @@ pub(crate) fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut Sett
     let current = settings.settings().font.family.clone();
     let os_fonts = katana_platform::os_fonts::OsFontScanner::cached_fonts();
 
-    // Persistent state IDs
     let open_id = egui::Id::new("font_selector_open");
     let search_id = egui::Id::new("font_search_query");
 
@@ -22,34 +21,29 @@ pub(crate) fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut Sett
         .data(|d| d.get_temp::<String>(search_id))
         .unwrap_or_default();
 
-    // ── Trigger button (shows current value, opens popup on click) ────────
     let button_resp =
         ui.add(egui::Button::new(&current).min_size(egui::vec2(FONT_FAMILY_COMBOBOX_WIDTH, 0.0)));
     if button_resp.clicked() {
         let new_state = !is_open;
         ui.data_mut(|d| d.insert_temp(open_id, new_state));
         if new_state {
-            // Clear search when opening.
             ui.data_mut(|d| d.insert_temp(search_id, String::new()));
             query = String::new();
         }
     }
 
-    // ── Popup with inline search field + filtered list ────────────────────
     egui::Popup::from_response(&button_resp)
         .open(is_open)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(|ui| {
             ui.set_min_width(FONT_FAMILY_COMBOBOX_WIDTH);
 
-            // Search field at the top of the popup.
             let search_resp = ui.text_edit_singleline(&mut query);
             if search_resp.changed() {
                 ui.data_mut(|d: &mut egui::util::IdTypeMap| {
                     d.insert_temp(search_id, query.clone())
                 });
             }
-            // Auto-focus whenever popup is open.
             search_resp.request_focus();
 
             ui.separator();
@@ -98,7 +92,6 @@ pub(crate) fn render_font_family_selector(ui: &mut egui::Ui, settings: &mut Sett
         });
 }
 
-// ── Common UI Components ─────────────────────────────────────────────
 
 pub(crate) fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut SettingsService) {
     let mut size = settings.settings().clamped_font_size();
@@ -114,5 +107,3 @@ pub(crate) fn render_font_size_slider(ui: &mut egui::Ui, settings: &mut Settings
         let _ = settings.save();
     }
 }
-
-// ── Layout tab ───────────────────────────────────────────────────────

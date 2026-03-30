@@ -83,7 +83,6 @@ fn edit_without_explicit_save_does_not_change_disk() {
     let svc = FilesystemService::new();
     let mut doc = svc.load_document(&path).unwrap();
     doc.update_buffer("edited but not saved");
-    // Disk unchanged.
     assert_eq!(fs::read_to_string(&path).unwrap(), "original");
 }
 
@@ -94,18 +93,13 @@ fn load_nonexistent_document_returns_error() {
     assert!(result.is_err());
 }
 
-// Hidden directories containing .md files are included in workspace tree
 #[test]
 fn hidden_directories_with_markdown_are_included() {
     let tmp = TempDir::new().unwrap();
-    // Regular md file
     fs::write(tmp.path().join("visible.md"), "# Visible").unwrap();
-    // Hidden .md file at root level
     fs::write(tmp.path().join(".hidden.md"), "# Hidden").unwrap();
-    // Hidden directory with a .md file
     fs::create_dir(tmp.path().join(".config")).unwrap();
     fs::write(tmp.path().join(".config").join("notes.md"), "# Notes").unwrap();
-    // Hidden directory without .md files (still excluded by has_any_markdown check)
     fs::create_dir(tmp.path().join(".cache")).unwrap();
     fs::write(tmp.path().join(".cache").join("data.bin"), b"binary").unwrap();
 
@@ -128,15 +122,11 @@ fn hidden_directories_with_markdown_are_included() {
 
     let all_paths = collect_all_paths(&ws.tree);
     assert!(all_paths.iter().any(|p| p.contains("visible.md")));
-    // Hidden .md file is now included
     assert!(all_paths.iter().any(|p| p.contains(".hidden.md")));
-    // Hidden directory with .md file is included
     assert!(all_paths.iter().any(|p| p.contains(".config")));
-    // Hidden directory without .md files is still excluded
     assert!(!all_paths.iter().any(|p| p.contains(".cache")));
 }
 
-/// Recursively collects all paths from a tree (for test assertions).
 fn collect_all_paths(tree: &[katana_core::workspace::TreeEntry]) -> Vec<String> {
     let mut paths = Vec::new();
     for entry in tree {
@@ -148,12 +138,10 @@ fn collect_all_paths(tree: &[katana_core::workspace::TreeEntry]) -> Vec<String> 
     paths
 }
 
-// L66: "target" directory is excluded
 #[test]
 fn target_directory_is_excluded_from_workspace() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("docs.md"), "# Docs").unwrap();
-    // Create target/ dir with a .md file inside
     fs::create_dir(tmp.path().join("target")).unwrap();
     fs::write(tmp.path().join("target").join("build.md"), "# Build output").unwrap();
 
@@ -182,7 +170,6 @@ fn target_directory_is_excluded_from_workspace() {
     assert!(!paths.iter().any(|p| p.contains("target")));
 }
 
-// L67: "node_modules" directory is excluded
 #[test]
 fn node_modules_directory_is_excluded_from_workspace() {
     let tmp = TempDir::new().unwrap();
@@ -215,13 +202,10 @@ fn node_modules_directory_is_excluded_from_workspace() {
     assert!(!paths.iter().any(|p| p.contains("node_modules")));
 }
 
-// L75-79: directories without any markdown are excluded
 #[test]
 fn directories_without_markdown_are_excluded() {
     let tmp = TempDir::new().unwrap();
-    // A md file at root so workspace is valid
     fs::write(tmp.path().join("root.md"), "# Root").unwrap();
-    // A subdirectory with only non-md files
     fs::create_dir(tmp.path().join("assets")).unwrap();
     fs::write(tmp.path().join("assets").join("image.png"), b"PNG data").unwrap();
     fs::write(tmp.path().join("assets").join("style.css"), "body{}").unwrap();
@@ -248,11 +232,9 @@ fn directories_without_markdown_are_excluded() {
         .iter()
         .map(|e| e.path().to_string_lossy().to_string())
         .collect();
-    // 'assets' dir has no md files so should be excluded
     assert!(!paths.iter().any(|p| p.contains("assets")));
 }
 
-// L80-88: non-markdown files at root level are excluded
 #[test]
 fn non_markdown_files_at_root_are_excluded() {
     let tmp = TempDir::new().unwrap();
@@ -287,12 +269,10 @@ fn non_markdown_files_at_root_are_excluded() {
     assert!(paths.iter().any(|p| p.contains("README.md")));
 }
 
-// L106: Recursion for has_any_markdown (detecting md in nested subdirectories)
 #[test]
 fn nested_subdirectory_with_markdown_is_included() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("root.md"), "# Root").unwrap();
-    // .md file in a subdirectory 2 levels deep
     fs::create_dir_all(tmp.path().join("docs").join("deep")).unwrap();
     fs::write(
         tmp.path().join("docs").join("deep").join("spec.md"),
@@ -317,7 +297,6 @@ fn nested_subdirectory_with_markdown_is_included() {
         )
         .unwrap();
 
-    // "docs" directory is included (because it contains a .md file inside)
     fn find_dir(tree: &[katana_core::workspace::TreeEntry], name: &str) -> bool {
         tree.iter().any(|e| match e {
             katana_core::workspace::TreeEntry::Directory { path, children } => {
@@ -330,11 +309,9 @@ fn nested_subdirectory_with_markdown_is_included() {
     assert!(find_dir(&ws.tree, "deep"));
 }
 
-// L109-112: FilesystemService::default()
 #[test]
 fn filesystem_service_default_works() {
     let svc: FilesystemService = Default::default();
-    // Default::default() and new() are the same
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("note.md"), "# Note").unwrap();
     let ignored = katana_platform::settings::DEFAULT_IGNORED_DIRECTORIES
@@ -369,7 +346,6 @@ fn test_scan_directory_respects_max_depth() {
     let ignored = vec![];
     let cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    // depth 2 should see dir1 (at depth 1) and its file, but not its subdirectory (dir2 at depth 2)
     let ws = svc
         .open_workspace(
             tmp.path(),

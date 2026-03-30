@@ -1,41 +1,20 @@
-//! Reusable overlay control grid for diagram/image pan, zoom, reset, and fullscreen.
-//!
-//! This module is a self-contained UI component (similar to a React component)
-//! that can be rendered on top of any image/diagram container.
 
 use crate::i18n;
 use crate::icon::{Icon, IconSize};
 use crate::preview_pane::ViewerState;
 use egui::Vec2;
 
-/// Size of overlay control buttons.
 const BUTTON_SIZE: f32 = 28.0;
-/// Margin from container edge to overlay buttons.
 const MARGIN: f32 = 8.0;
-/// Semi-transparent background for overlay buttons.
 const BG: egui::Color32 = crate::theme_bridge::TRANSPARENT;
-/// Gap between grid buttons.
 const GAP: f32 = 2.0;
-/// Number of columns/rows in the control grid.
 const GRID_DIM: f32 = 3.0;
 
-/// Action returned by the overlay controls.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ControlAction {
-    /// No action taken.
     None,
 }
 
-/// Draws the overlay control grid on the given container rect.
-///
-/// Layout (matching GitHub-style reference):
-/// ```text
-///         [PanUp]  [ZoomIn]
-/// [PanLeft] [Reset] [PanRight]
-///         [PanDown] [ZoomOut]
-/// ```
-///
-/// Returns `ControlAction::Fullscreen` if the fullscreen button was clicked.
 pub(crate) fn draw_controls(
     ui: &mut egui::Ui,
     state: &mut ViewerState,
@@ -61,7 +40,6 @@ pub(crate) fn draw_controls(
         )
     };
 
-    // Row 0: (empty), PanUp, ZoomIn
     if ui
         .put(
             btn_rect(1.0, 0.0),
@@ -83,7 +61,6 @@ pub(crate) fn draw_controls(
         state.zoom_in();
     }
 
-    // Row 1: PanLeft, Reset, PanRight
     if ui
         .put(
             btn_rect(0.0, 1.0),
@@ -115,7 +92,6 @@ pub(crate) fn draw_controls(
         state.pan_right();
     }
 
-    // Row 2: Info (trackpad help), PanDown, ZoomOut
     ui.put(
         btn_rect(0.0, 2.0),
         egui::Button::image(Icon::Info.image(IconSize::Large)).fill(BG),
@@ -146,9 +122,6 @@ pub(crate) fn draw_controls(
     ControlAction::None
 }
 
-/// Draws a fullscreen button at the top-right of the container.
-///
-/// Returns `true` if clicked.
 pub(crate) fn draw_fullscreen_button(ui: &mut egui::Ui, container_rect: egui::Rect) -> bool {
     let msgs = i18n::get();
     let dc = &msgs.preview.diagram_controller;

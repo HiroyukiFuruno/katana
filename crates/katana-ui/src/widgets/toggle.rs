@@ -1,18 +1,3 @@
-/// A custom generic toggle switch widget.
-///
-/// Designed to visually represent boolean states as an iOS-style switch
-/// instead of a traditional checkbox.
-///
-/// # Example
-///
-/// ```ignore
-/// use katana_ui::widgets::toggle_switch;
-///
-/// let mut is_enabled = true;
-/// if toggle_switch(ui, &mut is_enabled).clicked() {
-///     // Handle state change
-/// }
-/// ```
 pub fn toggle_switch(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
     let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
     let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
@@ -29,7 +14,6 @@ pub fn toggle_switch(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
     response
 }
 
-/// Extracted painting logic for reuse without click sensing
 pub(crate) fn paint_toggle_switch(
     ui: &mut egui::Ui,
     rect: egui::Rect,
@@ -112,14 +96,10 @@ pub enum TogglePosition {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ToggleAlignment {
-    /// Attach the toggle to the text with a specific margin.
     Attached(f32),
-    /// Push the toggle and text to opposite ends of the available width.
     SpaceBetween,
 }
 
-/// A labeled toggle switch that ensures perfect vertical centering between text and the toggle.
-/// It supports flexible alignment and positioning (e.g. left vs right).
 pub struct LabeledToggle<'a> {
     text: egui::WidgetText,
     on: &'a mut bool,
@@ -150,58 +130,89 @@ impl<'a> LabeledToggle<'a> {
 
 impl<'a> egui::Widget for LabeledToggle<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let mut list_item = crate::widgets::ListItem::new().interactive(true);
+        let text_galley = self.text.into_galley(
+            ui,
+            Some(egui::TextWrapMode::Extend),
+            ui.available_width(),
+            egui::TextStyle::Body,
+        );
+        let text_size = text_galley.size();
+        let toggle_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
+        
+        let margin = match self.alignment {
+            ToggleAlignment::Attached(m) => m,
+            ToggleAlignment::SpaceBetween => 0.0,
+        };
 
-        match self.alignment {
-            ToggleAlignment::Attached(margin) => {
-                list_item = list_item.spacing(margin);
+        let desired_width = match self.alignment {
+            ToggleAlignment::Attached(_) => {
+                let h_pad = ui.spacing().button_padding.x * 2.0;
+                text_size.x + toggle_size.x + margin + h_pad
             }
-            ToggleAlignment::SpaceBetween => (),
-        }
+            ToggleAlignment::SpaceBetween => ui.available_width(),
+        };
 
-        let toggle_rect = std::rc::Rc::new(std::cell::Cell::new(egui::Rect::NOTHING));
-        let rect_clone = toggle_rect.clone();
+        let row_pad = ui.spacing().button_padding.y;
+        let row_height = text_size.y.max(toggle_size.y).max(ui.spacing().interact_size.y) + row_pad * 2.0;
+        
+        let (rect, mut response) = ui.allocate_exact_size(
+            egui::vec2(desired_width, row_height),
+            egui::Sense::click(),
+        );
 
-        let toggle_node: Box<dyn FnOnce(&mut egui::Ui) -> egui::Response + '_> =
-            Box::new(move |ui: &mut egui::Ui| {
-                let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
-                let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::hover());
-                rect_clone.set(rect);
-                resp
-            });
-
-        let text_node: Box<dyn FnOnce(&mut egui::Ui) -> egui::Response + '_> =
-            Box::new(|ui: &mut egui::Ui| ui.label(self.text));
-
-        match (self.position, self.alignment) {
-            (TogglePosition::Right, ToggleAlignment::SpaceBetween) => {
-                list_item = list_item.left(text_node).right(toggle_node);
-            }
-            (TogglePosition::Left, ToggleAlignment::SpaceBetween) => {
-                list_item = list_item.left(toggle_node).right(text_node);
-            }
-            (TogglePosition::Right, ToggleAlignment::Attached(_)) => {
-                list_item = list_item.left(text_node).left(toggle_node);
-            }
-            (TogglePosition::Left, ToggleAlignment::Attached(_)) => {
-                list_item = list_item.left(toggle_node).left(text_node);
-            }
-        }
-
-        let mut row_resp = list_item.show(ui);
-
-        if row_resp.clicked() {
+        if response.clicked() {
             *self.on = !*self.on;
-            row_resp.mark_changed();
+            response.mark_changed();
         }
 
-        row_resp.widget_info(|| {
+        response.widget_info(|| {
             egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), *self.on, "")
         });
 
-        paint_toggle_switch(ui, toggle_rect.get(), &row_resp, *self.on);
+        if response.hovered() {
+            ui.painter().rect_filled(
+                rect,
+                ui.style().visuals.widgets.hovered.corner_radius,
+                ui.style().visuals.widgets.hovered.bg_fill,
+            );
+        }
 
-        row_resp
+        let (text_pos, toggle_pos) = match (self.position, self.alignment) {
+            (TogglePosition::Right, ToggleAlignment::SpaceBetween) => {
+                let text_x = rect.left();
+                let toggle_x = rect.right() - toggle_size.x;
+                (text_x, toggle_x)
+            }
+            (TogglePosition::Left, ToggleAlignment::SpaceBetween) => {
+                let toggle_x = rect.left();
+                let text_x = rect.right() - text_size.x;
+                (text_x, toggle_x)
+            }
+            (TogglePosition::Right, ToggleAlignment::Attached(_)) => {
+                let h_pad = ui.spacing().button_padding.x;
+                let text_x = rect.left() + h_pad;
+                let toggle_x = text_x + text_size.x + margin;
+                (text_x, toggle_x)
+            }
+            (TogglePosition::Left, ToggleAlignment::Attached(_)) => {
+                let h_pad = ui.spacing().button_padding.x;
+                let toggle_x = rect.left() + h_pad;
+                let text_x = toggle_x + toggle_size.x + margin;
+                (text_x, toggle_x)
+            }
+        };
+
+        let text_pos = egui::pos2(text_pos, rect.center().y - text_size.y / 2.0);
+        let toggle_pos = egui::pos2(toggle_pos, rect.center().y - toggle_size.y / 2.0);
+
+        let toggle_rect = egui::Rect::from_min_size(toggle_pos, toggle_size);
+
+        let text_color = ui.style().interact(&response).text_color();
+        ui.painter().galley(text_pos, text_galley, text_color);
+
+        paint_toggle_switch(ui, toggle_rect, &response, *self.on);
+
+        response
     }
 }
 
@@ -217,35 +228,30 @@ mod labeled_toggle_tests {
             egui::CentralPanel::default().show(ctx, |ui| {
                 let mut on = false;
 
-                // SpaceBetween Right
                 let _ = ui.add(
                     LabeledToggle::new("Toggle Space Right", &mut on)
                         .position(TogglePosition::Right)
                         .alignment(ToggleAlignment::SpaceBetween),
                 );
 
-                // SpaceBetween Left
                 let _ = ui.add(
                     LabeledToggle::new("Toggle Space Left", &mut on)
                         .position(TogglePosition::Left)
                         .alignment(ToggleAlignment::SpaceBetween),
                 );
 
-                // Attached Right
                 let _ = ui.add(
                     LabeledToggle::new("Toggle Attached Right", &mut on)
                         .position(TogglePosition::Right)
                         .alignment(ToggleAlignment::Attached(8.0)),
                 );
 
-                // Attached Left
                 let _ = ui.add(
                     LabeledToggle::new("Toggle Attached Left", &mut on)
                         .position(TogglePosition::Left)
                         .alignment(ToggleAlignment::Attached(8.0)),
                 );
 
-                // Click interaction
                 let mut on_click = false;
                 let _response = ui.add(LabeledToggle::new("Clickable", &mut on_click));
             });

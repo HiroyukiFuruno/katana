@@ -59,13 +59,12 @@ impl ExportOps for KatanaApp {
     }
     fn export_filename(&self, doc_path: &std::path::Path, ext: &str) -> String {
         let (prefix, relative) = if let Some(ws) = &self.state.workspace.data {
-            // Build prefix from workspace root path initials
             let initials: String = ws
                 .root
                 .components()
                 .filter_map(|c| match c {
                     std::path::Component::Normal(s) => s.to_string_lossy().chars().next(),
-                    _ => None, // skip RootDir, Prefix, CurDir, ParentDir
+                    _ => None,
                 })
                 .collect();
 
@@ -194,7 +193,6 @@ impl ExportOps for KatanaApp {
         const EXPORT_POLL_INTERVAL_MS: u64 = 50;
         let mut has_pending = false;
 
-        // Collect completed tasks first (borrow checker workaround).
         let mut completed: Vec<(usize, Result<std::path::PathBuf, String>)> = Vec::new();
         for (i, task) in self.export_tasks.iter().enumerate() {
             match task.rx.try_recv() {
@@ -210,7 +208,6 @@ impl ExportOps for KatanaApp {
             }
         }
 
-        // Process completed tasks in reverse order to maintain correct indices.
         for (i, result) in completed.into_iter().rev() {
             let task = self.export_tasks.remove(i);
             match result {

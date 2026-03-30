@@ -211,7 +211,6 @@ mod tests {
         assert_eq!(lightened.g, 150);
         assert_eq!(lightened.b, 150);
 
-        // Saturating add test
         let color2 = Rgb {
             r: 250,
             g: 250,
@@ -235,7 +234,6 @@ mod tests {
         assert_eq!(darkened.g, 50);
         assert_eq!(darkened.b, 50);
 
-        // Saturating sub test
         let color2 = Rgb {
             r: 10,
             g: 10,

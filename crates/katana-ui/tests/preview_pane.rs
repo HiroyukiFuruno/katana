@@ -6,7 +6,6 @@ use katana_core::markdown::svg_rasterize::RasterizedSvg;
 use katana_ui::preview_pane::{decode_png_rgba, extract_svg, PreviewPane, RenderedSection};
 use std::path::PathBuf;
 
-/// Helper: Extract Markdown text from RenderedSection.
 fn markdown_texts(sections: &[RenderedSection]) -> Vec<&str> {
     sections
         .iter()
@@ -38,19 +37,16 @@ fn flatten_shapes<'a>(
     flat
 }
 
-// ── 3.2 Preview Synchronization: Immediate preview update from unsaved buffer ──
 
 #[test]
 fn unsaved_buffer_changes_are_reflected_in_preview() {
     let mut pane = PreviewPane::default();
 
-    // Build preview with initial content
     pane.update_markdown_sections("# Hello", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
     let texts = markdown_texts(&pane.sections);
     assert!(texts[0].contains("# Hello"));
 
-    // Update buffer without saving to file -> Should be reflected in preview
     pane.update_markdown_sections(
         "# Hello World\n\nNew paragraph",
         std::path::Path::new("/tmp/test.md"),
@@ -64,7 +60,6 @@ fn unsaved_buffer_changes_are_reflected_in_preview() {
 fn consecutive_edits_are_immediately_reflected_in_preview() {
     let mut pane = PreviewPane::default();
 
-    // Multiple consecutive edits are all reflected
     let edits = vec![
         "# Draft 1",
         "# Draft 2\n\n- item A",
@@ -85,11 +80,9 @@ fn consecutive_edits_are_immediately_reflected_in_preview() {
 fn empty_buffer_does_not_crash_preview() {
     let mut pane = PreviewPane::default();
 
-    // Input content
     pane.update_markdown_sections("# Hello", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 1);
 
-    // Revert to empty -> Section count becomes 0 (empty string is not flushed)
     pane.update_markdown_sections("", std::path::Path::new("/tmp/test.md"));
     assert_eq!(pane.sections.len(), 0);
 }
@@ -98,7 +91,6 @@ fn empty_buffer_does_not_crash_preview() {
 fn buffer_with_diagrams_immediately_updates_markdown_portion_only() {
     let mut pane = PreviewPane::default();
 
-    // Initial content with diagram
     let source = "# Title\n```mermaid\ngraph TD; A-->B\n```\n## Footer";
     pane.full_render(
         source,
@@ -108,15 +100,12 @@ fn buffer_with_diagrams_immediately_updates_markdown_portion_only() {
         4,
     );
 
-    // Diagram is in Pending state
     assert!(pane.sections.len() >= 3);
     assert!(matches!(pane.sections[1], RenderedSection::Pending { .. }));
 
-    // Update only the Markdown portion (diagram is retained)
     let modified = "# Updated Title\n```mermaid\ngraph TD; A-->B\n```\n## Updated Footer";
     pane.update_markdown_sections(modified, std::path::Path::new("/tmp/test.md"));
 
-    // Verify Markdown text is updated
     let texts = markdown_texts(&pane.sections);
     assert!(texts.iter().any(|t| t.contains("Updated Title")));
     assert!(texts.iter().any(|t| t.contains("Updated Footer")));
@@ -135,7 +124,6 @@ fn full_render_splits_sections_correctly() {
         4,
     );
 
-    // 3 sections: Markdown, Diagram(Pending), Markdown
     assert_eq!(pane.sections.len(), 3);
     assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
     assert!(matches!(pane.sections[1], RenderedSection::Pending { .. }));
@@ -166,24 +154,18 @@ fn buffer_without_diagrams_does_not_generate_pending_sections() {
 
 #[test]
 fn verification_that_preview_updates_do_not_depend_on_file_saves() {
-    // Integration test for Document + PreviewPane:
-    // Verify that updating the document's buffer (is_dirty = true) without calling save
-    // correctly reflects the latest buffer in the preview.
     use katana_core::document::Document;
 
     let mut doc = Document::new("/workspace/spec.md", "# Original");
     let mut pane = PreviewPane::default();
 
-    // Initial preview
     pane.update_markdown_sections(&doc.buffer, std::path::Path::new("/tmp/test.md"));
     let texts = markdown_texts(&pane.sections);
     assert!(texts[0].contains("# Original"));
 
-    // Edit document (unsaved state)
     doc.update_buffer("# Modified by user\n\nThis is not saved yet.");
     assert!(doc.is_dirty, "Document must be dirty");
 
-    // Update preview with unsaved buffer
     pane.update_markdown_sections(&doc.buffer, std::path::Path::new("/tmp/test.md"));
     let texts = markdown_texts(&pane.sections);
     assert!(
@@ -195,11 +177,9 @@ fn verification_that_preview_updates_do_not_depend_on_file_saves() {
         "Unsaved edits are not reflected in preview"
     );
 
-    // Document should still be dirty (not saved)
     assert!(doc.is_dirty, "Document should not have been saved");
 }
 
-// ── extract_svg tests ──
 
 #[test]
 fn valid_svg_is_extracted() {
@@ -219,16 +199,13 @@ fn returns_none_if_no_svg_is_present() {
 fn covers_from_start_to_end_if_multiple_svgs_are_present() {
     let html = r#"<svg>first</svg><p>mid</p><svg>second</svg>"#;
     let svg = extract_svg(html).unwrap();
-    // Includes up to the last closing tag using rfind("</svg>")
     assert!(svg.contains("first"));
     assert!(svg.contains("second"));
 }
 
-// ── decode_png_rgba tests ──
 
 #[test]
 fn valid_png_is_decoded() {
-    // Generate minimal byte sequence for a 1x1 white PNG
     let mut buf = Vec::new();
     {
         use image::{ImageBuffer, Rgba};
@@ -250,7 +227,6 @@ fn invalid_data_returns_error() {
     assert!(result.is_err());
 }
 
-// ── Additional update_markdown_sections tests ──
 
 #[test]
 fn markdown_only_input_is_sectioned_correctly() {
@@ -269,7 +245,6 @@ fn mixed_diagram_input_is_split_into_sections() {
     let src =
         "Before\n```mermaid\ngraph TD; A-->B\n```\nMiddle\n```drawio\n<mxGraphModel/>\n```\nAfter";
     pane.update_markdown_sections(src, std::path::Path::new("/tmp/test.md"));
-    // Markdown + Pending + Markdown + Pending + Markdown = 5 sections
     assert!(pane.sections.len() >= 3);
 }
 
@@ -282,8 +257,6 @@ fn empty_input_returns_empty_section_list() {
 
 #[test]
 fn centered_html_stays_in_markdown_section_update() {
-    // After render_html_fn refactor, HTML blocks remain in Markdown sections.
-    // pulldown-cmark detects them and passes to render_html_fn at render time.
     let mut pane = PreviewPane::default();
     let src = "<p align=\"center\">centered</p>";
     pane.update_markdown_sections(src, std::path::Path::new("/tmp/test.md"));
@@ -306,9 +279,7 @@ fn centered_html_stays_in_markdown_section_full_render() {
     assert!(matches!(pane.sections[0], RenderedSection::Markdown(_)));
 }
 
-// ── Cover each variant of show_section using egui_kittest ──
 
-/// Covers rendering of the Markdown variant in show_section
 #[test]
 fn show_section_markdown_variant_renders() {
     let mut pane = PreviewPane::default();
@@ -321,10 +292,8 @@ fn show_section_markdown_variant_renders() {
         pane.show_content(ui, None, None);
     });
     harness.run();
-    // OK if it doesn't crash
 }
 
-/// Covers rendering of the Error variant in show_section (L267-275)
 #[test]
 fn show_section_error_variant_renders() {
     let mut pane = PreviewPane::default();
@@ -341,7 +310,6 @@ fn show_section_error_variant_renders() {
     harness.run();
 }
 
-/// Covers rendering of the CommandNotFound variant in show_section (L277-291)
 #[test]
 fn show_section_command_not_found_variant_renders() {
     let mut pane = PreviewPane::default();
@@ -358,7 +326,6 @@ fn show_section_command_not_found_variant_renders() {
     harness.run();
 }
 
-/// Covers rendering of the NotInstalled variant in show_section (L292-296, L310-341)
 #[test]
 fn show_section_not_installed_variant_renders() {
     let mut pane = PreviewPane::default();
@@ -375,7 +342,6 @@ fn show_section_not_installed_variant_renders() {
     harness.run();
 }
 
-/// Covers rendering of the Pending variant in show_section (L297-305)
 #[test]
 fn show_section_pending_variant_renders() {
     let mut pane = PreviewPane::default();
@@ -388,15 +354,12 @@ fn show_section_pending_variant_renders() {
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui, None, None);
     });
-    // Spinner paints constantly so execute just 1 frame with step()
     harness.step();
 }
 
-/// Covers rendering of the Image variant in show_section (L258-261, L344-358)
 #[test]
 fn show_section_image_variant_renders() {
     let mut pane = PreviewPane::default();
-    // 1x1 RGBA dummy image
     pane.sections = vec![RenderedSection::Image {
         svg_data: RasterizedSvg {
             width: 1,
@@ -413,7 +376,6 @@ fn show_section_image_variant_renders() {
     harness.run();
 }
 
-/// Covers show() method rendering (L156-167): has allow(dead_code) but covered by egui_kittest
 #[test]
 fn show_method_renders_without_crash() {
     let mut pane = PreviewPane::default();
@@ -425,11 +387,9 @@ fn show_method_renders_without_crash() {
     harness.run();
 }
 
-/// Covers the empty section branch in render_sections (L189-191)
 #[test]
 fn render_sections_empty_shows_no_preview_label() {
     let mut pane = PreviewPane::default();
-    // sections remains empty
 
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui, None, None);
@@ -437,11 +397,9 @@ fn render_sections_empty_shows_no_preview_label() {
     harness.run();
 }
 
-/// poll_renders: repaint_after is called when still pending (L214-215)
 #[test]
 fn poll_renders_with_pending_does_not_crash() {
     let mut pane = PreviewPane::default();
-    // background thread started with full_render
     pane.full_render(
         "# Title\n```mermaid\ngraph TD; A-->B\n```\nAfter",
         std::path::Path::new("/tmp/test.md"),
@@ -450,17 +408,12 @@ fn poll_renders_with_pending_does_not_crash() {
         4,
     );
 
-    // execute poll_renders with egui context
     let mut harness = Harness::new_ui(move |ui| {
-        // show_content calls poll_renders internally
         pane.show_content(ui, None, None);
     });
-    // Repaints continue via spinner due to Pending section.
-    // Verify no crash occurs by executing just 1 frame using step().
     harness.step();
 }
 
-/// Renders show_not_installed UI for NotInstalled state (L310-341)
 #[test]
 fn show_section_not_installed_download_button_returns_request() {
     let mut pane = PreviewPane::default();
@@ -472,18 +425,14 @@ fn show_section_not_installed_download_button_returns_request() {
     }];
 
     let mut harness = Harness::new_ui(move |ui| {
-        // Covers show_not_installed rendering (L316-341)
         let _req = pane.show_content(ui, None, None);
     });
     harness.run();
-    // OK if no crash occurs (button rendering and label rendering executed)
 }
 
-/// show_rasterized: Covers the actual texture drawing path (L344-358)
 #[test]
 fn show_section_image_full_render_with_texture() {
     let mut pane = PreviewPane::default();
-    // 4x4 valid RGBA image
     let rgba: Vec<u8> = (0..64).map(|i| (i * 4) as u8).collect();
     pane.sections = vec![RenderedSection::Image {
         svg_data: RasterizedSvg {
@@ -501,12 +450,10 @@ fn show_section_image_full_render_with_texture() {
     harness.run();
 }
 
-// ── Image Path Resolution Integration Tests ──
 
 #[test]
 fn image_path_resolved_in_rendered_markdown_section() {
     let dir = tempfile::tempdir().unwrap();
-    // Create: project/docs/readme.md referencing project/assets/logo.png
     let docs_dir = dir.path().join("docs");
     let assets_dir = dir.path().join("assets");
     std::fs::create_dir_all(&docs_dir).unwrap();
@@ -521,7 +468,6 @@ fn image_path_resolved_in_rendered_markdown_section() {
 
     let texts = markdown_texts(&pane.sections);
     assert_eq!(texts.len(), 1);
-    // The relative path should be resolved to an absolute file:// URI.
     assert!(
         texts[0].contains("file://"),
         "Image path should be resolved to file:// URI, got: {}",
@@ -563,7 +509,6 @@ fn multiple_images_all_resolved_in_single_section() {
     pane.update_markdown_sections(source, &md_path);
 
     let texts = markdown_texts(&pane.sections);
-    // Both images should be resolved.
     let resolved_count = texts[0].matches("file://").count();
     assert_eq!(
         resolved_count, 2,
@@ -588,12 +533,9 @@ fn standalone_local_image_is_split_into_local_image_section() {
     assert!(matches!(pane.sections[2], RenderedSection::Markdown(_)));
 }
 
-// ── Preset Color Application via egui_kittest ──
 
 #[test]
 fn preset_colors_applied_without_crash_in_harness() {
-    // Verifies that the full preset wiring (preview_text color + syntax themes)
-    // works through the real rendering pipeline without panicking.
     let mut pane = PreviewPane::default();
     pane.update_markdown_sections(
         "# Heading\n\nBody text.\n\n```rust\nfn main() {}\n```\n",
@@ -608,8 +550,6 @@ fn preset_colors_applied_without_crash_in_harness() {
 
 #[test]
 fn syntax_highlighted_code_block_renders_in_harness() {
-    // Specifically tests that the syntax theme names from the preset are
-    // valid syntect theme identifiers that don't cause panics.
     let mut pane = PreviewPane::default();
     let source = concat!(
         "# Code\n\n",
@@ -631,7 +571,6 @@ fn syntax_highlighted_code_block_renders_in_harness() {
 
 #[test]
 fn show_section_centered_markdown_variant_renders() {
-    // HTML blocks now stay inside Markdown sections and are rendered via render_html_fn.
     let mut pane = PreviewPane::default();
     pane.sections = vec![RenderedSection::Markdown(
         "<p align=\"center\"><img src=\"test.png\" alt=\"alt\"></p>".to_string(),
@@ -643,10 +582,7 @@ fn show_section_centered_markdown_variant_renders() {
     harness.run();
 }
 
-// ── TDD: HTML rendering behavior verification ──
 
-/// Verifies that a centered paragraph with multiple badge links renders them
-/// on the same horizontal row (all badges share the same Y coordinate).
 #[test]
 fn centered_badges_render_on_same_horizontal_row() {
     let html = concat!(
@@ -661,16 +597,12 @@ fn centered_badges_render_on_same_horizontal_row() {
     let mut harness = Harness::new_ui(move |ui| {
         pane.show_content(ui, None, None);
     });
-    // Multiple steps needed for measure-then-position pattern (request_discard)
     harness.step();
     harness.step();
     harness.step();
     harness.run();
-    // Test passes if no panic — the multi-element centering code path is exercised.
-    // AccessKit-based position verification follows once the basic rendering is stable.
 }
 
-/// Verifies that a link in a centered paragraph is clickable (has click sense).
 #[test]
 fn centered_text_link_is_clickable() {
     let html = concat!(
@@ -688,14 +620,9 @@ fn centered_text_link_is_clickable() {
     harness.step();
     harness.step();
     harness.run();
-    // Verify the link label exists in the accessibility tree
     let _link_node = harness.get_by_label("\u{65e5}\u{672c}\u{8a9e}");
 }
 
-/// Verifies that mixed inline text is emitted as a single wrapped text run.
-///
-/// Rendering each text fragment as an independent widget causes baseline drift
-/// for CJK text and makes long lines wrap inconsistently.
 #[test]
 fn inline_html_text_fragments_are_not_split_into_multiple_widgets() {
     let html = "<p>\u{524d}\u{6587}<strong>\u{5f37}\u{8abf}</strong>\u{5f8c}\u{6587}</p>\n";
@@ -1486,9 +1413,6 @@ fn preview_code_blocks_keep_monospace_font_when_body_text_is_proportional() {
     );
 }
 
-/// Verifies that multiple centered <p> blocks each take their own vertical
-/// space and don't overlap. The cursor positions after each block should
-/// be strictly increasing.
 #[test]
 fn multiple_centered_paragraphs_have_increasing_y_positions() {
     let html = concat!(
@@ -1507,7 +1431,6 @@ fn multiple_centered_paragraphs_have_increasing_y_positions() {
     harness.step();
     harness.run();
 
-    // Verify all three paragraphs are present and have distinct Y positions
     let first = harness.get_by_label("First paragraph");
     let second = harness.get_by_label("Second paragraph");
     let third = harness.get_by_label("Third paragraph");
@@ -1539,8 +1462,6 @@ fn multiple_centered_paragraphs_have_increasing_y_positions() {
     );
 }
 
-/// Full README header structure: icon, heading, description, badges, language selector.
-/// Verifies the complete rendering pipeline doesn't crash and produces widgets.
 #[test]
 fn readme_header_full_structure_renders() {
     let html = concat!(
@@ -1570,14 +1491,11 @@ fn readme_header_full_structure_renders() {
     harness.step();
     harness.run();
 
-    // Verify key widgets exist in the accessibility tree
     let _heading = harness.get_by_label("KatanA Desktop");
     let _description = harness.get_by_label("A fast, lightweight Markdown workspace for macOS.");
     let _lang_link = harness.get_by_label("\u{65e5}\u{672c}\u{8a9e}");
 }
 
-/// Verifies that a single centered text is horizontally centered within the
-/// available width. The widget's center X should be near the panel center.
 #[test]
 fn centered_single_text_is_horizontally_centered() {
     let html = "<p align=\"center\">Centered Text Here</p>\n";
@@ -1603,8 +1521,6 @@ fn centered_single_text_is_horizontally_centered() {
     let widget_center_x = (bounds.x0 + bounds.x1) / 2.0;
     let panel_center_x = f64::from(panel_width) / 2.0;
 
-    // Centering tolerance: widget center should be within 50px of panel center.
-    // This is generous because egui adds padding/margins.
     let tolerance = 50.0;
     assert!(
         (widget_center_x - panel_center_x).abs() < tolerance,
@@ -1613,8 +1529,6 @@ fn centered_single_text_is_horizontally_centered() {
     );
 }
 
-/// Verifies that multi-element centered content (text + link) is rendered
-/// on the same row and that the link widget exists in the accessibility tree.
 #[test]
 fn centered_text_and_link_share_same_row() {
     let html = concat!(
@@ -1635,7 +1549,6 @@ fn centered_text_and_link_share_same_row() {
     harness.step();
     harness.run();
 
-    // Both "English |" text and "\u{65e5}\u{672c}\u{8a9e}" link should exist
     let text_node = harness.get_by_label("English |");
     let link_node = harness.get_by_label("\u{65e5}\u{672c}\u{8a9e}");
 
@@ -1648,7 +1561,6 @@ fn centered_text_and_link_share_same_row() {
         .raw_bounds()
         .expect("link should have bounds");
 
-    // They should be on the same row (similar Y coordinates, within text height)
     let y_diff = (text_bounds.y0 - link_bounds.y0).abs();
     assert!(
         y_diff < 5.0,
@@ -1657,7 +1569,6 @@ fn centered_text_and_link_share_same_row() {
         link_bounds.y0
     );
 
-    // The link should be to the right of the text
     assert!(
         link_bounds.x0 > text_bounds.x0,
         "Link X ({:.1}) should be to the right of text X ({:.1})",
@@ -1665,7 +1576,6 @@ fn centered_text_and_link_share_same_row() {
         text_bounds.x0
     );
 
-    // The GROUP (text + link combined) should be horizontally centered.
     let group_left = text_bounds.x0.min(link_bounds.x0);
     let group_right = text_bounds.x1.max(link_bounds.x1);
     let group_center_x = (group_left + group_right) / 2.0;
@@ -1678,12 +1588,7 @@ fn centered_text_and_link_share_same_row() {
     );
 }
 
-// ── TDD: Centering bug reproduction ──
-// These tests verify the POSITION of centered elements, not just that they render.
-// The bug: <h1 align="center">, <p align="center"> etc. are not horizontally centered.
 
-/// Verifies that `<h1 align="center">` renders the heading text centered
-/// within the panel width. The heading's center X must be near the panel center.
 #[test]
 fn centered_heading_h1_is_horizontally_centered() {
     let html = "<h1 align=\"center\">KatanA Desktop</h1>\n";
@@ -1717,7 +1622,6 @@ fn centered_heading_h1_is_horizontally_centered() {
     );
 }
 
-/// Verifies that a centered description paragraph renders centered.
 #[test]
 fn centered_description_paragraph_is_horizontally_centered() {
     let html = concat!(
@@ -1756,9 +1660,6 @@ fn centered_description_paragraph_is_horizontally_centered() {
     );
 }
 
-/// Full README header integration test: verifies ALL centered elements are
-/// horizontally centered. This reproduces the exact bug seen in the UI where
-/// elements appear left-aligned instead of centered.
 #[test]
 fn readme_header_all_elements_horizontally_centered() {
     let html = concat!(
@@ -1788,7 +1689,6 @@ fn readme_header_all_elements_horizontally_centered() {
         .build_ui(move |ui| {
             pane.show_content(ui, None, None);
         });
-    // Multiple frames needed for measure-then-position (request_discard)
     for _ in 0..5 {
         harness.step();
     }
@@ -1797,7 +1697,6 @@ fn readme_header_all_elements_horizontally_centered() {
     let panel_center_x = f64::from(panel_width) / 2.0;
     let tolerance = 50.0;
 
-    // Verify heading is centered
     let heading = harness.get_by_label("KatanA Desktop");
     let heading_bounds = heading
         .accesskit_node()
@@ -1810,7 +1709,6 @@ fn readme_header_all_elements_horizontally_centered() {
         (heading_center_x - panel_center_x).abs()
     );
 
-    // Verify description text is centered
     let desc =
         harness.get_by_label("macOS\u{5411}\u{3051}\u{306e}\u{9ad8}\u{901f}\u{30fb}\u{8efd}\u{91cf}\u{306a}Markdown\u{30ef}\u{30fc}\u{30af}\u{30b9}\u{30da}\u{30fc}\u{30b9} — Rust\u{3068}egui\u{3067}\u{69cb}\u{7bc9}\u{3002}");
     let desc_bounds = desc
@@ -1829,13 +1727,11 @@ fn readme_header_all_elements_horizontally_centered() {
         "Heading-to-description gap should stay compact, got {heading_to_desc_gap:.1}"
     );
 
-    // Verify language selector link is centered (the "English" link within the group)
     let english_link = harness.get_by_label("English");
     let english_bounds = english_link
         .accesskit_node()
         .raw_bounds()
         .expect("English link should have bounds");
-    // The "| \u{65e5}\u{672c}\u{8a9e}" is plain text (pipe + space + Japanese text)
     let ja_node = harness.get_by_label("| \u{65e5}\u{672c}\u{8a9e}");
     let ja_bounds = ja_node
         .accesskit_node()
@@ -1851,8 +1747,6 @@ fn readme_header_all_elements_horizontally_centered() {
     );
 }
 
-/// Diagnostic test: heading + description (no badges) — isolates whether
-/// multiple centered HTML blocks affect each other's positioning.
 #[test]
 fn centered_heading_then_description_both_centered() {
     let html = concat!(
@@ -1896,8 +1790,6 @@ fn centered_heading_then_description_both_centered() {
     );
 }
 
-/// Diagnostic test: badges block + language selector — isolates whether
-/// the multi-element badge block affects subsequent centered blocks.
 #[test]
 fn badges_then_language_selector_both_centered() {
     let html = concat!(
@@ -1926,7 +1818,6 @@ fn badges_then_language_selector_both_centered() {
     let panel_center_x = f64::from(panel_width) / 2.0;
     let tolerance = 50.0;
 
-    // Verify the language selector after badges is still centered
     let english_link = harness.get_by_label("English");
     let english_bounds = english_link.accesskit_node().raw_bounds().expect("bounds");
     let ja_node = harness.get_by_label("| \u{65e5}\u{672c}\u{8a9e}");
@@ -1941,10 +1832,7 @@ fn badges_then_language_selector_both_centered() {
     );
 }
 
-// ── TDD(RED): Markdown table must be horizontally centered ──
 
-/// Table must shrink to fit its contents up to available_width,
-/// and it must align to the center of the available horizontal space.
 #[test]
 fn markdown_table_stretches_to_full_width() {
     let table_md = concat!(
@@ -1978,8 +1866,6 @@ fn markdown_table_stretches_to_full_width() {
         })
     };
 
-    // Run multiple frames so egui::Grid can persist column widths.
-    // Grid's min_col_width propagates via stored state across frames.
     let _ = render_frame(&ctx, &mut pane);
     let _ = render_frame(&ctx, &mut pane);
     let output = render_frame(&ctx, &mut pane);
@@ -1990,7 +1876,6 @@ fn markdown_table_stretches_to_full_width() {
     let mut table_frame_rect = egui::Rect::NOTHING;
     for s in flat.iter() {
         if let egui::epaint::Shape::Rect(rect_shape) = s {
-            // Find the table group frame rect
             if rect_shape.stroke.width > 0.0 && rect_shape.rect.width() > 50.0 {
                 table_frame_rect = rect_shape.rect;
                 break;
@@ -2013,17 +1898,7 @@ fn markdown_table_stretches_to_full_width() {
     );
 }
 
-// ── TDD(RED): Table cells within same row must share the same Y coordinate ──
 
-/// Validates that header cells and data cells are rendered in proper row-aligned
-/// layout. With `ui.columns()` (equal-width distribution), columns are rendered
-/// but cell content within each "row" may not share the same Y coordinate if the
-/// Grid-based row mechanism is broken.
-///
-/// This test uses Shape-based inspection to verify:
-/// 1. All 6 data cell texts (Cell 1–6) are present in the rendered output
-/// 2. Cells within the SAME row share the same Y coordinate (within tolerance)
-/// 3. Header cells (Header A/B/C) are all on the same row
 #[test]
 fn markdown_table_cells_in_same_row_share_y_coordinate() {
     let table_md = concat!(
@@ -2057,9 +1932,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
         })
     };
 
-    // Multiple frames for egui::Grid layout stabilization.
-    // Grid persists column widths across frames and needs several iterations
-    // to settle auto-sized column widths.
     for _ in 0..4 {
         let _ = render_frame(&ctx, &mut pane);
     }
@@ -2067,7 +1939,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
 
     let flat = flatten_shapes(&output.shapes);
 
-    // Extract positions of all cell/header text shapes
     let cell_labels = [
         "Header A", "Header B", "Header C", "Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5",
         "Cell 6",
@@ -2086,7 +1957,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
         }
     }
 
-    // ── Check 1: All cell texts must be present ──
     for label in &cell_labels {
         assert!(
             text_positions.contains_key(label),
@@ -2096,10 +1966,8 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
         );
     }
 
-    // ── Check 2: Cells in the same row must share the same Y coordinate ──
     let y_tolerance = 2.0_f32;
 
-    // Header row: Header A, Header B, Header C
     let header_a_y = text_positions["Header A"].y;
     let header_b_y = text_positions["Header B"].y;
     let header_c_y = text_positions["Header C"].y;
@@ -2110,7 +1978,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
          Got: A.y={header_a_y:.1}, B.y={header_b_y:.1}, C.y={header_c_y:.1}"
     );
 
-    // Data row 1: Cell 1, Cell 2, Cell 3
     let cell1_y = text_positions["Cell 1"].y;
     let cell2_y = text_positions["Cell 2"].y;
     let cell3_y = text_positions["Cell 3"].y;
@@ -2120,7 +1987,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
          Got: C1.y={cell1_y:.1}, C2.y={cell2_y:.1}, C3.y={cell3_y:.1}"
     );
 
-    // Data row 2: Cell 4, Cell 5, Cell 6
     let cell4_y = text_positions["Cell 4"].y;
     let cell5_y = text_positions["Cell 5"].y;
     let cell6_y = text_positions["Cell 6"].y;
@@ -2130,7 +1996,6 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
          Got: C4.y={cell4_y:.1}, C5.y={cell5_y:.1}, C6.y={cell6_y:.1}"
     );
 
-    // ── Check 3: Rows must be in descending Y order ──
     assert!(
         header_a_y < cell1_y && cell1_y < cell4_y,
         "Rows must be in top-to-bottom order. \
@@ -2138,10 +2003,7 @@ fn markdown_table_cells_in_same_row_share_y_coordinate() {
     );
 }
 
-// ── TDD(RED): Table must render visible vertical separator lines between columns ──
 
-/// Tables with 3 columns should have 2 vertical divider lines (between col 1-2 and col 2-3).
-/// The vlines must span the full table height (header + all body rows), not just individual cells.
 #[test]
 fn markdown_table_has_visible_vertical_lines() {
     let table_md = concat!(
@@ -2180,7 +2042,6 @@ fn markdown_table_has_visible_vertical_lines() {
 
     let flat = flatten_shapes(&output.shapes);
 
-    // Find all vertical line segments (same x, different y, visible stroke).
     let vertical_lines: Vec<_> = flat
         .iter()
         .filter_map(|s| {
@@ -2203,8 +2064,6 @@ fn markdown_table_has_visible_vertical_lines() {
         "Expected at least one vertical line segment in a 3-column table"
     );
 
-    // The vlines must have visible stroke: width ≥ 0.5 AND color alpha ≥ 100.
-    // If bg_stroke is transparent/faint, the vlines exist but are invisible.
     for (x, height, width, alpha) in &vertical_lines {
         assert!(
             *width >= 0.5 && *alpha >= 100,
@@ -2214,11 +2073,7 @@ fn markdown_table_has_visible_vertical_lines() {
     }
 }
 
-// ── TDD(RED): Table must NOT have excessive whitespace below the last row ──
 
-/// Validates that the table's bottom edge closely matches the last row's text
-/// bottom. A visible gap below the last row indicates trailing space caused by
-/// Grid internals or misplaced newlines.
 #[test]
 fn markdown_table_no_trailing_whitespace() {
     let table_md = concat!(
@@ -2257,7 +2112,6 @@ fn markdown_table_no_trailing_whitespace() {
 
     let flat = flatten_shapes(&output.shapes);
 
-    // Find the bottom edge of the last text in the table body.
     let mut last_text_bottom: f32 = 0.0;
     for s in &flat {
         if let egui::epaint::Shape::Text(text_shape) = s {
@@ -2276,12 +2130,9 @@ fn markdown_table_no_trailing_whitespace() {
         "Expected last-row text shapes to be found"
     );
 
-    // Find the table's visual bottom edge from the border rect.
-    // The border is drawn with rect_stroke (stroke_width > 0) and covers the table area.
     let mut table_bottom: f32 = 0.0;
     for s in &flat {
         if let egui::epaint::Shape::Rect(rect_shape) = s {
-            // Table border rect has visible stroke and reasonable table width.
             if rect_shape.rect.width() > 50.0
                 && rect_shape.stroke.width > 0.0
                 && rect_shape.rect.height() > 20.0
@@ -2300,8 +2151,6 @@ fn markdown_table_no_trailing_whitespace() {
         "Expected table background rects to be found"
     );
 
-    // The gap between the last text bottom and the table bottom should be small.
-    // Normal cell padding is ~4-8px. A gap > 20px indicates trailing whitespace.
     let gap = table_bottom - last_text_bottom;
     assert!(
         gap < 20.0,
@@ -2311,14 +2160,7 @@ fn markdown_table_no_trailing_whitespace() {
     );
 }
 
-// ── TDD(RED): Blockquote vertical lines must have uniform thickness ──
 
-/// All blockquote nesting levels should draw their vertical accent line with
-/// identical stroke width. A first-level quote whose line is drawn at the
-/// parent clip rect boundary gets half-clipped, appearing thinner.
-///
-/// This test renders nested blockquotes and asserts that line x-coordinates
-/// are offset inward enough that the full stroke width is visible.
 #[test]
 fn blockquote_lines_uniform_thickness() {
     let md = concat!(
@@ -2356,13 +2198,10 @@ fn blockquote_lines_uniform_thickness() {
 
     let flat = flatten_shapes(&output.shapes);
 
-    // Collect all vertical line segments (blockquote accent lines are vertical
-    // line_segment shapes with non-zero stroke width).
     let mut line_widths: Vec<f32> = Vec::new();
     let mut line_x_positions: Vec<f32> = Vec::new();
     for s in &flat {
         if let egui::epaint::Shape::LineSegment { points, stroke } = s {
-            // Vertical line: same x, different y
             if (points[0].x - points[1].x).abs() < 0.1
                 && stroke.width > 0.0
                 && (points[1].y - points[0].y).abs() > 5.0
@@ -2380,7 +2219,6 @@ fn blockquote_lines_uniform_thickness() {
         line_widths.len()
     );
 
-    // All lines must have the same stroke width.
     let first_width = line_widths[0];
     for (i, width) in line_widths.iter().enumerate() {
         assert!(
@@ -2393,9 +2231,6 @@ fn blockquote_lines_uniform_thickness() {
         );
     }
 
-    // The leftmost line's x must be far enough from the parent clip rect left
-    // (8.0 = inner margin) to avoid clipping. Specifically, x should be at
-    // least half_stroke_width inward from the clip edge.
     let clip_left = 8.0_f32; // CentralPanel inner_margin
     let half_stroke = first_width / 2.0;
     let leftmost_x = line_x_positions
@@ -2446,7 +2281,6 @@ fn markdown_table_max_width_is_constrained() {
         })
     };
 
-    // Run multiple frames
     let _ = render_frame(&ctx, &mut pane);
     let _ = render_frame(&ctx, &mut pane);
     let output = render_frame(&ctx, &mut pane);

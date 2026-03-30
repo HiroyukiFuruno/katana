@@ -8,7 +8,6 @@ pub(crate) fn render_behavior_tab(
     let behavior_msgs = &crate::i18n::get().settings.behavior;
     let settings = &mut state.config.settings;
 
-    // A1: Confirm before closing unsaved tabs
     let mut confirm = settings.settings().behavior.confirm_close_dirty_tab;
     if ui
         .add(
@@ -27,7 +26,6 @@ pub(crate) fn render_behavior_tab(
 
     ui.add_space(SUBSECTION_SPACING);
 
-    // B1: Scroll sync (persistent setting)
     let mut scroll_sync = settings.settings().behavior.scroll_sync_enabled;
     if ui
         .add(
@@ -45,7 +43,6 @@ pub(crate) fn render_behavior_tab(
 
     ui.add_space(SUBSECTION_SPACING);
 
-    // E1: Auto-save toggle
     let mut enabled = settings.settings().behavior.auto_save;
     if ui
         .add(
@@ -76,7 +73,7 @@ pub(crate) fn render_behavior_tab(
                 &mut display_val,
                 AUTO_SAVE_INTERVAL_MIN..=AUTO_SAVE_INTERVAL_MAX,
             )
-            .show_value(false) // Text is displayed separately
+            .show_value(false) // WHY: Text is displayed separately
             .step_by(AUTO_SAVE_INTERVAL_STEP)
             .min_decimals(1)
             .max_decimals(1)
@@ -85,7 +82,6 @@ pub(crate) fn render_behavior_tab(
 
             let slider_response = add_styled_slider(ui, slider);
 
-            // Place text portion as a separate component alongside
             let drag_response = ui.add(
                 egui::DragValue::new(&mut display_val)
                     .speed(AUTO_SAVE_INTERVAL_STEP)
@@ -95,7 +91,6 @@ pub(crate) fn render_behavior_tab(
             );
 
             if slider_response.changed() || drag_response.changed() {
-                // Save when DragValue or Slider changes
                 settings.settings_mut().behavior.auto_save_interval_secs = display_val;
                 let _ = settings.save();
             }
@@ -119,7 +114,6 @@ mod tests {
 
     #[test]
     fn test_auto_save_interval_slider_config_invariants() {
-        // Strict UT for the 0.1 step requirement.
         assert_eq!(
             AUTO_SAVE_INTERVAL_STEP, 0.1,
             "The auto-save slider MUST increment/decrement by exactly 0.1 seconds \

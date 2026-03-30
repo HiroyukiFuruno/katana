@@ -137,19 +137,17 @@ impl BytesLoader for PersistentHttpLoader {
     fn forget_all(&self) {
         self.cache.lock().clear();
 
-        // macOS "Directory not empty" (os error 66) is often caused by Spotlight or Finder
-        // trying to index the directory while `remove_dir_all` attempts to delete the root folder.
-        // To safely clear the cache, we only delete its contents and keep the root directory intact.
-        if let Ok(entries) = std::fs::read_dir(&self.cache_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Err(err) = std::fs::remove_dir_all(&path) {
-                        tracing::warn!("Failed to clear cache subdir {}: {err}", path.display());
-                    }
-                } else if let Err(err) = std::fs::remove_file(&path) {
-                    tracing::warn!("Failed to delete cache file {}: {err}", path.display());
+        let Ok(entries) = std::fs::read_dir(&self.cache_dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Err(err) = std::fs::remove_dir_all(&path) {
+                    tracing::warn!("Failed to clear cache subdir {}: {err}", path.display());
                 }
+            } else if let Err(err) = std::fs::remove_file(&path) {
+                tracing::warn!("Failed to delete cache file {}: {err}", path.display());
             }
         }
     }

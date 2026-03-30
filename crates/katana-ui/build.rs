@@ -1,13 +1,7 @@
-// Build script for macOS native menu bar and compile-time metadata.
-// Compiles and links the Objective-C file (macos_menu.m).
-// Captures the rustc version for display in the About dialog.
 
 fn main() {
-    // Tell Cargo to allow #[cfg(coverage)] to satisfy `unexpected_cfgs` lint when testing
     println!("cargo::rustc-check-cfg=cfg(coverage)");
 
-    // Capture rustc version (e.g. "rustc 1.82.0 (f6e511eec 2024-10-15)")
-    // and expose it as KATANA_RUSTC_VERSION for use with env!() in about_info.rs.
     if let Ok(output) = std::process::Command::new("rustc")
         .arg("--version")
         .output()
@@ -16,7 +10,6 @@ fn main() {
         println!("cargo:rustc-env=KATANA_RUSTC_VERSION={version}");
     }
 
-    // Capture build profile and Git commit hash for KATANA_BUILD
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "dev".to_string());
     if let Ok(output) = std::process::Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])

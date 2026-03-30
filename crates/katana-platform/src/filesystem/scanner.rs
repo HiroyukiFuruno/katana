@@ -141,7 +141,6 @@ mod tests {
             path: PathBuf::from("file.md"),
         };
 
-        // Without empty string in visible_extensions
         let visible_exts_without_empty = vec!["md".to_string()];
         assert!(!has_any_visible(
             std::slice::from_ref(&file_with_no_ext),
@@ -152,14 +151,12 @@ mod tests {
             &visible_exts_without_empty
         ));
 
-        // With empty string in visible_extensions
         let visible_exts_with_empty = vec!["md".to_string(), "".to_string()];
         assert!(has_any_visible(
             std::slice::from_ref(&file_with_no_ext),
             &visible_exts_with_empty
         ));
 
-        // Inside a directory
         let dir = TreeEntry::Directory {
             path: PathBuf::from("dir"),
             children: vec![file_with_no_ext],
@@ -185,7 +182,6 @@ mod tests {
         let cancel_token = Arc::new(AtomicBool::new(false));
         let in_memory_dirs = std::collections::HashSet::new();
 
-        // 1. empty string in visible_extensions
         let tree_with_empty = scan_directory(
             dir.path(),
             &[],
@@ -205,7 +201,6 @@ mod tests {
             panic!("Expected file entry");
         }
 
-        // 2. empty string not in visible_extensions
         let tree_without_empty = scan_directory(
             dir.path(),
             &[],

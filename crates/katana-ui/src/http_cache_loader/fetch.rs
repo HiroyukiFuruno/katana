@@ -26,10 +26,6 @@ pub(crate) fn entry_to_bytes_result(entry: Entry) -> BytesLoadResult {
     }
 }
 
-/// Extracted from the `ehttp::fetch` callback to make the logic testable.
-///
-/// Converts a raw HTTP result into a `CachedFile`, persisting successful
-/// responses to the disk cache.
 pub(crate) fn process_fetch_response(
     uri: &str,
     cache_dir: &Path,

@@ -145,7 +145,6 @@ mod tests {
         cache.set_memory("test", "data".to_string());
         assert_eq!(cache.get_memory("test"), Some("data".to_string()));
 
-        // test update
         cache.set_memory("test", "data2".to_string());
         assert_eq!(cache.get_memory("test"), Some("data2".to_string()));
     }
@@ -160,11 +159,9 @@ mod tests {
         cache.set_persistent("key", "val".to_string()).unwrap();
         assert_eq!(cache.get_persistent("key"), Some("val".to_string()));
 
-        // test update
         cache.set_persistent("key", "val2".to_string()).unwrap();
         assert_eq!(cache.get_persistent("key"), Some("val2".to_string()));
 
-        // re-load
         let cache2 = DefaultCacheService::new(path);
         assert_eq!(cache2.get_persistent("key"), Some("val2".to_string()));
     }
@@ -174,7 +171,6 @@ mod tests {
         let cache = DefaultCacheService::default();
         let _cache_clone = DefaultCacheService::with_default_path();
 
-        // We just verify it doesn't crash, because the default path varies by OS
         assert_eq!(cache.get_persistent("non-existent"), None);
     }
 
@@ -183,15 +179,12 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let base = tmp.path();
 
-        // Create an empty dir
         std::fs::create_dir(base.join("empty_dir")).unwrap();
 
-        // Create a dir with files
         let full_dir = base.join("full_dir");
         std::fs::create_dir(&full_dir).unwrap();
         std::fs::write(full_dir.join("file.txt"), b"test").unwrap();
 
-        // Create a root file that should be ignored
         let root_file = base.join("cache.json");
         std::fs::write(&root_file, b"test").unwrap();
 
@@ -201,7 +194,6 @@ mod tests {
         assert!(!full_dir.exists());
         assert!(root_file.exists());
 
-        // Cover dirs::cache_dir() invocation mapping
         DefaultCacheService::clear_all_directories();
     }
 
@@ -226,7 +218,6 @@ mod tests {
         let file_path = tmp.path().join("just_a_file.txt");
         std::fs::write(&file_path, b"test").unwrap();
 
-        // Directly call clear_directory on a file to ensure the fallback block is covered
         DefaultCacheService::clear_directory(&file_path);
     }
 }

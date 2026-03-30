@@ -1,7 +1,5 @@
 use eframe::egui;
 
-/// A custom accordion widget that uses `ListItem` for perfectly centered layout
-/// rather than struggling with manual optical alignment tweaks.
 pub struct Accordion<'a> {
     id_source: egui::Id,
     label: egui::WidgetText,
@@ -48,8 +46,6 @@ impl<'a> Accordion<'a> {
 
         let openness = state.openness(ui.ctx());
 
-        // To ensure perfectly tight click regions (so we don't accidentally capture clicks
-        // meant for another flex item), we compute the galley exactly and allocate space natively.
         let font_id = egui::TextStyle::Body.resolve(ui.style());
         let galley =
             self.label
@@ -69,7 +65,6 @@ impl<'a> Accordion<'a> {
 
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-        // Ensure accessibility and kittest can find the label, exactly like native CollapsingHeader.
         response.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::CollapsingHeader, true, galley.text())
         });
@@ -84,15 +79,12 @@ impl<'a> Accordion<'a> {
             );
         }
 
-        // --- Optical Icon Centering ---
-        // Create an icon rect perfectly vertically centered
         let icon_min_y = rect.center().y - icon_size / 2.0;
         let icon_rect = egui::Rect::from_min_max(
             egui::pos2(rect.min.x, icon_min_y),
             egui::pos2(rect.min.x + icon_size, icon_min_y + icon_size),
         );
 
-        // Render exact small triangle icon dynamically matching native CollapsingHeader behavior
         let icon_response = ui.interact(icon_rect, ui.next_auto_id(), egui::Sense::click());
 
         let stroke_color = if response.hovered() || response.has_focus() {
@@ -101,9 +93,11 @@ impl<'a> Accordion<'a> {
             ui.style().interact(&response).fg_stroke.color
         };
 
-        // Exact small sizing
+        const TRIANGLE_RADIUS_RATIO: f32 = 0.3;
+        const TRIANGLE_BACK_RATIO: f32 = 0.6;
+        
         let center = icon_rect.center();
-        let triangle_radius = icon_size * 0.3; // Make the triangle nice and small!
+        let triangle_radius = icon_size * TRIANGLE_RADIUS_RATIO; // WHY: Make the triangle nice and small!
 
         let rot = openness * std::f32::consts::FRAC_PI_2;
         let rot_mat = egui::emath::Rot2::from_angle(rot);
@@ -111,8 +105,8 @@ impl<'a> Accordion<'a> {
 
         let points = vec![
             transform(egui::pos2(triangle_radius, 0.0)),
-            transform(egui::pos2(-triangle_radius * 0.6, -triangle_radius)),
-            transform(egui::pos2(-triangle_radius * 0.6, triangle_radius)),
+            transform(egui::pos2(-triangle_radius * TRIANGLE_BACK_RATIO, -triangle_radius)),
+            transform(egui::pos2(-triangle_radius * TRIANGLE_BACK_RATIO, triangle_radius)),
         ];
 
         ui.painter().add(egui::Shape::convex_polygon(
@@ -121,7 +115,6 @@ impl<'a> Accordion<'a> {
             egui::Stroke::NONE,
         ));
 
-        // --- Text Centering ---
         let text_min_y = rect.center().y - galley.size().y / 2.0;
         let text_pos = egui::pos2(rect.min.x + icon_size + spacing, text_min_y);
         ui.painter().galley(text_pos, galley, text_color);

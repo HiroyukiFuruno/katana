@@ -1,8 +1,3 @@
-//! Main application frame layout rendering.
-//!
-//! Renders the top-level panels when the splash screen is not opaque:
-//! menu bar, status bar, title bar, workspace sidebar, tab toolbar,
-//! breadcrumbs, and central content area.
 
 use crate::app::action::ActionOps;
 use crate::app_state::{AppAction, ViewMode};
@@ -14,9 +9,6 @@ use eframe::egui;
 
 const CHEVRON_ICON_SIZE: f32 = 10.0;
 
-/// Renders the main application panels (everything inside the `if !splash_is_opaque` guard).
-///
-/// Returns an optional `DownloadRequest` produced by split preview rendering.
 pub(crate) struct MainPanels<'a> {
     pub app: &'a mut KatanaApp,
     pub theme_colors: &'a katana_platform::theme::ThemeColors,
@@ -33,7 +25,6 @@ impl<'a> MainPanels<'a> {
     pub fn show(self, ctx: &egui::Context) -> Option<DownloadRequest> {
         let app = self.app;
         let theme_colors = self.theme_colors;
-        // Menu bar is removed as it's delegated to macOS native menu.
         let export_filenames: Vec<String> = app
             .export_tasks
             .iter()
@@ -48,19 +39,14 @@ impl<'a> MainPanels<'a> {
             .show(ui);
         });
 
-        // Window title
         WindowTitle::new(app).show(ctx);
 
-        // In-app title bar
         TitleBar::new(app, theme_colors).show(ctx);
 
-        // Workspace sidebar
         WorkspaceSidebar::new(app).show(ctx);
 
-        // Tab toolbar (tabs + breadcrumbs + view mode)
         TabToolbar::new(app).show(ctx);
 
-        // Central content area
         CentralContent::new(app).show(ctx)
     }
 }
@@ -379,10 +365,6 @@ impl<'a> CentralContent<'a> {
     }
 }
 
-/// Intercepts URL opening requests from egui output commands.
-///
-/// External URLs (http/https/mailto) are passed through to the browser.
-/// Internal file paths are resolved and dispatched as `SelectDocument` actions.
 pub(crate) fn intercept_url_commands(ctx: &egui::Context, app: &mut KatanaApp) {
     let commands = ctx.output_mut(|o| std::mem::take(&mut o.commands));
     let mut unprocessed_commands = Vec::new();

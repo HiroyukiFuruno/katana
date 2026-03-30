@@ -18,8 +18,6 @@ mod tests {
 
     pub(crate) const PREVIEW_CONTENT_PADDING: f32 = 12.0;
 
-    /// Custom testing egui Context that pre-populates dummy font mappings for Markdown
-    /// layout families. PreviewPane panics if these are missing natively.
     fn test_context() -> egui::Context {
         let ctx = egui::Context::default();
         let mut fonts = egui::FontDefinitions::default();
@@ -690,16 +688,7 @@ mod tests {
         );
     }
 
-    // ── TDD(RED): Vertical split must leave sufficient height for editor scrolling ──
 
-    /// When the split direction is vertical (top/bottom), the editor's
-    /// CentralPanel must occupy at least 30% of the total height so that
-    /// the TextEdit inside can scroll.
-    ///
-    /// The bug: `render_preview_content` calls `allocate_rect(outer_rect)` which
-    /// consumes the full available height of the TopBottomPanel. Combined with
-    /// no `max_height` constraint, the preview panel grows beyond its `default_height`,
-    /// starving the CentralPanel.
     #[test]
     fn vertical_split_editor_has_sufficient_height_for_scrolling() {
         let ctx = test_context();
@@ -708,7 +697,6 @@ mod tests {
         let mut app = app_with_preview_doc(&active, &long_content);
         let total_height = 800.0_f32;
 
-        // Run 3 frames for layout stabilization
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, total_height)), |ctx| {
                 crate::views::layout::split::VerticalSplit::new(
@@ -729,8 +717,6 @@ mod tests {
         .expect("preview panel rect")
         .rect;
 
-        // The preview panel should not consume more than 70% of the total height.
-        // The remaining >= 30% is the editor's CentralPanel.
         let editor_height = total_height - preview_rect.height();
         let min_editor_ratio = 0.30;
 
@@ -743,14 +729,7 @@ mod tests {
         );
     }
 
-    // ── TDD(RED): Bidirectional scroll sync in vertical split ──
-    //
-    // Scenario 3: Scroll sync works bidirectionally in vertical split.
-    // Scenario 5: Scroll sync works bidirectionally after order swap.
 
-    /// When the editor reports a scroll (scroll_source=Editor, fraction=0.5),
-    /// the preview must consume it within the next frame, transitioning
-    /// scroll_source to Neither. This verifies editor→preview sync works.
     #[test]
     fn vertical_split_editor_to_preview_scroll_sync() {
         let ctx = test_context();
@@ -758,7 +737,6 @@ mod tests {
         let long_content = (0..100).map(|i| format!("Line {i}\n")).collect::<String>();
         let mut app = app_with_preview_doc(&active, &long_content);
 
-        // Stabilize layout (5 frames)
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
                 crate::views::layout::split::VerticalSplit::new(
@@ -769,11 +747,9 @@ mod tests {
             });
         }
 
-        // Simulate editor scroll by setting scroll state
         app.state.scroll.fraction = 0.5;
         app.state.scroll.source = ScrollSource::Editor;
 
-        // Run 3 frames for sync to propagate
         for _ in 0..3 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
                 crate::views::layout::split::VerticalSplit::new(
@@ -784,8 +760,6 @@ mod tests {
             });
         }
 
-        // After sync, scroll_source must settle to Neither.
-        // If it bounces to Preview, the sync is creating an oscillation loop.
         assert_eq!(
             app.state.scroll.source,
             ScrollSource::Neither,
@@ -796,7 +770,6 @@ mod tests {
         );
     }
 
-    /// Same editor→preview sync test for horizontal split — expected to PASS.
     #[test]
     fn horizontal_split_editor_to_preview_scroll_sync() {
         let ctx = test_context();
@@ -837,8 +810,6 @@ mod tests {
         );
     }
 
-    /// Scenario 5: After swapping order (PreviewFirst), the same
-    /// editor→preview sync must work in vertical split.
     #[test]
     fn vertical_split_editor_to_preview_scroll_sync_after_swap() {
         let ctx = test_context();
@@ -846,7 +817,6 @@ mod tests {
         let long_content = (0..100).map(|i| format!("Line {i}\n")).collect::<String>();
         let mut app = app_with_preview_doc(&active, &long_content);
 
-        // Use PreviewFirst (swapped order)
         for _ in 0..5 {
             let _ = ctx.run(test_input(egui::vec2(1200.0, 800.0)), |ctx| {
                 crate::views::layout::split::VerticalSplit::new(
@@ -880,8 +850,6 @@ mod tests {
         );
     }
 
-    /// Verify preview→editor sync direction also works in vertical split.
-    /// Set scroll_source=Preview and verify it transitions to Neither.
     #[test]
     fn vertical_split_preview_to_editor_scroll_sync() {
         let ctx = test_context();
@@ -899,7 +867,6 @@ mod tests {
             });
         }
 
-        // Simulate preview scroll
         app.state.scroll.fraction = 0.5;
         app.state.scroll.source = ScrollSource::Preview;
 
