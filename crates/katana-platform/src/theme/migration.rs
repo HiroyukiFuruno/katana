@@ -2,7 +2,9 @@ const ERROR_R: u8 = 0xFF;
 const ERROR_G: u8 = 0x55;
 const ERROR_B: u8 = 0x55;
 
-use crate::theme::types::*;
+use crate::theme::types::{
+    CodeColors, PreviewColors, Rgb, Rgba, SystemColors, ThemeColors, ThemeMode,
+};
 use serde::{Deserialize, Deserializer};
 
 // ── Migration fallback color constants ──────────────────────────

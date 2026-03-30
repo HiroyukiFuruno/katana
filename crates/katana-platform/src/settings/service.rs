@@ -5,7 +5,7 @@
 
 use super::defaults::select_initial_preset;
 use super::repository::{InMemoryRepository, SettingsRepository};
-use super::types::*;
+use super::types::{AppSettings, SettingsLoadOrigin};
 
 /// Platform settings service.
 pub struct SettingsService {

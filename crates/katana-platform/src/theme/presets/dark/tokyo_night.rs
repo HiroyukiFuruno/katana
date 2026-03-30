@@ -1,5 +1,5 @@
 use crate::theme::builder::ThemePresetBuilder;
-use crate::theme::types::*;
+use crate::theme::types::{PresetColorData, Rgb, ThemeMode};
 
 pub(crate) const TOKYO_NIGHT: PresetColorData = ThemePresetBuilder::new(
     ThemeMode::Dark,
