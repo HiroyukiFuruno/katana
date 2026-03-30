@@ -767,7 +767,7 @@ impl<'a> CommonMarkViewerInternal<'a> {
                     .id_salt(id_salt)
                     .icon(crate::ui_components::centering::AccordionIcon::paint_optically_centered);
 
-                    let _header_res = collapsing.show_unindented(ui, |ui| {
+                    let _header_res = collapsing.show(ui, |ui| {
                         let layout = egui::Layout::left_to_right(egui::Align::Center)
                             .with_main_wrap(true);
                         let body_width = ui.available_width();

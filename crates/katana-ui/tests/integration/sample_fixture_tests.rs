@@ -955,35 +955,6 @@ fn basic_fixture_en_s12_accordion_icon_vertically_centered() {
 }
 
 #[test]
-fn basic_fixture_en_s12_accordion_open_no_vertical_left_line() {
-    let (_, _, source) = load_fixture("sample_basic.md");
-    let section_md = extract_section(&source, "## 7", "## 8");
-    let pane = render_snippet(&section_md);
-    let harness = build_harness_accordion_open(pane.sections.clone());
-
-    let summary = harness.get_by_label("Show details");
-    let summary_bounds = summary
-        .accesskit_node()
-        .raw_bounds()
-        .expect("'Show details' should have bounds");
-
-    let swords = harness.get_by_label("Swords");
-    let swords_bounds = swords
-        .accesskit_node()
-        .raw_bounds()
-        .expect("'Swords' should have bounds after accordion opens");
-
-    let indent_delta = swords_bounds.x0 - summary_bounds.x0;
-    assert!(
-        indent_delta <= 30.0,
-        "Open accordion body 'Swords' x0 ({:.1}) vs summary x0 ({:.1}) = {:.1}px extra indent — vertical left line present? (task 4.5)",
-        swords_bounds.x0,
-        summary_bounds.x0,
-        indent_delta
-    );
-}
-
-#[test]
 fn basic_fixture_en_s11_4_footnote_reference_rendered() {
     let (_, _, source) = load_fixture("sample_basic.md");
     let section_md = extract_section(&source, "### 13.4", "### 13.5");
