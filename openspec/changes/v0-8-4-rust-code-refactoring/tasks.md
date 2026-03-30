@@ -321,9 +321,14 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 - [x] 6.28 `shell_ui.rs`, `settings_window.rs`, `preview_pane_ui.rs`, `widgets.rs` 起点の parameter-heavy な `render_*` free function が end-state に残っていないことを確認
 - [ ] 6.29 AST Linter の構造/コーディングルール対象を `katana-ui/src` へ拡大し、Task 4.3 で棚卸しした既存違反を解消する
   - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
+  - **【最重要: テスト容易性のための構造分離】** `file_length` (200行超過) などの違反解消でファイルを分割する際は、行数で機械的に割るのではなく、必ず**「egui描画層（UI）」と「純粋なロジック・状態計算（Logic）」を物理ファイルレベルで明確に分離**すること。
+  - これは Task 6.31 において「ロジック層のみ `COVERAGE_IGNORE` を外し、100%カバレッジ（UT/IT）を達成する」ための必須のアーキテクチャ制約とする。
   - `crates/katana-linter/tests/ast_linter.rs` の target 範囲に `katana-ui/src` を追加する
 - [ ] 6.30 `pub_free_fn` の統合テストから `#[ignore]` を外し、Task 4.4 で整理した条件に従って最終ルールとして有効化する
-- [ ] 6.31 `views/`, `app/`, `state/` モジュールに抽出された元 `shell_ui.rs` のコアロジックに対するカバレッジ免除（`COVERAGE_IGNORE`）を、コンポーネント化に合わせて解除し、適切な単体・結合テストを追加する
+- [ ] 6.31 純粋なロジック層のカバレッジ免除（`COVERAGE_IGNORE`）解除とUT/ITの完全実装
+  - `views/`, `app/`, `state/` モジュール等に抽出されたファイル群のうち、**egui描画を含まない純粋なコアロジックファイルの `COVERAGE_IGNORE` 指定（正規表現）を解除する**。
+  - 除外を解除した各ファイルに対し、分岐網羅率100%の単体テスト・結合テスト（UT/IT）を完備し、`make check` カバレッジゲートを通過させる。
+  - 以降、「未検証のロジック（バグの死角）」を OSS として許容しない堅牢な設計基盤を完成させる。
 
 ### Definition of Done (DoD)
 
