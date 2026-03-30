@@ -16,6 +16,7 @@ fn target_crates(root: &std::path::Path) -> Vec<std::path::PathBuf> {
         root.join("crates/katana-linter/src"),
         root.join("crates/katana-core/src"),
         root.join("crates/katana-platform/src"),
+        root.join("crates/katana-ui/src"),
     ]
 }
 
