@@ -1,27 +1,34 @@
-use crate::app_state::{AppAction, AppState, ScrollSource};
+use crate::app_state::{AppAction, ScrollSource};
 use crate::shell::{EDITOR_INITIAL_VISIBLE_ROWS, SCROLL_SYNC_DEAD_ZONE};
 use eframe::egui;
 
 pub(crate) struct EditorContent<'a> {
-    pub state: &'a mut AppState,
+    pub document: Option<&'a katana_core::document::Document>,
+    pub scroll: &'a mut crate::app_state::ScrollState,
     pub action: &'a mut AppAction,
     pub sync_scroll: bool,
 }
 
 impl<'a> EditorContent<'a> {
-    pub fn new(state: &'a mut AppState, action: &'a mut AppAction, sync_scroll: bool) -> Self {
+    pub fn new(
+        document: Option<&'a katana_core::document::Document>,
+        scroll: &'a mut crate::app_state::ScrollState,
+        action: &'a mut AppAction,
+        sync_scroll: bool,
+    ) -> Self {
         Self {
-            state,
+            document,
+            scroll,
             action,
             sync_scroll,
         }
     }
 
     pub fn show(self, ui: &mut egui::Ui) {
-        let state = self.state;
         let action = self.action;
         let sync_scroll = self.sync_scroll;
-        if let Some(doc) = state.active_document() {
+        let scroll = self.scroll;
+        if let Some(doc) = self.document {
             let mut buffer = doc.buffer.clone();
 
             let (
@@ -68,11 +75,10 @@ impl<'a> EditorContent<'a> {
 
             let mut scroll_area = egui::ScrollArea::vertical().id_salt("editor_scroll");
 
-            let consuming_preview = sync_scroll && state.scroll.source == ScrollSource::Preview;
+            let consuming_preview = sync_scroll && scroll.source == ScrollSource::Preview;
             if consuming_preview {
-                scroll_area = scroll_area.vertical_scroll_offset(
-                    state.scroll.fraction * state.scroll.editor_max.max(1.0),
-                );
+                scroll_area = scroll_area
+                    .vertical_scroll_offset(scroll.fraction * scroll.editor_max.max(1.0));
             }
 
             let output = egui::Frame::NONE.fill(code_bg).show(ui, |ui| {
@@ -115,7 +121,7 @@ impl<'a> EditorContent<'a> {
                                     .take(char_idx)
                                     .filter(|&ch| ch == '\n')
                                     .count();
-                                state.scroll.scroll_to_line = Some(line);
+                                scroll.scroll_to_line = Some(line);
                             }
                         }
 
@@ -128,7 +134,7 @@ impl<'a> EditorContent<'a> {
                                 .take(char_idx)
                                 .filter(|&ch| ch == '\n')
                                 .count();
-                            state.scroll.active_editor_line = Some(paragraph);
+                            scroll.active_editor_line = Some(paragraph);
 
                             let cursor_rect = galley.pos_from_cursor(c.primary);
                             current_cursor_y = Some(cursor_rect.min.y);
@@ -152,7 +158,7 @@ impl<'a> EditorContent<'a> {
                             ui.painter()
                                 .rect_filled(highlight_rect, 1.0, highlight_color);
                         } else {
-                            state.scroll.active_editor_line = None;
+                            scroll.active_editor_line = None;
                         }
 
                         // Hover highlights from preview pane
@@ -165,7 +171,7 @@ impl<'a> EditorContent<'a> {
                             }
                         });
 
-                        for line_range in &state.scroll.hovered_preview_lines {
+                        for line_range in &scroll.hovered_preview_lines {
                             let mut current_line = 0;
                             let mut start_char = None;
                             let mut end_char = None;
@@ -268,7 +274,7 @@ impl<'a> EditorContent<'a> {
                                 let resp =
                                     ui.interact(label_rect, ui.id().with(p), egui::Sense::click());
                                 if resp.clicked() {
-                                    state.scroll.scroll_to_line = Some(p);
+                                    scroll.scroll_to_line = Some(p);
                                 }
                                 if resp.hovered() {
                                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -287,7 +293,7 @@ impl<'a> EditorContent<'a> {
                             *action = AppAction::UpdateBuffer(buffer.clone());
                         }
 
-                        if let Some(target_line) = state.scroll.scroll_to_line.take() {
+                        if let Some(target_line) = scroll.scroll_to_line.take() {
                             let mut current_line = 0;
                             let mut target_char = None;
                             for (char_idx, c) in buffer.chars().enumerate() {
@@ -327,22 +333,22 @@ impl<'a> EditorContent<'a> {
             if sync_scroll {
                 let max_scroll =
                     (output.inner.content_size.y - output.inner.inner_rect.height()).max(0.0);
-                state.scroll.editor_max = max_scroll;
+                scroll.editor_max = max_scroll;
 
                 if consuming_preview {
-                    state.scroll.source = ScrollSource::Neither;
+                    scroll.source = ScrollSource::Neither;
                     if max_scroll > 0.0 {
-                        state.scroll.fraction =
+                        scroll.fraction =
                             (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
                     }
                 } else {
                     if max_scroll > 0.0 {
                         let current_fraction =
                             (output.inner.state.offset.y / max_scroll).clamp(0.0, 1.0);
-                        let diff = (current_fraction - state.scroll.fraction).abs();
+                        let diff = (current_fraction - scroll.fraction).abs();
                         if diff > SCROLL_SYNC_DEAD_ZONE {
-                            state.scroll.fraction = current_fraction;
-                            state.scroll.source = ScrollSource::Editor;
+                            scroll.fraction = current_fraction;
+                            scroll.source = ScrollSource::Editor;
                         }
                     }
                 }

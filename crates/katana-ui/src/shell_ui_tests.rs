@@ -152,7 +152,10 @@ mod tests {
                 .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
                 .show(ctx, |ui| {
                     before_height = ui.available_height();
-                    crate::views::panels::preview::PreviewHeader::new(&state, &mut action).show(ui);
+                    let has_doc = state.active_document().is_some();
+                    let toc_visible = state.config.settings.settings().layout.toc_visible;
+                    let show_toc = state.layout.show_toc;
+                    crate::views::panels::preview::PreviewHeader::new(has_doc, toc_visible, show_toc, &mut action).show(ui);
                     remaining_height = ui.available_height();
                 });
         });

@@ -1,4 +1,4 @@
-use crate::app_state::{AppAction, AppState};
+use crate::app_state::AppAction;
 use crate::shell::{
     ACTIVE_FILE_HIGHLIGHT_ROUNDING, NO_WORKSPACE_BOTTOM_SPACING, RECENT_WORKSPACES_ITEM_SPACING,
     RECENT_WORKSPACES_SPACING, TREE_LABEL_HOFFSET, TREE_ROW_HEIGHT,
@@ -11,17 +11,35 @@ use crate::shell_ui::{
 use eframe::egui;
 
 pub(crate) struct WorkspacePanel<'a> {
-    pub state: &'a mut AppState,
+    pub workspace: &'a mut crate::app_state::WorkspaceState,
+    pub search: &'a mut crate::app_state::SearchState,
+    pub recent_paths: &'a [String],
+    pub active_path: Option<&'a std::path::Path>,
     pub action: &'a mut AppAction,
 }
 
 impl<'a> WorkspacePanel<'a> {
-    pub fn new(state: &'a mut AppState, action: &'a mut AppAction) -> Self {
-        Self { state, action }
+    pub fn new(
+        workspace: &'a mut crate::app_state::WorkspaceState,
+        search: &'a mut crate::app_state::SearchState,
+        recent_paths: &'a [String],
+        active_path: Option<&'a std::path::Path>,
+        action: &'a mut AppAction,
+    ) -> Self {
+        Self {
+            workspace,
+            search,
+            recent_paths,
+            active_path,
+            action,
+        }
     }
 
     pub fn show(self, ui: &mut egui::Ui) {
-        let state = self.state;
+        let workspace = self.workspace;
+        let search = self.search;
+        let recent_paths = self.recent_paths;
+        let active_path = self.active_path;
         let action = self.action;
         let panel_width = ui.available_width();
         ui.set_max_width(panel_width);
@@ -37,11 +55,11 @@ impl<'a> WorkspacePanel<'a> {
                     .on_hover_text(crate::i18n::get().action.collapse_sidebar.clone())
                     .clicked()
                 {
-                    state.layout.show_workspace = false;
+                    *action = AppAction::ToggleWorkspace;
                 }
             });
         });
-        if state.workspace.data.is_some() {
+        if workspace.data.is_some() {
             ui.horizontal(|ui| {
                 let btn_resp = ui
                     .add(egui::Button::image(
@@ -51,9 +69,8 @@ impl<'a> WorkspacePanel<'a> {
                 btn_resp
                     .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "+"));
                 if btn_resp.clicked() {
-                    if let Some(ws) = &state.workspace.data {
-                        state
-                            .workspace
+                    if let Some(ws) = &workspace.data {
+                        workspace
                             .expanded_directories
                             .extend(ws.collect_all_directory_paths());
                     }
@@ -66,7 +83,7 @@ impl<'a> WorkspacePanel<'a> {
                 btn_resp
                     .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "-"));
                 if btn_resp.clicked() {
-                    state.workspace.force_tree_open = Some(false);
+                    workspace.force_tree_open = Some(false);
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let icon_bg = if ui.visuals().dark_mode {
@@ -76,21 +93,13 @@ impl<'a> WorkspacePanel<'a> {
                         // Always gray for icons in light mode
                     };
 
-                    if !state.config.settings.settings().workspace.paths.is_empty() {
+                    if !recent_paths.is_empty() {
                         let ws_history_img =
                             crate::Icon::Document.ui_image(ui, crate::icon::IconSize::Small);
                         ui.scope(|ui| {
                             ui.visuals_mut().widgets.inactive.bg_fill = icon_bg;
                             ui.menu_image_button(ws_history_img, |ui| {
-                                for path in state
-                                    .config
-                                    .settings
-                                    .settings()
-                                    .workspace
-                                    .paths
-                                    .iter()
-                                    .rev()
-                                {
+                                for path in recent_paths.iter().rev() {
                                     ui.horizontal(|ui| {
                                         if ui
                                             .add(egui::Button::image_and_text(
@@ -134,7 +143,7 @@ impl<'a> WorkspacePanel<'a> {
                         *action = AppAction::RefreshWorkspace;
                     }
 
-                    let filter_btn_color = if state.search.filter_enabled {
+                    let filter_btn_color = if search.filter_enabled {
                         if ui.visuals().dark_mode {
                             ui.visuals().selection.bg_fill
                         } else {
@@ -156,7 +165,7 @@ impl<'a> WorkspacePanel<'a> {
                         .on_hover_text(crate::i18n::get().action.toggle_filter.clone())
                         .clicked()
                     {
-                        state.search.filter_enabled = !state.search.filter_enabled;
+                        *action = AppAction::ToggleWorkspaceFilter;
                     }
 
                     if ui
@@ -170,15 +179,15 @@ impl<'a> WorkspacePanel<'a> {
                         .on_hover_text(crate::i18n::get().search.modal_title.clone())
                         .clicked()
                     {
-                        state.layout.show_search_modal = true;
+                        *action = AppAction::ToggleSearchModal;
                     }
                 });
             });
 
-            if state.search.filter_enabled {
+            if search.filter_enabled {
                 let mut is_valid_regex = true;
-                if !state.search.filter_query.is_empty() {
-                    is_valid_regex = regex::Regex::new(&state.search.filter_query).is_ok();
+                if !search.filter_query.is_empty() {
+                    is_valid_regex = regex::Regex::new(&search.filter_query).is_ok();
                 }
                 ui.horizontal(|ui| {
                     let text_color = if is_valid_regex {
@@ -195,7 +204,7 @@ impl<'a> WorkspacePanel<'a> {
                             })
                     };
                     ui.add(
-                        egui::TextEdit::singleline(&mut state.search.filter_query)
+                        egui::TextEdit::singleline(&mut search.filter_query)
                             .text_color(text_color)
                             .hint_text("Filter (Regex)...")
                             .desired_width(f32::INFINITY),
@@ -204,7 +213,7 @@ impl<'a> WorkspacePanel<'a> {
             }
         }
         ui.separator();
-        if state.workspace.is_loading {
+        if workspace.is_loading {
             ui.add_space(WORKSPACE_SPINNER_OUTER_MARGIN);
             ui.horizontal(|ui| {
                 ui.add_space(WORKSPACE_SPINNER_INNER_MARGIN);
@@ -213,51 +222,65 @@ impl<'a> WorkspacePanel<'a> {
                 ui.label(crate::i18n::get().action.refresh_workspace.clone());
             });
         } else {
-            WorkspaceContent::new(state, action).show(ui);
+            WorkspaceContent::new(workspace, search, recent_paths, active_path, action).show(ui);
         }
     }
 }
 
 pub(crate) struct WorkspaceContent<'a> {
-    pub state: &'a mut AppState,
+    pub workspace: &'a mut crate::app_state::WorkspaceState,
+    pub search: &'a mut crate::app_state::SearchState,
+    pub recent_paths: &'a [String],
+    pub active_path: Option<&'a std::path::Path>,
     pub action: &'a mut AppAction,
 }
 
 impl<'a> WorkspaceContent<'a> {
-    pub fn new(state: &'a mut AppState, action: &'a mut AppAction) -> Self {
-        Self { state, action }
+    pub fn new(
+        workspace: &'a mut crate::app_state::WorkspaceState,
+        search: &'a mut crate::app_state::SearchState,
+        recent_paths: &'a [String],
+        active_path: Option<&'a std::path::Path>,
+        action: &'a mut AppAction,
+    ) -> Self {
+        Self {
+            workspace,
+            search,
+            recent_paths,
+            active_path,
+            action,
+        }
     }
 
     pub fn show(self, ui: &mut egui::Ui) {
-        let state = self.state;
+        let workspace = self.workspace;
+        let search = self.search;
+        let recent_paths = self.recent_paths;
+        let active_path = self.active_path;
         let action = self.action;
-        if let Some(ws) = &state.workspace.data {
+        if let Some(ws) = &workspace.data {
             let entries = ws.tree.clone();
-            if let Some(force) = state.workspace.force_tree_open {
+            if let Some(force) = workspace.force_tree_open {
                 if force {
-                    state
-                        .workspace
+                    workspace
                         .expanded_directories
                         .extend(ws.collect_all_directory_paths());
                 } else {
-                    state.workspace.expanded_directories.clear();
+                    workspace.expanded_directories.clear();
                 }
             }
-            let active_path = state.active_path().map(|p| p.to_path_buf());
 
             let ws_root = ws.root.clone();
-            if state.search.filter_enabled && !state.search.filter_query.is_empty() {
-                let is_negated = state.search.filter_query.starts_with('!');
+            if search.filter_enabled && !search.filter_query.is_empty() {
+                let is_negated = search.filter_query.starts_with('!');
                 let query_str = if is_negated {
-                    &state.search.filter_query[1..]
+                    &search.filter_query[1..]
                 } else {
-                    &state.search.filter_query
+                    &search.filter_query
                 };
 
                 if let Ok(regex) = regex::Regex::new(query_str) {
-                    if state.search.filter_cache.as_ref().map(|(q, _)| q)
-                        != Some(&state.search.filter_query)
-                    {
+                    if search.filter_cache.as_ref().map(|(q, _)| q) != Some(&search.filter_query) {
                         let mut visible = std::collections::HashSet::new();
                         crate::views::panels::tree::gather_visible_paths(
                             &entries,
@@ -266,16 +289,15 @@ impl<'a> WorkspaceContent<'a> {
                             &ws_root,
                             &mut visible,
                         );
-                        state.search.filter_cache =
-                            Some((state.search.filter_query.clone(), visible));
+                        search.filter_cache = Some((search.filter_query.clone(), visible));
                     }
                 } else {
-                    state.search.filter_cache = None;
+                    search.filter_cache = None;
                 }
             } else {
-                state.search.filter_cache = None;
+                search.filter_cache = None;
             }
-            let filter_set = state.search.filter_cache.as_ref().map(|(_, v)| v);
+            let filter_set = search.filter_cache.as_ref().map(|(_, v)| v);
 
             egui::ScrollArea::vertical()
                 .id_salt("workspace_tree_scroll")
@@ -284,16 +306,16 @@ impl<'a> WorkspaceContent<'a> {
                     let mut ctx = TreeRenderContext {
                         action,
                         depth: 0,
-                        active_path: active_path.as_deref(),
+                        active_path,
                         filter_set,
-                        expanded_directories: &mut state.workspace.expanded_directories,
+                        expanded_directories: &mut workspace.expanded_directories,
                         disable_context_menu: false,
                     };
                     for entry in &entries {
                         TreeEntryNode::new(entry, &mut ctx).show(ui);
                     }
                 });
-            state.workspace.force_tree_open = None;
+            workspace.force_tree_open = None;
         } else {
             ui.label(crate::i18n::get().workspace.no_workspace_open.clone());
             ui.add_space(NO_WORKSPACE_BOTTOM_SPACING);
@@ -306,7 +328,6 @@ impl<'a> WorkspaceContent<'a> {
                 }
             }
 
-            let recent_paths = &state.config.settings.settings().workspace.paths;
             if !recent_paths.is_empty() {
                 ui.add_space(RECENT_WORKSPACES_SPACING);
                 ui.separator();

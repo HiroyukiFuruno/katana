@@ -112,9 +112,14 @@ impl<'a> HorizontalSplit<'a> {
                         &mut app.tab_previews,
                         path.clone(),
                     );
+                    let toc_visible = app.state.config.settings.settings().layout.toc_visible;
+                    let show_toc = app.state.layout.show_toc;
                     download_req = PreviewContent::new(
                         pane,
-                        &mut app.state,
+                        app.state.document.active_document(),
+                        &mut app.state.scroll,
+                        toc_visible,
+                        show_toc,
                         &mut app.pending_action,
                         scroll_sync,
                         &mut scroll_state,
@@ -133,7 +138,13 @@ impl<'a> HorizontalSplit<'a> {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
             .show(ctx, |ui| {
-                EditorContent::new(&mut app.state, &mut app.pending_action, scroll_sync).show(ui);
+                EditorContent::new(
+                    app.state.document.active_document(),
+                    &mut app.state.scroll,
+                    &mut app.pending_action,
+                    scroll_sync,
+                )
+                .show(ui);
             });
 
         download_req
@@ -207,9 +218,14 @@ impl<'a> VerticalSplit<'a> {
                             &mut app.tab_previews,
                             path.clone(),
                         );
+                        let toc_visible = app.state.config.settings.settings().layout.toc_visible;
+                        let show_toc = app.state.layout.show_toc;
                         download_req = PreviewContent::new(
                             pane,
-                            &mut app.state,
+                            app.state.document.active_document(),
+                            &mut app.state.scroll,
+                            toc_visible,
+                            show_toc,
                             &mut app.pending_action,
                             scroll_sync,
                             &mut scroll_state,
@@ -229,8 +245,13 @@ impl<'a> VerticalSplit<'a> {
             egui::CentralPanel::default()
                 .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
                 .show(ctx, |ui| {
-                    EditorContent::new(&mut app.state, &mut app.pending_action, scroll_sync)
-                        .show(ui);
+                    EditorContent::new(
+                        app.state.document.active_document(),
+                        &mut app.state.scroll,
+                        &mut app.pending_action,
+                        scroll_sync,
+                    )
+                    .show(ui);
                 });
         } else {
             egui::TopBottomPanel::bottom(panel_id)
@@ -244,9 +265,14 @@ impl<'a> VerticalSplit<'a> {
                             &mut app.tab_previews,
                             path.clone(),
                         );
+                        let toc_visible = app.state.config.settings.settings().layout.toc_visible;
+                        let show_toc = app.state.layout.show_toc;
                         download_req = PreviewContent::new(
                             pane,
-                            &mut app.state,
+                            app.state.document.active_document(),
+                            &mut app.state.scroll,
+                            toc_visible,
+                            show_toc,
                             &mut app.pending_action,
                             scroll_sync,
                             &mut scroll_state,
@@ -262,8 +288,13 @@ impl<'a> VerticalSplit<'a> {
             egui::CentralPanel::default()
                 .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
                 .show(ctx, |ui| {
-                    EditorContent::new(&mut app.state, &mut app.pending_action, scroll_sync)
-                        .show(ui);
+                    EditorContent::new(
+                        app.state.document.active_document(),
+                        &mut app.state.scroll,
+                        &mut app.pending_action,
+                        scroll_sync,
+                    )
+                    .show(ui);
                 });
         }
 
@@ -299,9 +330,14 @@ impl<'a> PreviewOnly<'a> {
         let mut scroll_state = (0.0_f32, ScrollSource::Neither, 0.0_f32);
         if let Some(path) = active_path {
             let pane = crate::shell::KatanaApp::get_preview_pane(&mut app.tab_previews, path);
+            let toc_visible = app.state.config.settings.settings().layout.toc_visible;
+            let show_toc = app.state.layout.show_toc;
             PreviewContent::new(
                 pane,
-                &mut app.state,
+                app.state.document.active_document(),
+                &mut app.state.scroll,
+                toc_visible,
+                show_toc,
                 &mut app.pending_action,
                 false,
                 &mut scroll_state,

@@ -1,4 +1,4 @@
-use crate::app_state::{AppAction, AppState, ScrollSource};
+use crate::app_state::{AppAction, ScrollSource};
 use crate::preview_pane::{DownloadRequest, PreviewPane};
 use crate::shell::SCROLL_SYNC_DEAD_ZONE;
 use crate::shell_ui::{
@@ -21,23 +21,33 @@ pub(crate) fn invalidate_preview_image_cache(ctx: &egui::Context, action: &AppAc
 
 pub(crate) struct PreviewContent<'a> {
     pub preview: &'a mut PreviewPane,
-    pub state: &'a mut AppState,
+    pub document: Option<&'a katana_core::document::Document>,
+    pub scroll: &'a mut crate::app_state::ScrollState,
+    pub toc_visible: bool,
+    pub show_toc: bool,
     pub action: &'a mut AppAction,
     pub scroll_sync: bool,
     pub scroll_state: &'a mut (f32, ScrollSource, f32),
 }
 
 impl<'a> PreviewContent<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         preview: &'a mut PreviewPane,
-        state: &'a mut AppState,
+        document: Option<&'a katana_core::document::Document>,
+        scroll: &'a mut crate::app_state::ScrollState,
+        toc_visible: bool,
+        show_toc: bool,
         action: &'a mut AppAction,
         scroll_sync: bool,
         scroll_state: &'a mut (f32, ScrollSource, f32),
     ) -> Self {
         Self {
             preview,
-            state,
+            document,
+            scroll,
+            toc_visible,
+            show_toc,
             action,
             scroll_sync,
             scroll_state,
@@ -46,7 +56,10 @@ impl<'a> PreviewContent<'a> {
 
     pub fn show(self, ui: &mut egui::Ui) -> Option<DownloadRequest> {
         let preview = self.preview;
-        let state = self.state;
+        let document = self.document;
+        let scroll = self.scroll;
+        let toc_visible = self.toc_visible;
+        let show_toc = self.show_toc;
         let action = self.action;
         let scroll_sync = self.scroll_sync;
         let scroll_state = self.scroll_state;
@@ -63,10 +76,10 @@ impl<'a> PreviewContent<'a> {
         let mut target_scroll_offset = *fraction * (*prev_max_scroll).max(1.0);
         let consuming_editor = scroll_sync && *source == ScrollSource::Editor;
         if consuming_editor {
-            if let Some(doc) = state.active_document() {
+            if let Some(doc) = document {
                 let _buffer = &doc.buffer;
                 let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
-                let editor_y = *fraction * state.scroll.editor_max.max(1.0);
+                let editor_y = *fraction * scroll.editor_max.max(1.0);
 
                 let mut points = Vec::new();
                 points.push((0.0, 0.0));
@@ -75,10 +88,7 @@ impl<'a> PreviewContent<'a> {
                     let p_y = (rect.min.y - preview.content_top_y).max(0.0);
                     points.push((e_y, p_y));
                 }
-                points.push((
-                    state.scroll.editor_max.max(1.0),
-                    (*prev_max_scroll).max(1.0),
-                ));
+                points.push((scroll.editor_max.max(1.0), (*prev_max_scroll).max(1.0)));
 
                 let mut mapped_y = 0.0;
                 for i in 0..points.len() - 1 {
@@ -132,18 +142,18 @@ impl<'a> PreviewContent<'a> {
                             let mut hovered_lines = Vec::new();
                             let (req, actions) = preview.show_content(
                                 ui,
-                                state.scroll.active_editor_line,
+                                scroll.active_editor_line,
                                 Some(&mut hovered_lines),
                             );
                             if scroll_sync && *source != ScrollSource::Preview {
-                                state.scroll.hovered_preview_lines = hovered_lines.clone();
+                                scroll.hovered_preview_lines = hovered_lines.clone();
                             }
 
                             if ui.rect_contains_pointer(ui.min_rect())
                                 && ui.input(|i| i.pointer.primary_clicked())
                             {
                                 if let Some(hovered) = hovered_lines.first() {
-                                    state.scroll.scroll_to_line = Some(hovered.start);
+                                    scroll.scroll_to_line = Some(hovered.start);
                                 }
                             }
                             download_req = req;
@@ -175,7 +185,7 @@ impl<'a> PreviewContent<'a> {
                     let preview_y = output.state.offset.y;
                     let mut editor_target_y = preview_y;
 
-                    if let Some(doc) = state.active_document() {
+                    if let Some(doc) = document {
                         let _buffer = &doc.buffer;
                         let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
 
@@ -186,7 +196,7 @@ impl<'a> PreviewContent<'a> {
                             let p_y = (rect.min.y - preview.content_top_y).max(0.0);
                             points.push((e_y, p_y));
                         }
-                        points.push((state.scroll.editor_max.max(1.0), max_scroll));
+                        points.push((scroll.editor_max.max(1.0), max_scroll));
 
                         let mut mapped_y = 0.0;
                         for i in 0..points.len() - 1 {
@@ -209,7 +219,7 @@ impl<'a> PreviewContent<'a> {
                     }
 
                     let current_fraction =
-                        (editor_target_y / state.scroll.editor_max.max(1.0)).clamp(0.0, 1.0);
+                        (editor_target_y / scroll.editor_max.max(1.0)).clamp(0.0, 1.0);
                     let diff = (current_fraction - *fraction).abs();
                     if diff > SCROLL_SYNC_DEAD_ZONE {
                         *fraction = current_fraction;
@@ -219,30 +229,42 @@ impl<'a> PreviewContent<'a> {
             }
         }
 
-        PreviewHeader::new(state, action).show(ui);
+        PreviewHeader::new(document.is_some(), toc_visible, show_toc, action).show(ui);
 
         download_req
     }
 }
 
 pub(crate) struct PreviewHeader<'a> {
-    pub state: &'a AppState,
+    pub has_doc: bool,
+    pub toc_visible: bool,
+    pub show_toc: bool,
     pub action: &'a mut AppAction,
 }
 
 impl<'a> PreviewHeader<'a> {
-    pub fn new(state: &'a AppState, action: &'a mut AppAction) -> Self {
-        Self { state, action }
+    pub fn new(
+        has_doc: bool,
+        toc_visible: bool,
+        show_toc: bool,
+        action: &'a mut AppAction,
+    ) -> Self {
+        Self {
+            has_doc,
+            toc_visible,
+            show_toc,
+            action,
+        }
     }
 
     pub fn show(self, ui: &mut egui::Ui) {
-        let state = self.state;
+        let has_doc = self.has_doc;
         let action = self.action;
         let button_size = egui::vec2(ui.spacing().interact_size.y, ui.spacing().interact_size.y);
         let margin = f32::from(PREVIEW_CONTENT_PADDING);
         let spacing = ui.spacing().item_spacing.x;
         let mut button_count = 2.0; // Refresh + Export
-        if state.config.settings.settings().layout.toc_visible {
+        if self.toc_visible {
             button_count += 1.0;
         }
         let total_width = (button_size.x * button_count) + (spacing * (button_count - 1.0));
@@ -259,7 +281,6 @@ impl<'a> PreviewHeader<'a> {
                 .max_rect(button_rect)
                 .layout(egui::Layout::right_to_left(egui::Align::Center)),
         );
-        let has_doc = state.active_document().is_some();
 
         let icon_bg = if ui.visuals().dark_mode {
             crate::theme_bridge::TRANSPARENT
@@ -320,8 +341,8 @@ impl<'a> PreviewHeader<'a> {
             });
         });
 
-        if state.config.settings.settings().layout.toc_visible {
-            let toc_bg = if state.layout.show_toc {
+        if self.toc_visible {
+            let toc_bg = if self.show_toc {
                 if ui.visuals().dark_mode {
                     ui.visuals().selection.bg_fill
                 } else {

@@ -75,7 +75,82 @@ impl ActionOps for KatanaApp {
         match action {
             AppAction::OpenWorkspace(p) => self.handle_open_workspace(p),
             AppAction::RefreshWorkspace => self.handle_refresh_workspace(),
-            AppAction::SelectDocument(p) => self.handle_select_document(p, true),
+            AppAction::CreateFsNode {
+                parent_dir,
+                is_dir,
+                target_path,
+            } => {
+                let res = if is_dir {
+                    std::fs::create_dir(&target_path)
+                } else {
+                    std::fs::File::create(&target_path).map(|_| ())
+                };
+                if let Err(e) = res {
+                    tracing::error!("Failed to create fs node: {}", e);
+                } else {
+                    if is_dir {
+                        self.state.workspace.in_memory_dirs.insert(target_path);
+                    }
+                    self.handle_refresh_workspace();
+                    self.state.workspace.expanded_directories.insert(parent_dir);
+                }
+            }
+            AppAction::RenameFsNode {
+                target_path,
+                new_path,
+            } => {
+                if let Err(e) = std::fs::rename(&target_path, &new_path) {
+                    tracing::error!("Failed to rename file: {}", e);
+                } else {
+                    self.handle_refresh_workspace();
+                    for doc in &mut self.state.document.open_documents {
+                        if doc.path == target_path {
+                            doc.path = new_path.clone();
+                            break;
+                        }
+                    }
+                }
+            }
+            AppAction::DeleteFsNode { target_path } => {
+                let res = if target_path.is_dir() {
+                    std::fs::remove_dir_all(&target_path)
+                } else {
+                    std::fs::remove_file(&target_path)
+                };
+
+                if let Err(e) = res {
+                    tracing::error!("Failed to delete path: {}", e);
+                } else {
+                    self.handle_refresh_workspace();
+                    if let Some(idx) = self
+                        .state
+                        .document
+                        .open_documents
+                        .iter()
+                        .position(|d| d.path == target_path)
+                    {
+                        self.state.document.open_documents.remove(idx);
+                        if let Some(active_idx) = self.state.document.active_doc_idx {
+                            if active_idx == idx {
+                                self.state.document.active_doc_idx =
+                                    if self.state.document.open_documents.is_empty() {
+                                        None
+                                    } else {
+                                        Some(if idx > 0 { idx - 1 } else { 0 })
+                                    };
+                            } else if active_idx > idx {
+                                self.state.document.active_doc_idx = Some(active_idx - 1);
+                            }
+                        }
+                    }
+                }
+            }
+            AppAction::SelectDocument(p) => {
+                self.handle_select_document(p, true);
+                if self.state.layout.show_search_modal {
+                    self.state.layout.show_search_modal = false;
+                }
+            }
             AppAction::OpenMultipleDocuments(paths) => {
                 // When recursively opening a directory, activate the first file
                 // and open the rest lazily (no load, no activate) in subsequent frames
@@ -166,6 +241,15 @@ impl ActionOps for KatanaApp {
             }
             AppAction::ToggleToc => {
                 self.state.layout.show_toc = !self.state.layout.show_toc;
+            }
+            AppAction::ToggleWorkspace => {
+                self.state.layout.show_workspace = !self.state.layout.show_workspace;
+            }
+            AppAction::ToggleSearchModal => {
+                self.state.layout.show_search_modal = !self.state.layout.show_search_modal;
+            }
+            AppAction::ToggleWorkspaceFilter => {
+                self.state.search.filter_enabled = !self.state.search.filter_enabled;
             }
             AppAction::SetSplitDirection(dir) => {
                 // Keep toolbar toggles temporary and scoped to the active tab.

@@ -316,9 +316,9 @@ Tasks Grouped by ## = Adhere unconditionally to the branching standard defined i
 
 - [x] 6.24 `ui/menu`, `ui/header`, `ui/status_bar`, `ui/workspace`, `ui/tab_bar`, `ui/modals` を `struct + impl show() -> Response` パターンへ統一
 - [x] 6.25 `settings/`, `preview/`, `widgets/` の各UIを props + typed response を持つ自己完結コンポーネントへ統一
-- [ ] 6.26 親子 UI 間の依存を最小 props + typed response に整理し、巨大な `AppState` / `KatanaApp` の横流しを段階的に排除
-- [ ] 6.27 release-critical UI 導線の統合テストを、component 境界再編後の構造に合わせて更新・追加
-- [ ] 6.28 `shell_ui.rs`, `settings_window.rs`, `preview_pane_ui.rs`, `widgets.rs` 起点の parameter-heavy な `render_*` free function が end-state に残っていないことを確認
+- [x] 6.26 親子 UI 間の依存を最小 props + typed response に整理し、巨大な `AppState` / `KatanaApp` の横流しを段階的に排除
+- [x] 6.27 release-critical UI 導線の統合テストを、component 境界再編後の構造に合わせて更新・追加
+- [x] 6.28 `shell_ui.rs`, `settings_window.rs`, `preview_pane_ui.rs`, `widgets.rs` 起点の parameter-heavy な `render_*` free function が end-state に残っていないことを確認
 - [ ] 6.29 AST Linter の構造/コーディングルール対象を `katana-ui/src` へ拡大し、Task 4.3 で棚卸しした既存違反を解消する
   - 対象: `file_length`, `function_length`, `nesting_depth`, `error_first`, `pub_free_fn`
   - `crates/katana-linter/tests/ast_linter.rs` の target 範囲に `katana-ui/src` を追加する

@@ -56,4 +56,9 @@ impl DocumentState {
             last_auto_save: None,
         }
     }
+
+    pub fn active_document(&self) -> Option<&Document> {
+        self.active_doc_idx
+            .and_then(|idx| self.open_documents.get(idx))
+    }
 }

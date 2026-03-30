@@ -251,11 +251,18 @@ impl eframe::App for KatanaApp {
         }
 
         if self.state.layout.show_search_modal {
+            let mut is_open = true;
+            let workspace_data = self.state.workspace.data.as_ref();
             crate::views::modals::search::SearchModal::new(
-                &mut self.state,
+                &mut self.state.search,
+                workspace_data,
+                &mut is_open,
                 &mut self.pending_action,
             )
             .show(ctx);
+            if !is_open {
+                self.pending_action = AppAction::ToggleSearchModal;
+            }
         }
 
         // About dialog
@@ -281,26 +288,43 @@ impl eframe::App for KatanaApp {
         }
 
         // File system operation modals
-        if self.state.layout.create_fs_node_modal.is_some() {
-            crate::views::modals::file_ops::CreateFsNodeModal::new(
-                &mut self.state,
+        if let Some(mut modal_data) = self.state.layout.create_fs_node_modal.take() {
+            let visible_extensions = &self
+                .state
+                .config
+                .settings
+                .settings()
+                .workspace
+                .visible_extensions;
+            let close = crate::views::modals::file_ops::CreateFsNodeModal::new(
+                &mut modal_data,
+                visible_extensions,
                 &mut self.pending_action,
             )
             .show(ctx);
+            if !close {
+                self.state.layout.create_fs_node_modal = Some(modal_data);
+            }
         }
-        if self.state.layout.rename_modal.is_some() {
-            crate::views::modals::file_ops::RenameModal::new(
-                &mut self.state,
+        if let Some(mut modal_data) = self.state.layout.rename_modal.take() {
+            let close = crate::views::modals::file_ops::RenameModal::new(
+                &mut modal_data,
                 &mut self.pending_action,
             )
             .show(ctx);
+            if !close {
+                self.state.layout.rename_modal = Some(modal_data);
+            }
         }
-        if self.state.layout.delete_modal.is_some() {
-            crate::views::modals::file_ops::DeleteModal::new(
-                &mut self.state,
+        if let Some(modal_data) = self.state.layout.delete_modal.take() {
+            let close = crate::views::modals::file_ops::DeleteModal::new(
+                &modal_data,
                 &mut self.pending_action,
             )
             .show(ctx);
+            if !close {
+                self.state.layout.delete_modal = Some(modal_data);
+            }
         }
 
         // Update notification dialog

@@ -151,8 +151,12 @@ impl<'a> WorkspaceSidebar<'a> {
                 .min_width(crate::shell::FILE_TREE_PANEL_MIN_WIDTH)
                 .default_width(crate::shell::FILE_TREE_PANEL_DEFAULT_WIDTH)
                 .show(ctx, |ui| {
+                    let active_path = app.state.active_path().map(|p| p.to_path_buf());
                     crate::views::panels::workspace::WorkspacePanel::new(
-                        &mut app.state,
+                        &mut app.state.workspace,
+                        &mut app.state.search,
+                        &app.state.config.settings.settings().workspace.paths,
+                        active_path.as_deref(),
                         &mut app.pending_action,
                     )
                     .show(ui);
@@ -356,7 +360,8 @@ impl<'a> CentralContent<'a> {
                     .show(ctx, |ui| match current_mode {
                         ViewMode::CodeOnly => {
                             crate::views::panels::editor::EditorContent::new(
-                                &mut app.state,
+                                app.state.document.active_document(),
+                                &mut app.state.scroll,
                                 &mut app.pending_action,
                                 false,
                             )

@@ -23,28 +23,41 @@ use katana_core::workspace::{TreeEntry, Workspace};
 use std::path::{Path, PathBuf};
 
 pub(crate) struct SearchModal<'a> {
-    pub state: &'a mut AppState,
+    pub search: &'a mut crate::app_state::SearchState,
+    pub workspace: Option<&'a katana_core::workspace::Workspace>,
+    pub is_open: &'a mut bool,
     pub action: &'a mut AppAction,
 }
 
 impl<'a> SearchModal<'a> {
-    pub fn new(state: &'a mut AppState, action: &'a mut AppAction) -> Self {
-        Self { state, action }
+    pub fn new(
+        search: &'a mut crate::app_state::SearchState,
+        workspace: Option<&'a katana_core::workspace::Workspace>,
+        is_open: &'a mut bool,
+        action: &'a mut AppAction,
+    ) -> Self {
+        Self {
+            search,
+            workspace,
+            is_open,
+            action,
+        }
     }
 
     pub fn show(self, ctx: &egui::Context) {
-        let state = self.state;
+        let search = self.search;
+        let workspace = self.workspace;
         let action = self.action;
-        let mut is_open = state.layout.show_search_modal;
+        let mut local_is_open = *self.is_open;
         egui::Window::new(crate::i18n::get().search.modal_title.clone())
-            .open(&mut is_open)
+            .open(&mut local_is_open)
             .collapsible(false)
             .resizable(true)
             .default_size(egui::vec2(SEARCH_MODAL_WIDTH, SEARCH_MODAL_HEIGHT))
             .show(ctx, |ui| {
                 // Focus on the text edit automatically
                 let response = ui.add(
-                    egui::TextEdit::singleline(&mut state.search.query)
+                    egui::TextEdit::singleline(&mut search.query)
                         .hint_text(crate::i18n::get().search.query_hint.clone())
                         .desired_width(f32::INFINITY),
                 );
@@ -52,8 +65,8 @@ impl<'a> SearchModal<'a> {
 
                 let mut include_regexes = Vec::new();
                 let mut include_valid = true;
-                if !state.search.include_pattern.is_empty() {
-                    for pat in state.search.include_pattern.split(',') {
+                if !search.include_pattern.is_empty() {
+                    for pat in search.include_pattern.split(',') {
                         let pat = pat.trim();
                         if !pat.is_empty() {
                             match regex::Regex::new(pat) {
@@ -66,8 +79,8 @@ impl<'a> SearchModal<'a> {
 
                 let mut exclude_regexes = Vec::new();
                 let mut exclude_valid = true;
-                if !state.search.exclude_pattern.is_empty() {
-                    for pat in state.search.exclude_pattern.split(',') {
+                if !search.exclude_pattern.is_empty() {
+                    for pat in search.exclude_pattern.split(',') {
                         let pat = pat.trim();
                         if !pat.is_empty() {
                             match regex::Regex::new(pat) {
@@ -107,33 +120,33 @@ impl<'a> SearchModal<'a> {
                 };
 
                 ui.add(
-                    egui::TextEdit::singleline(&mut state.search.include_pattern)
+                    egui::TextEdit::singleline(&mut search.include_pattern)
                         .hint_text(crate::i18n::get().search.include_pattern_hint.clone())
                         .text_color(include_color)
                         .desired_width(f32::INFINITY),
                 );
 
                 ui.add(
-                    egui::TextEdit::singleline(&mut state.search.exclude_pattern)
+                    egui::TextEdit::singleline(&mut search.exclude_pattern)
                         .hint_text(crate::i18n::get().search.exclude_pattern_hint.clone())
                         .text_color(exclude_color)
                         .desired_width(f32::INFINITY),
                 );
 
                 let current_params = (
-                    state.search.query.clone(),
-                    state.search.include_pattern.clone(),
-                    state.search.exclude_pattern.clone(),
+                    search.query.clone(),
+                    search.include_pattern.clone(),
+                    search.exclude_pattern.clone(),
                 );
 
-                if state.search.last_params.as_ref() != Some(&current_params) {
-                    state.search.last_params = Some(current_params);
+                if search.last_params.as_ref() != Some(&current_params) {
+                    search.last_params = Some(current_params);
 
-                    let query = state.search.query.to_lowercase();
+                    let query = search.query.to_lowercase();
                     if query.is_empty() && include_regexes.is_empty() && exclude_regexes.is_empty()
                     {
-                        state.search.results.clear();
-                    } else if let Some(ws) = &state.workspace.data {
+                        search.results.clear();
+                    } else if let Some(ws) = workspace {
                         let mut results = Vec::new();
                         crate::shell_logic::collect_matches(
                             &ws.tree,
@@ -143,7 +156,7 @@ impl<'a> SearchModal<'a> {
                             &ws.root,
                             &mut results,
                         );
-                        state.search.results = results;
+                        search.results = results;
                     }
                 }
 
@@ -152,27 +165,23 @@ impl<'a> SearchModal<'a> {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
-                        if state.search.results.is_empty() && !state.search.query.is_empty() {
+                        if search.results.is_empty() && !search.query.is_empty() {
                             ui.label(crate::i18n::get().search.no_results.clone());
                         } else {
-                            let ws_root = state.workspace.data.as_ref().map(|ws| ws.root.clone());
-                            for path in &state.search.results {
+                            let ws_root = workspace.map(|ws| ws.root.clone());
+                            for path in &search.results {
                                 let rel = crate::shell_logic::relative_full_path(
                                     path,
                                     ws_root.as_deref(),
                                 );
                                 if ui.selectable_label(false, rel).clicked() && path.exists() {
                                     *action = AppAction::SelectDocument(path.to_path_buf());
-                                    // Close the modal by updating state directly
-                                    state.layout.show_search_modal = false;
                                 }
                             }
                         }
                     });
             });
 
-        if !is_open {
-            state.layout.show_search_modal = false;
-        }
+        *self.is_open = local_is_open;
     }
 }
